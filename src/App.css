@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* ── 暗色主题（默认） ── */
+:root {
+  --bg-app:       #0d1117;
+  --bg-nav:       #010409;
+  --bg-panel:     #161b22;
+  --bg-surface:   #21262d;
+  --bg-overlay:   #161b22;
+  --border:       #21262d;
+  --border-sub:   #30363d;
+  --text-strong:  #e6edf3;
+  --text-base:    #c9d1d9;
+  --text-soft:    #8b949e;
+  --text-muted:   #6e7681;
+  --accent:       #1f6feb;
+  --accent-text:  #58a6ff;
+}
+
+/* ── 亮色主题 ── */
+.theme-light {
+  --bg-app:       #f6f8fa;
+  --bg-nav:       #ffffff;
+  --bg-panel:     #ffffff;
+  --bg-surface:   #f6f8fa;
+  --bg-overlay:   #ffffff;
+  --border:       #d0d7de;
+  --border-sub:   #d8dee4;
+  --text-strong:  #1f2328;
+  --text-base:    #24292f;
+  --text-soft:    #57606a;
+  --text-muted:   #6e7681;
+  --accent:       #0969da;
+  --accent-text:  #0550ae;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-base);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border-sub); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+}
