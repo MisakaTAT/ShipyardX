@@ -74,29 +74,42 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   });
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-app)" }}>
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-700/50 shrink-0 flex-wrap">
-        <ImageIcon className="w-4 h-4 text-slate-400 flex-shrink-0" />
-        <span className="text-sm font-medium text-slate-300 mr-1">镜像</span>
+      <div
+        className="flex items-center gap-2 px-5 py-3 border-b shrink-0 flex-wrap"
+        style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+      >
+        <ImageIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-soft)" }} />
+        <span className="text-sm font-medium mr-1" style={{ color: "var(--text-base)" }}>镜像</span>
         {images.length > 0 && (
-          <span className="text-xs text-slate-500">({images.length})</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>({images.length})</span>
         )}
 
         {/* 搜索 */}
         <div className="relative ml-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+            style={{ color: "var(--text-muted)" }}
+          />
           <input
             ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder='搜索… ("/" 快速聚焦)'
-            className="w-48 pl-8 pr-7 py-1 text-xs bg-slate-800 border border-slate-700 rounded-lg
-              text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-600 transition-colors"
+            className="w-48 pl-8 pr-7 py-1 text-xs rounded-lg border outline-none transition-colors"
+            style={{
+              background: "var(--bg-input)",
+              borderColor: "var(--border-sub)",
+              color: "var(--text-base)",
+            }}
           />
           {search && (
-            <button onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--text-muted)" }}
+            >
               <X size={12} />
             </button>
           )}
@@ -105,8 +118,8 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setShowPull(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300
-              bg-blue-900/20 hover:bg-blue-900/40 rounded-lg border border-blue-800/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-500 hover:text-blue-400
+              bg-blue-500/10 hover:bg-blue-500/20 rounded-lg border border-blue-500/30 transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             拉取镜像
@@ -114,8 +127,12 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           <button
             onClick={fetchImages}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200
-              bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-surface)",
+              borderColor: "var(--border)",
+              color: "var(--text-soft)",
+            }}
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             刷新
@@ -125,9 +142,9 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
 
       {/* Error */}
       {error && (
-        <div className="mx-5 mt-3 px-4 py-2.5 bg-red-900/20 border border-red-800/50 rounded-lg text-xs text-red-400 flex items-start gap-2">
+        <div className="mx-5 mt-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-500 flex items-start gap-2">
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError("")} className="text-red-400 hover:text-red-300 flex-shrink-0">
+          <button onClick={() => setError("")} className="text-red-400 hover:text-red-300 shrink-0">
             <X size={12} />
           </button>
         </div>
@@ -137,53 +154,60 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       <div className="flex-1 overflow-auto">
         {loading && images.length === 0 ? (
           <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-muted)" }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-500">
-            <ImageIcon className="w-10 h-10 mb-3 text-slate-700" />
+          <div className="flex flex-col items-center justify-center h-48" style={{ color: "var(--text-muted)" }}>
+            <ImageIcon className="w-10 h-10 mb-3" style={{ color: "var(--border-sub)" }} />
             <p className="text-sm">{search ? `无匹配的镜像 "${search}"` : "没有镜像"}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-900/95 backdrop-blur-sm">
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">仓库</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">标签</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">大小</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">创建时间</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">操作</th>
+            <thead className="sticky top-0 backdrop-blur-sm" style={{ background: "var(--bg-panel)" }}>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>仓库</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>标签</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>ID</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>大小</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>创建时间</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody>
               {filtered.map((img) => (
-                <tr key={img.id} className="hover:bg-slate-800/50 transition-colors">
+                <tr
+                  key={img.id}
+                  className="border-b transition-colors"
+                  style={{ borderColor: "var(--border)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
                   <td className="px-5 py-3 max-w-[220px]">
-                    <span className="font-mono text-xs text-slate-300 truncate block" title={img.repository}>
+                    <span className="font-mono text-xs truncate block" style={{ color: "var(--text-base)" }} title={img.repository}>
                       {img.repository}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     {img.tag === "<none>" ? (
-                      <span className="text-xs text-slate-600 italic">无标签</span>
+                      <span className="text-xs italic" style={{ color: "var(--text-muted)" }}>无标签</span>
                     ) : (
-                      <span className="inline-block px-2 py-0.5 rounded text-xs font-mono bg-blue-900/30 text-blue-400 border border-blue-800/40">
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-mono bg-blue-500/10 text-blue-500 border border-blue-500/30">
                         {img.tag}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500 font-mono">
+                  <td className="px-4 py-3 text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                     {img.id.replace("sha256:", "").slice(0, 12)}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-400">{img.size}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{img.created_at}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-soft)" }}>{img.size}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>{img.created_at}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end">
                       <button
                         onClick={() => handleRemove(img)}
                         title="删除"
-                        className="p-1.5 rounded-lg text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors"
+                        className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 hover:text-red-500"
+                        style={{ color: "var(--text-muted)" }}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -258,7 +282,6 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
       unlistenDataRef.current = await listen<string>(`pull-data:${id}`, (event) => {
         const chunk = event.payload;
         setLines(prev => {
-          // 按换行分割追加
           const newLines = chunk.split("\n");
           if (prev.length > 0 && !prev[prev.length - 1].endsWith("\n")) {
             const updated = [...prev];
@@ -302,12 +325,29 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="bg-[#161b22] border border-[#30363d] rounded-xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#30363d]">
-          <Download size={16} className="text-[#58a6ff]" />
-          <span className="text-sm font-semibold text-[#e6edf3] flex-1">拉取镜像</span>
-          <button onClick={handleClose}
-            className="p-1 rounded text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d] transition-colors">
+      <div
+        className="rounded-xl w-full max-w-lg shadow-2xl border"
+        style={{ background: "var(--bg-overlay)", borderColor: "var(--border-sub)" }}
+      >
+        <div
+          className="flex items-center gap-2 px-4 py-3 border-b"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <Download size={16} style={{ color: "var(--accent-text)" }} />
+          <span className="text-sm font-semibold flex-1" style={{ color: "var(--text-strong)" }}>拉取镜像</span>
+          <button
+            onClick={handleClose}
+            className="p-1 rounded transition-colors"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+            }}
+          >
             <X size={16} />
           </button>
         </div>
@@ -322,14 +362,17 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
               onKeyDown={(e) => e.key === "Enter" && status !== "pulling" && handlePull()}
               placeholder="nginx:latest 或 ubuntu:22.04"
               disabled={status === "pulling"}
-              className="flex-1 px-3 py-2 text-sm bg-[#0d1117] border border-[#30363d] rounded-lg
-                text-[#e6edf3] placeholder-[#6e7681] focus:outline-none focus:border-[#1f6feb]
-                disabled:opacity-50 transition-colors font-mono"
+              className="flex-1 px-3 py-2 text-sm rounded-lg border outline-none disabled:opacity-50 transition-colors font-mono"
+              style={{
+                background: "var(--bg-input)",
+                borderColor: "var(--border-sub)",
+                color: "var(--text-base)",
+              }}
             />
             <button
               onClick={handlePull}
               disabled={!image.trim() || status === "pulling"}
-              className="px-4 py-2 text-sm font-medium bg-[#238636] hover:bg-[#2ea043] text-white
+              className="px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-500 text-white
                 rounded-lg disabled:opacity-40 transition-colors flex items-center gap-2"
             >
               {status === "pulling"
@@ -342,9 +385,10 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
           {lines.length > 0 && (
             <div
               ref={outputRef}
-              className="rounded-lg bg-[#0d1117] border border-[#21262d] p-3 h-52 overflow-y-auto"
+              className="rounded-lg border p-3 h-52 overflow-y-auto"
+              style={{ background: "var(--bg-app)", borderColor: "var(--border)" }}
             >
-              <pre className="text-xs font-mono text-[#c9d1d9] whitespace-pre-wrap break-all leading-relaxed">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-all leading-relaxed" style={{ color: "var(--text-base)" }}>
                 {lines.join("\n")}
               </pre>
             </div>
@@ -354,8 +398,8 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
           {(status === "success" || status === "error") && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm
               ${status === "success"
-                ? "bg-green-900/20 border border-green-800/40 text-green-400"
-                : "bg-red-900/20 border border-red-800/40 text-red-400"
+                ? "bg-green-500/10 border border-green-500/30 text-green-500"
+                : "bg-red-500/10 border border-red-500/30 text-red-500"
               }`}
             >
               {status === "success"

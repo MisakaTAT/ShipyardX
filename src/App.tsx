@@ -70,7 +70,6 @@ export default function App() {
       {/* ── 列 1: 图标导航栏 ── */}
       <nav className="w-14 flex flex-col items-center shrink-0 py-3 border-r"
            style={{ background: "var(--bg-nav)", borderColor: "var(--border)" }}>
-        {/* 服务器列表入口（始终 active，因为第二列就是服务器列表） */}
         <div className="flex flex-col gap-1 w-full px-2">
           <NavBtn
             icon={<ServerIcon size={18} />}
@@ -124,29 +123,50 @@ export default function App() {
         {selectedServer ? (
           <>
             {/* 顶部服务器标题 */}
-            <header className="flex items-center justify-between px-5 py-2.5 shrink-0 border-b"
-                    style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}>
+            <header
+              className="flex items-center justify-between px-5 py-2.5 shrink-0 border-b"
+              style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+            >
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 bg-[#1f6feb]/20 rounded-lg flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)" }}
+                >
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
                 </div>
                 <div>
-                  <h1 className="text-sm font-semibold text-[#e6edf3] leading-none">
+                  <h1 className="text-sm font-semibold leading-none" style={{ color: "var(--text-strong)" }}>
                     {selectedServer.name}
                   </h1>
-                  <p className="text-[11px] text-[#6e7681] mt-0.5">
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                     {selectedServer.username}@{selectedServer.host}:{selectedServer.port}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#21262d] text-[#8b949e] border border-[#30363d]">
+                <span
+                  className="text-[11px] px-2 py-0.5 rounded-full border"
+                  style={{
+                    background: "var(--bg-surface)",
+                    color: "var(--text-soft)",
+                    borderColor: "var(--border-sub)",
+                  }}
+                >
                   {selectedServer.auth_type === "key" ? "SSH Key" : "密码认证"}
                 </span>
                 <button
                   onClick={() => handleEdit(selectedServer)}
-                  className="p-1.5 rounded-lg text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d] transition-colors"
+                  className="p-1.5 rounded-lg transition-colors"
+                  style={{ color: "var(--text-muted)" }}
                   title="编辑配置"
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+                  }}
                 >
                   <Settings size={14} />
                 </button>
@@ -157,17 +177,27 @@ export default function App() {
             <ServerOverview serverId={selectedServer.id} />
 
             {/* Tab 栏 */}
-            <div className="flex items-center gap-0.5 px-4 shrink-0 border-b"
-                 style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}>
+            <div
+              className="flex items-center gap-0.5 px-4 shrink-0 border-b"
+              style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+            >
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.key}
                   onClick={() => setActiveTab(item.key)}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors
-                    ${activeTab === item.key
-                      ? "border-[#1f6feb] text-[#58a6ff]"
-                      : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
-                    }`}
+                  className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors"
+                  style={activeTab === item.key
+                    ? { borderColor: "var(--accent)", color: "var(--accent-text)" }
+                    : { borderColor: "transparent", color: "var(--text-soft)" }
+                  }
+                  onMouseEnter={(e) => {
+                    if (activeTab !== item.key)
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeTab !== item.key)
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
+                  }}
                 >
                   {item.icon}
                   {item.label}
@@ -227,9 +257,20 @@ function NavBtn({
         : { color: "var(--text-muted)" }
       }
       className={`w-full flex items-center justify-center p-2.5 rounded-lg transition-all
-        ${!active ? "hover:bg-[var(--bg-surface)] hover:!text-[var(--text-base)]" : ""}
         ${disabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}
       `}
+      onMouseEnter={(e) => {
+        if (!active && !disabled) {
+          (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active && !disabled) {
+          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+        }
+      }}
     >
       {icon}
     </button>
@@ -240,20 +281,24 @@ function NavBtn({
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-8">
-      <div className="w-16 h-16 bg-[#161b22] border border-[#30363d] rounded-2xl flex items-center justify-center mb-5">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 border"
+        style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)" }}
+      >
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke="var(--accent-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
           <path d="M2 12l10 5 10-5" />
         </svg>
       </div>
-      <h2 className="text-base font-semibold text-[#e6edf3] mb-2">欢迎使用 ShipyardX</h2>
-      <p className="text-sm text-[#6e7681] mb-6 max-w-xs leading-relaxed">
+      <h2 className="text-base font-semibold mb-2" style={{ color: "var(--text-strong)" }}>欢迎使用 ShipyardX</h2>
+      <p className="text-sm mb-6 max-w-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
         通过 SSH 远程管理服务器上的 Docker 容器与镜像。从左侧添加第一台服务器开始。
       </p>
       <button
         onClick={onAdd}
-        className="px-5 py-2 bg-[#238636] hover:bg-[#2ea043] text-white text-sm font-medium rounded-lg transition-colors"
+        className="px-5 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors"
       >
         添加服务器
       </button>
@@ -263,10 +308,14 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           { icon: <Layers size={16} />, label: "镜像管理", desc: "拉取、查看、删除镜像" },
           { icon: <Terminal size={16} />, label: "SSH 终端", desc: "直接进入远程终端" },
         ].map((f) => (
-          <div key={f.label} className="flex flex-col items-center gap-2 p-3 bg-[#161b22] rounded-xl border border-[#21262d]">
-            <div className="text-[#58a6ff]">{f.icon}</div>
-            <div className="text-xs font-medium text-[#c9d1d9]">{f.label}</div>
-            <div className="text-[11px] text-[#6e7681] text-center leading-relaxed">{f.desc}</div>
+          <div
+            key={f.label}
+            className="flex flex-col items-center gap-2 p-3 rounded-xl border"
+            style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
+          >
+            <div style={{ color: "var(--accent-text)" }}>{f.icon}</div>
+            <div className="text-xs font-medium" style={{ color: "var(--text-base)" }}>{f.label}</div>
+            <div className="text-[11px] text-center leading-relaxed" style={{ color: "var(--text-muted)" }}>{f.desc}</div>
           </div>
         ))}
       </div>

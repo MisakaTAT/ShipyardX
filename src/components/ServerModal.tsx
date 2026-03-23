@@ -88,17 +88,39 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
     }
   };
 
+  const inputClass = "w-full px-3 py-2 text-sm rounded-lg border outline-none transition-colors";
+  const inputStyle = {
+    background: "var(--bg-input)",
+    borderColor: "var(--border-sub)",
+    color: "var(--text-base)",
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md mx-4 shadow-2xl">
+      <div
+        className="rounded-xl w-full max-w-md mx-4 shadow-2xl border"
+        style={{ background: "var(--bg-overlay)", borderColor: "var(--border-sub)" }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h2 className="text-base font-semibold text-slate-100">
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <h2 className="text-base font-semibold" style={{ color: "var(--text-strong)" }}>
             {isEdit ? "编辑服务器" : "添加服务器"}
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+            }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -107,7 +129,7 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>
               服务器名称 *
             </label>
             <input
@@ -115,57 +137,61 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
               value={form.name}
               onChange={(e) => update("name", e.target.value)}
               placeholder="例如：生产服务器"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className={inputClass}
+              style={inputStyle}
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">主机地址 *</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>主机地址 *</label>
               <input
                 type="text"
                 value={form.host}
                 onChange={(e) => update("host", e.target.value)}
                 placeholder="192.168.1.100"
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
+                style={inputStyle}
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">端口</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>端口</label>
               <input
                 type="number"
                 value={form.port}
                 onChange={(e) => update("port", parseInt(e.target.value) || 22)}
                 min={1}
                 max={65535}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
+                style={inputStyle}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">用户名 *</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>用户名 *</label>
             <input
               type="text"
               value={form.username}
               onChange={(e) => update("username", e.target.value)}
               placeholder="root"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+              className={inputClass}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">认证方式</label>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>认证方式</label>
             <div className="flex gap-2">
               {(["key", "password"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => update("auth_type", type)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    form.auth_type === type
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-900 text-slate-400 border border-slate-600 hover:border-slate-500"
-                  }`}
+                  className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={form.auth_type === type
+                    ? { background: "var(--accent)", color: "#ffffff" }
+                    : { background: "var(--bg-input)", color: "var(--text-soft)", border: "1px solid var(--border-sub)" }
+                  }
                 >
                   {type === "key" ? "SSH 密钥" : "密码"}
                 </button>
@@ -175,30 +201,32 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
 
           {form.auth_type === "password" ? (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">密码</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>密码</label>
               <input
                 type="password"
                 value={form.password || ""}
                 onChange={(e) => update("password", e.target.value)}
                 placeholder="SSH 登录密码"
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
+                style={inputStyle}
               />
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">密钥路径</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>密钥路径</label>
               <input
                 type="text"
                 value={form.key_path || ""}
                 onChange={(e) => update("key_path", e.target.value)}
                 placeholder="~/.ssh/id_rsa"
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className={inputClass}
+                style={inputStyle}
               />
             </div>
           )}
 
           {error && (
-            <p className="text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded-lg px-3 py-2">
+            <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -207,8 +235,8 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
             <div
               className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
                 testResult.ok
-                  ? "bg-green-900/20 border border-green-800/50 text-green-400"
-                  : "bg-red-900/20 border border-red-800/50 text-red-400"
+                  ? "bg-green-500/10 border border-green-500/30 text-green-500"
+                  : "bg-red-500/10 border border-red-500/30 text-red-500"
               }`}
             >
               <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -218,12 +246,24 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700">
+        <div
+          className="flex items-center justify-between px-6 py-4 border-t"
+          style={{ borderColor: "var(--border)" }}
+        >
           {isEdit ? (
             <button
               onClick={handleTest}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50"
+              style={{ color: "var(--text-soft)" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
+              }}
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               测试连接
@@ -234,7 +274,16 @@ export default function ServerModal({ server, onClose, onSave }: ServerModalProp
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm rounded-lg transition-colors"
+              style={{ color: "var(--text-soft)" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
+              }}
             >
               取消
             </button>

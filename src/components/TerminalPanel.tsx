@@ -151,27 +151,30 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
   }, [serverId]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0f172a]">
+    <div className="flex flex-col h-full" style={{ background: "#0d1117" }}>
       {/* 状态栏 */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700/50 shrink-0 bg-slate-900/60">
-        <TerminalIcon className="w-3.5 h-3.5 text-slate-500" />
-        <span className="text-xs text-slate-500 font-mono">{serverName}</span>
-        <span className="text-slate-700">·</span>
+      <div
+        className="flex items-center gap-2 px-4 py-2 border-b shrink-0"
+        style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+      >
+        <TerminalIcon className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
+        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{serverName}</span>
+        <span style={{ color: "var(--border-sub)" }}>·</span>
         <StatusBadge status={status} />
       </div>
 
-      {/* 终端容器 */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* 终端容器（始终暗色背景） */}
+      <div className="flex-1 relative overflow-hidden" style={{ background: "#0d1117" }}>
         {status === "connecting" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 pointer-events-none">
-            <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
-            <span className="text-xs text-slate-500">正在建立 SSH 连接...</span>
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-muted)" }} />
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>正在建立 SSH 连接...</span>
           </div>
         )}
         {/* xterm.js 挂载点 */}
         <div
           ref={containerRef}
-          className="h-full w-full p-2"
+          className="h-full w-full"
           style={{ padding: "8px" }}
         />
       </div>

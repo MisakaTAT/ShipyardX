@@ -34,31 +34,34 @@ function StateBadge({ state }: { state: string }) {
   const s = state.toLowerCase();
   if (s === "running") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-400 border border-green-800/50">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
         运行中
       </span>
     );
   }
   if (s === "exited" || s === "dead") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
         已停止
       </span>
     );
   }
   if (s === "paused") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/30 text-yellow-400 border border-yellow-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
         已暂停
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 text-slate-400 border border-slate-600/50">
-      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
+      style={{ background: "var(--bg-surface)", color: "var(--text-soft)", borderColor: "var(--border-sub)" }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--text-muted)" }} />
       {state}
     </span>
   );
@@ -92,7 +95,6 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
 
   useEffect(() => { fetchContainers(); }, [fetchContainers]);
 
-  // 自动刷新
   useEffect(() => {
     if (autoRefresh) {
       intervalRef.current = setInterval(fetchContainers, refreshInterval);
@@ -102,7 +104,6 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [autoRefresh, refreshInterval, fetchContainers]);
 
-  // 按 "/" 聚焦搜索
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
@@ -144,7 +145,6 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
     await runAction(container.id, "remove", "remove_container", { force: isRunning });
   };
 
-  // 过滤
   const filtered = containers.filter((c) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -159,34 +159,45 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const runningCount = containers.filter(c => c.state === "running").length;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-app)" }}>
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-700/50 shrink-0 flex-wrap">
-        <Box className="w-4 h-4 text-slate-400 flex-shrink-0" />
-        <span className="text-sm font-medium text-slate-300 mr-1">
+      <div
+        className="flex items-center gap-2 px-5 py-3 border-b shrink-0 flex-wrap"
+        style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+      >
+        <Box className="w-4 h-4 shrink-0" style={{ color: "var(--text-soft)" }} />
+        <span className="text-sm font-medium mr-1" style={{ color: "var(--text-base)" }}>
           容器
         </span>
         {containers.length > 0 && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             {runningCount}/{containers.length} 运行中
           </span>
         )}
 
         {/* 搜索 */}
         <div className="relative ml-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+            style={{ color: "var(--text-muted)" }}
+          />
           <input
             ref={searchRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder='搜索… ("/" 快速聚焦)'
-            className="w-52 pl-8 pr-7 py-1 text-xs bg-slate-800 border border-slate-700 rounded-lg
-              text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-600 transition-colors"
+            className="w-52 pl-8 pr-7 py-1 text-xs rounded-lg border outline-none transition-colors"
+            style={{
+              background: "var(--bg-input)",
+              borderColor: "var(--border-sub)",
+              color: "var(--text-base)",
+            }}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--text-muted)" }}
             >
               <X size={12} />
             </button>
@@ -200,10 +211,12 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
               onClick={() => setAutoRefresh(r => !r)}
               title={autoRefresh ? "停止自动刷新" : "开启自动刷新"}
               className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs border transition-colors
-                ${autoRefresh
-                  ? "bg-blue-900/30 border-blue-700/50 text-blue-400"
-                  : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200"
-                }`}
+                ${autoRefresh ? "bg-blue-500/10 border-blue-500/40 text-blue-500" : ""}`}
+              style={autoRefresh ? {} : {
+                background: "var(--bg-surface)",
+                borderColor: "var(--border)",
+                color: "var(--text-soft)",
+              }}
             >
               <Timer className={`w-3.5 h-3.5 ${autoRefresh ? "animate-pulse" : ""}`} />
               {autoRefresh ? "自动" : "手动"}
@@ -212,7 +225,12 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
               <select
                 value={refreshInterval}
                 onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 text-slate-400 text-xs rounded-lg px-1.5 py-1.5"
+                className="text-xs rounded-lg px-1.5 py-1.5 border outline-none"
+                style={{
+                  background: "var(--bg-surface)",
+                  borderColor: "var(--border)",
+                  color: "var(--text-soft)",
+                }}
               >
                 {REFRESH_INTERVALS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -225,8 +243,12 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
           <button
             onClick={fetchContainers}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200
-              bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-surface)",
+              borderColor: "var(--border)",
+              color: "var(--text-soft)",
+            }}
           >
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             刷新
@@ -236,9 +258,9 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
 
       {/* Error */}
       {error && (
-        <div className="mx-5 mt-3 px-4 py-2.5 bg-red-900/20 border border-red-800/50 rounded-lg text-xs text-red-400 flex items-start gap-2">
+        <div className="mx-5 mt-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-500 flex items-start gap-2">
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError("")} className="text-red-400 hover:text-red-300 flex-shrink-0">
+          <button onClick={() => setError("")} className="text-red-400 hover:text-red-300 shrink-0">
             <X size={12} />
           </button>
         </div>
@@ -248,72 +270,77 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       <div className="flex-1 overflow-auto">
         {loading && containers.length === 0 ? (
           <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-muted)" }} />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48 text-slate-500">
-            <Box className="w-10 h-10 mb-3 text-slate-700" />
+          <div className="flex flex-col items-center justify-center h-48" style={{ color: "var(--text-muted)" }}>
+            <Box className="w-10 h-10 mb-3" style={{ color: "var(--border-sub)" }} />
             <p className="text-sm">{search ? `无匹配的容器 "${search}"` : "没有容器"}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-900/95 backdrop-blur-sm">
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">名称</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">镜像</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">状态</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">端口</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">创建时间</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">操作</th>
+            <thead className="sticky top-0 backdrop-blur-sm" style={{ background: "var(--bg-panel)" }}>
+              <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>名称</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>镜像</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>状态</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>端口</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>创建时间</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody>
               {filtered.map((c) => {
                 const busy = actionLoading[c.id];
                 const isRunning = c.state === "running";
                 return (
-                  <tr key={c.id} className="hover:bg-slate-800/50 transition-colors group">
+                  <tr
+                    key={c.id}
+                    className="border-b transition-colors"
+                    style={{ borderColor: "var(--border)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
                     <td className="px-5 py-3">
-                      <div className="font-medium text-slate-200">{c.name}</div>
-                      <div className="text-xs text-slate-500 font-mono mt-0.5">{c.id}</div>
+                      <div className="font-medium" style={{ color: "var(--text-strong)" }}>{c.name}</div>
+                      <div className="text-xs font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{c.id}</div>
                     </td>
                     <td className="px-4 py-3 max-w-[200px]">
-                      <span className="text-slate-400 text-xs font-mono truncate block" title={c.image}>{c.image}</span>
+                      <span className="text-xs font-mono truncate block" style={{ color: "var(--text-soft)" }} title={c.image}>{c.image}</span>
                     </td>
                     <td className="px-4 py-3">
                       <StateBadge state={c.state} />
-                      <div className="text-xs text-slate-500 mt-1">{c.status}</div>
+                      <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{c.status}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-slate-400 font-mono">{c.ports || "—"}</span>
+                      <span className="text-xs font-mono" style={{ color: "var(--text-soft)" }}>{c.ports || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{c.running_for}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>{c.running_for}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {isRunning ? (
                           <ActionBtn onClick={() => runAction(c.id, "stop", "stop_container")}
                             loading={busy === "stop"} icon={<Square className="w-3.5 h-3.5" />}
-                            title="停止" colorClass="hover:bg-yellow-900/50 hover:text-yellow-400" />
+                            title="停止" colorClass="hover:bg-yellow-500/10 hover:text-yellow-500" />
                         ) : (
                           <ActionBtn onClick={() => runAction(c.id, "start", "start_container")}
                             loading={busy === "start"} icon={<Play className="w-3.5 h-3.5" />}
-                            title="启动" colorClass="hover:bg-green-900/50 hover:text-green-400" />
+                            title="启动" colorClass="hover:bg-green-500/10 hover:text-green-500" />
                         )}
                         <ActionBtn onClick={() => runAction(c.id, "restart", "restart_container")}
                           loading={busy === "restart"} icon={<RotateCcw className="w-3.5 h-3.5" />}
-                          title="重启" colorClass="hover:bg-blue-900/50 hover:text-blue-400" />
-                        {/* Stats — 仅运行中可用 */}
+                          title="重启" colorClass="hover:bg-blue-500/10 hover:text-blue-500" />
                         {isRunning && (
                           <ActionBtn onClick={() => setStatsTarget(c)}
                             loading={false} icon={<BarChart2 className="w-3.5 h-3.5" />}
-                            title="资源监控" colorClass="hover:bg-purple-900/50 hover:text-purple-400" />
+                            title="资源监控" colorClass="hover:bg-purple-500/10 hover:text-purple-500" />
                         )}
                         <ActionBtn onClick={() => setLogTarget(c)}
                           loading={false} icon={<FileText className="w-3.5 h-3.5" />}
-                          title="日志" colorClass="hover:bg-slate-700 hover:text-slate-200" />
+                          title="日志" colorClass="hover:bg-[var(--bg-surface)] hover:text-[var(--text-base)]" />
                         <ActionBtn onClick={() => handleRemove(c)}
                           loading={busy === "remove"} icon={<Trash2 className="w-3.5 h-3.5" />}
-                          title="删除" colorClass="hover:bg-red-900/50 hover:text-red-400" />
+                          title="删除" colorClass="hover:bg-red-500/10 hover:text-red-500" />
                       </div>
                     </td>
                   </tr>
@@ -359,7 +386,8 @@ function ActionBtn({
       onClick={onClick}
       disabled={loading}
       title={title}
-      className={`p-1.5 rounded-lg text-slate-500 transition-colors disabled:opacity-40 ${colorClass}`}
+      className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${colorClass}`}
+      style={{ color: "var(--text-muted)" }}
     >
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : icon}
     </button>

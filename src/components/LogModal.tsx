@@ -35,7 +35,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
   const [copied, setCopied] = useState(false);
   const [lineCount, setLineCount] = useState(0);
 
-  // 初始化 xterm
+  // xterm 始终保持暗色主题（终端本身就是暗色的）
   useEffect(() => {
     if (!containerRef.current || termRef.current) return;
 
@@ -88,7 +88,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     };
   }, []);
 
-  // 停止当前流
   const stopStream = useCallback(async () => {
     if (unlistenDataRef.current) { unlistenDataRef.current(); unlistenDataRef.current = null; }
     if (unlistenDoneRef.current) { unlistenDoneRef.current(); unlistenDoneRef.current = null; }
@@ -98,7 +97,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
   }, []);
 
-  // 静态加载日志
   const loadStaticLogs = useCallback(async () => {
     await stopStream();
     setError("");
@@ -115,9 +113,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
       if (termRef.current) {
         const lines = logs.split("\n");
         setLineCount(lines.filter(l => l).length);
-        termRef.current.write(
-          logs.replace(/\r?\n/g, "\r\n")
-        );
+        termRef.current.write(logs.replace(/\r?\n/g, "\r\n"));
       }
     } catch (e) {
       setError(String(e));
@@ -126,7 +122,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
   }, [serverId, containerId, tail, timestamps, stopStream]);
 
-  // 启动 follow 流
   const startFollow = useCallback(async () => {
     await stopStream();
     setError("");
@@ -151,7 +146,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
         (event) => {
           const bytes = new Uint8Array(event.payload);
           termRef.current?.write(bytes);
-          // 粗略计算新行数
           count += event.payload.filter((b: number) => b === 10).length;
           setLineCount(count);
         }
@@ -173,43 +167,36 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
   }, [serverId, containerId, tail, timestamps, stopStream]);
 
-  // follow 开关切换
   useEffect(() => {
     if (follow) {
       startFollow();
     } else {
-      // 如果 follow 被关闭，停止流并改为静态加载
       stopStream().then(() => loadStaticLogs());
     }
     return () => { stopStream(); };
   }, [follow]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // tail / timestamps 变化时重新加载（非 follow 状态）
   useEffect(() => {
     if (!follow) {
       loadStaticLogs();
     }
   }, [tail, timestamps]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 初次挂载加载
   useEffect(() => {
     if (!follow) loadStaticLogs();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 关闭时清理
   const handleClose = useCallback(async () => {
     await stopStream();
     onClose();
   }, [stopStream, onClose]);
 
-  // Escape 关闭
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleClose]);
 
-  // 复制全部内容
   const handleCopy = useCallback(() => {
     if (!termRef.current) return;
     termRef.current.selectAll();
@@ -226,22 +213,31 @@ export default function LogModal({ serverId, containerId, containerName, onClose
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
-      <div className="bg-[#161b22] border border-[#30363d] rounded-xl w-full max-w-5xl flex flex-col shadow-2xl"
-        style={{ height: "80vh" }}>
-
+      <div
+        className="rounded-xl w-full max-w-5xl flex flex-col shadow-2xl border"
+        style={{ height: "80vh", background: "var(--bg-overlay)", borderColor: "var(--border-sub)" }}
+      >
         {/* 工具栏 */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#30363d] flex-shrink-0 flex-wrap">
-          <span className="text-sm font-semibold text-[#e6edf3] mr-1 font-mono">
+        <div
+          className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <span className="text-sm font-semibold mr-1 font-mono" style={{ color: "var(--text-strong)" }}>
             {containerName}
           </span>
-          <span className="text-[#6e7681] text-xs mr-2">日志</span>
+          <span className="text-xs mr-2" style={{ color: "var(--text-muted)" }}>日志</span>
 
           {/* Tail 选择 */}
           <select
             value={tail}
             onChange={(e) => setTail(Number(e.target.value))}
             disabled={follow}
-            className="bg-[#21262d] border border-[#30363d] text-[#c9d1d9] text-xs rounded px-2 py-1 disabled:opacity-40"
+            className="text-xs rounded px-2 py-1 border outline-none disabled:opacity-40"
+            style={{
+              background: "var(--bg-surface)",
+              borderColor: "var(--border-sub)",
+              color: "var(--text-base)",
+            }}
           >
             {TAIL_OPTIONS.map(n => (
               <option key={n} value={n}>后 {n} 行</option>
@@ -253,11 +249,11 @@ export default function LogModal({ serverId, containerId, containerName, onClose
             onClick={() => setTimestamps(t => !t)}
             disabled={follow}
             title="显示时间戳"
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-40
-              ${timestamps
-                ? "bg-[#1f6feb]/20 border-[#1f6feb] text-[#58a6ff]"
-                : "bg-[#21262d] border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9]"
-              }`}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-40`}
+            style={timestamps
+              ? { background: "color-mix(in srgb, var(--accent) 15%, transparent)", borderColor: "var(--accent)", color: "var(--accent-text)" }
+              : { background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }
+            }
           >
             <Clock size={12} />
             时间戳
@@ -269,8 +265,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
             title={follow ? "停止跟踪" : "实时跟踪"}
             className={`flex items-center gap-1 px-3 py-1 rounded text-xs border font-medium transition-colors
               ${follow
-                ? "bg-red-500/20 border-red-500/40 text-red-400 hover:bg-red-500/30"
-                : "bg-[#238636]/20 border-[#238636]/40 text-[#3fb950] hover:bg-[#238636]/30"
+                ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
+                : "bg-green-500/10 border-green-500/30 text-green-500 hover:bg-green-500/20"
               }`}
           >
             {follow ? <><Square size={12} /> 停止</> : <><Play size={12} /> 跟踪</>}
@@ -282,8 +278,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
               onClick={loadStaticLogs}
               disabled={loading}
               title="刷新"
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-[#30363d]
-                bg-[#21262d] text-[#8b949e] hover:text-[#c9d1d9] transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-40"
+              style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }}
             >
               <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
             </button>
@@ -293,20 +289,29 @@ export default function LogModal({ serverId, containerId, containerName, onClose
           <button
             onClick={handleCopy}
             title="复制全部"
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs border border-[#30363d]
-              bg-[#21262d] text-[#8b949e] hover:text-[#c9d1d9] transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors"
+            style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }}
           >
-            {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
           </button>
 
           {lineCount > 0 && (
-            <span className="text-[#6e7681] text-xs ml-auto">{lineCount} 行</span>
+            <span className="text-xs ml-auto" style={{ color: "var(--text-muted)" }}>{lineCount} 行</span>
           )}
 
           {/* 关闭 */}
           <button
             onClick={handleClose}
-            className="ml-auto p-1 rounded text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d] transition-colors"
+            className="ml-auto p-1 rounded transition-colors"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+            }}
           >
             <X size={16} />
           </button>
@@ -314,17 +319,17 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
         {/* 错误提示 */}
         {error && (
-          <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-xs flex-shrink-0">
+          <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-500 text-xs shrink-0">
             {error}
           </div>
         )}
 
         {/* xterm 容器 */}
-        <div className="flex-1 overflow-hidden p-2 relative">
+        <div className="flex-1 overflow-hidden p-2 relative" style={{ background: "#0d1117" }}>
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/60 z-10">
-              <div className="flex items-center gap-2 text-[#8b949e] text-sm">
-                <div className="w-4 h-4 border-2 border-[#1f6feb] border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
+              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-soft)" }}>
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 加载中...
               </div>
             </div>

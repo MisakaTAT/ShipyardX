@@ -7,6 +7,7 @@
   --bg-panel:     #161b22;
   --bg-surface:   #21262d;
   --bg-overlay:   #161b22;
+  --bg-input:     #0d1117;
   --border:       #21262d;
   --border-sub:   #30363d;
   --text-strong:  #e6edf3;
@@ -22,8 +23,9 @@
   --bg-app:       #f6f8fa;
   --bg-nav:       #ffffff;
   --bg-panel:     #ffffff;
-  --bg-surface:   #f6f8fa;
+  --bg-surface:   #f3f4f6;
   --bg-overlay:   #ffffff;
+  --bg-input:     #ffffff;
   --border:       #d0d7de;
   --border-sub:   #d8dee4;
   --text-strong:  #1f2328;
