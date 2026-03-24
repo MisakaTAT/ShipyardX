@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
+import type { ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, AlertTriangle, ChevronUp, ChevronDown } from "lucide-react";
+import { RefreshCw, Box, Layers, Cpu, HardDrive, Server } from "lucide-react";
 import type { DockerInfo } from "../types";
 
 interface Props {
@@ -9,20 +10,19 @@ interface Props {
 
 function fmtMem(bytes: number): string {
   const gb = bytes / 1_073_741_824;
-  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1_048_576).toFixed(0)} MB`;
+  return gb >= 1
+    ? `${gb.toFixed(1)} GB`
+    : `${(bytes / 1_048_576).toFixed(0)} MB`;
 }
 
-interface Cell {
-  label: string;
-  value: string | number;
-  highlight?: boolean;
-  warn?: boolean;
+function fmtPct(value: number, total: number): string {
+  if (total <= 0) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
 }
 
 export default function ServerOverview({ serverId }: Props) {
   const [info, setInfo] = useState<DockerInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -36,109 +36,273 @@ export default function ServerOverview({ serverId }: Props) {
     }
   }, [serverId]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
 
   if (!info && !loading) return null;
-
-  const rows: Cell[][] = info ? [
-    [
-      { label: "容器数", value: info.containers },
-      { label: "警告数", value: info.warnings, warn: info.warnings > 0 },
-      { label: "主机名", value: info.name },
-      { label: "操作系统", value: info.os },
-    ],
-    [
-      { label: "运行中", value: info.containers_running, highlight: true },
-      { label: "镜像数", value: info.images },
-      { label: "处理器", value: info.ncpu },
-      { label: "系统版本", value: info.os_version || "—" },
-    ],
-    [
-      { label: "已暂停", value: info.containers_paused },
-      { label: "引擎版本", value: info.server_version },
-      { label: "内存", value: fmtMem(info.mem_total) },
-      { label: "内核版本", value: info.kernel_version },
-    ],
-    [
-      { label: "已停止", value: info.containers_stopped },
-      { label: "存储驱动", value: info.storage_driver },
-      { label: "架构", value: info.architecture },
-      { label: "系统类型", value: "linux" },
-    ],
-  ] : [];
+  const totalContainers = info?.containers ?? 0;
+  const running = info?.containers_running ?? 0;
+  const paused = info?.containers_paused ?? 0;
+  const stopped = info?.containers_stopped ?? 0;
+  const warnings = info?.warnings ?? 0;
 
   return (
-    <div className="shrink-0 border-b" style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}>
-      {/* 折叠条 */}
-      <div className="flex items-center justify-between px-4 py-2">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs font-medium text-[#8b949e]">主机概览</span>
-          {info?.warnings ? (
-            <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded">
-              <AlertTriangle size={10} />
-              {info.warnings} 个警告
-            </span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={fetch}
-            disabled={loading}
-            className="p-1 rounded text-[#6e7681] hover:text-[#8b949e] transition-colors disabled:opacity-40"
-          >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          </button>
-          <button
-            onClick={() => setCollapsed(c => !c)}
-            className="p-1 rounded text-[#6e7681] hover:text-[#8b949e] transition-colors"
-          >
-            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
-        </div>
-      </div>
-
-      {/* 统计网格 */}
-      {!collapsed && (
-        <div className="px-4 pb-3">
-          {loading && !info ? (
-            <div className="flex items-center gap-2 py-4 text-[#6e7681] text-xs">
-              <div className="w-3 h-3 border border-[#1f6feb] border-t-transparent rounded-full animate-spin" />
-              加载主机信息...
-            </div>
-          ) : (
-            <div className="rounded-lg overflow-hidden border" style={{ borderColor: "var(--border)" }}>
-              {rows.map((row, ri) => (
-                <div
-                  key={ri}
-                  className="grid grid-cols-4"
-                  style={ri < rows.length - 1 ? { borderBottom: "1px solid var(--border)" } : {}}
+    <div
+      className="h-full overflow-auto"
+      style={{ background: "var(--bg-app)" }}
+    >
+      <div className="space-y-3">
+        <div
+          className="rounded-xl border px-4 py-3 md:px-5 md:py-4"
+          style={{
+            background: "var(--bg-panel)",
+            borderColor: "var(--border)",
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span
+                  className="text-xs uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
                 >
-                  {row.map((cell, ci) => (
-                    <div
-                      key={ci}
-                      className="flex items-center gap-3 px-3 py-2"
-                      style={ci < 3 ? { borderRight: "1px solid var(--border)" } : {}}
-                    >
-                      <span className="text-xs w-16 shrink-0" style={{ color: "var(--text-muted)" }}>{cell.label}</span>
-                      <span
-                        className={`text-xs font-medium truncate
-                          ${cell.warn ? "text-yellow-500" : ""}
-                          ${cell.highlight ? "text-green-500" : ""}
-                        `}
-                        style={!cell.warn && !cell.highlight ? { color: "var(--text-base)" } : {}}
-                        title={String(cell.value)}
-                      >
-                        {String(cell.value)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                  Host Overview
+                </span>
+              </div>
+              <h2
+                className="text-base md:text-lg font-semibold mt-1 truncate"
+                style={{ color: "var(--text-strong)" }}
+              >
+                {info?.name || "未知主机"}
+              </h2>
+              <p
+                className="text-xs mt-1 truncate"
+                style={{ color: "var(--text-soft)" }}
+              >
+                {info?.os || "Unknown OS"}{" "}
+                {info?.os_version ? `· ${info.os_version}` : ""}
+              </p>
             </div>
-          )}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={fetch}
+                disabled={loading}
+                className="p-1.5 rounded-lg transition-colors disabled:opacity-40"
+                style={{ color: "var(--text-muted)" }}
+                title="刷新"
+              >
+                <RefreshCw
+                  size={13}
+                  className={loading ? "animate-spin" : ""}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+            <MetricCard
+              icon={<Box size={14} />}
+              label="容器总数"
+              value={String(totalContainers)}
+            />
+            <MetricCard
+              icon={<Layers size={14} />}
+              label="镜像数"
+              value={String(info?.images ?? 0)}
+            />
+            <MetricCard
+              icon={<Cpu size={14} />}
+              label="CPU 核心"
+              value={String(info?.ncpu ?? "—")}
+            />
+            <MetricCard
+              icon={<HardDrive size={14} />}
+              label="总内存"
+              value={info ? fmtMem(info.mem_total) : "—"}
+            />
+          </div>
         </div>
-      )}
+
+        {loading && !info ? (
+          <div
+            className="rounded-xl border px-4 py-6 flex items-center gap-2 text-xs"
+            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          >
+            <div className="w-3 h-3 border border-(--accent) border-t-transparent rounded-full animate-spin" />
+            加载主机信息...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+            <InfoSection title="容器状态">
+              <StatusBar
+                label="运行中"
+                value={running}
+                total={totalContainers}
+                color="bg-green-500"
+              />
+              <StatusBar
+                label="已暂停"
+                value={paused}
+                total={totalContainers}
+                color="bg-yellow-500"
+              />
+              <StatusBar
+                label="已停止"
+                value={stopped}
+                total={totalContainers}
+                color="bg-slate-500"
+              />
+            </InfoSection>
+
+            <InfoSection title="Docker 引擎">
+              <InfoRow label="引擎版本" value={info?.server_version || "—"} />
+              <InfoRow label="存储驱动" value={info?.storage_driver || "—"} />
+              <InfoRow
+                label="警告数量"
+                value={String(warnings)}
+                highlight={warnings > 0}
+              />
+            </InfoSection>
+
+            <InfoSection title="主机系统">
+              <InfoRow
+                label="主机名"
+                value={info?.name || "—"}
+                icon={<Server size={12} />}
+              />
+              <InfoRow label="操作系统" value={info?.os || "—"} />
+              <InfoRow label="内核版本" value={info?.kernel_version || "—"} />
+              <InfoRow label="架构" value={info?.architecture || "—"} />
+            </InfoSection>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  accent = "normal",
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  accent?: "normal" | "green" | "yellow";
+}) {
+  const color =
+    accent === "green"
+      ? "text-green-500"
+      : accent === "yellow"
+      ? "text-yellow-500"
+      : "";
+  return (
+    <div
+      className="rounded-lg border px-3 py-2.5"
+      style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {label}
+        </span>
+        <span style={{ color: "var(--text-soft)" }}>{icon}</span>
+      </div>
+      <div
+        className={`text-lg font-semibold ${color}`}
+        style={!color ? { color: "var(--text-strong)" } : {}}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function InfoSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-xl border p-3.5"
+      style={{ borderColor: "var(--border)", background: "var(--bg-panel)" }}
+    >
+      <div
+        className="text-xs font-medium mb-3"
+        style={{ color: "var(--text-soft)" }}
+      >
+        {title}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  icon,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  icon?: ReactNode;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <div
+        className="flex items-center gap-1.5 min-w-0"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {icon ? <span className="shrink-0">{icon}</span> : null}
+        <span className="truncate">{label}</span>
+      </div>
+      <span
+        className={highlight ? "text-yellow-500 font-medium" : "font-medium"}
+        style={!highlight ? { color: "var(--text-base)" } : {}}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function StatusBar({
+  label,
+  value,
+  total,
+  color,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  color: string;
+}) {
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span style={{ color: "var(--text-muted)" }}>{label}</span>
+        <span style={{ color: "var(--text-base)" }}>
+          {value} ({fmtPct(value, total)})
+        </span>
+      </div>
+      <div
+        className="h-1.5 rounded-full"
+        style={{ background: "var(--bg-surface)" }}
+      >
+        <div
+          className={`h-full rounded-full ${color}`}
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+        />
+      </div>
     </div>
   );
 }

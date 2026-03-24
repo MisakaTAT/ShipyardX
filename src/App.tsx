@@ -1,16 +1,27 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Box, Layers, Terminal, Server as ServerIcon, Settings, Sun, Moon } from "lucide-react";
+import {
+  Box,
+  Layers,
+  Terminal,
+  Server as ServerIcon,
+  Settings,
+  Sun,
+  Moon,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import type { Server } from "./types";
-import Sidebar from "./components/Sidebar";
 import ServerModal from "./components/ServerModal";
 import ContainerPanel from "./components/ContainerPanel";
 import ImagePanel from "./components/ImagePanel";
 import TerminalPanel from "./components/TerminalPanel";
 import ServerOverview from "./components/ServerOverview";
 
-type Tab = "containers" | "images" | "terminal";
+type Tab = "overview" | "containers" | "images" | "terminal";
+type Page = "connect" | "workspace";
 
 interface NavItem {
   key: Tab;
@@ -19,6 +30,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { key: "overview", icon: <ServerIcon size={18} />, label: "概览" },
   { key: "containers", icon: <Box size={18} />, label: "容器" },
   { key: "images", icon: <Layers size={18} />, label: "镜像" },
   { key: "terminal", icon: <Terminal size={18} />, label: "终端" },
@@ -27,7 +39,8 @@ const NAV_ITEMS: NavItem[] = [
 export default function App() {
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServer, setSelectedServer] = useState<Server | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("containers");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [page, setPage] = useState<Page>("connect");
   const [showModal, setShowModal] = useState(false);
   const [editingServer, setEditingServer] = useState<Server | null>(null);
   const [light, setLight] = useState(() => localStorage.getItem("theme") === "light");
@@ -59,29 +72,44 @@ export default function App() {
     try {
       const updated = await invoke<Server[]>("delete_server", { id });
       setServers(updated);
-      if (selectedServer?.id === id) setSelectedServer(null);
+      if (selectedServer?.id === id) {
+        setSelectedServer(null);
+        setPage("connect");
+      }
     } catch (e) { console.error(e); }
+  };
+
+  const handleConnect = (server: Server) => {
+    setSelectedServer(server);
+    setActiveTab("overview");
+    setPage("workspace");
   };
 
   return (
     <div className="flex h-screen overflow-hidden select-none"
          style={{ background: "var(--bg-app)", color: "var(--text-base)" }}>
-
-      {/* ── 列 1: 图标导航栏 ── */}
-      <nav className="w-14 flex flex-col items-center shrink-0 py-3 border-r"
-           style={{ background: "var(--bg-nav)", borderColor: "var(--border)" }}>
+      <nav
+        className="w-14 flex flex-col items-center shrink-0 py-3 border-r"
+        style={{ background: "var(--bg-nav)", borderColor: "var(--border)" }}
+      >
         <div className="flex flex-col gap-1 w-full px-2">
           <NavBtn
             icon={<ServerIcon size={18} />}
-            label="服务器列表"
-            active={true}
-            onClick={() => {}}
+            label="连接页"
+            active={page === "connect"}
+            onClick={() => setPage("connect")}
+          />
+          <NavBtn
+            icon={<Box size={18} />}
+            label="容器工作区"
+            active={page === "workspace"}
+            disabled={!selectedServer}
+            onClick={() => setPage("workspace")}
           />
         </div>
 
         <div className="flex-1" />
 
-        {/* 底部：GitHub + 主题切换 + 设置 */}
         <div className="flex flex-col gap-1 w-full px-2 pb-1">
           <NavBtn
             icon={
@@ -90,139 +118,50 @@ export default function App() {
               </svg>
             }
             label="GitHub"
-            active={false}
             onClick={() => openUrl("https://github.com").catch(() => {})}
           />
           <NavBtn
             icon={light ? <Moon size={18} /> : <Sun size={18} />}
             label={light ? "切换深色" : "切换浅色"}
-            active={false}
-            onClick={() => setLight(v => !v)}
+            onClick={() => setLight((v) => !v)}
           />
           <NavBtn
             icon={<Settings size={18} />}
             label="设置"
-            active={false}
             onClick={() => {}}
           />
         </div>
       </nav>
 
-      {/* ── 列 2: 服务器列表 ── */}
-      <Sidebar
-        servers={servers}
-        selectedId={selectedServer?.id ?? null}
-        onSelect={(s) => { setSelectedServer(s); setActiveTab("containers"); }}
-        onAdd={handleAdd}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      {/* ── 列 3: 主内容 ── */}
       <main className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--bg-app)" }}>
-        {selectedServer ? (
-          <>
-            {/* 顶部服务器标题 */}
-            <header
-              className="flex items-center justify-between px-5 py-2.5 shrink-0 border-b"
-              style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)" }}
-                >
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                </div>
-                <div>
-                  <h1 className="text-sm font-semibold leading-none" style={{ color: "var(--text-strong)" }}>
-                    {selectedServer.name}
-                  </h1>
-                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {selectedServer.username}@{selectedServer.host}:{selectedServer.port}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-[11px] px-2 py-0.5 rounded-full border"
-                  style={{
-                    background: "var(--bg-surface)",
-                    color: "var(--text-soft)",
-                    borderColor: "var(--border-sub)",
-                  }}
-                >
-                  {selectedServer.auth_type === "key" ? "SSH Key" : "密码认证"}
-                </span>
-                <button
-                  onClick={() => handleEdit(selectedServer)}
-                  className="p-1.5 rounded-lg transition-colors"
-                  style={{ color: "var(--text-muted)" }}
-                  title="编辑配置"
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-                    (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                    (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-                  }}
-                >
-                  <Settings size={14} />
-                </button>
-              </div>
-            </header>
-
-            {/* 服务器概览（可折叠统计网格） */}
-            <ServerOverview serverId={selectedServer.id} />
-
-            {/* Tab 栏 */}
-            <div
-              className="flex items-center gap-0.5 px-4 shrink-0 border-b"
-              style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
-            >
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => setActiveTab(item.key)}
-                  className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors"
-                  style={activeTab === item.key
-                    ? { borderColor: "var(--accent)", color: "var(--accent-text)" }
-                    : { borderColor: "transparent", color: "var(--text-soft)" }
-                  }
-                  onMouseEnter={(e) => {
-                    if (activeTab !== item.key)
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (activeTab !== item.key)
-                      (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
-                  }}
-                >
-                  {item.icon}
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            {/* 内容区 */}
-            <div className="flex-1 overflow-hidden">
-              {activeTab === "containers" && (
-                <ContainerPanel serverId={selectedServer.id} />
-              )}
-              {activeTab === "images" && (
-                <ImagePanel serverId={selectedServer.id} />
-              )}
-              {activeTab === "terminal" && (
-                <TerminalPanel
-                  serverId={selectedServer.id}
-                  serverName={`${selectedServer.username}@${selectedServer.host}`}
-                />
-              )}
-            </div>
-          </>
+        {page === "connect" ? (
+          <ConnectPage
+            servers={servers}
+            light={light}
+            onToggleTheme={() => setLight((v) => !v)}
+            onOpenGithub={() => openUrl("https://github.com").catch(() => {})}
+            onConnect={handleConnect}
+            onAdd={handleAdd}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ) : selectedServer ? (
+          <WorkspacePage
+            selectedServer={selectedServer}
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+          />
         ) : (
-          <EmptyState onAdd={handleAdd} />
+          <ConnectPage
+            servers={servers}
+            light={light}
+            onToggleTheme={() => setLight((v) => !v)}
+            onOpenGithub={() => openUrl("https://github.com").catch(() => {})}
+            onConnect={handleConnect}
+            onAdd={handleAdd}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         )}
       </main>
 
@@ -237,13 +176,79 @@ export default function App() {
   );
 }
 
-// ── 导航图标按钮 ──
+function WorkspacePage({
+  selectedServer,
+  activeTab,
+  onSelectTab,
+}: {
+  selectedServer: Server;
+  activeTab: Tab;
+  onSelectTab: (tab: Tab) => void;
+}) {
+  return (
+    <div className="flex-1 overflow-auto p-2 md:p-3">
+      <div className="h-full flex flex-col gap-3">
+        <div
+          className="shrink-0 rounded-xl border px-2 py-1.5 flex items-center gap-1 flex-wrap"
+          style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
+        >
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => onSelectTab(item.key)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors"
+              style={
+                activeTab === item.key
+                  ? {
+                      background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                      color: "var(--accent-text)",
+                    }
+                  : { color: "var(--text-soft)" }
+              }
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          className={`flex-1 min-h-[360px] overflow-hidden ${
+            activeTab === "overview" ? "" : "rounded-xl border"
+          }`}
+          style={
+            activeTab === "overview"
+              ? { background: "transparent" }
+              : { borderColor: "var(--border)", background: "var(--bg-panel)" }
+          }
+        >
+          {activeTab === "overview" && (
+            <ServerOverview serverId={selectedServer.id} />
+          )}
+          {activeTab === "containers" && (
+            <ContainerPanel serverId={selectedServer.id} />
+          )}
+          {activeTab === "images" && (
+            <ImagePanel serverId={selectedServer.id} />
+          )}
+          {activeTab === "terminal" && (
+            <TerminalPanel
+              serverId={selectedServer.id}
+              serverName={`${selectedServer.username}@${selectedServer.host}`}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NavBtn({
   icon, label, active, onClick, disabled,
 }: {
   icon: React.ReactNode;
   label: string;
-  active: boolean;
+  active?: boolean;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -256,9 +261,9 @@ function NavBtn({
         ? { background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent-text)" }
         : { color: "var(--text-muted)" }
       }
-      className={`w-full flex items-center justify-center p-2.5 rounded-lg transition-all
-        ${disabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}
-      `}
+      className={`w-full flex items-center justify-center p-2.5 rounded-lg transition-all ${
+        disabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+      }`}
       onMouseEnter={(e) => {
         if (!active && !disabled) {
           (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
@@ -277,47 +282,97 @@ function NavBtn({
   );
 }
 
-// ── 空状态 ──
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+function ConnectPage({
+  servers,
+  light,
+  onToggleTheme,
+  onOpenGithub,
+  onConnect,
+  onAdd,
+  onEdit,
+  onDelete,
+}: {
+  servers: Server[];
+  light: boolean;
+  onToggleTheme: () => void;
+  onOpenGithub: () => void;
+  onConnect: (server: Server) => void;
+  onAdd: () => void;
+  onEdit: (server: Server) => void;
+  onDelete: (id: string) => void;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-8">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 border"
-        style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)" }}
-      >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-          stroke="var(--accent-text)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-      </div>
-      <h2 className="text-base font-semibold mb-2" style={{ color: "var(--text-strong)" }}>欢迎使用 ShipyardX</h2>
-      <p className="text-sm mb-6 max-w-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-        通过 SSH 远程管理服务器上的 Docker 容器与镜像。从左侧添加第一台服务器开始。
-      </p>
-      <button
-        onClick={onAdd}
-        className="px-5 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-medium rounded-lg transition-colors"
-      >
-        添加服务器
-      </button>
-      <div className="mt-8 grid grid-cols-3 gap-3 max-w-sm">
-        {[
-          { icon: <Box size={16} />, label: "容器管理", desc: "启动、停止、重启、监控" },
-          { icon: <Layers size={16} />, label: "镜像管理", desc: "拉取、查看、删除镜像" },
-          { icon: <Terminal size={16} />, label: "SSH 终端", desc: "直接进入远程终端" },
-        ].map((f) => (
-          <div
-            key={f.label}
-            className="flex flex-col items-center gap-2 p-3 rounded-xl border"
-            style={{ background: "var(--bg-surface)", borderColor: "var(--border)" }}
-          >
-            <div style={{ color: "var(--accent-text)" }}>{f.icon}</div>
-            <div className="text-xs font-medium" style={{ color: "var(--text-base)" }}>{f.label}</div>
-            <div className="text-[11px] text-center leading-relaxed" style={{ color: "var(--text-muted)" }}>{f.desc}</div>
+    <div className="h-full flex flex-col">
+      <header className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--bg-panel)" }}>
+        <div>
+          <h1 className="text-base font-semibold" style={{ color: "var(--text-strong)" }}>连接服务器</h1>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>请选择一个服务器连接，连接后进入容器管理页面。</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={onOpenGithub} className="px-3 py-1.5 text-xs rounded-lg border" style={{ borderColor: "var(--border-sub)", color: "var(--text-soft)" }}>
+            GitHub
+          </button>
+          <button onClick={onToggleTheme} className="p-1.5 rounded-lg border" style={{ borderColor: "var(--border-sub)", color: "var(--text-soft)" }}>
+            {light ? <Moon size={14} /> : <Sun size={14} />}
+          </button>
+          <button onClick={onAdd} className="px-3 py-1.5 text-xs rounded-lg bg-green-600 hover:bg-green-500 text-white flex items-center gap-1.5">
+            <Plus size={14} />
+            添加服务器
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-auto p-6">
+        {servers.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <ServerIcon size={34} style={{ color: "var(--border-sub)" }} />
+            <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>暂无服务器，先添加一个连接配置。</p>
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {servers.map((server) => (
+              <div key={server.id} className="rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-panel)" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate" style={{ color: "var(--text-strong)" }}>{server.name}</div>
+                    <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      {server.username}@{server.host}:{server.port}
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: "var(--border-sub)", color: "var(--text-soft)" }}>
+                    {server.auth_type === "key" ? "SSH Key" : "密码"}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => onEdit(server)}
+                      className="p-1.5 rounded-md"
+                      title="编辑"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(server.id)}
+                      className="p-1.5 rounded-md"
+                      title="删除"
+                      style={{ color: "#f85149" }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => onConnect(server)}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    连接
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
