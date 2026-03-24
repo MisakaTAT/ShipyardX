@@ -34,7 +34,10 @@ pub async fn remove_image(
 ) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        docker_delete(&server, &format!("/v1.41/images/{}?force={}", image_id, force))
+        docker_delete(
+            &server,
+            &format!("/v1.41/images/{}?force={}", image_id, force),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -66,7 +69,10 @@ fn run_pull_thread(
     let sess = match create_ssh_session(&config) {
         Ok(s) => s,
         Err(e) => {
-            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("连接失败: {}\n", e));
+            let _ = ah.emit(
+                &format!("pull-data:{}", pull_id),
+                format!("连接失败: {}\n", e),
+            );
             let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
             return;
         }
@@ -75,14 +81,20 @@ fn run_pull_thread(
     let mut channel = match sess.channel_session() {
         Ok(c) => c,
         Err(e) => {
-            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("通道失败: {}\n", e));
+            let _ = ah.emit(
+                &format!("pull-data:{}", pull_id),
+                format!("通道失败: {}\n", e),
+            );
             let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
             return;
         }
     };
 
     if let Err(e) = channel.exec(&format!("docker pull {} 2>&1", image)) {
-        let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("执行失败: {}\n", e));
+        let _ = ah.emit(
+            &format!("pull-data:{}", pull_id),
+            format!("执行失败: {}\n", e),
+        );
         let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
         return;
     }
@@ -137,7 +149,11 @@ pub fn start_image_pull(
     let ah = app_handle.clone();
     std::thread::spawn(move || run_pull_thread(server, pid, img, rx, ah));
 
-    state.streams.lock().unwrap().insert(pull_id.clone(), StreamHandle { tx });
+    state
+        .streams
+        .lock()
+        .unwrap()
+        .insert(pull_id.clone(), StreamHandle { tx });
     Ok(pull_id)
 }
 

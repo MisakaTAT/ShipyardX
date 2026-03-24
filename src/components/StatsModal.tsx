@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X, RefreshCw, Cpu, MemoryStick, Network, HardDrive } from "lucide-react";
+import { X, Cpu, MemoryStick, Network, HardDrive } from "lucide-react";
 import type { ContainerStats } from "../types";
 
 interface Props {
@@ -100,7 +100,6 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
   const [stats, setStats] = useState<ContainerStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -121,13 +120,9 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
   useEffect(() => { fetchStats(); }, [fetchStats]);
 
   useEffect(() => {
-    if (autoRefresh) {
-      intervalRef.current = setInterval(fetchStats, 3000);
-    } else {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    }
+    intervalRef.current = setInterval(fetchStats, 5000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoRefresh, fetchStats]);
+  }, [fetchStats]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -150,37 +145,6 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
           <span className="text-sm font-semibold font-mono flex-1 truncate" style={{ color: "var(--text-strong)" }}>
             {containerName}
           </span>
-          <span className="text-xs mr-2" style={{ color: "var(--text-muted)" }}>资源监控</span>
-
-          {/* 自动刷新 */}
-          <button
-            onClick={() => setAutoRefresh(r => !r)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors`}
-            style={autoRefresh
-              ? { background: "color-mix(in srgb, var(--accent) 15%, transparent)", borderColor: "var(--accent)", color: "var(--accent-text)" }
-              : { background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }
-            }
-          >
-            <RefreshCw size={11} className={autoRefresh ? "animate-spin" : ""} />
-            {autoRefresh ? "自动中" : "自动刷新"}
-          </button>
-
-          <button
-            onClick={fetchStats}
-            disabled={loading}
-            className="p-1 rounded transition-colors disabled:opacity-40"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-            }}
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
 
           <button
             onClick={onClose}
@@ -264,7 +228,6 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
               {lastUpdated && (
                 <div className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
                   更新于 {lastUpdated}
-                  {autoRefresh && <span className="ml-1">(每 3 秒刷新)</span>}
                 </div>
               )}
             </>

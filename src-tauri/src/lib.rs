@@ -10,21 +10,23 @@ pub use state::AppState;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use tauri::Manager;
 use store::{get_data_file, load_servers};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_file = get_data_file(app.handle());
             let servers = load_servers(&data_file);
             app.manage(AppState {
-                servers:   Mutex::new(servers),
+                servers: Mutex::new(servers),
                 data_file: Mutex::new(data_file),
                 terminals: Mutex::new(HashMap::new()),
-                streams:   Mutex::new(HashMap::new()),
+                streams: Mutex::new(HashMap::new()),
+                terminal_ws_clients: Mutex::new(HashMap::new()),
             });
             Ok(())
         })

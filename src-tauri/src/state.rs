@@ -23,6 +23,7 @@ pub struct AppState {
     pub data_file: Mutex<std::path::PathBuf>,
     pub(crate) terminals: Mutex<HashMap<String, TerminalHandle>>,
     pub(crate) streams: Mutex<HashMap<String, StreamHandle>>,
+    pub(crate) terminal_ws_clients: Mutex<HashMap<String, mpsc::Sender<String>>>,
 }
 
 pub fn get_server_config(state: &State<AppState>, id: &str) -> Result<ServerConfig, String> {

@@ -38,10 +38,7 @@ pub fn update_server(
 }
 
 #[tauri::command]
-pub fn delete_server(
-    id: String,
-    state: State<AppState>,
-) -> Result<Vec<ServerConfig>, String> {
+pub fn delete_server(id: String, state: State<AppState>) -> Result<Vec<ServerConfig>, String> {
     let mut servers = state.servers.lock().unwrap();
     let data_file = state.data_file.lock().unwrap();
     servers.retain(|s| s.id != id);
@@ -56,8 +53,11 @@ pub async fn test_connection(
 ) -> Result<String, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        ssh_exec(&server, "docker version --format 'Server: {{.Server.Version}}'")
-            .map(|v| format!("连接成功！Docker {}", v.trim()))
+        ssh_exec(
+            &server,
+            "docker version --format 'Server: {{.Server.Version}}'",
+        )
+        .map(|v| format!("连接成功！Docker {}", v.trim()))
     })
     .await
     .map_err(|e| e.to_string())?

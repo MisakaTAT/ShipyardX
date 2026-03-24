@@ -3,10 +3,7 @@ use tauri::{AppHandle, Manager};
 use crate::models::ServerConfig;
 
 pub fn get_data_file(app: &AppHandle) -> std::path::PathBuf {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .expect("无法获取应用数据目录");
+    let data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
     std::fs::create_dir_all(&data_dir).ok();
     data_dir.join("servers.json")
 }

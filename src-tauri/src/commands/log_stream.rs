@@ -108,11 +108,13 @@ pub fn start_log_stream(
     let sid = stream_id.clone();
     let cid = container_id.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || {
-        run_log_stream_thread(server, sid, cid, tail, timestamps, rx, ah)
-    });
+    std::thread::spawn(move || run_log_stream_thread(server, sid, cid, tail, timestamps, rx, ah));
 
-    state.streams.lock().unwrap().insert(stream_id.clone(), StreamHandle { tx });
+    state
+        .streams
+        .lock()
+        .unwrap()
+        .insert(stream_id.clone(), StreamHandle { tx });
     Ok(stream_id)
 }
 

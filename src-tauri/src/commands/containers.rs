@@ -14,7 +14,11 @@ pub async fn list_containers(
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/v1.41/containers/json?all=1")?;
         let api: Vec<ApiContainer> = serde_json::from_str(&resp).map_err(|e| {
-            format!("解析容器列表失败: {} — 原始响应: {}", e, &resp[..resp.len().min(200)])
+            format!(
+                "解析容器列表失败: {} — 原始响应: {}",
+                e,
+                &resp[..resp.len().min(200)]
+            )
         })?;
         Ok(api.into_iter().map(api_container_to_dto).collect())
     })
@@ -30,7 +34,10 @@ pub async fn start_container(
 ) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        docker_post(&server, &format!("/v1.41/containers/{}/start", container_id))
+        docker_post(
+            &server,
+            &format!("/v1.41/containers/{}/start", container_id),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -58,7 +65,10 @@ pub async fn restart_container(
 ) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        docker_post(&server, &format!("/v1.41/containers/{}/restart", container_id))
+        docker_post(
+            &server,
+            &format!("/v1.41/containers/{}/restart", container_id),
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -130,8 +140,7 @@ fn demux_log_stream(data: &[u8]) -> String {
 }
 
 fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
-    const CHARS: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut table = [255u8; 256];
     for (i, &c) in CHARS.iter().enumerate() {
         table[c as usize] = i as u8;

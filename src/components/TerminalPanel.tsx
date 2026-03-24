@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import WebSocket from "@tauri-apps/plugin-websocket";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -13,6 +13,57 @@ interface TerminalPanelProps {
 }
 
 type Status = "connecting" | "connected" | "closed" | "error";
+interface OpenTerminalResult {
+  session_id: string;
+  ws_port: number;
+}
+type ServerMsg = { type: "output"; data: number[] } | { type: "closed" };
+
+function extractTextPayload(msg: unknown): string | null {
+  if (typeof msg === "string") return msg;
+  if (msg && typeof msg === "object") {
+    const obj = msg as Record<string, unknown>;
+    if (
+      typeof obj.data === "string" &&
+      (obj.type === "Text" || obj.type === "text")
+    ) {
+      return obj.data;
+    }
+    if (typeof obj.Text === "string") {
+      return obj.Text;
+    }
+  }
+  return null;
+}
+
+function parseWsPayload(msg: unknown): ServerMsg | null {
+  const text = extractTextPayload(msg);
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text) as { type?: string; data?: unknown };
+    if (parsed.type === "closed") return { type: "closed" };
+    if (parsed.type === "output" && Array.isArray(parsed.data)) {
+      return { type: "output", data: parsed.data as number[] };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function connectTerminalWs(sessionId: string, wsPort: number) {
+  const url = `ws://127.0.0.1:${wsPort}/terminal/${sessionId}`;
+  let lastErr: unknown = null;
+  for (let i = 0; i < 20; i += 1) {
+    try {
+      return await WebSocket.connect(url);
+    } catch (e) {
+      lastErr = e;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw lastErr ?? new Error("websocket connect failed");
+}
 
 const XTERM_THEME = {
   background: "#0f172a",
@@ -38,20 +89,37 @@ const XTERM_THEME = {
   brightWhite: "#f8fafc",
 };
 
-export default function TerminalPanel({ serverId, serverName }: TerminalPanelProps) {
+export default function TerminalPanel({
+  serverId,
+  serverName,
+}: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
-  const unlistensRef = useRef<UnlistenFn[]>([]);
+  const wsRef = useRef<Awaited<ReturnType<typeof WebSocket.connect>> | null>(
+    null
+  );
+  const removeWsListenerRef = useRef<(() => void) | null>(null);
+  const resizeTimerRef = useRef<number | null>(null);
   const [status, setStatus] = useState<Status>("connecting");
+
+  const syncResizeToBackend = (term: Terminal) => {
+    const ws = wsRef.current;
+    if (!ws) return;
+    void ws
+      .send(
+        JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows })
+      )
+      .catch(() => {});
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     // 初始化 xterm.js
     const term = new Terminal({
-      fontFamily: '"Cascadia Code", "JetBrains Mono", Menlo, "Courier New", monospace',
+      fontFamily:
+        '"Cascadia Code", "JetBrains Mono", Menlo, "Courier New", monospace',
       fontSize: 13,
       lineHeight: 1.3,
       theme: XTERM_THEME,
@@ -70,67 +138,73 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
     // 延迟 fit 确保容器已渲染
     requestAnimationFrame(() => fitAddon.fit());
 
-    termRef.current = term;
     fitAddonRef.current = fitAddon;
 
     const { cols, rows } = term;
 
     // 打开 SSH 终端会话
-    invoke<string>("open_terminal", { serverId, cols, rows })
-      .then(async (sessionId) => {
-        sessionIdRef.current = sessionId;
+    invoke<OpenTerminalResult>("open_terminal", { serverId, cols, rows })
+      .then(async ({ session_id, ws_port }) => {
+        sessionIdRef.current = session_id;
+        const ws = await connectTerminalWs(session_id, ws_port);
+        wsRef.current = ws;
         setStatus("connected");
+        // 连接建立后主动同步一次尺寸，避免如 top/vim 首屏拿到旧 PTY 尺寸
+        syncResizeToBackend(term);
 
-        // 监听终端输出
-        const unlistenOutput = await listen<number[]>(
-          `terminal-output:${sessionId}`,
-          (event) => {
-            term.write(new Uint8Array(event.payload));
-          }
-        );
-
-        // 监听终端关闭
-        const unlistenClose = await listen<null>(
-          `terminal-closed:${sessionId}`,
-          () => {
+        const removeListener = ws.addListener((msg) => {
+          const parsed = parseWsPayload(msg);
+          if (!parsed) return;
+          if (parsed.type === "output") {
+            term.write(new Uint8Array(parsed.data));
+          } else if (parsed.type === "closed") {
             setStatus("closed");
             term.writeln("\r\n\x1b[33m[ 连接已关闭 ]\x1b[0m");
             term.options.disableStdin = true;
           }
-        );
-
-        unlistensRef.current = [unlistenOutput, unlistenClose];
+        });
+        removeWsListenerRef.current = removeListener;
 
         // 将键盘输入发送到 SSH
         term.onData((data) => {
-          const sessionId = sessionIdRef.current;
-          if (!sessionId) return;
           const bytes = Array.from(new TextEncoder().encode(data));
-          invoke("write_terminal", { sessionId, data: bytes }).catch(console.error);
+          void ws
+            .send(JSON.stringify({ type: "input", data: bytes }))
+            .catch(console.error);
         });
 
         // 二进制输入（如粘贴）
         term.onBinary((data) => {
-          const sessionId = sessionIdRef.current;
-          if (!sessionId) return;
-          const bytes = Array.from(Uint8Array.from(data, (c) => c.charCodeAt(0)));
-          invoke("write_terminal", { sessionId, data: bytes }).catch(console.error);
+          const bytes = Array.from(
+            Uint8Array.from(data, (c) => c.charCodeAt(0))
+          );
+          void ws
+            .send(JSON.stringify({ type: "input", data: bytes }))
+            .catch(console.error);
         });
 
-        // 同步终端尺寸变化到 SSH PTY
+        // 同步终端尺寸变化
         term.onResize(({ cols, rows }) => {
-          const sessionId = sessionIdRef.current;
-          if (!sessionId) return;
-          invoke("resize_terminal", { sessionId, cols, rows }).catch(console.error);
+          void ws
+            .send(JSON.stringify({ type: "resize", cols, rows }))
+            .catch(console.error);
         });
       })
       .catch((e) => {
         setStatus("error");
-        term.writeln(`\x1b[31m连接失败: ${e}\x1b[0m`);
+        term.writeln(`\x1b[31m连接失败: ${String(e)}\x1b[0m`);
       });
 
     // 响应窗口尺寸变化
-    const handleResize = () => fitAddonRef.current?.fit();
+    const handleResize = () => {
+      if (resizeTimerRef.current) {
+        window.clearTimeout(resizeTimerRef.current);
+      }
+      resizeTimerRef.current = window.setTimeout(() => {
+        fitAddonRef.current?.fit();
+        syncResizeToBackend(term);
+      }, 30);
+    };
     const resizeObserver = new ResizeObserver(handleResize);
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
@@ -138,11 +212,19 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
 
     return () => {
       resizeObserver.disconnect();
-      unlistensRef.current.forEach((fn) => fn());
-      unlistensRef.current = [];
+      if (resizeTimerRef.current) {
+        window.clearTimeout(resizeTimerRef.current);
+        resizeTimerRef.current = null;
+      }
+      const ws = wsRef.current;
+      wsRef.current = null;
+      removeWsListenerRef.current?.();
+      removeWsListenerRef.current = null;
 
       const sessionId = sessionIdRef.current;
       if (sessionId) {
+        void ws?.send(JSON.stringify({ type: "close" })).catch(() => {});
+        void ws?.disconnect().catch(() => {});
         invoke("close_terminal", { sessionId }).catch(console.error);
         sessionIdRef.current = null;
       }
@@ -157,18 +239,34 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
         className="flex items-center gap-2 px-4 py-2 border-b shrink-0"
         style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
       >
-        <TerminalIcon className="w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
-        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{serverName}</span>
+        <TerminalIcon
+          className="w-3.5 h-3.5"
+          style={{ color: "var(--text-muted)" }}
+        />
+        <span
+          className="text-xs font-mono"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {serverName}
+        </span>
         <span style={{ color: "var(--border-sub)" }}>·</span>
         <StatusBadge status={status} />
       </div>
 
       {/* 终端容器（始终暗色背景） */}
-      <div className="flex-1 relative overflow-hidden" style={{ background: "#0d1117" }}>
+      <div
+        className="flex-1 relative overflow-hidden"
+        style={{ background: "#0d1117" }}
+      >
         {status === "connecting" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 pointer-events-none">
-            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-muted)" }} />
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>正在建立 SSH 连接...</span>
+            <Loader2
+              className="w-5 h-5 animate-spin"
+              style={{ color: "var(--text-muted)" }}
+            />
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              正在建立 SSH 连接...
+            </span>
           </div>
         )}
         {/* xterm.js 挂载点 */}
@@ -183,7 +281,10 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
 }
 
 function StatusBadge({ status }: { status: Status }) {
-  const configs: Record<Status, { color: string; text: string; dot?: boolean }> = {
+  const configs: Record<
+    Status,
+    { color: string; text: string; dot?: boolean }
+  > = {
     connecting: { color: "text-yellow-500", text: "连接中...", dot: true },
     connected: { color: "text-green-400", text: "已连接", dot: true },
     closed: { color: "text-slate-500", text: "已断开" },

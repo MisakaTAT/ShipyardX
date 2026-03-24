@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  RefreshCw,
   Play,
   Square,
   RotateCcw,
@@ -13,7 +12,6 @@ import {
   Search,
   X,
   BarChart2,
-  Timer,
 } from "lucide-react";
 import type { Container } from "../types";
 import LogModal from "./LogModal";
@@ -23,12 +21,12 @@ interface ContainerPanelProps {
   serverId: string;
 }
 
-const REFRESH_INTERVALS = [
-  { label: "5 秒", value: 5000 },
-  { label: "15 秒", value: 15000 },
-  { label: "30 秒", value: 30000 },
-  { label: "60 秒", value: 60000 },
-];
+function parsePorts(ports: string): string[] {
+  return ports
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 function StateBadge({ state }: { state: string }) {
   const s = state.toLowerCase();
@@ -75,9 +73,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const [logTarget, setLogTarget] = useState<Container | null>(null);
   const [statsTarget, setStatsTarget] = useState<Container | null>(null);
   const [search, setSearch] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(15000);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [lastUpdated, setLastUpdated] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
   const fetchContainers = useCallback(async () => {
@@ -86,6 +82,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
     try {
       const data = await invoke<Container[]>("list_containers", { serverId });
       setContainers(data);
+      setLastUpdated(new Date().toLocaleTimeString("zh-CN"));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -96,13 +93,9 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   useEffect(() => { fetchContainers(); }, [fetchContainers]);
 
   useEffect(() => {
-    if (autoRefresh) {
-      intervalRef.current = setInterval(fetchContainers, refreshInterval);
-    } else {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoRefresh, refreshInterval, fetchContainers]);
+    const intervalId = setInterval(fetchContainers, 5000);
+    return () => clearInterval(intervalId);
+  }, [fetchContainers]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -204,56 +197,11 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* 自动刷新 */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setAutoRefresh(r => !r)}
-              title={autoRefresh ? "停止自动刷新" : "开启自动刷新"}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs border transition-colors
-                ${autoRefresh ? "bg-blue-500/10 border-blue-500/40 text-blue-500" : ""}`}
-              style={autoRefresh ? {} : {
-                background: "var(--bg-surface)",
-                borderColor: "var(--border)",
-                color: "var(--text-soft)",
-              }}
-            >
-              <Timer className={`w-3.5 h-3.5 ${autoRefresh ? "animate-pulse" : ""}`} />
-              {autoRefresh ? "自动" : "手动"}
-            </button>
-            {autoRefresh && (
-              <select
-                value={refreshInterval}
-                onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="text-xs rounded-lg px-1.5 py-1.5 border outline-none"
-                style={{
-                  background: "var(--bg-surface)",
-                  borderColor: "var(--border)",
-                  color: "var(--text-soft)",
-                }}
-              >
-                {REFRESH_INTERVALS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            )}
+        {lastUpdated ? (
+          <div className="ml-auto text-xs" style={{ color: "var(--text-muted)" }}>
+            更新于 {lastUpdated}
           </div>
-
-          {/* 刷新 */}
-          <button
-            onClick={fetchContainers}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors disabled:opacity-50"
-            style={{
-              background: "var(--bg-surface)",
-              borderColor: "var(--border)",
-              color: "var(--text-soft)",
-            }}
-          >
-            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            刷新
-          </button>
-        </div>
+        ) : null}
       </div>
 
       {/* Error */}
@@ -279,7 +227,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="sticky top-0 backdrop-blur-sm" style={{ background: "var(--bg-panel)" }}>
+            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: "var(--bg-panel)" }}>
               <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>名称</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>镜像</th>
@@ -312,8 +260,12 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
                       <StateBadge state={c.state} />
                       <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{c.status}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-mono" style={{ color: "var(--text-soft)" }}>{c.ports || "—"}</span>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      {c.ports ? (
+                        <PortCell ports={c.ports} />
+                      ) : (
+                        <span className="text-xs font-mono" style={{ color: "var(--text-soft)" }}>—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>{c.running_for}</td>
                     <td className="px-5 py-3">
@@ -367,6 +319,42 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
           containerName={statsTarget.name}
           onClose={() => setStatsTarget(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function PortCell({ ports }: { ports: string }) {
+  const list = parsePorts(ports);
+  const visible = list.slice(0, 2);
+  const hiddenCount = list.length - visible.length;
+
+  return (
+    <div className="flex flex-wrap gap-1" title={ports}>
+      {visible.map((port) => (
+        <span
+          key={port}
+          className="inline-block max-w-[200px] truncate px-1.5 py-0.5 rounded border text-[10px] font-mono"
+          style={{
+            color: "var(--text-soft)",
+            borderColor: "var(--border-sub)",
+            background: "var(--bg-surface)",
+          }}
+        >
+          {port}
+        </span>
+      ))}
+      {hiddenCount > 0 && (
+        <span
+          className="inline-block px-1.5 py-0.5 rounded border text-[10px]"
+          style={{
+            color: "var(--text-muted)",
+            borderColor: "var(--border-sub)",
+            background: "var(--bg-surface)",
+          }}
+        >
+          +{hiddenCount}
+        </span>
       )}
     </div>
   );

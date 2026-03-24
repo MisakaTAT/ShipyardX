@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCw, Box, Layers, Cpu, HardDrive, Server } from "lucide-react";
+import { Box, Layers, Cpu, HardDrive, Server } from "lucide-react";
 import type { DockerInfo } from "../types";
 
 interface Props {
@@ -23,12 +23,14 @@ function fmtPct(value: number, total: number): string {
 export default function ServerOverview({ serverId }: Props) {
   const [info, setInfo] = useState<DockerInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("");
 
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
       const d = await invoke<DockerInfo>("get_docker_info", { serverId });
       setInfo(d);
+      setLastUpdated(new Date().toLocaleTimeString("zh-CN"));
     } catch {
       // 静默失败，服务器可能不支持 Docker
     } finally {
@@ -38,6 +40,11 @@ export default function ServerOverview({ serverId }: Props) {
 
   useEffect(() => {
     fetch();
+  }, [fetch]);
+
+  useEffect(() => {
+    const intervalId = setInterval(fetch, 5000);
+    return () => clearInterval(intervalId);
   }, [fetch]);
 
   if (!info && !loading) return null;
@@ -85,20 +92,11 @@ export default function ServerOverview({ serverId }: Props) {
                 {info?.os_version ? `· ${info.os_version}` : ""}
               </p>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={fetch}
-                disabled={loading}
-                className="p-1.5 rounded-lg transition-colors disabled:opacity-40"
-                style={{ color: "var(--text-muted)" }}
-                title="刷新"
-              >
-                <RefreshCw
-                  size={13}
-                  className={loading ? "animate-spin" : ""}
-                />
-              </button>
-            </div>
+            {lastUpdated ? (
+              <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
+                更新于 {lastUpdated}
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
