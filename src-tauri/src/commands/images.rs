@@ -1,28 +1,15 @@
-use std::io::Read;
-use std::sync::mpsc;
+use tauri::{AppHandle, State};
 
-use tauri::{AppHandle, Emitter, State};
-
-use crate::core::docker::{api_image_to_dto, docker_delete, docker_get, ApiImage};
 use crate::core::models::DockerImage;
-use crate::core::ssh::create_ssh_session;
-use crate::core::state::{get_server_config, AppState, StreamHandle};
-use crate::utils::id::generate_id;
+use crate::core::services;
+use crate::core::state::AppState;
 
 #[tauri::command]
 pub async fn list_images(
     server_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DockerImage>, String> {
-    let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, "/v1.41/images/json")?;
-        let api: Vec<ApiImage> =
-            serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
-        Ok(api.into_iter().map(api_image_to_dto).collect())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    services::images::list_images(server_id, state).await
 }
 
 #[tauri::command]
@@ -32,91 +19,7 @@ pub async fn remove_image(
     force: bool,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        docker_delete(
-            &server,
-            &format!("/v1.41/images/{}?force={}", image_id, force),
-        )
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-// ── 流式拉取 ──────────────────────────────────────────────────
-
-fn run_pull_thread(
-    config: crate::core::models::ServerConfig,
-    pull_id: String,
-    image: String,
-    rx: mpsc::Receiver<()>,
-    ah: AppHandle,
-) {
-    let sess = match create_ssh_session(&config) {
-        Ok(s) => s,
-        Err(e) => {
-            let _ = ah.emit(
-                &format!("pull-data:{}", pull_id),
-                format!("连接失败: {}\n", e),
-            );
-            let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
-            return;
-        }
-    };
-
-    let mut channel = match sess.channel_session() {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = ah.emit(
-                &format!("pull-data:{}", pull_id),
-                format!("通道失败: {}\n", e),
-            );
-            let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
-            return;
-        }
-    };
-
-    if let Err(e) = channel.exec(&format!("docker pull {} 2>&1", image)) {
-        let _ = ah.emit(
-            &format!("pull-data:{}", pull_id),
-            format!("执行失败: {}\n", e),
-        );
-        let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
-        return;
-    }
-
-    sess.set_blocking(false);
-    let mut buf = [0u8; 4096];
-
-    loop {
-        match rx.try_recv() {
-            Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
-                return;
-            }
-            Err(mpsc::TryRecvError::Empty) => {}
-        }
-        match channel.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                let _ = ah.emit(
-                    &format!("pull-data:{}", pull_id),
-                    String::from_utf8_lossy(&buf[..n]).to_string(),
-                );
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
-            Err(_) => break,
-        }
-        if channel.eof() {
-            break;
-        }
-    }
-
-    channel.wait_close().ok();
-    let success = channel.exit_status().unwrap_or(-1) == 0;
-    let _ = ah.emit(&format!("pull-done:{}", pull_id), success);
+    services::images::remove_image(server_id, image_id, force, state).await
 }
 
 #[tauri::command]
@@ -126,26 +29,10 @@ pub fn start_image_pull(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
-    let server = get_server_config(&state, &server_id)?;
-    let pull_id = generate_id();
-    let (tx, rx) = mpsc::channel::<()>();
-
-    let pid = pull_id.clone();
-    let img = image.clone();
-    let ah = app_handle.clone();
-    std::thread::spawn(move || run_pull_thread(server, pid, img, rx, ah));
-
-    state
-        .streams
-        .lock()
-        .unwrap()
-        .insert(pull_id.clone(), StreamHandle { tx });
-    Ok(pull_id)
+    services::images::start_image_pull(server_id, image, state, app_handle)
 }
 
 #[tauri::command]
 pub fn cancel_stream(stream_id: String, state: State<AppState>) {
-    if let Some(h) = state.streams.lock().unwrap().remove(&stream_id) {
-        let _ = h.tx.send(());
-    }
+    services::images::cancel_stream(stream_id, state)
 }
