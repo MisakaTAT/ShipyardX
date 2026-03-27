@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Manager};
 
-use crate::models::ServerConfig;
+use crate::core::models::ServerConfig;
 
 pub fn get_data_file(app: &AppHandle) -> std::path::PathBuf {
     let data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
@@ -21,8 +21,3 @@ pub fn save_servers(path: &std::path::Path, servers: &[ServerConfig]) -> Result<
         .and_then(|json| std::fs::write(path, json).map_err(|e| e.to_string()))
 }
 
-pub fn generate_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    format!("{:x}{:x}", t.as_secs(), t.subsec_nanos())
-}

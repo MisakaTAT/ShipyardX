@@ -13,10 +13,10 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
-use crate::models::ServerConfig;
-use crate::ssh::create_ssh_session;
-use crate::state::{get_server_config, AppState, TerminalHandle, TerminalMsg};
-use crate::store::generate_id;
+use crate::core::models::ServerConfig;
+use crate::core::ssh::create_ssh_session;
+use crate::core::state::{get_server_config, AppState, TerminalHandle, TerminalMsg};
+use crate::utils::id::generate_id;
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
 

@@ -3,11 +3,11 @@ use std::sync::mpsc;
 
 use tauri::{AppHandle, Emitter, State};
 
-use crate::docker::{api_image_to_dto, docker_delete, docker_get, ApiImage};
-use crate::models::DockerImage;
-use crate::ssh::create_ssh_session;
-use crate::state::{get_server_config, AppState, StreamHandle};
-use crate::store::generate_id;
+use crate::core::docker::{api_image_to_dto, docker_delete, docker_get, ApiImage};
+use crate::core::models::DockerImage;
+use crate::core::ssh::create_ssh_session;
+use crate::core::state::{get_server_config, AppState, StreamHandle};
+use crate::utils::id::generate_id;
 
 #[tauri::command]
 pub async fn list_images(
@@ -43,24 +43,10 @@ pub async fn remove_image(
     .map_err(|e| e.to_string())?
 }
 
-/// 旧版同步拉取（保留兼容）
-#[tauri::command]
-pub async fn pull_image(
-    server_id: String,
-    image: String,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
-    use crate::ssh::ssh_exec;
-    let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || ssh_exec(&server, &format!("docker pull {}", image)))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
 // ── 流式拉取 ──────────────────────────────────────────────────
 
 fn run_pull_thread(
-    config: crate::models::ServerConfig,
+    config: crate::core::models::ServerConfig,
     pull_id: String,
     image: String,
     rx: mpsc::Receiver<()>,

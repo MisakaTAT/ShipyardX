@@ -93,7 +93,10 @@ export default function ServerOverview({ serverId }: Props) {
               </p>
             </div>
             {lastUpdated ? (
-              <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
+              <span
+                className="text-xs shrink-0"
+                style={{ color: "var(--text-muted)" }}
+              >
                 更新于 {lastUpdated}
               </span>
             ) : null}

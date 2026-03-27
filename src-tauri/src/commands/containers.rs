@@ -1,9 +1,9 @@
 use tauri::State;
 
-use crate::docker::{api_container_to_dto, docker_delete, docker_get, docker_post, ApiContainer};
-use crate::models::DockerContainer;
-use crate::ssh::ssh_exec;
-use crate::state::{get_server_config, AppState};
+use crate::core::docker::{api_container_to_dto, docker_delete, docker_get, docker_post, ApiContainer};
+use crate::core::models::DockerContainer;
+use crate::core::ssh::ssh_exec;
+use crate::core::state::{get_server_config, AppState};
 
 #[tauri::command]
 pub async fn list_containers(

@@ -3,10 +3,10 @@ use std::sync::mpsc;
 
 use tauri::{AppHandle, Emitter, State};
 
-use crate::models::ServerConfig;
-use crate::ssh::create_ssh_session;
-use crate::state::{get_server_config, AppState, StreamHandle};
-use crate::store::generate_id;
+use crate::core::models::ServerConfig;
+use crate::core::ssh::create_ssh_session;
+use crate::core::state::{get_server_config, AppState, StreamHandle};
+use crate::utils::id::generate_id;
 
 fn run_log_stream_thread(
     config: ServerConfig,

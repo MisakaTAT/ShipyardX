@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::models::ContainerStats;
+use crate::core::models::ContainerStats;
 
 // ── Docker Stats API 内部解析类型 ────────────────────────────
 
@@ -108,13 +108,13 @@ pub fn compute_stats(raw: RawStats) -> ContainerStats {
         .io_service_bytes_recursive
         .as_ref()
         .map(|entries| {
-            entries.iter().fold((0u64, 0u64), |(r, w), e| {
-                match e.op.to_lowercase().as_str() {
+            entries
+                .iter()
+                .fold((0u64, 0u64), |(r, w), e| match e.op.to_lowercase().as_str() {
                     "read" => (r + e.value, w),
                     "write" => (r, w + e.value),
                     _ => (r, w),
-                }
-            })
+                })
         })
         .unwrap_or((0, 0));
 

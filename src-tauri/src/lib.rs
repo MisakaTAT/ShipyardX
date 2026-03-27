@@ -1,19 +1,16 @@
 mod commands;
-mod docker;
-mod models;
-mod ssh;
-mod state;
-mod store;
+mod config;
+mod core;
+mod utils;
 
-pub use state::AppState;
+pub use core::state::AppState;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use store::{get_data_file, load_servers};
+use config::store::{get_data_file, load_servers};
 use tauri::Manager;
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_websocket::init())
@@ -47,7 +44,6 @@ pub fn run() {
             // 镜像管理
             commands::images::list_images,
             commands::images::remove_image,
-            commands::images::pull_image,
             commands::images::start_image_pull,
             commands::images::cancel_stream,
             // 系统信息 & 统计

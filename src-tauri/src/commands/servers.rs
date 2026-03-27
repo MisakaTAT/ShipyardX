@@ -1,9 +1,10 @@
 use tauri::State;
 
-use crate::models::ServerConfig;
-use crate::ssh::ssh_exec;
-use crate::state::{get_server_config, AppState};
-use crate::store::{generate_id, save_servers};
+use crate::config::store::save_servers;
+use crate::core::models::ServerConfig;
+use crate::core::ssh::ssh_exec;
+use crate::core::state::{get_server_config, AppState};
+use crate::utils::id::generate_id;
 
 #[tauri::command]
 pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {

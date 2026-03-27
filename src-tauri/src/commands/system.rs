@@ -1,11 +1,11 @@
 use tauri::State;
 
-use crate::docker::{
+use crate::core::docker::{
     docker_get,
     stats::{compute_stats, RawStats},
 };
-use crate::models::{ContainerStats, DockerInfo};
-use crate::state::{get_server_config, AppState};
+use crate::core::models::{ContainerStats, DockerInfo};
+use crate::core::state::{get_server_config, AppState};
 
 #[tauri::command]
 pub async fn get_docker_info(
