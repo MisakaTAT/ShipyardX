@@ -55,7 +55,10 @@ export default function ServerOverview({ serverId }: Props) {
   return (
     <div className="h-full overflow-auto" style={{ background: 'var(--bg-app)' }}>
       <div className="space-y-3">
-        <div className="rounded-xl border border-border px-4 py-3 md:px-5 md:py-4" style={{ background: 'var(--bg-panel)' }}>
+        <div
+          className="rounded-xl border border-border px-4 py-3 md:px-5 md:py-4"
+          style={{ background: 'var(--bg-panel)' }}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -87,9 +90,7 @@ export default function ServerOverview({ serverId }: Props) {
         </div>
 
         {loading && !info ? (
-          <div
-            className="flex items-center gap-2 rounded-xl border border-border px-4 py-6 text-xs text-(--text-muted)"
-          >
+          <div className="flex items-center gap-2 rounded-xl border border-border px-4 py-6 text-xs text-(--text-muted)">
             <div className="w-3 h-3 border border-(--accent) border-t-transparent rounded-full animate-spin" />
             加载主机信息...
           </div>

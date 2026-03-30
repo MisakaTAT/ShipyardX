@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from './ConfirmDialog'
 import { cn } from '@/lib/utils'
+import { formatUnixSeconds } from '@/utils/datetime'
 
 interface ImagePanelProps {
   serverId: string
@@ -242,8 +243,8 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
                   <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {img.size}
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {img.created_at}
+                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                    <span title={formatUnixSeconds(img.created_ts)}>{formatUnixSeconds(img.created_ts)}</span>
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">

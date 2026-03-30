@@ -214,7 +214,10 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
   return (
     <div className="flex flex-col h-full" style={{ background: '#0d1117' }}>
       {/* 状态栏 */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2" style={{ background: 'var(--bg-panel)' }}>
+      <div
+        className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2"
+        style={{ background: 'var(--bg-panel)' }}
+      >
         <TerminalIcon className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
         <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
           {serverName}

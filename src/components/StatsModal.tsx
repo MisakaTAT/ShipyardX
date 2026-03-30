@@ -87,7 +87,10 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
     cyan: '#39c5cf',
   }
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3" style={{ background: 'var(--bg-surface)' }}>
+    <div
+      className="flex items-center gap-3 rounded-lg border border-border px-4 py-3"
+      style={{ background: 'var(--bg-surface)' }}
+    >
       <div className="shrink-0" style={{ color: colorMap[color] ?? '#58a6ff' }}>
         {icon}
       </div>
@@ -204,9 +207,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
                 />
               </div>
 
-              {lastUpdated ? (
-                <div className="text-center text-xs text-(--text-muted)">更新于 {lastUpdated}</div>
-              ) : null}
+              {lastUpdated ? <div className="text-center text-xs text-(--text-muted)">更新于 {lastUpdated}</div> : null}
             </>
           ) : null}
         </div>

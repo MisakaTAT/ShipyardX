@@ -1,17 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Box, Layers, Terminal, Server as ServerIcon, Unplug, ShieldAlert, RefreshCw, Loader2 } from 'lucide-react'
+import {
+  Box,
+  Layers,
+  Terminal,
+  Server as ServerIcon,
+  Unplug,
+  ShieldAlert,
+  RefreshCw,
+  Loader2,
+  Share2,
+  Database,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import type { Server } from '../types'
 import ContainerPanel from '../components/ContainerPanel'
 import ImagePanel from '../components/ImagePanel'
+import NetworkPanel from '../components/NetworkPanel'
 import TerminalPanel from '../components/TerminalPanel'
 import ServerOverview from '../components/ServerOverview'
+import VolumePanel from '../components/VolumePanel'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'containers' | 'images' | 'terminal'
+type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'terminal'
 type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
 interface NavItem {
@@ -24,6 +37,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'overview', icon: <ServerIcon className="size-[18px]" />, label: '概览' },
   { key: 'containers', icon: <Box className="size-[18px]" />, label: '容器' },
   { key: 'images', icon: <Layers className="size-[18px]" />, label: '镜像' },
+  { key: 'networks', icon: <Share2 className="size-[18px]" />, label: '网络' },
+  { key: 'volumes', icon: <Database className="size-[18px]" />, label: '存储卷' },
   { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
 ]
 
@@ -151,6 +166,8 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
           {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} /> : null}
           {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} /> : null}
           {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'networks' ? <NetworkPanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'terminal' ? (
             <TerminalPanel
               serverId={selectedServer.id}

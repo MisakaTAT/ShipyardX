@@ -16,8 +16,10 @@ pub async fn list_images(
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/images/json")?;
-        let api: Vec<ApiImage> =
+        let mut api: Vec<ApiImage> =
             serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
+        // 按创建时间倒序（最新在前）
+        api.sort_by(|a, b| b.created.cmp(&a.created));
         Ok(api.into_iter().map(api_image_to_dto).collect())
     })
     .await

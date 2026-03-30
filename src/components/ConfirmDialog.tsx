@@ -63,9 +63,7 @@ export function ConfirmDialog({
             ) : (
               <DialogDescription className="sr-only">请确认是否继续</DialogDescription>
             )}
-            {extra ? (
-              <div className={cn('pt-3', pending && 'pointer-events-none opacity-60')}>{extra}</div>
-            ) : null}
+            {extra ? <div className={cn('pt-3', pending && 'pointer-events-none opacity-60')}>{extra}</div> : null}
           </DialogHeader>
         </div>
         <DialogFooter className="mx-0 mb-0 shrink-0 gap-2 bg-(--bg-surface)/40 px-6 pt-3 pb-4 sm:flex-row sm:justify-end">

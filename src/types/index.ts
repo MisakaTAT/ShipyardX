@@ -16,8 +16,7 @@ export interface Container {
   status: string
   state: string
   ports: string
-  created_at: string
-  running_for: string
+  created_ts: number
 }
 
 export interface DockerImage {
@@ -25,8 +24,28 @@ export interface DockerImage {
   repository: string
   tag: string
   size: string
+  created_ts: number
+}
+
+export interface DockerNetwork {
+  id: string
+  name: string
+  driver: string
+  scope: string
   created_at: string
-  created_since: string
+  subnets: string[]
+  gateways: string[]
+  labels: string[]
+  internal: boolean
+  attachable: boolean
+}
+
+export interface DockerVolume {
+  name: string
+  driver: string
+  mountpoint: string
+  scope: string
+  created_at: string
 }
 
 export interface DockerInfo {

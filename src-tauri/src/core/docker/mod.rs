@@ -149,21 +149,6 @@ pub fn format_bytes(bytes: i64) -> String {
     }
 }
 
-pub fn time_ago(ts: i64) -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
-    let diff = now.saturating_sub(ts);
-    match diff {
-        0..=59 => "刚刚".to_string(),
-        60..=3599 => format!("{} 分钟前", diff / 60),
-        3600..=86399 => format!("{} 小时前", diff / 3600),
-        86400..=2591999 => format!("{} 天前", diff / 86400),
-        _ => format!("{} 个月前", diff / 2592000),
-    }
-}
-
 pub fn api_container_to_dto(c: ApiContainer) -> DockerContainer {
     let name = c
         .names
@@ -177,8 +162,7 @@ pub fn api_container_to_dto(c: ApiContainer) -> DockerContainer {
         state: c.state,
         status: c.status,
         ports: format_ports(&c.ports),
-        created_at: time_ago(c.created),
-        running_for: time_ago(c.created),
+        created_ts: c.created,
     }
 }
 
@@ -199,7 +183,6 @@ pub fn api_image_to_dto(img: ApiImage) -> DockerImage {
         repository,
         tag,
         size: format_bytes(img.size),
-        created_at: time_ago(img.created),
-        created_since: time_ago(img.created),
+        created_ts: img.created,
     }
 }

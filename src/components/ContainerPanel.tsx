@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
+import { formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
   serverId: string
@@ -150,7 +151,10 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
       {/* Toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3" style={{ background: 'var(--bg-panel)' }}>
+      <div
+        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
+        style={{ background: 'var(--bg-panel)' }}
+      >
         <Box className="w-4 h-4 shrink-0" style={{ color: 'var(--text-soft)' }} />
         <span className="text-sm font-medium mr-1" style={{ color: 'var(--text-base)' }}>
           容器
@@ -312,7 +316,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {c.running_for}
+                      <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
