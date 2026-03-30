@@ -26,3 +26,4 @@ ssh2 = "0.9"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 tauri-plugin-websocket = "2"
 tungstenite = "0.23"
+keyring = "3"
