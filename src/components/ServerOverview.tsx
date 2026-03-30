@@ -103,6 +103,7 @@ export default function ServerOverview({ serverId }: Props) {
 
             <InfoSection title="Docker 引擎">
               <InfoRow label="引擎版本" value={info?.server_version || '—'} />
+              <InfoRow label="API 版本" value={info?.api_version || '—'} />
               <InfoRow label="存储驱动" value={info?.storage_driver || '—'} />
               <InfoRow label="警告数量" value={String(warnings)} highlight={warnings > 0} />
             </InfoSection>

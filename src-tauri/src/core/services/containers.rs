@@ -1,7 +1,8 @@
 use tauri::State;
 
 use crate::core::docker::{
-    api_container_to_dto, docker_delete, docker_get, docker_post, ApiContainer,
+    api_container_to_dto, docker_delete, docker_get, docker_post, resolve_api_version,
+    ApiContainer,
 };
 use crate::core::models::DockerContainer;
 use crate::core::ssh::ssh_exec;
@@ -13,7 +14,7 @@ pub async fn list_containers(
 ) -> Result<Vec<DockerContainer>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, "/v1.41/containers/json?all=1")?;
+        let resp = docker_get(&server, "/containers/json?all=1")?;
         let api: Vec<ApiContainer> = serde_json::from_str(&resp).map_err(|e| {
             format!(
                 "解析容器列表失败: {} — 原始响应: {}",
@@ -36,7 +37,7 @@ pub async fn start_container(
     tokio::task::spawn_blocking(move || {
         docker_post(
             &server,
-            &format!("/v1.41/containers/{}/start", container_id),
+            &format!("/containers/{}/start", container_id),
         )
     })
     .await
@@ -50,7 +51,7 @@ pub async fn stop_container(
 ) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        docker_post(&server, &format!("/v1.41/containers/{}/stop", container_id))
+        docker_post(&server, &format!("/containers/{}/stop", container_id))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -65,7 +66,7 @@ pub async fn restart_container(
     tokio::task::spawn_blocking(move || {
         docker_post(
             &server,
-            &format!("/v1.41/containers/{}/restart", container_id),
+            &format!("/containers/{}/restart", container_id),
         )
     })
     .await
@@ -82,7 +83,7 @@ pub async fn remove_container(
     tokio::task::spawn_blocking(move || {
         docker_delete(
             &server,
-            &format!("/v1.41/containers/{}?force={}", container_id, force),
+            &format!("/containers/{}?force={}", container_id, force),
         )
     })
     .await
@@ -98,11 +99,12 @@ pub async fn get_container_logs(
 ) -> Result<String, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
+        let ver = resolve_api_version(&server)?;
         let ts = if timestamps { "&timestamps=1" } else { "" };
         let cmd = format!(
             "curl -s --unix-socket /var/run/docker.sock \
-            'http://localhost/v1.41/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
-            container_id, tail, ts
+            'http://localhost/v{}/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
+            ver, container_id, tail, ts
         );
         let b64 = ssh_exec(&server, &cmd)?;
         let raw = base64_decode(b64.trim())?;

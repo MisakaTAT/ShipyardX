@@ -20,6 +20,7 @@ pub struct DockerInfo {
     pub containers_stopped: i64,
     pub images: i64,
     pub server_version: String,
+    pub api_version: String,
     pub name: String,
     pub ncpu: i64,
     pub mem_total: i64,

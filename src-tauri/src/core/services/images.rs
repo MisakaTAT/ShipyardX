@@ -15,7 +15,7 @@ pub async fn list_images(
 ) -> Result<Vec<DockerImage>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, "/v1.41/images/json")?;
+        let resp = docker_get(&server, "/images/json")?;
         let api: Vec<ApiImage> =
             serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
         Ok(api.into_iter().map(api_image_to_dto).collect())
@@ -34,7 +34,7 @@ pub async fn remove_image(
     tokio::task::spawn_blocking(move || {
         docker_delete(
             &server,
-            &format!("/v1.41/images/{}?force={}", image_id, force),
+            &format!("/images/{}?force={}", image_id, force),
         )
     })
     .await

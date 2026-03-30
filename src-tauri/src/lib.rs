@@ -48,6 +48,7 @@ pub fn run() {
             commands::images::start_image_pull,
             commands::images::cancel_stream,
             // 系统信息 & 统计
+            commands::system::check_docker_access,
             commands::system::get_docker_info,
             commands::system::get_container_stats,
             // 日志流

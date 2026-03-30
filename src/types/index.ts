@@ -36,6 +36,7 @@ export interface DockerInfo {
   containers_stopped: number
   images: number
   server_version: string
+  api_version: string
   name: string
   ncpu: number
   mem_total: number

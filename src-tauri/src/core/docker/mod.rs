@@ -1,11 +1,41 @@
 pub mod stats;
 
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
 use serde::Deserialize;
 
 use crate::core::models::{DockerContainer, DockerImage, ServerConfig};
 use crate::core::ssh::ssh_exec;
 
-// ── Docker REST API 内部类型 ──────────────────────────────────
+fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn cache_key(config: &ServerConfig) -> String {
+    format!("{}@{}:{}", config.username, config.host, config.port)
+}
+
+pub fn invalidate_api_version(config: &ServerConfig) {
+    api_version_cache().lock().unwrap().remove(&cache_key(config));
+}
+
+pub fn resolve_api_version(config: &ServerConfig) -> Result<String, String> {
+    let key = cache_key(config);
+    if let Some(ver) = api_version_cache().lock().unwrap().get(&key) {
+        return Ok(ver.clone());
+    }
+    let cmd = "curl -s --unix-socket /var/run/docker.sock 'http://localhost/version'";
+    let resp = ssh_exec(config, cmd)?;
+    let v: serde_json::Value = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
+    let api_ver = v["ApiVersion"]
+        .as_str()
+        .ok_or_else(|| "无法获取 Docker API 版本".to_string())?
+        .to_string();
+    api_version_cache().lock().unwrap().insert(key, api_ver.clone());
+    Ok(api_ver)
+}
 
 #[derive(Deserialize)]
 pub(crate) struct ApiContainer {
@@ -49,12 +79,11 @@ pub(crate) struct ApiImage {
     pub created: i64,
 }
 
-// ── Docker API 辅助函数 ──────────────────────────────────────
-
 pub fn docker_get(config: &ServerConfig, path: &str) -> Result<String, String> {
+    let ver = resolve_api_version(config)?;
     let cmd = format!(
-        "curl -s --unix-socket /var/run/docker.sock 'http://localhost{}'",
-        path
+        "curl -s --unix-socket /var/run/docker.sock 'http://localhost/v{}{}'",
+        ver, path
     );
     let resp = ssh_exec(config, &cmd)?;
     check_docker_error(&resp)?;
@@ -62,24 +91,25 @@ pub fn docker_get(config: &ServerConfig, path: &str) -> Result<String, String> {
 }
 
 pub fn docker_post(config: &ServerConfig, path: &str) -> Result<(), String> {
+    let ver = resolve_api_version(config)?;
     let cmd = format!(
-        "curl -s -X POST --unix-socket /var/run/docker.sock 'http://localhost{}'",
-        path
+        "curl -s -X POST --unix-socket /var/run/docker.sock 'http://localhost/v{}{}'",
+        ver, path
     );
     let resp = ssh_exec(config, &cmd)?;
     check_docker_error(&resp)
 }
 
 pub fn docker_delete(config: &ServerConfig, path: &str) -> Result<(), String> {
+    let ver = resolve_api_version(config)?;
     let cmd = format!(
-        "curl -s -X DELETE --unix-socket /var/run/docker.sock 'http://localhost{}'",
-        path
+        "curl -s -X DELETE --unix-socket /var/run/docker.sock 'http://localhost/v{}{}'",
+        ver, path
     );
     let resp = ssh_exec(config, &cmd)?;
     check_docker_error(&resp)
 }
 
-/// 解析 Docker API 结构化错误 `{"message": "..."}`
 pub fn check_docker_error(resp: &str) -> Result<(), String> {
     let trimmed = resp.trim();
     if trimmed.is_empty() {
@@ -92,8 +122,6 @@ pub fn check_docker_error(resp: &str) -> Result<(), String> {
     }
     Ok(())
 }
-
-// ── 格式化工具 ──────────────────────────────────────────────
 
 pub fn format_ports(ports: &[ApiPort]) -> String {
     ports
@@ -135,8 +163,6 @@ pub fn time_ago(ts: i64) -> String {
         _ => format!("{} 个月前", diff / 2592000),
     }
 }
-
-// ── DTO 转换 ───────────────────────────────────────────────
 
 pub fn api_container_to_dto(c: ApiContainer) -> DockerContainer {
     let name = c
