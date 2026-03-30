@@ -1,6 +1,5 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Server as ServerIcon, Settings, Sun, Moon } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -16,20 +15,11 @@ function siderNavButtonClass(active?: boolean, disabled?: boolean) {
 
 interface SiderProps {
   light: boolean
-  /** 已连接时为非空，用于断开提示与点击行为 */
   connectedServerName: string | null
-  onDisconnect: () => void
   onToggleTheme: () => void
 }
 
-export default function Sider({ light, connectedServerName, onDisconnect, onToggleTheme }: SiderProps) {
-  const handleServerNavClick = () => {
-    if (!connectedServerName) return
-    const label = connectedServerName
-    onDisconnect()
-    toast.success(`连接 ${label} 已断开`)
-  }
-
+export default function Sider({ light, connectedServerName, onToggleTheme }: SiderProps) {
   return (
     <nav
       className="flex w-14 shrink-0 flex-col items-center border-r border-border py-3"
@@ -39,9 +29,9 @@ export default function Sider({ light, connectedServerName, onDisconnect, onTogg
         <Button
           type="button"
           variant="ghost"
-          title={connectedServerName ? `已连接「${connectedServerName}」，点击断开` : '服务器列表'}
-          className={siderNavButtonClass(true)}
-          onClick={handleServerNavClick}
+          title="服务器列表"
+          className={siderNavButtonClass(true, Boolean(connectedServerName))}
+          disabled={Boolean(connectedServerName)}
         >
           <ServerIcon size={18} />
         </Button>

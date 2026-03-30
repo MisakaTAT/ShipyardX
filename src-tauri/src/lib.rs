@@ -34,6 +34,7 @@ pub fn run() {
             commands::servers::update_server,
             commands::servers::delete_server,
             commands::servers::test_connection,
+            commands::servers::test_connection_direct,
             // 容器管理
             commands::containers::list_containers,
             commands::containers::start_container,

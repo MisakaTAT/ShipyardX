@@ -51,8 +51,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
       data-slot="tabs-trigger"
       className={cn(
         "relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--accent-text)/40 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
-        'text-(--text-soft) hover:text-(--text-base)',
-        'data-[state=inactive]:bg-transparent',
+        'text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)',
         'data-[state=active]:bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] data-[state=active]:text-(--accent-text)',
         'group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none',
         className,

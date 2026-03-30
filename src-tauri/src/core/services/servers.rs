@@ -39,6 +39,14 @@ pub fn delete_server(id: String, state: State<AppState>) -> Result<Vec<ServerCon
 
 pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> Result<String, String> {
     let server = get_server_config(&state, &server_id)?;
+    test_connection_with_config(server).await
+}
+
+pub async fn test_connection_direct(server: ServerConfig) -> Result<String, String> {
+    test_connection_with_config(server).await
+}
+
+async fn test_connection_with_config(server: ServerConfig) -> Result<String, String> {
     tokio::task::spawn_blocking(move || {
         ssh_exec(&server, "docker version --format 'Server: {{.Server.Version}}'")
             .map(|v| format!("连接成功！Docker {}", v.trim()))

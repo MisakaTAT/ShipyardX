@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Box, Layers, Terminal, Server as ServerIcon } from 'lucide-react'
+import { Box, Layers, Terminal, Server as ServerIcon, Unplug } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Server } from '../types'
 import ContainerPanel from '../components/ContainerPanel'
 import ImagePanel from '../components/ImagePanel'
 import TerminalPanel from '../components/TerminalPanel'
 import ServerOverview from '../components/ServerOverview'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
@@ -25,14 +27,21 @@ const NAV_ITEMS: NavItem[] = [
 
 interface WorkspacePageProps {
   selectedServer: Server
+  onDisconnect: () => void
 }
 
-export default function WorkspacePage({ selectedServer }: WorkspacePageProps) {
+export default function WorkspacePage({ selectedServer, onDisconnect }: WorkspacePageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   useEffect(() => {
     setActiveTab('overview')
   }, [selectedServer.id])
+
+  const handleDisconnect = () => {
+    const label = selectedServer.name
+    onDisconnect()
+    toast.success(`连接 ${label} 已断开`)
+  }
 
   return (
     <div className="flex-1 overflow-auto p-2 md:p-3">
@@ -48,6 +57,19 @@ export default function WorkspacePage({ selectedServer }: WorkspacePageProps) {
                 {item.label}
               </TabsTrigger>
             ))}
+
+            <div className="ml-auto flex items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9 rounded-full text-(--text-muted) hover:bg-red-500/15 hover:text-red-500"
+                title="断开连接"
+                onClick={handleDisconnect}
+              >
+                <Unplug className="size-[18px]" />
+              </Button>
+            </div>
           </TabsList>
         </Tabs>
 

@@ -37,3 +37,10 @@ pub async fn test_connection(
 ) -> Result<String, String> {
     services::servers::test_connection(server_id, state).await
 }
+
+#[tauri::command]
+pub async fn test_connection_direct(
+    server: ServerConfig,
+) -> Result<String, String> {
+    services::servers::test_connection_direct(server).await
+}

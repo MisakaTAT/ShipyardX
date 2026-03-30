@@ -27,16 +27,11 @@ export default function Layout() {
       className="flex h-screen overflow-hidden select-none"
       style={{ background: 'var(--bg-app)', color: 'var(--text-base)' }}
     >
-      <Sider
-        light={light}
-        connectedServerName={selectedServer?.name ?? null}
-        onDisconnect={() => setSelectedServer(null)}
-        onToggleTheme={toggleTheme}
-      />
+      <Sider light={light} connectedServerName={selectedServer?.name ?? null} onToggleTheme={toggleTheme} />
 
       <main className="flex flex-1 flex-col overflow-hidden" style={{ background: 'var(--bg-app)' }}>
         {selectedServer ? (
-          <WorkspacePage selectedServer={selectedServer} />
+          <WorkspacePage selectedServer={selectedServer} onDisconnect={() => setSelectedServer(null)} />
         ) : (
           <ConnectPage onConnect={setSelectedServer} />
         )}

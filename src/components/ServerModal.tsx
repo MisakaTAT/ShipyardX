@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { toast } from 'sonner'
 import { Server } from '../types'
-import { X, Loader2, CheckCircle } from 'lucide-react'
+import { X, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,15 +28,13 @@ const defaultForm = (): Omit<Server, 'id'> => ({
 export default function ServerModal({ open, onOpenChange, server, onSave }: ServerModalProps) {
   const [form, setForm] = useState<Omit<Server, 'id'>>(server ? { ...server } : defaultForm())
   const [loading, setLoading] = useState(false)
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const isEdit = !!server
 
   useEffect(() => {
     if (!open) return
     setForm(server ? { ...server } : defaultForm())
-    setTestResult(null)
-    setError('')
+    setShowPassword(false)
   }, [open, server?.id])
 
   const handleOpenChange = (next: boolean) => {
@@ -44,17 +43,16 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
 
   const update = (key: keyof Omit<Server, 'id'>, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }))
-    setTestResult(null)
-    setError('')
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) return setError('请填写服务器名称')
-    if (!form.host.trim()) return setError('请填写主机地址')
-    if (!form.username.trim()) return setError('请填写用户名')
+    if (!form.name.trim()) return toast.warning('请填写服务器名称')
+    if (!form.host.trim()) return toast.warning('请填写主机地址')
+    if (!form.username.trim()) return toast.warning('请填写用户名')
+    if (form.auth_type === 'password' && !form.password?.trim()) return toast.warning('请填写密码')
+    if (form.auth_type === 'key' && !form.key_path?.trim()) return toast.warning('请填写密钥路径')
 
     setLoading(true)
-    setError('')
     try {
       let servers: Server[]
       if (isEdit && server) {
@@ -69,26 +67,25 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
       onSave(servers)
       onOpenChange(false)
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
   }
 
   const handleTest = async () => {
-    if (!form.host.trim()) return setError('请先填写主机地址')
-    if (!server) {
-      setError('请先保存服务器配置再测试连接')
-      return
-    }
+    if (!form.host.trim()) return toast.warning('请先填写主机地址')
+    if (!form.username.trim()) return toast.warning('请先填写用户名')
+    if (form.auth_type === 'password' && !form.password?.trim()) return toast.warning('请填写密码')
+    if (form.auth_type === 'key' && !form.key_path?.trim()) return toast.warning('请填写密钥路径')
     setLoading(true)
-    setTestResult(null)
-    setError('')
     try {
-      const msg = await invoke<string>('test_connection', { serverId: server.id })
-      setTestResult({ ok: true, msg })
+      const msg = await invoke<string>('test_connection_direct', {
+        server: { ...form, id: server?.id ?? '' },
+      })
+      toast.success(msg)
     } catch (e) {
-      setTestResult({ ok: false, msg: String(e) })
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -175,18 +172,30 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
 
           {form.auth_type === 'password' ? (
             <div className="space-y-1.5">
-              <Label className="text-xs text-(--text-soft)">密码</Label>
-              <Input
-                type="password"
-                value={form.password || ''}
-                onChange={(e) => update('password', e.target.value)}
-                placeholder="SSH 登录密码"
-                className="h-10 text-sm"
-              />
+              <Label className="text-xs text-(--text-soft)">密码 *</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password || ''}
+                  onChange={(e) => update('password', e.target.value)}
+                  placeholder="SSH 登录密码"
+                  className="h-10 pr-10 text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <Label className="text-xs text-(--text-soft)">密钥路径</Label>
+              <Label className="text-xs text-(--text-soft)">密钥路径 *</Label>
               <Input
                 value={form.key_path || ''}
                 onChange={(e) => update('key_path', e.target.value)}
@@ -195,41 +204,20 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
               />
             </div>
           )}
-
-          {error ? (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">{error}</p>
-          ) : null}
-
-          {testResult ? (
-            <div
-              className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
-                testResult.ok
-                  ? 'border-green-500/30 bg-green-500/10 text-green-500'
-                  : 'border-red-500/30 bg-red-500/10 text-red-500'
-              }`}
-            >
-              <CheckCircle className="mt-0.5 size-3.5 shrink-0" />
-              <span>{testResult.msg}</span>
-            </div>
-          ) : null}
         </div>
 
         <div className="flex items-center justify-between border-t border-border px-6 py-4">
-          {isEdit ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={loading}
-              className="text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)"
-              onClick={handleTest}
-            >
-              {loading ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              测试连接
-            </Button>
-          ) : (
-            <span />
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={loading}
+            className="text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)"
+            onClick={handleTest}
+          >
+            {loading ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            测试连接
+          </Button>
           <div className="flex gap-2">
             <Button
               type="button"
