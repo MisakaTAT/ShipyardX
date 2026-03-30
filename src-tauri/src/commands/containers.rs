@@ -54,7 +54,8 @@ pub async fn get_container_logs(
     server_id: String,
     container_id: String,
     tail: u32,
+    timestamps: bool,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    services::containers::get_container_logs(server_id, container_id, tail, state).await
+    services::containers::get_container_logs(server_id, container_id, tail, timestamps, state).await
 }

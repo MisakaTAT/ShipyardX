@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import '@xterm/xterm/css/xterm.css'
+import { AnsiUp } from 'ansi_up'
+import { Virtuoso } from 'react-virtuoso'
 import { X, RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 interface Props {
   serverId: string
@@ -22,10 +22,36 @@ function formatTimestamp(): string {
   return new Date().toLocaleTimeString('zh-CN')
 }
 
+function logPayloadToBytes(payload: unknown): Uint8Array | null {
+  if (payload == null) return null
+  if (payload instanceof Uint8Array) return payload
+  if (payload instanceof ArrayBuffer) return new Uint8Array(payload)
+  if (Array.isArray(payload)) return new Uint8Array(payload as number[])
+  return null
+}
+
+function getEventPayload(event: unknown): unknown {
+  if (event && typeof event === 'object' && 'payload' in event) {
+    return (event as { payload: unknown }).payload
+  }
+  return event
+}
+
+function LogLine({ line, ansi }: { line: string; ansi: AnsiUp }) {
+  const html = useMemo(() => ansi.ansi_to_html(line.length ? line : '\u00a0'), [ansi, line])
+  return (
+    <div
+      className="px-3 font-mono text-[13px] leading-[1.45] wrap-break-word text-[#e6edf3]"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
 export default function LogModal({ serverId, containerId, containerName, onClose }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const termRef = useRef<Terminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
+  const ansi = useMemo(() => new AnsiUp(), [])
+
+  const streamDecoderRef = useRef(new TextDecoder('utf-8', { fatal: false }))
+  const streamLineBufferRef = useRef('')
   const streamIdRef = useRef<string | null>(null)
   const unlistenDataRef = useRef<UnlistenFn | null>(null)
   const unlistenDoneRef = useRef<UnlistenFn | null>(null)
@@ -36,59 +62,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
-  const [lineCount, setLineCount] = useState(0)
-
-  useEffect(() => {
-    if (!containerRef.current || termRef.current) return
-
-    const term = new Terminal({
-      theme: {
-        background: '#0d1117',
-        foreground: '#e6edf3',
-        cursor: '#e6edf3',
-        black: '#21262d',
-        red: '#ff7b72',
-        green: '#3fb950',
-        yellow: '#d29922',
-        blue: '#58a6ff',
-        magenta: '#bc8cff',
-        cyan: '#39c5cf',
-        white: '#b1bac4',
-        brightBlack: '#6e7681',
-        brightRed: '#ffa198',
-        brightGreen: '#56d364',
-        brightYellow: '#e3b341',
-        brightBlue: '#79c0ff',
-        brightMagenta: '#d2a8ff',
-        brightCyan: '#56d4dd',
-        brightWhite: '#f0f6fc',
-        selectionBackground: '#264f78',
-      },
-      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-      fontSize: 13,
-      lineHeight: 1.4,
-      scrollback: 5000,
-      disableStdin: true,
-      cursorBlink: false,
-    })
-
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    term.open(containerRef.current)
-    setTimeout(() => fitAddon.fit(), 50)
-
-    termRef.current = term
-    fitAddonRef.current = fitAddon
-
-    const ro = new ResizeObserver(() => fitAddon.fit())
-    ro.observe(containerRef.current)
-
-    return () => {
-      ro.disconnect()
-      term.dispose()
-      termRef.current = null
-    }
-  }, [])
+  const [lines, setLines] = useState<string[]>([])
 
   const stopStream = useCallback(async () => {
     if (unlistenDataRef.current) {
@@ -113,8 +87,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     await stopStream()
     setError('')
     setLoading(true)
-    termRef.current?.clear()
-    setLineCount(0)
+    setLines([])
+    streamLineBufferRef.current = ''
     try {
       const logs = await invoke<string>('get_container_logs', {
         serverId,
@@ -122,11 +96,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
         tail,
         timestamps,
       })
-      if (termRef.current) {
-        const lines = logs.split('\n')
-        setLineCount(lines.filter((l) => l).length)
-        termRef.current.write(logs.replace(/\r?\n/g, '\r\n'))
-      }
+      const normalized = logs.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      setLines(normalized.length ? normalized.split('\n') : [])
     } catch (e) {
       setError(String(e))
     } finally {
@@ -137,9 +108,9 @@ export default function LogModal({ serverId, containerId, containerName, onClose
   const startFollow = useCallback(async () => {
     await stopStream()
     setError('')
-    termRef.current?.clear()
-    setLineCount(0)
-    termRef.current?.write(`\x1b[2m[${formatTimestamp()}] 正在连接日志流...\x1b[0m\r\n`)
+    streamDecoderRef.current = new TextDecoder('utf-8', { fatal: false })
+    streamLineBufferRef.current = ''
+    setLines([`[${formatTimestamp()}] 正在连接日志流...`])
 
     try {
       const streamId = await invoke<string>('start_log_stream', {
@@ -150,16 +121,27 @@ export default function LogModal({ serverId, containerId, containerName, onClose
       })
       streamIdRef.current = streamId
 
-      let count = 0
-      unlistenDataRef.current = await listen<number[]>(`log-data:${streamId}`, (event) => {
-        const bytes = new Uint8Array(event.payload)
-        termRef.current?.write(bytes)
-        count += event.payload.filter((b: number) => b === 10).length
-        setLineCount(count)
+      unlistenDataRef.current = await listen(`log-data:${streamId}`, (event) => {
+        const bytes = logPayloadToBytes(getEventPayload(event))
+        if (!bytes?.length) return
+        const chunk = streamDecoderRef.current.decode(bytes, { stream: true })
+        streamLineBufferRef.current += chunk
+        const buf = streamLineBufferRef.current
+        const parts = buf.split('\n')
+        const incomplete = parts.pop() ?? ''
+        streamLineBufferRef.current = incomplete
+        if (parts.length) {
+          setLines((prev) => [...prev, ...parts])
+        }
       })
 
       unlistenDoneRef.current = await listen(`log-done:${streamId}`, () => {
-        termRef.current?.write(`\r\n\x1b[2m[${formatTimestamp()}] 日志流已结束\x1b[0m\r\n`)
+        const flushed = streamDecoderRef.current.decode(new Uint8Array(), { stream: false })
+        streamLineBufferRef.current += flushed ?? ''
+        const remaining = streamLineBufferRef.current
+        streamLineBufferRef.current = ''
+        const tailParts = remaining.length ? remaining.split('\n') : []
+        setLines((prev) => [...prev, ...tailParts, `[${formatTimestamp()}] 日志流已结束`])
         setFollow(false)
         streamIdRef.current = null
       })
@@ -199,15 +181,13 @@ export default function LogModal({ serverId, containerId, containerName, onClose
   }, [stopStream, onClose])
 
   const handleCopy = useCallback(() => {
-    if (!termRef.current) return
-    termRef.current.selectAll()
-    const fullText = termRef.current.getSelection()
-    termRef.current.clearSelection()
-    void navigator.clipboard.writeText(fullText).then(() => {
+    void navigator.clipboard.writeText(lines.join('\n')).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
-  }, [])
+  }, [lines])
+
+  const lineCount = lines.length
 
   return (
     <Dialog
@@ -218,20 +198,21 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     >
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[80vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        className={cn(
+          'flex! h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
+          'fixed! inset-0! left-0! top-0! translate-x-0! translate-y-0!',
+          'sm:max-w-full',
+        )}
       >
         <div
-          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3"
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
           style={{ background: 'var(--bg-panel)' }}
         >
           <span className="mr-1 font-mono text-sm font-semibold text-(--text-strong)">{containerName}</span>
           <span className="mr-2 text-xs text-(--text-muted)">日志</span>
 
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
-            <SelectTrigger
-              size="sm"
-              className="h-7 border-(--border-sub) bg-(--bg-surface) text-xs text-(--text-base)"
-            >
+            <SelectTrigger size="sm" className="h-8 border-(--border-sub) bg-(--bg-input) text-xs text-(--text-base)">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -245,40 +226,34 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
           <Button
             type="button"
-            variant="outline"
+            variant={timestamps ? 'secondary' : 'ghost'}
             size="sm"
+            className="gap-1.5"
             disabled={follow}
             title="显示时间戳"
             onClick={() => setTimestamps((t) => !t)}
-            className={
-              timestamps
-                ? 'h-7 border-(--accent) bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-xs text-(--accent-text)'
-                : 'h-7 border-(--border-sub) bg-(--bg-surface) text-xs text-(--text-soft)'
-            }
           >
-            <Clock className="size-3" />
+            <Clock className="size-3.5 stroke-[2.5]" />
             时间戳
           </Button>
 
           <Button
             type="button"
-            variant="outline"
+            variant={follow ? 'outline' : 'default'}
             size="sm"
+            className="gap-1.5"
             title={follow ? '停止跟踪' : '实时跟踪'}
             onClick={() => setFollow((f) => !f)}
-            className={`h-7 text-xs ${
-              follow
-                ? 'border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20'
-                : 'border-green-500/30 bg-green-500/10 text-green-500 hover:bg-green-500/20'
-            }`}
           >
             {follow ? (
               <>
-                <Square className="size-3" /> 停止
+                <Square className="size-3.5 stroke-[2.5]" />
+                停止
               </>
             ) : (
               <>
-                <Play className="size-3" /> 跟踪
+                <Play className="size-3.5 stroke-[2.5]" />
+                跟踪
               </>
             )}
           </Button>
@@ -286,26 +261,25 @@ export default function LogModal({ serverId, containerId, containerName, onClose
           {!follow ? (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
+              className="gap-1.5"
               disabled={loading}
               title="刷新"
               onClick={() => void loadStaticLogs()}
-              className="h-7 border-(--border-sub) bg-(--bg-surface) text-(--text-soft)"
             >
-              <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-3.5 stroke-[2.5] ${loading ? 'animate-spin' : ''}`} />
+              刷新
             </Button>
           ) : null}
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            title="复制全部"
-            onClick={handleCopy}
-            className="h-7 border-(--border-sub) bg-(--bg-surface) text-(--text-soft)"
-          >
-            {copied ? <Check className="size-3 text-green-500" /> : <Copy className="size-3" />}
+          <Button type="button" variant="ghost" size="sm" className="gap-1.5" title="复制全部" onClick={handleCopy}>
+            {copied ? (
+              <Check className="size-3.5 stroke-[2.5] text-green-500" />
+            ) : (
+              <Copy className="size-3.5 stroke-[2.5]" />
+            )}
+            复制
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
@@ -314,21 +288,21 @@ export default function LogModal({ serverId, containerId, containerName, onClose
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              className="rounded-lg text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
               onClick={() => void handleClose()}
             >
-              <X className="size-4" />
+              <X className="size-3.5 stroke-[2.5]" />
             </Button>
           </div>
         </div>
 
         {error ? (
-          <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-xs text-red-500">
+          <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-2 text-xs text-red-500">
             {error}
           </div>
         ) : null}
 
-        <div className="relative min-h-0 flex-1 overflow-hidden p-2" style={{ background: '#0d1117' }}>
+        <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
           {loading ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
               <div className="flex items-center gap-2 text-sm text-(--text-soft)">
@@ -337,7 +311,16 @@ export default function LogModal({ serverId, containerId, containerName, onClose
               </div>
             </div>
           ) : null}
-          <div ref={containerRef} className="size-full" />
+          <div className="absolute inset-0 min-h-0 p-2">
+            <Virtuoso
+              className="rounded-sm"
+              style={{ height: '100%' }}
+              data={lines}
+              defaultItemHeight={22}
+              followOutput={follow ? 'smooth' : false}
+              itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

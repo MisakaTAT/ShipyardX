@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from './ConfirmDialog'
+import { cn } from '@/lib/utils'
 
 interface ImagePanelProps {
   serverId: string
@@ -126,14 +127,8 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
               更新于 {lastUpdated}
             </span>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowPull(true)}
-            className="gap-1.5 border-blue-500/30 bg-blue-500/10 text-xs text-blue-500 hover:bg-blue-500/20 hover:text-blue-400"
-          >
-            <Download className="size-3.5" />
+          <Button type="button" size="sm" className="gap-1.5" onClick={() => setShowPull(true)}>
+            <Download className="size-3.5 stroke-[2.5]" />
             拉取镜像
           </Button>
         </div>
@@ -251,15 +246,17 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
                     {img.created_at}
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-end">
-                      <button
-                        onClick={() => setRemoveTarget(img)}
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
                         title="删除"
-                        className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10 hover:text-red-500"
-                        style={{ color: 'var(--text-muted)' }}
+                        onClick={() => setRemoveTarget(img)}
+                        className={cn('rounded-lg text-(--text-muted)', 'hover:bg-red-500/10 hover:text-red-500')}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <Trash2 className="size-3.5" />
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -440,17 +437,20 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
             />
             <Button
               type="button"
+              size="sm"
+              className="shrink-0 gap-1.5"
               disabled={!image.trim() || status === 'pulling'}
               onClick={() => void handlePull()}
-              className="bg-green-600 text-white hover:bg-green-500 disabled:opacity-40"
             >
               {status === 'pulling' ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" /> 拉取中
+                  <Loader2 className="size-3.5 animate-spin stroke-[2.5]" />
+                  拉取中
                 </>
               ) : (
                 <>
-                  <Download className="size-3.5" /> 拉取
+                  <Download className="size-3.5 stroke-[2.5]" />
+                  拉取
                 </>
               )}
             </Button>

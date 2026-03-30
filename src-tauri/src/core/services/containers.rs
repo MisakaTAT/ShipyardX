@@ -93,14 +93,16 @@ pub async fn get_container_logs(
     server_id: String,
     container_id: String,
     tail: u32,
+    timestamps: bool,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
+        let ts = if timestamps { "&timestamps=1" } else { "" };
         let cmd = format!(
             "curl -s --unix-socket /var/run/docker.sock \
-            'http://localhost/v1.41/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0' | base64",
-            container_id, tail
+            'http://localhost/v1.41/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
+            container_id, tail, ts
         );
         let b64 = ssh_exec(&server, &cmd)?;
         let raw = base64_decode(b64.trim())?;
