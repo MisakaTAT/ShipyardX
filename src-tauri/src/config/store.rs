@@ -1,11 +1,52 @@
+use std::path::{Path, PathBuf};
+
+use aes_gcm::{
+    aead::{Aead, AeadCore, OsRng},
+    Aes256Gcm, KeyInit, Nonce,
+};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use tauri::{AppHandle, Manager};
 
 use crate::core::models::ServerConfig;
 
-const KEYRING_SERVICE: &str = "ShipyardX";
+const KEY_FILE: &str = "encryption.key";
 
-fn keyring_entry(server_id: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, server_id).map_err(|e| e.to_string())
+fn get_or_create_key(data_dir: &Path) -> Result<[u8; 32], String> {
+    let key_path = data_dir.join(KEY_FILE);
+    if let Ok(bytes) = std::fs::read(&key_path) {
+        if bytes.len() == 32 {
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&bytes);
+            return Ok(key);
+        }
+    }
+    let mut key = [0u8; 32];
+    aes_gcm::aead::rand_core::RngCore::fill_bytes(&mut OsRng, &mut key);
+    std::fs::write(&key_path, &key).map_err(|e| format!("写入密钥文件失败: {e}"))?;
+    Ok(key)
+}
+
+fn encrypt(key: &[u8; 32], plaintext: &str) -> Result<String, String> {
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let ciphertext = cipher
+        .encrypt(&nonce, plaintext.as_bytes())
+        .map_err(|e| format!("encrypt: {e}"))?;
+    let mut buf = nonce.to_vec();
+    buf.extend_from_slice(&ciphertext);
+    Ok(BASE64.encode(&buf))
+}
+
+fn decrypt(key: &[u8; 32], encoded: &str) -> Result<String, String> {
+    let data = BASE64.decode(encoded).map_err(|e| format!("base64: {e}"))?;
+    if data.len() < 12 {
+        return Err("invalid encrypted data".into());
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(12);
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
+    let nonce = Nonce::from_slice(nonce_bytes);
+    let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|e| format!("decrypt: {e}"))?;
+    String::from_utf8(plaintext).map_err(|e| format!("utf8: {e}"))
 }
 
 pub fn get_data_file(app: &AppHandle) -> std::path::PathBuf {
@@ -14,21 +55,33 @@ pub fn get_data_file(app: &AppHandle) -> std::path::PathBuf {
     data_dir.join("servers.json")
 }
 
-pub fn load_servers(path: &std::path::Path) -> Vec<ServerConfig> {
+pub fn data_dir_from_file(data_file: &Path) -> PathBuf {
+    data_file.parent().unwrap_or(data_file).to_path_buf()
+}
+
+pub fn load_servers(path: &Path) -> Vec<ServerConfig> {
+    let key = match get_or_create_key(&data_dir_from_file(path)) {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("[crypto] key init failed: {e}");
+            return std::fs::read_to_string(path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
+        }
+    };
+
     std::fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str::<Vec<ServerConfig>>(&s).ok())
         .map(|mut servers| {
             for s in &mut servers {
                 if s.auth_type == "password" {
-                    if let Ok(entry) = keyring_entry(&s.id) {
-                        if let Ok(p) = entry.get_password() {
-                            s.password = Some(p);
-                        } else {
-                            s.password = None;
+                    if let Some(ref enc) = s.password {
+                        match decrypt(&key, enc) {
+                            Ok(p) => s.password = Some(p),
+                            Err(e) => eprintln!("[crypto] decrypt failed for {}: {e}", s.id),
                         }
-                    } else {
-                        s.password = None;
                     }
                 }
             }
@@ -37,15 +90,15 @@ pub fn load_servers(path: &std::path::Path) -> Vec<ServerConfig> {
         .unwrap_or_default()
 }
 
-pub fn save_servers(path: &std::path::Path, servers: &[ServerConfig]) -> Result<(), String> {
+pub fn save_servers(path: &Path, servers: &[ServerConfig]) -> Result<(), String> {
+    let key = get_or_create_key(&data_dir_from_file(path))?;
+
     let mut out: Vec<ServerConfig> = servers.to_vec();
     for s in &mut out {
         if s.auth_type == "password" {
-            if let Some(p) = s.password.as_deref() {
-                let entry = keyring_entry(&s.id)?;
-                entry.set_password(p).map_err(|e| e.to_string())?;
+            if let Some(ref p) = s.password {
+                s.password = Some(encrypt(&key, p)?);
             }
-            s.password = None;
         } else {
             s.password = None;
         }

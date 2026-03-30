@@ -8,7 +8,6 @@ pub struct ServerConfig {
     pub port: u16,
     pub username: String,
     pub auth_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
     pub key_path: Option<String>,
 }
