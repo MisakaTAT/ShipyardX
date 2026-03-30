@@ -1,3 +1,8 @@
+.yarn/*
+.cursor/*
+.yarnrc.yml
+.pnp.*
+
 # Logs
 logs
 *.log
