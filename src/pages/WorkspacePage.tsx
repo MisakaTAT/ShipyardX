@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Box, Layers, Terminal, Server as ServerIcon } from 'lucide-react'
 import type { Server } from '../types'
 import ContainerPanel from '../components/ContainerPanel'
@@ -24,15 +25,19 @@ const NAV_ITEMS: NavItem[] = [
 
 interface WorkspacePageProps {
   selectedServer: Server
-  activeTab: Tab
-  onSelectTab: (tab: Tab) => void
 }
 
-export default function WorkspacePage({ selectedServer, activeTab, onSelectTab }: WorkspacePageProps) {
+export default function WorkspacePage({ selectedServer }: WorkspacePageProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
+
+  useEffect(() => {
+    setActiveTab('overview')
+  }, [selectedServer.id])
+
   return (
     <div className="flex-1 overflow-auto p-2 md:p-3">
       <div className="flex h-full flex-col gap-3">
-        <Tabs value={activeTab} onValueChange={(v) => onSelectTab(v as Tab)} className="flex flex-col gap-3">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)} className="flex flex-col gap-3">
           <TabsList
             variant="line"
             className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-(--bg-panel) p-1.5"

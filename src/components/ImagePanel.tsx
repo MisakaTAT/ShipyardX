@@ -21,6 +21,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerImage | null>(null)
+  const [removeForce, setRemoveForce] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetchImages = useCallback(async () => {
@@ -42,6 +43,10 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   }, [fetchImages])
 
   useEffect(() => {
+    setRemoveForce(false)
+  }, [removeTarget?.id])
+
+  useEffect(() => {
     const intervalId = setInterval(fetchImages, 5000)
     return () => clearInterval(intervalId)
   }, [fetchImages])
@@ -57,13 +62,12 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const imageRefLabel = (img: DockerImage) =>
-    img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.id
+  const imageRefLabel = (img: DockerImage) => (img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.id)
 
   const removeImageDescription =
     removeTarget == null
       ? ''
-      : `确认删除镜像「${imageRefLabel(removeTarget)}」？\n如有容器正在使用此镜像，删除将会失败。`
+      : `确认删除镜像「${imageRefLabel(removeTarget)}」？\n\n默认情况下，若仍有容器使用该镜像，删除会失败。可勾选强制删除以解除引用并删除（可能影响运行中的容器，请谨慎）。`
 
   const filtered = images.filter((img) => {
     if (!search.trim()) return true
@@ -76,7 +80,10 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
       {/* Toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3" style={{ background: 'var(--bg-panel)' }}>
+      <div
+        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
+        style={{ background: 'var(--bg-panel)' }}
+      >
         <ImageIcon className="w-4 h-4 shrink-0" style={{ color: 'var(--text-soft)' }} />
         <span className="text-sm font-medium mr-1" style={{ color: 'var(--text-base)' }}>
           镜像
@@ -273,10 +280,21 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         title="删除镜像"
         description={removeImageDescription}
         confirmText="删除"
+        extra={
+          <label className="flex cursor-pointer items-start gap-2.5 text-left">
+            <input
+              type="checkbox"
+              checked={removeForce}
+              onChange={(e) => setRemoveForce(e.target.checked)}
+              className="mt-0.5 size-3.5 shrink-0 rounded border-(--border-sub) bg-(--bg-input) accent-(--accent)"
+            />
+            <span className="text-xs leading-snug text-(--text-muted)">强制删除</span>
+          </label>
+        }
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_image', { serverId, imageId: removeTarget.id })
+            await invoke('remove_image', { serverId, imageId: removeTarget.id, force: removeForce })
             await fetchImages()
           } catch (e) {
             setError(String(e))
@@ -439,10 +457,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
           </div>
 
           {lines.length > 0 ? (
-            <div
-              ref={outputRef}
-              className="h-52 overflow-y-auto rounded-lg border border-border bg-(--bg-app) p-3"
-            >
+            <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-(--bg-app) p-3">
               <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-(--text-base)">
                 {lines.join('\n')}
               </pre>

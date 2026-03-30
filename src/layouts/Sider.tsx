@@ -1,9 +1,8 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { Box, Server as ServerIcon, Settings, Sun, Moon } from 'lucide-react'
+import { Server as ServerIcon, Settings, Sun, Moon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-
-type Page = 'connect' | 'workspace'
 
 function siderNavButtonClass(active?: boolean, disabled?: boolean) {
   return cn(
@@ -16,35 +15,35 @@ function siderNavButtonClass(active?: boolean, disabled?: boolean) {
 }
 
 interface SiderProps {
-  page: Page
-  hasSelectedServer: boolean
   light: boolean
-  onPageChange: (page: Page) => void
+  /** 已连接时为非空，用于断开提示与点击行为 */
+  connectedServerName: string | null
+  onDisconnect: () => void
   onToggleTheme: () => void
 }
 
-export default function Sider({ page, hasSelectedServer, light, onPageChange, onToggleTheme }: SiderProps) {
+export default function Sider({ light, connectedServerName, onDisconnect, onToggleTheme }: SiderProps) {
+  const handleServerNavClick = () => {
+    if (!connectedServerName) return
+    const label = connectedServerName
+    onDisconnect()
+    toast.success(`连接 ${label} 已断开`)
+  }
+
   return (
-    <nav className="flex w-14 shrink-0 flex-col items-center border-r border-border py-3" style={{ background: 'var(--bg-nav)' }}>
+    <nav
+      className="flex w-14 shrink-0 flex-col items-center border-r border-border py-3"
+      style={{ background: 'var(--bg-nav)' }}
+    >
       <div className="flex w-full flex-col gap-1 px-2">
         <Button
           type="button"
           variant="ghost"
-          title="连接页"
-          className={siderNavButtonClass(page === 'connect')}
-          onClick={() => onPageChange('connect')}
+          title={connectedServerName ? `已连接「${connectedServerName}」，点击断开` : '服务器列表'}
+          className={siderNavButtonClass(true)}
+          onClick={handleServerNavClick}
         >
           <ServerIcon size={18} />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          title="容器工作区"
-          disabled={!hasSelectedServer}
-          className={siderNavButtonClass(page === 'workspace', !hasSelectedServer)}
-          onClick={() => onPageChange('workspace')}
-        >
-          <Box size={18} />
         </Button>
       </div>
 

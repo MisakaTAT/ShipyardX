@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { Server as ServerIcon, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
 import type { Server } from '../types'
 import { Button } from '@/components/ui/button'
@@ -6,85 +7,141 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import ServerModal from '../components/ServerModal'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 interface ConnectPageProps {
-  servers: Server[]
   onConnect: (server: Server) => void
-  onAdd: () => void
-  onEdit: (server: Server) => void
-  onDelete: (id: string) => void
 }
 
-export default function ConnectPage({ servers, onConnect, onAdd, onEdit, onDelete }: ConnectPageProps) {
+export default function ConnectPage({ onConnect }: ConnectPageProps) {
+  const [servers, setServers] = useState<Server[]>([])
   const [search, setSearch] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [editingServer, setEditingServer] = useState<Server | null>(null)
+  const [deleteServerId, setDeleteServerId] = useState<string | null>(null)
+
+  useEffect(() => {
+    invoke<Server[]>('get_servers').then(setServers).catch(console.error)
+  }, [])
+
+  const handleSave = (updated: Server[]) => {
+    setServers(updated)
+  }
+
+  const handleAdd = () => {
+    setEditingServer(null)
+    setShowModal(true)
+  }
+
+  const handleEdit = (server: Server) => {
+    setEditingServer(server)
+    setShowModal(true)
+  }
+
+  const executeDeleteServer = async () => {
+    const id = deleteServerId
+    if (!id) return
+    try {
+      const updated = await invoke<Server[]>('delete_server', { id })
+      setServers(updated)
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const filtered = servers.filter(
     (s) => s.name.toLowerCase().includes(search.toLowerCase()) || s.host.toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
-    <div className="flex-1 overflow-auto p-2 md:p-3">
-      <div className="flex h-full flex-col gap-3">
-        <div className="shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-semibold text-(--text-strong)">服务器</h1>
-              <p className="mt-0.5 text-xs text-(--text-muted)">管理远程服务器连接，选择一个服务器进入工作区。</p>
-            </div>
-            <Button size="sm" className="gap-1.5" onClick={onAdd}>
-              <Plus className="size-3.5 stroke-[2.5]" />
-              添加服务器
-            </Button>
-          </div>
-
-          {servers.length > 0 && (
-            <div className="relative mt-4">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-(--text-muted)" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索服务器名称或地址…"
-                className="pr-8 pl-9"
-              />
-              {search ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="absolute top-1/2 right-2 -translate-y-1/2 text-(--text-muted)"
-                  onClick={() => setSearch('')}
-                >
-                  <X className="size-3" />
+    <>
+      <div className="flex-1 overflow-auto p-2 md:p-3">
+        <div className={cn('flex h-full flex-col', servers.length > 0 && 'gap-3')}>
+          {servers.length > 0 ? (
+            <div className="shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-lg font-semibold text-(--text-strong)">服务器</h1>
+                  <p className="mt-0.5 text-xs text-(--text-muted)">管理远程服务器连接，选择一个服务器进入工作区。</p>
+                </div>
+                <Button size="sm" className="gap-1.5" onClick={handleAdd}>
+                  <Plus className="size-3.5 stroke-[2.5]" />
+                  添加服务器
                 </Button>
-              ) : null}
-            </div>
-          )}
-        </div>
+              </div>
 
-        <div className="flex-1 overflow-auto">
-          {servers.length === 0 ? (
-            <EmptyState onAdd={onAdd} />
-          ) : filtered.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <Search className="size-7 text-(--border-sub)" />
-              <p className="mt-2 text-sm text-(--text-muted)">没有找到匹配的服务器</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((server) => (
-                <ServerCard
-                  key={server.id}
-                  server={server}
-                  onConnect={() => onConnect(server)}
-                  onEdit={() => onEdit(server)}
-                  onDelete={() => onDelete(server.id)}
+              <div className="relative mt-4">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-(--text-muted)" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="搜索服务器名称或地址…"
+                  className="pr-8 pl-9"
                 />
-              ))}
+                {search ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 text-(--text-muted)"
+                    onClick={() => setSearch('')}
+                  >
+                    <X className="size-3" />
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          )}
+          ) : null}
+
+          <div className="flex-1 overflow-auto">
+            {servers.length === 0 ? (
+              <EmptyState onAdd={handleAdd} />
+            ) : filtered.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <Search className="size-7 text-(--border-sub)" />
+                <p className="mt-2 text-sm text-(--text-muted)">没有找到匹配的服务器</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((server) => (
+                  <ServerCard
+                    key={server.id}
+                    server={server}
+                    onConnect={() => onConnect(server)}
+                    onEdit={() => handleEdit(server)}
+                    onDelete={() => setDeleteServerId(server.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      <ServerModal
+        open={showModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowModal(false)
+            setEditingServer(null)
+          }
+        }}
+        server={editingServer}
+        onSave={handleSave}
+      />
+
+      <ConfirmDialog
+        open={deleteServerId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteServerId(null)
+        }}
+        title="删除服务器"
+        description="确定要删除此服务器配置吗？此操作不可撤销。"
+        confirmText="删除"
+        onConfirm={executeDeleteServer}
+      />
+    </>
   )
 }
 
@@ -188,9 +245,10 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         >
           <ServerIcon className="size-7 text-(--accent-text)" />
         </div>
-        <h2 className="text-sm font-semibold text-(--text-strong)">还没有服务器</h2>
+        <h2 className="text-sm font-semibold text-(--text-strong)">尚未配置远程服务器</h2>
         <p className="mt-1.5 text-xs leading-relaxed text-(--text-muted)">
-          添加你的第一个远程服务器连接，开始管理 Docker 容器和镜像。
+          配置完成后，可在此查看系统概览、管理 Docker
+          容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
         </p>
         <Button size="sm" className="mt-5 gap-1.5" onClick={onAdd}>
           <Plus className="size-3.5 stroke-[2.5]" />
