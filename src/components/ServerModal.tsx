@@ -1,303 +1,252 @@
-import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { Server } from "../types";
-import { X, Loader2, CheckCircle } from "lucide-react";
+import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { Server } from '../types'
+import { X, Loader2, CheckCircle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface ServerModalProps {
-  server?: Server | null;
-  onClose: () => void;
-  onSave: (servers: Server[]) => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  server?: Server | null
+  onSave: (servers: Server[]) => void
 }
 
-const defaultForm = (): Omit<Server, "id"> => ({
-  name: "",
-  host: "",
+const defaultForm = (): Omit<Server, 'id'> => ({
+  name: '',
+  host: '',
   port: 22,
-  username: "root",
-  auth_type: "key",
-  password: "",
-  key_path: "~/.ssh/id_rsa",
-});
+  username: 'root',
+  auth_type: 'key',
+  password: '',
+  key_path: '~/.ssh/id_rsa',
+})
 
-export default function ServerModal({ server, onClose, onSave }: ServerModalProps) {
-  const [form, setForm] = useState<Omit<Server, "id">>(
-    server ? { ...server } : defaultForm()
-  );
-  const [loading, setLoading] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [error, setError] = useState("");
-  const isEdit = !!server;
+export default function ServerModal({ open, onOpenChange, server, onSave }: ServerModalProps) {
+  const [form, setForm] = useState<Omit<Server, 'id'>>(server ? { ...server } : defaultForm())
+  const [loading, setLoading] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [error, setError] = useState('')
+  const isEdit = !!server
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+    if (!open) return
+    setForm(server ? { ...server } : defaultForm())
+    setTestResult(null)
+    setError('')
+  }, [open, server?.id])
 
-  const update = (key: keyof Omit<Server, "id">, value: string | number) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-    setTestResult(null);
-    setError("");
-  };
+  const handleOpenChange = (next: boolean) => {
+    onOpenChange(next)
+  }
+
+  const update = (key: keyof Omit<Server, 'id'>, value: string | number) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
+    setTestResult(null)
+    setError('')
+  }
 
   const handleSave = async () => {
-    if (!form.name.trim()) return setError("请填写服务器名称");
-    if (!form.host.trim()) return setError("请填写主机地址");
-    if (!form.username.trim()) return setError("请填写用户名");
+    if (!form.name.trim()) return setError('请填写服务器名称')
+    if (!form.host.trim()) return setError('请填写主机地址')
+    if (!form.username.trim()) return setError('请填写用户名')
 
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError('')
     try {
-      let servers: Server[];
+      let servers: Server[]
       if (isEdit && server) {
-        servers = await invoke<Server[]>("update_server", {
+        servers = await invoke<Server[]>('update_server', {
           server: { ...form, id: server.id },
-        });
+        })
       } else {
-        servers = await invoke<Server[]>("add_server", {
-          server: { ...form, id: "" },
-        });
+        servers = await invoke<Server[]>('add_server', {
+          server: { ...form, id: '' },
+        })
       }
-      onSave(servers);
-      onClose();
+      onSave(servers)
+      onOpenChange(false)
     } catch (e) {
-      setError(String(e));
+      setError(String(e))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleTest = async () => {
-    if (!form.host.trim()) return setError("请先填写主机地址");
+    if (!form.host.trim()) return setError('请先填写主机地址')
     if (!server) {
-      setError("请先保存服务器配置再测试连接");
-      return;
+      setError('请先保存服务器配置再测试连接')
+      return
     }
-    setLoading(true);
-    setTestResult(null);
-    setError("");
+    setLoading(true)
+    setTestResult(null)
+    setError('')
     try {
-      const msg = await invoke<string>("test_connection", { serverId: server.id });
-      setTestResult({ ok: true, msg });
+      const msg = await invoke<string>('test_connection', { serverId: server.id })
+      setTestResult({ ok: true, msg })
     } catch (e) {
-      setTestResult({ ok: false, msg: String(e) });
+      setTestResult({ ok: false, msg: String(e) })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  const inputClass = "w-full px-3 py-2 text-sm rounded-lg border outline-none transition-colors";
-  const inputStyle = {
-    background: "var(--bg-input)",
-    borderColor: "var(--border-sub)",
-    color: "var(--text-base)",
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div
-        className="rounded-xl w-full max-w-md mx-4 shadow-2xl border"
-        style={{ background: "var(--bg-overlay)", borderColor: "var(--border-sub)" }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-strong)" }}>
-            {isEdit ? "编辑服务器" : "添加服务器"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-            }}
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent showCloseButton={false} className="max-w-md gap-0 overflow-hidden p-0 sm:max-w-md">
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border px-6 py-4">
+          <DialogTitle className="text-base font-semibold text-(--text-strong)">
+            {isEdit ? '编辑服务器' : '添加服务器'}
+          </DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+            onClick={() => onOpenChange(false)}
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+            <X className="size-4" />
+          </Button>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>
-              服务器名称 *
-            </label>
-            <input
-              type="text"
+        <div className="space-y-4 px-6 py-5">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-(--text-soft)">服务器名称 *</Label>
+            <Input
               value={form.name}
-              onChange={(e) => update("name", e.target.value)}
+              onChange={(e) => update('name', e.target.value)}
               placeholder="例如：生产服务器"
-              className={inputClass}
-              style={inputStyle}
+              className="h-10 text-sm"
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>主机地址 *</label>
-              <input
-                type="text"
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs text-(--text-soft)">主机地址 *</Label>
+              <Input
                 value={form.host}
-                onChange={(e) => update("host", e.target.value)}
+                onChange={(e) => update('host', e.target.value)}
                 placeholder="192.168.1.100"
-                className={inputClass}
-                style={inputStyle}
+                className="h-10 text-sm"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>端口</label>
-              <input
+            <div className="space-y-1.5">
+              <Label className="text-xs text-(--text-soft)">端口</Label>
+              <Input
                 type="number"
                 value={form.port}
-                onChange={(e) => update("port", parseInt(e.target.value) || 22)}
+                onChange={(e) => update('port', parseInt(e.target.value, 10) || 22)}
                 min={1}
                 max={65535}
-                className={inputClass}
-                style={inputStyle}
+                className="h-10 text-sm"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>用户名 *</label>
-            <input
-              type="text"
+          <div className="space-y-1.5">
+            <Label className="text-xs text-(--text-soft)">用户名 *</Label>
+            <Input
               value={form.username}
-              onChange={(e) => update("username", e.target.value)}
+              onChange={(e) => update('username', e.target.value)}
               placeholder="root"
-              className={inputClass}
-              style={inputStyle}
+              className="h-10 text-sm"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>认证方式</label>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-(--text-soft)">认证方式</Label>
             <div className="flex gap-2">
-              {(["key", "password"] as const).map((type) => (
-                <button
+              {(['key', 'password'] as const).map((type) => (
+                <Button
                   key={type}
-                  onClick={() => update("auth_type", type)}
-                  className="flex-1 py-2 rounded-lg text-sm font-medium transition-colors"
-                  style={form.auth_type === type
-                    ? { background: "var(--accent)", color: "#ffffff" }
-                    : { background: "var(--bg-input)", color: "var(--text-soft)", border: "1px solid var(--border-sub)" }
-                  }
+                  type="button"
+                  variant={form.auth_type === type ? 'default' : 'outline'}
+                  className="flex-1 text-sm"
+                  onClick={() => update('auth_type', type)}
                 >
-                  {type === "key" ? "SSH 密钥" : "密码"}
-                </button>
+                  {type === 'key' ? 'SSH 密钥' : '密码'}
+                </Button>
               ))}
             </div>
           </div>
 
-          {form.auth_type === "password" ? (
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>密码</label>
-              <input
+          {form.auth_type === 'password' ? (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-(--text-soft)">密码</Label>
+              <Input
                 type="password"
-                value={form.password || ""}
-                onChange={(e) => update("password", e.target.value)}
+                value={form.password || ''}
+                onChange={(e) => update('password', e.target.value)}
                 placeholder="SSH 登录密码"
-                className={inputClass}
-                style={inputStyle}
+                className="h-10 text-sm"
               />
             </div>
           ) : (
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-soft)" }}>密钥路径</label>
-              <input
-                type="text"
-                value={form.key_path || ""}
-                onChange={(e) => update("key_path", e.target.value)}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-(--text-soft)">密钥路径</Label>
+              <Input
+                value={form.key_path || ''}
+                onChange={(e) => update('key_path', e.target.value)}
                 placeholder="~/.ssh/id_rsa"
-                className={inputClass}
-                style={inputStyle}
+                className="h-10 text-sm"
               />
             </div>
           )}
 
-          {error && (
-            <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
+          {error ? (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">{error}</p>
+          ) : null}
 
-          {testResult && (
+          {testResult ? (
             <div
-              className={`flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
+              className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
                 testResult.ok
-                  ? "bg-green-500/10 border border-green-500/30 text-green-500"
-                  : "bg-red-500/10 border border-red-500/30 text-red-500"
+                  ? 'border-green-500/30 bg-green-500/10 text-green-500'
+                  : 'border-red-500/30 bg-red-500/10 text-red-500'
               }`}
             >
-              <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <CheckCircle className="mt-0.5 size-3.5 shrink-0" />
               <span>{testResult.msg}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
-        {/* Footer */}
-        <div
-          className="flex items-center justify-between px-6 py-4 border-t"
-          style={{ borderColor: "var(--border)" }}
-        >
+        <div className="flex items-center justify-between border-t border-border px-6 py-4">
           {isEdit ? (
-            <button
-              onClick={handleTest}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-colors disabled:opacity-50"
-              style={{ color: "var(--text-soft)" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
-              }}
+              className="text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              onClick={handleTest}
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              {loading ? <Loader2 className="size-3.5 animate-spin" /> : null}
               测试连接
-            </button>
+            </Button>
           ) : (
             <span />
           )}
           <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg transition-colors"
-              style={{ color: "var(--text-soft)" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-soft)";
-              }}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              onClick={() => onOpenChange(false)}
             >
               取消
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {isEdit ? "保存" : "添加"}
-            </button>
+            </Button>
+            <Button type="button" size="sm" disabled={loading} onClick={handleSave}>
+              {loading ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {isEdit ? '保存' : '添加'}
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
-  );
+      </DialogContent>
+    </Dialog>
+  )
 }

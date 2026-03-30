@@ -1,95 +1,69 @@
-import {
-  Box,
-  Layers,
-  Terminal,
-  Server as ServerIcon,
-} from "lucide-react";
-import type { Server } from "../types";
-import ContainerPanel from "../components/ContainerPanel";
-import ImagePanel from "../components/ImagePanel";
-import TerminalPanel from "../components/TerminalPanel";
-import ServerOverview from "../components/ServerOverview";
+import { Box, Layers, Terminal, Server as ServerIcon } from 'lucide-react'
+import type { Server } from '../types'
+import ContainerPanel from '../components/ContainerPanel'
+import ImagePanel from '../components/ImagePanel'
+import TerminalPanel from '../components/TerminalPanel'
+import ServerOverview from '../components/ServerOverview'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 
-type Tab = "overview" | "containers" | "images" | "terminal";
+type Tab = 'overview' | 'containers' | 'images' | 'terminal'
 
 interface NavItem {
-  key: Tab;
-  icon: React.ReactNode;
-  label: string;
+  key: Tab
+  icon: React.ReactNode
+  label: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: "overview", icon: <ServerIcon size={18} />, label: "概览" },
-  { key: "containers", icon: <Box size={18} />, label: "容器" },
-  { key: "images", icon: <Layers size={18} />, label: "镜像" },
-  { key: "terminal", icon: <Terminal size={18} />, label: "终端" },
-];
+  { key: 'overview', icon: <ServerIcon className="size-[18px]" />, label: '概览' },
+  { key: 'containers', icon: <Box className="size-[18px]" />, label: '容器' },
+  { key: 'images', icon: <Layers className="size-[18px]" />, label: '镜像' },
+  { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
+]
 
 interface WorkspacePageProps {
-  selectedServer: Server;
-  activeTab: Tab;
-  onSelectTab: (tab: Tab) => void;
+  selectedServer: Server
+  activeTab: Tab
+  onSelectTab: (tab: Tab) => void
 }
 
-export default function WorkspacePage({
-  selectedServer,
-  activeTab,
-  onSelectTab,
-}: WorkspacePageProps) {
+export default function WorkspacePage({ selectedServer, activeTab, onSelectTab }: WorkspacePageProps) {
   return (
     <div className="flex-1 overflow-auto p-2 md:p-3">
-      <div className="h-full flex flex-col gap-3">
-        <div
-          className="shrink-0 rounded-xl border px-2 py-1.5 flex items-center gap-1 flex-wrap"
-          style={{ background: "var(--bg-panel)", borderColor: "var(--border)" }}
-        >
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => onSelectTab(item.key)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors"
-              style={
-                activeTab === item.key
-                  ? {
-                      background: "color-mix(in srgb, var(--accent) 15%, transparent)",
-                      color: "var(--accent-text)",
-                    }
-                  : { color: "var(--text-soft)" }
-              }
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex h-full flex-col gap-3">
+        <Tabs value={activeTab} onValueChange={(v) => onSelectTab(v as Tab)} className="flex flex-col gap-3">
+          <TabsList
+            variant="line"
+            className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-(--bg-panel) p-1.5"
+          >
+            {NAV_ITEMS.map((item) => (
+              <TabsTrigger key={item.key} value={item.key} className="flex flex-1 sm:flex-none">
+                {item.icon}
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         <div
-          className={`flex-1 min-h-[360px] overflow-hidden ${
-            activeTab === "overview" ? "" : "rounded-xl border"
-          }`}
-          style={
-            activeTab === "overview"
-              ? { background: "transparent" }
-              : { borderColor: "var(--border)", background: "var(--bg-panel)" }
-          }
+          className={cn(
+            'min-h-[360px] flex-1 overflow-hidden',
+            activeTab === 'overview' ? '' : 'rounded-xl border border-border bg-(--bg-panel)',
+          )}
+          style={activeTab === 'overview' ? { background: 'transparent' } : undefined}
         >
-          {activeTab === "overview" && (
-            <ServerOverview serverId={selectedServer.id} />
-          )}
-          {activeTab === "containers" && (
-            <ContainerPanel serverId={selectedServer.id} />
-          )}
-          {activeTab === "images" && (
-            <ImagePanel serverId={selectedServer.id} />
-          )}
-          {activeTab === "terminal" && (
+          {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} /> : null}
+          {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'terminal' ? (
             <TerminalPanel
               serverId={selectedServer.id}
               serverName={`${selectedServer.username}@${selectedServer.host}`}
             />
-          )}
+          ) : null}
         </div>
       </div>
     </div>
-  );
+  )
 }

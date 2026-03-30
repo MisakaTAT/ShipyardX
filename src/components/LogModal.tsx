@@ -1,66 +1,68 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import "@xterm/xterm/css/xterm.css";
-import { X, RefreshCw, Play, Square, Clock, Copy, Check } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
+import { X, RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Props {
-  serverId: string;
-  containerId: string;
-  containerName: string;
-  onClose: () => void;
+  serverId: string
+  containerId: string
+  containerName: string
+  onClose: () => void
 }
 
-const TAIL_OPTIONS = [50, 100, 200, 500, 1000] as const;
+const TAIL_OPTIONS = [50, 100, 200, 500, 1000] as const
 
 function formatTimestamp(): string {
-  return new Date().toLocaleTimeString("zh-CN");
+  return new Date().toLocaleTimeString('zh-CN')
 }
 
 export default function LogModal({ serverId, containerId, containerName, onClose }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const streamIdRef = useRef<string | null>(null);
-  const unlistenDataRef = useRef<UnlistenFn | null>(null);
-  const unlistenDoneRef = useRef<UnlistenFn | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null)
+  const termRef = useRef<Terminal | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
+  const streamIdRef = useRef<string | null>(null)
+  const unlistenDataRef = useRef<UnlistenFn | null>(null)
+  const unlistenDoneRef = useRef<UnlistenFn | null>(null)
 
-  const [tail, setTail] = useState<number>(100);
-  const [timestamps, setTimestamps] = useState(false);
-  const [follow, setFollow] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [lineCount, setLineCount] = useState(0);
+  const [tail, setTail] = useState<number>(100)
+  const [timestamps, setTimestamps] = useState(false)
+  const [follow, setFollow] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [lineCount, setLineCount] = useState(0)
 
-  // xterm 始终保持暗色主题（终端本身就是暗色的）
   useEffect(() => {
-    if (!containerRef.current || termRef.current) return;
+    if (!containerRef.current || termRef.current) return
 
     const term = new Terminal({
       theme: {
-        background: "#0d1117",
-        foreground: "#e6edf3",
-        cursor: "#e6edf3",
-        black: "#21262d",
-        red: "#ff7b72",
-        green: "#3fb950",
-        yellow: "#d29922",
-        blue: "#58a6ff",
-        magenta: "#bc8cff",
-        cyan: "#39c5cf",
-        white: "#b1bac4",
-        brightBlack: "#6e7681",
-        brightRed: "#ffa198",
-        brightGreen: "#56d364",
-        brightYellow: "#e3b341",
-        brightBlue: "#79c0ff",
-        brightMagenta: "#d2a8ff",
-        brightCyan: "#56d4dd",
-        brightWhite: "#f0f6fc",
-        selectionBackground: "#264f78",
+        background: '#0d1117',
+        foreground: '#e6edf3',
+        cursor: '#e6edf3',
+        black: '#21262d',
+        red: '#ff7b72',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#b1bac4',
+        brightBlack: '#6e7681',
+        brightRed: '#ffa198',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#f0f6fc',
+        selectionBackground: '#264f78',
       },
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 13,
@@ -68,275 +70,276 @@ export default function LogModal({ serverId, containerId, containerName, onClose
       scrollback: 5000,
       disableStdin: true,
       cursorBlink: false,
-    });
+    })
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(containerRef.current);
-    setTimeout(() => fitAddon.fit(), 50);
+    const fitAddon = new FitAddon()
+    term.loadAddon(fitAddon)
+    term.open(containerRef.current)
+    setTimeout(() => fitAddon.fit(), 50)
 
-    termRef.current = term;
-    fitAddonRef.current = fitAddon;
+    termRef.current = term
+    fitAddonRef.current = fitAddon
 
-    const ro = new ResizeObserver(() => fitAddon.fit());
-    ro.observe(containerRef.current);
+    const ro = new ResizeObserver(() => fitAddon.fit())
+    ro.observe(containerRef.current)
 
     return () => {
-      ro.disconnect();
-      term.dispose();
-      termRef.current = null;
-    };
-  }, []);
+      ro.disconnect()
+      term.dispose()
+      termRef.current = null
+    }
+  }, [])
 
   const stopStream = useCallback(async () => {
-    if (unlistenDataRef.current) { unlistenDataRef.current(); unlistenDataRef.current = null; }
-    if (unlistenDoneRef.current) { unlistenDoneRef.current(); unlistenDoneRef.current = null; }
-    if (streamIdRef.current) {
-      try { await invoke("stop_log_stream", { streamId: streamIdRef.current }); } catch { /* ignore */ }
-      streamIdRef.current = null;
+    if (unlistenDataRef.current) {
+      unlistenDataRef.current()
+      unlistenDataRef.current = null
     }
-  }, []);
+    if (unlistenDoneRef.current) {
+      unlistenDoneRef.current()
+      unlistenDoneRef.current = null
+    }
+    if (streamIdRef.current) {
+      try {
+        await invoke('stop_log_stream', { streamId: streamIdRef.current })
+      } catch {
+        /* ignore */
+      }
+      streamIdRef.current = null
+    }
+  }, [])
 
   const loadStaticLogs = useCallback(async () => {
-    await stopStream();
-    setError("");
-    setLoading(true);
-    termRef.current?.clear();
-    setLineCount(0);
+    await stopStream()
+    setError('')
+    setLoading(true)
+    termRef.current?.clear()
+    setLineCount(0)
     try {
-      const logs = await invoke<string>("get_container_logs", {
+      const logs = await invoke<string>('get_container_logs', {
         serverId,
         containerId,
         tail,
         timestamps,
-      });
+      })
       if (termRef.current) {
-        const lines = logs.split("\n");
-        setLineCount(lines.filter(l => l).length);
-        termRef.current.write(logs.replace(/\r?\n/g, "\r\n"));
+        const lines = logs.split('\n')
+        setLineCount(lines.filter((l) => l).length)
+        termRef.current.write(logs.replace(/\r?\n/g, '\r\n'))
       }
     } catch (e) {
-      setError(String(e));
+      setError(String(e))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [serverId, containerId, tail, timestamps, stopStream]);
+  }, [serverId, containerId, tail, timestamps, stopStream])
 
   const startFollow = useCallback(async () => {
-    await stopStream();
-    setError("");
-    termRef.current?.clear();
-    setLineCount(0);
-    termRef.current?.write(
-      `\x1b[2m[${formatTimestamp()}] 正在连接日志流...\x1b[0m\r\n`
-    );
+    await stopStream()
+    setError('')
+    termRef.current?.clear()
+    setLineCount(0)
+    termRef.current?.write(`\x1b[2m[${formatTimestamp()}] 正在连接日志流...\x1b[0m\r\n`)
 
     try {
-      const streamId = await invoke<string>("start_log_stream", {
+      const streamId = await invoke<string>('start_log_stream', {
         serverId,
         containerId,
         tail,
         timestamps,
-      });
-      streamIdRef.current = streamId;
+      })
+      streamIdRef.current = streamId
 
-      let count = 0;
-      unlistenDataRef.current = await listen<number[]>(
-        `log-data:${streamId}`,
-        (event) => {
-          const bytes = new Uint8Array(event.payload);
-          termRef.current?.write(bytes);
-          count += event.payload.filter((b: number) => b === 10).length;
-          setLineCount(count);
-        }
-      );
+      let count = 0
+      unlistenDataRef.current = await listen<number[]>(`log-data:${streamId}`, (event) => {
+        const bytes = new Uint8Array(event.payload)
+        termRef.current?.write(bytes)
+        count += event.payload.filter((b: number) => b === 10).length
+        setLineCount(count)
+      })
 
-      unlistenDoneRef.current = await listen(
-        `log-done:${streamId}`,
-        () => {
-          termRef.current?.write(
-            `\r\n\x1b[2m[${formatTimestamp()}] 日志流已结束\x1b[0m\r\n`
-          );
-          setFollow(false);
-          streamIdRef.current = null;
-        }
-      );
+      unlistenDoneRef.current = await listen(`log-done:${streamId}`, () => {
+        termRef.current?.write(`\r\n\x1b[2m[${formatTimestamp()}] 日志流已结束\x1b[0m\r\n`)
+        setFollow(false)
+        streamIdRef.current = null
+      })
     } catch (e) {
-      setError(String(e));
-      setFollow(false);
+      setError(String(e))
+      setFollow(false)
     }
-  }, [serverId, containerId, tail, timestamps, stopStream]);
+  }, [serverId, containerId, tail, timestamps, stopStream])
 
   useEffect(() => {
     if (follow) {
-      startFollow();
+      void startFollow()
     } else {
-      stopStream().then(() => loadStaticLogs());
+      void stopStream().then(() => loadStaticLogs())
     }
-    return () => { stopStream(); };
-  }, [follow]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      void stopStream()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follow 切换驱动拉流/静态
+  }, [follow])
 
   useEffect(() => {
     if (!follow) {
-      loadStaticLogs();
+      void loadStaticLogs()
     }
-  }, [tail, timestamps]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tail/timestamps 变更刷新静态日志
+  }, [tail, timestamps])
 
   useEffect(() => {
-    if (!follow) loadStaticLogs();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadStaticLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 挂载时加载
+  }, [])
 
   const handleClose = useCallback(async () => {
-    await stopStream();
-    onClose();
-  }, [stopStream, onClose]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleClose]);
+    await stopStream()
+    onClose()
+  }, [stopStream, onClose])
 
   const handleCopy = useCallback(() => {
-    if (!termRef.current) return;
-    termRef.current.selectAll();
-    const fullText = termRef.current.getSelection();
-    termRef.current.clearSelection();
-    navigator.clipboard.writeText(fullText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }, []);
+    if (!termRef.current) return
+    termRef.current.selectAll()
+    const fullText = termRef.current.getSelection()
+    termRef.current.clearSelection()
+    void navigator.clipboard.writeText(fullText).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }, [])
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={(e) => e.target === e.currentTarget && handleClose()}
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) void handleClose()
+      }}
     >
-      <div
-        className="rounded-xl w-full max-w-5xl flex flex-col shadow-2xl border"
-        style={{ height: "80vh", background: "var(--bg-overlay)", borderColor: "var(--border-sub)" }}
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[80vh] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
       >
-        {/* 工具栏 */}
         <div
-          className="flex items-center gap-2 px-4 py-3 border-b shrink-0 flex-wrap"
-          style={{ borderColor: "var(--border)" }}
+          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-3"
+          style={{ background: 'var(--bg-panel)' }}
         >
-          <span className="text-sm font-semibold mr-1 font-mono" style={{ color: "var(--text-strong)" }}>
-            {containerName}
-          </span>
-          <span className="text-xs mr-2" style={{ color: "var(--text-muted)" }}>日志</span>
+          <span className="mr-1 font-mono text-sm font-semibold text-(--text-strong)">{containerName}</span>
+          <span className="mr-2 text-xs text-(--text-muted)">日志</span>
 
-          {/* Tail 选择 */}
-          <select
-            value={tail}
-            onChange={(e) => setTail(Number(e.target.value))}
-            disabled={follow}
-            className="text-xs rounded px-2 py-1 border outline-none disabled:opacity-40"
-            style={{
-              background: "var(--bg-surface)",
-              borderColor: "var(--border-sub)",
-              color: "var(--text-base)",
-            }}
-          >
-            {TAIL_OPTIONS.map(n => (
-              <option key={n} value={n}>后 {n} 行</option>
-            ))}
-          </select>
+          <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
+            <SelectTrigger
+              size="sm"
+              className="h-7 border-(--border-sub) bg-(--bg-surface) text-xs text-(--text-base)"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TAIL_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  后 {n} 行
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* 时间戳 */}
-          <button
-            onClick={() => setTimestamps(t => !t)}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             disabled={follow}
             title="显示时间戳"
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-40`}
-            style={timestamps
-              ? { background: "color-mix(in srgb, var(--accent) 15%, transparent)", borderColor: "var(--accent)", color: "var(--accent-text)" }
-              : { background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }
+            onClick={() => setTimestamps((t) => !t)}
+            className={
+              timestamps
+                ? 'h-7 border-(--accent) bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-xs text-(--accent-text)'
+                : 'h-7 border-(--border-sub) bg-(--bg-surface) text-xs text-(--text-soft)'
             }
           >
-            <Clock size={12} />
+            <Clock className="size-3" />
             时间戳
-          </button>
+          </Button>
 
-          {/* Follow 切换 */}
-          <button
-            onClick={() => setFollow(f => !f)}
-            title={follow ? "停止跟踪" : "实时跟踪"}
-            className={`flex items-center gap-1 px-3 py-1 rounded text-xs border font-medium transition-colors
-              ${follow
-                ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
-                : "bg-green-500/10 border-green-500/30 text-green-500 hover:bg-green-500/20"
-              }`}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            title={follow ? '停止跟踪' : '实时跟踪'}
+            onClick={() => setFollow((f) => !f)}
+            className={`h-7 text-xs ${
+              follow
+                ? 'border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                : 'border-green-500/30 bg-green-500/10 text-green-500 hover:bg-green-500/20'
+            }`}
           >
-            {follow ? <><Square size={12} /> 停止</> : <><Play size={12} /> 跟踪</>}
-          </button>
+            {follow ? (
+              <>
+                <Square className="size-3" /> 停止
+              </>
+            ) : (
+              <>
+                <Play className="size-3" /> 跟踪
+              </>
+            )}
+          </Button>
 
-          {/* 刷新（静态模式） */}
-          {!follow && (
-            <button
-              onClick={loadStaticLogs}
+          {!follow ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               disabled={loading}
               title="刷新"
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-40"
-              style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }}
+              onClick={() => void loadStaticLogs()}
+              className="h-7 border-(--border-sub) bg-(--bg-surface) text-(--text-soft)"
             >
-              <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            </button>
-          )}
+              <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          ) : null}
 
-          {/* 复制 */}
-          <button
-            onClick={handleCopy}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             title="复制全部"
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors"
-            style={{ background: "var(--bg-surface)", borderColor: "var(--border-sub)", color: "var(--text-soft)" }}
+            onClick={handleCopy}
+            className="h-7 border-(--border-sub) bg-(--bg-surface) text-(--text-soft)"
           >
-            {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-          </button>
+            {copied ? <Check className="size-3 text-green-500" /> : <Copy className="size-3" />}
+          </Button>
 
-          {lineCount > 0 && (
-            <span className="text-xs ml-auto" style={{ color: "var(--text-muted)" }}>{lineCount} 行</span>
-          )}
-
-          {/* 关闭 */}
-          <button
-            onClick={handleClose}
-            className="ml-auto p-1 rounded transition-colors"
-            style={{ color: "var(--text-muted)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-surface)";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-base)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-              (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
-            }}
-          >
-            <X size={16} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {lineCount > 0 ? <span className="text-xs text-(--text-muted)">{lineCount} 行</span> : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              onClick={() => void handleClose()}
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-500 text-xs shrink-0">
+        {error ? (
+          <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-xs text-red-500">
             {error}
           </div>
-        )}
+        ) : null}
 
-        {/* xterm 容器 */}
-        <div className="flex-1 overflow-hidden p-2 relative" style={{ background: "#0d1117" }}>
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10">
-              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-soft)" }}>
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="relative min-h-0 flex-1 overflow-hidden p-2" style={{ background: '#0d1117' }}>
+          {loading ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+              <div className="flex items-center gap-2 text-sm text-(--text-soft)">
+                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                 加载中...
               </div>
             </div>
-          )}
-          <div ref={containerRef} className="w-full h-full" />
+          ) : null}
+          <div ref={containerRef} className="size-full" />
         </div>
-      </div>
-    </div>
-  );
+      </DialogContent>
+    </Dialog>
+  )
 }

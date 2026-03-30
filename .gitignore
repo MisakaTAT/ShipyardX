@@ -1,7 +1,5 @@
-.yarn/*
-.cursor/*
-.yarnrc.yml
-.pnp.*
+.cursor
+.yarn
 
 # Logs
 logs
