@@ -60,7 +60,7 @@ export interface DockerVolume {
 export interface CreateVolumeRequest {
   name: string
   driver?: string | null
-  driver_opts?: Record<string, string> | null
+  driverOpts?: Record<string, string> | null
 }
 
 export interface DockerInfo {
@@ -80,6 +80,26 @@ export interface DockerInfo {
   architecture: string
   storage_driver: string
   warnings: number
+}
+
+export interface DockerDaemonSettings {
+  mirror_urls: string[]
+  log_rotation: boolean
+  log_max_size: string
+  log_max_file: string
+  live_restore: boolean
+  cgroup_driver: string
+  socket_path: string
+}
+
+export interface UpdateDockerDaemonRequest {
+  mirrorUrls: string[]
+  logRotation: boolean
+  logMaxSize: string
+  logMaxFile: string
+  liveRestore: boolean
+  cgroupDriver: string
+  socketPath: string
 }
 
 export interface ContainerStats {

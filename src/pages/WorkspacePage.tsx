@@ -11,6 +11,7 @@ import {
   Loader2,
   Share2,
   Database,
+  Settings2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Server } from '../types'
@@ -20,11 +21,12 @@ import NetworkPanel from '../components/NetworkPanel'
 import TerminalPanel from '../components/TerminalPanel'
 import ServerOverview from '../components/ServerOverview'
 import VolumePanel from '../components/VolumePanel'
+import DockerManagePanel from '../components/DockerManagePanel'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'terminal'
+type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'docker' | 'terminal'
 type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
 interface NavItem {
@@ -39,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'images', icon: <Layers className="size-[18px]" />, label: '镜像' },
   { key: 'networks', icon: <Share2 className="size-[18px]" />, label: '网络' },
   { key: 'volumes', icon: <Database className="size-[18px]" />, label: '存储卷' },
+  { key: 'docker', icon: <Settings2 className="size-[18px]" />, label: '配置' },
   { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
 ]
 
@@ -159,15 +162,16 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
         <div
           className={cn(
             'min-h-[360px] flex-1 overflow-hidden',
-            activeTab === 'overview' ? '' : 'rounded-xl border border-border bg-(--bg-panel)',
+            activeTab === 'overview' || activeTab === 'docker' ? '' : 'rounded-xl border border-border bg-(--bg-panel)',
           )}
-          style={activeTab === 'overview' ? { background: 'transparent' } : undefined}
+          style={activeTab === 'overview' || activeTab === 'docker' ? { background: 'transparent' } : undefined}
         >
           {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} /> : null}
           {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} /> : null}
           {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'networks' ? <NetworkPanel serverId={selectedServer.id} /> : null}
           {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'terminal' ? (
             <TerminalPanel
               serverId={selectedServer.id}

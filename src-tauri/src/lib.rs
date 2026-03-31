@@ -59,6 +59,9 @@ pub fn run() {
             commands::system::check_docker_access,
             commands::system::get_docker_info,
             commands::system::get_container_stats,
+            commands::system::get_docker_daemon_settings,
+            commands::system::update_docker_daemon_settings,
+            commands::system::restart_docker_daemon,
             // 日志流
             commands::log_stream::start_log_stream,
             commands::log_stream::stop_log_stream,

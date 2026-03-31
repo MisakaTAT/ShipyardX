@@ -428,7 +428,7 @@ export default function VolumePanel({ serverId }: Props) {
                     const req: CreateVolumeRequest = {
                       name: createName.trim(),
                       driver: 'local',
-                      driver_opts: Object.keys(driverOpts).length ? driverOpts : null,
+                      driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
                     }
                     await invoke('create_volume', { serverId, ...req })
                     setShowCreate(false)

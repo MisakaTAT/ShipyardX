@@ -86,3 +86,14 @@ pub struct ContainerStats {
     pub blk_read: u64,
     pub blk_write: u64,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DockerDaemonSettings {
+    pub mirror_urls: Vec<String>,
+    pub log_rotation: bool,
+    pub log_max_size: String,
+    pub log_max_file: String,
+    pub live_restore: bool,
+    pub cgroup_driver: String,
+    pub socket_path: String,
+}
