@@ -81,8 +81,9 @@ pub async fn get_container_logs(
             ver, container_id, tail, ts
         );
         let b64 = ssh_exec(&server, &cmd)?;
+        let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
         let raw = BASE64
-            .decode(b64.trim())
+            .decode(clean)
             .map_err(|e| format!("base64 解码失败: {}", e))?;
         Ok(demux_log_stream(&raw))
     })
