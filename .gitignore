@@ -1,5 +1,6 @@
 .cursor
 .yarn
+.yarnrc.yml
 
 # Logs
 logs
