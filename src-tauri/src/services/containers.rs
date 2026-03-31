@@ -1,4 +1,5 @@
 use tauri::State;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
 use crate::core::docker::{api_container_to_dto, docker_delete, docker_get, docker_post, resolve_api_version};
 use crate::core::ssh::ssh_exec;
@@ -80,7 +81,9 @@ pub async fn get_container_logs(
             ver, container_id, tail, ts
         );
         let b64 = ssh_exec(&server, &cmd)?;
-        let raw = base64_decode(b64.trim())?;
+        let raw = BASE64
+            .decode(b64.trim())
+            .map_err(|e| format!("base64 解码失败: {}", e))?;
         Ok(demux_log_stream(&raw))
     })
     .await
@@ -108,34 +111,3 @@ fn demux_log_stream(data: &[u8]) -> String {
     out
 }
 
-fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut table = [255u8; 256];
-    for (i, &c) in CHARS.iter().enumerate() {
-        table[c as usize] = i as u8;
-    }
-    let clean: Vec<u8> = input
-        .bytes()
-        .filter(|&b| b != b'\n' && b != b'\r' && b != b' ')
-        .collect();
-    let mut out = Vec::with_capacity(clean.len() * 3 / 4);
-    let mut buf = 0u32;
-    let mut bits = 0u32;
-    for &c in &clean {
-        if c == b'=' {
-            break;
-        }
-        let v = table[c as usize];
-        if v == 255 {
-            return Err(format!("无效的 base64 字符: {}", c as char));
-        }
-        buf = (buf << 6) | v as u32;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            out.push((buf >> bits) as u8);
-            buf &= (1 << bits) - 1;
-        }
-    }
-    Ok(out)
-}
