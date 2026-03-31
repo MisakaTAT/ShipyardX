@@ -1,70 +1,17 @@
-use serde::Deserialize;
 use tauri::State;
 
 use crate::core::docker::{docker_delete, docker_get, docker_post_json};
-use crate::core::models::DockerNetwork;
 use crate::core::state::{get_server_config, AppState};
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-struct ApiIpamConfig {
-    #[serde(rename = "Subnet")]
-    subnet: Option<String>,
-    #[serde(rename = "Gateway")]
-    gateway: Option<String>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-struct ApiIpam {
-    #[serde(rename = "Config")]
-    config: Option<Vec<ApiIpamConfig>>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-struct ApiNetwork {
-    #[serde(rename = "Id")]
-    id: Option<String>,
-    #[serde(rename = "Name")]
-    name: Option<String>,
-    #[serde(rename = "Driver")]
-    driver: Option<String>,
-    #[serde(rename = "Scope")]
-    scope: Option<String>,
-    #[serde(rename = "IPAM")]
-    ipam: Option<ApiIpam>,
-    #[serde(rename = "Labels")]
-    labels: Option<std::collections::HashMap<String, String>>,
-    #[serde(rename = "Created")]
-    created: Option<String>,
-    #[serde(rename = "Internal")]
-    internal: Option<bool>,
-    #[serde(rename = "Attachable")]
-    attachable: Option<bool>,
-}
-
-impl Default for ApiNetwork {
-    fn default() -> Self {
-        Self {
-            id: None,
-            name: None,
-            driver: None,
-            scope: None,
-            ipam: None,
-            labels: None,
-            created: None,
-            internal: None,
-            attachable: None,
-        }
-    }
-}
+use crate::models::docker::DockerNetwork;
+use crate::models::network::{
+    NetworkResp, CreateNetworkReq, CreateNetworkIpamReq, CreateNetworkIpamConfigReq,
+};
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let api: Vec<ApiNetwork> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        let api: Vec<NetworkResp> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
         // 按创建时间倒序（最新在前）；字段缺失时排在后面
         let mut api = api;
         api.sort_by(|a, b| b.created.cmp(&a.created));
@@ -135,49 +82,17 @@ pub async fn create_network(
         driver
     };
 
-    #[derive(serde::Serialize)]
-    struct CreateNetworkIpamConfig {
-        #[serde(rename = "Subnet", skip_serializing_if = "Option::is_none")]
-        subnet: Option<String>,
-        #[serde(rename = "Gateway", skip_serializing_if = "Option::is_none")]
-        gateway: Option<String>,
-    }
-
-    #[derive(serde::Serialize)]
-    struct CreateNetworkIpam {
-        #[serde(rename = "Driver")]
-        driver: String,
-        #[serde(rename = "Config")]
-        config: Vec<CreateNetworkIpamConfig>,
-    }
-
-    #[derive(serde::Serialize)]
-    struct CreateNetworkBody {
-        #[serde(rename = "Name")]
-        name: String,
-        #[serde(rename = "Driver")]
-        driver: String,
-        #[serde(rename = "CheckDuplicate")]
-        check_duplicate: bool,
-        #[serde(rename = "Internal", skip_serializing_if = "Option::is_none")]
-        internal: Option<bool>,
-        #[serde(rename = "Attachable", skip_serializing_if = "Option::is_none")]
-        attachable: Option<bool>,
-        #[serde(rename = "IPAM", skip_serializing_if = "Option::is_none")]
-        ipam: Option<CreateNetworkIpam>,
-    }
-
     let sub = subnet.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let gw = gateway.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let ipam = sub.map(|s| CreateNetworkIpam {
+    let ipam = sub.map(|s| CreateNetworkIpamReq {
         driver: "default".to_string(),
-        config: vec![CreateNetworkIpamConfig {
+        config: vec![CreateNetworkIpamConfigReq {
             subnet: Some(s.to_string()),
             gateway: gw.map(|g| g.to_string()),
         }],
     });
 
-    let body = CreateNetworkBody {
+    let body = CreateNetworkReq {
         name,
         driver,
         check_duplicate: true,

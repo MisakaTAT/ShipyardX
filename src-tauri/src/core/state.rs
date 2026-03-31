@@ -1,36 +1,6 @@
-use std::collections::HashMap;
-use std::sync::{mpsc, Mutex};
 use tauri::State;
-
-use crate::core::models::ServerConfig;
-
-pub enum TerminalMsg {
-    Data(Vec<u8>),
-    Resize { cols: u32, rows: u32 },
-    Close,
-}
-
-pub struct TerminalHandle {
-    pub tx: mpsc::Sender<TerminalMsg>,
-}
-
-pub struct StreamHandle {
-    pub tx: mpsc::Sender<()>,
-}
-
-pub struct EventStreamHandle {
-    pub stream_id: String,
-    pub tx: mpsc::Sender<()>,
-}
-
-pub struct AppState {
-    pub servers: Mutex<Vec<ServerConfig>>,
-    pub data_file: Mutex<std::path::PathBuf>,
-    pub(crate) terminals: Mutex<HashMap<String, TerminalHandle>>,
-    pub(crate) streams: Mutex<HashMap<String, StreamHandle>>,
-    pub(crate) terminal_ws_clients: Mutex<HashMap<String, mpsc::Sender<String>>>,
-    pub(crate) event_streams: Mutex<HashMap<String, EventStreamHandle>>,
-}
+use crate::models::server::ServerConfig;
+pub use crate::models::state::{AppState, EventStreamHandle, StreamHandle, TerminalHandle, TerminalMsg};
 
 pub fn get_server_config(state: &State<AppState>, id: &str) -> Result<ServerConfig, String> {
     state

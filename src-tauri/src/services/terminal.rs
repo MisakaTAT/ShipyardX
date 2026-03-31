@@ -4,7 +4,6 @@ use std::sync::mpsc;
 use std::sync::OnceLock;
 
 use serde::Deserialize;
-use serde::Serialize;
 use serde_json::json;
 use tauri::{AppHandle, Manager, State};
 use tungstenite::protocol::Message;
@@ -13,9 +12,10 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
-use crate::core::models::ServerConfig;
 use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, TerminalHandle, TerminalMsg};
+use crate::models::server::ServerConfig;
+use crate::models::terminal::OpenTerminalResult;
 use crate::utils::id::generate_id;
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
@@ -259,12 +259,6 @@ fn terminal_ws_port() -> u16 {
     *WS_PORT
         .get()
         .expect("terminal ws server must be initialized before reading port")
-}
-
-#[derive(Serialize)]
-pub struct OpenTerminalResult {
-    pub session_id: String,
-    pub ws_port: u16,
 }
 
 pub fn open_terminal(

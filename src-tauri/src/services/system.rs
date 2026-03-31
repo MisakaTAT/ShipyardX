@@ -1,15 +1,18 @@
 use tauri::State;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use serde::Deserialize;
 
 use crate::core::docker::{
     docker_get, invalidate_api_version, resolve_api_version,
-    stats::{compute_stats, RawStats},
+    stats::compute_stats,
 };
-use crate::core::models::{ContainerStats, DockerDaemonSettings, DockerInfo};
 use crate::core::ssh::ssh_exec;
+use crate::models::docker_stats::RawStats;
 use crate::core::state::{get_server_config, AppState};
+use crate::models::server::ServerConfig;
+use crate::models::system::{
+    ContainerStats, DockerDaemonConfig, DockerDaemonSettings, DockerInfo, DockerInfoResp,
+};
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
 const ERR_BAD_SU_PASSWORD: &str = "__ERR_BAD_SU_PASSWORD__";
@@ -50,7 +53,7 @@ fn map_restart_error(err: String) -> String {
 }
 
 fn restart_docker_service(
-    server: &crate::core::models::ServerConfig,
+    server: &ServerConfig,
     sudo_password: Option<String>,
 ) -> Result<(), String> {
     let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
@@ -69,46 +72,11 @@ fn restart_docker_service(
     Ok(())
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-struct DockerInfoResponse {
-    #[serde(rename = "Containers")]
-    containers: Option<i64>,
-    #[serde(rename = "ContainersRunning")]
-    containers_running: Option<i64>,
-    #[serde(rename = "ContainersPaused")]
-    containers_paused: Option<i64>,
-    #[serde(rename = "ContainersStopped")]
-    containers_stopped: Option<i64>,
-    #[serde(rename = "Images")]
-    images: Option<i64>,
-    #[serde(rename = "ServerVersion")]
-    server_version: Option<String>,
-    #[serde(rename = "Name")]
-    name: Option<String>,
-    #[serde(rename = "NCPU")]
-    ncpu: Option<i64>,
-    #[serde(rename = "MemTotal")]
-    mem_total: Option<i64>,
-    #[serde(rename = "OperatingSystem")]
-    os: Option<String>,
-    #[serde(rename = "OSVersion")]
-    os_version: Option<String>,
-    #[serde(rename = "KernelVersion")]
-    kernel_version: Option<String>,
-    #[serde(rename = "Architecture")]
-    architecture: Option<String>,
-    #[serde(rename = "Driver")]
-    storage_driver: Option<String>,
-    #[serde(rename = "Warnings")]
-    warnings: Option<Vec<serde_json::Value>>,
-}
-
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerInfo, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/info")?;
-        let v: DockerInfoResponse = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
+        let v: DockerInfoResp = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
         Ok(DockerInfo {
             containers: v.containers.unwrap_or(0),
             containers_running: v.containers_running.unwrap_or(0),
@@ -172,25 +140,6 @@ pub async fn get_container_stats(
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-#[derive(Debug, Default, Deserialize, serde::Serialize)]
-#[serde(default)]
-struct DockerDaemonConfig {
-    #[serde(rename = "registry-mirrors", skip_serializing_if = "Option::is_none")]
-    registry_mirrors: Option<Vec<String>>,
-    #[serde(rename = "log-driver", skip_serializing_if = "Option::is_none")]
-    log_driver: Option<String>,
-    #[serde(rename = "log-opts", skip_serializing_if = "Option::is_none")]
-    log_opts: Option<std::collections::HashMap<String, String>>,
-    #[serde(rename = "live-restore", skip_serializing_if = "Option::is_none")]
-    live_restore: Option<bool>,
-    #[serde(rename = "exec-opts", skip_serializing_if = "Option::is_none")]
-    exec_opts: Option<Vec<String>>,
-    #[serde(rename = "hosts", skip_serializing_if = "Option::is_none")]
-    hosts: Option<Vec<String>>,
-    #[serde(flatten)]
-    extra: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 pub async fn get_docker_daemon_settings(

@@ -1,6 +1,8 @@
 mod commands;
 mod config;
 mod core;
+mod models;
+mod services;
 mod utils;
 
 pub use core::state::AppState;

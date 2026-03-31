@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::core::services;
+use crate::services;
 use crate::core::state::AppState;
 
 #[tauri::command]

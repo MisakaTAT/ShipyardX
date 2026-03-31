@@ -1,7 +1,7 @@
 use tauri::State;
 
-use crate::core::models::ServerConfig;
-use crate::core::services;
+use crate::models::server::ServerConfig;
+use crate::services;
 use crate::core::state::AppState;
 
 #[tauri::command]

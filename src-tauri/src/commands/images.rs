@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
-use crate::core::models::DockerImage;
-use crate::core::services;
+use crate::models::docker::DockerImage;
+use crate::services;
 use crate::core::state::AppState;
 
 #[tauri::command]

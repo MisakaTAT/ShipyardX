@@ -4,10 +4,12 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use crate::core::models::{DockerContainer, DockerImage, ServerConfig};
 use crate::core::ssh::ssh_exec;
+use crate::models::docker_api::{ContainerResp, ImageResp, PortResp, DockerError, VersionResp};
+use crate::models::docker::{DockerContainer, DockerImage};
+use crate::models::server::ServerConfig;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -29,57 +31,10 @@ pub fn resolve_api_version(config: &ServerConfig) -> Result<String, String> {
     }
     let cmd = "curl -s --unix-socket /var/run/docker.sock 'http://localhost/version'";
     let resp = ssh_exec(config, cmd)?;
-    #[derive(Deserialize)]
-    struct VersionResp {
-        #[serde(rename = "ApiVersion")]
-        api_version: String,
-    }
     let v: VersionResp = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
     let api_ver = v.api_version;
     api_version_cache().lock().unwrap().insert(key, api_ver.clone());
     Ok(api_ver)
-}
-
-#[derive(Deserialize)]
-pub(crate) struct ApiContainer {
-    #[serde(rename = "Id")]
-    pub id: String,
-    #[serde(rename = "Names")]
-    pub names: Vec<String>,
-    #[serde(rename = "Image")]
-    pub image: String,
-    #[serde(rename = "State")]
-    pub state: String,
-    #[serde(rename = "Status")]
-    pub status: String,
-    #[serde(rename = "Ports")]
-    pub ports: Vec<ApiPort>,
-    #[serde(rename = "Created")]
-    pub created: i64,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct ApiPort {
-    #[serde(rename = "IP")]
-    pub ip: Option<String>,
-    #[serde(rename = "PrivatePort")]
-    pub private_port: u16,
-    #[serde(rename = "PublicPort")]
-    pub public_port: Option<u16>,
-    #[serde(rename = "Type")]
-    pub port_type: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct ApiImage {
-    #[serde(rename = "Id")]
-    pub id: String,
-    #[serde(rename = "RepoTags")]
-    pub repo_tags: Option<Vec<String>>,
-    #[serde(rename = "Size")]
-    pub size: i64,
-    #[serde(rename = "Created")]
-    pub created: i64,
 }
 
 pub fn docker_get(config: &ServerConfig, path: &str) -> Result<String, String> {
@@ -131,10 +86,6 @@ pub fn check_docker_error(resp: &str) -> Result<(), String> {
     if trimmed.is_empty() {
         return Ok(());
     }
-    #[derive(Deserialize)]
-    struct DockerError {
-        message: Option<String>,
-    }
     if let Ok(v) = serde_json::from_str::<DockerError>(trimmed) {
         if let Some(msg) = v.message {
             return Err(msg);
@@ -143,7 +94,7 @@ pub fn check_docker_error(resp: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn format_ports(ports: &[ApiPort]) -> String {
+pub fn format_ports(ports: &[PortResp]) -> String {
     ports
         .iter()
         .filter_map(|p| {
@@ -169,7 +120,7 @@ pub fn format_bytes(bytes: i64) -> String {
     }
 }
 
-pub fn api_container_to_dto(c: ApiContainer) -> DockerContainer {
+pub fn api_container_to_dto(c: ContainerResp) -> DockerContainer {
     let name = c
         .names
         .first()
@@ -186,7 +137,7 @@ pub fn api_container_to_dto(c: ApiContainer) -> DockerContainer {
     }
 }
 
-pub fn api_image_to_dto(img: ApiImage) -> DockerImage {
+pub fn api_image_to_dto(img: ImageResp) -> DockerImage {
     let (repository, tag) = img
         .repo_tags
         .as_deref()

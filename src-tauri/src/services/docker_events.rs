@@ -2,50 +2,14 @@ use std::io::Read;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
 use crate::core::docker::resolve_api_version;
-use crate::core::models::ServerConfig;
 use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, EventStreamHandle};
+use crate::models::events::{DockerEvent, RawDockerEvent};
+use crate::models::server::ServerConfig;
 use crate::utils::id::generate_id;
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DockerEvent {
-    pub event_type: String,
-    pub action: String,
-    pub actor_id: String,
-    pub actor_name: String,
-    pub actor_image: String,
-    pub scope: String,
-    pub time: i64,
-    pub time_nano: i64,
-    pub detail: String,
-}
-
-#[derive(Deserialize)]
-struct RawDockerEvent {
-    #[serde(rename = "Type")]
-    event_type: String,
-    #[serde(rename = "Action")]
-    action: String,
-    #[serde(rename = "Actor", default)]
-    actor: RawActor,
-    #[serde(default)]
-    scope: Option<String>,
-    time: Option<i64>,
-    #[serde(rename = "timeNano")]
-    time_nano: Option<i64>,
-}
-
-#[derive(Deserialize, Default)]
-struct RawActor {
-    #[serde(rename = "ID", default)]
-    id: String,
-    #[serde(rename = "Attributes", default)]
-    attributes: std::collections::HashMap<String, String>,
-}
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
 

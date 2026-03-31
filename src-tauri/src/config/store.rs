@@ -7,7 +7,7 @@ use aes_gcm::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use tauri::{AppHandle, Manager};
 
-use crate::core::models::ServerConfig;
+use crate::models::server::ServerConfig;
 
 const KEY_FILE: &str = "encryption.key";
 

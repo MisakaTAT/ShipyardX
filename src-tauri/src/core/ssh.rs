@@ -1,8 +1,7 @@
 use ssh2::Session;
 use std::io::Read;
 use std::net::TcpStream;
-
-use crate::core::models::ServerConfig;
+use crate::models::server::ServerConfig;
 
 /// 建立认证完成的 SSH Session
 pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
