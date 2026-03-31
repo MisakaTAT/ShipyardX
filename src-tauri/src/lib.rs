@@ -49,9 +49,11 @@ pub fn run() {
             commands::images::cancel_stream,
             // 网络管理
             commands::networks::list_networks,
+            commands::networks::create_network,
             commands::networks::remove_network,
             // 存储卷管理
             commands::volumes::list_volumes,
+            commands::volumes::create_volume,
             commands::volumes::remove_volume,
             // 系统信息 & 统计
             commands::system::check_docker_access,

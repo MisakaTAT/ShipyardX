@@ -9,15 +9,11 @@ use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, StreamHandle};
 use crate::utils::id::generate_id;
 
-pub async fn list_images(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<DockerImage>, String> {
+pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/images/json")?;
-        let mut api: Vec<ApiImage> =
-            serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
+        let mut api: Vec<ApiImage> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
         // 按创建时间倒序（最新在前）
         api.sort_by(|a, b| b.created.cmp(&a.created));
         Ok(api.into_iter().map(api_image_to_dto).collect())
@@ -33,14 +29,9 @@ pub async fn remove_image(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        docker_delete(
-            &server,
-            &format!("/images/{}?force={}", image_id, force),
-        )
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(move || docker_delete(&server, &format!("/images/{}?force={}", image_id, force)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn run_pull_thread(
@@ -53,10 +44,7 @@ fn run_pull_thread(
     let sess = match create_ssh_session(&config) {
         Ok(s) => s,
         Err(e) => {
-            let _ = ah.emit(
-                &format!("pull-data:{}", pull_id),
-                format!("连接失败: {}\n", e),
-            );
+            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("连接失败: {}\n", e));
             let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
             return;
         }
@@ -65,20 +53,14 @@ fn run_pull_thread(
     let mut channel = match sess.channel_session() {
         Ok(c) => c,
         Err(e) => {
-            let _ = ah.emit(
-                &format!("pull-data:{}", pull_id),
-                format!("通道失败: {}\n", e),
-            );
+            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("通道失败: {}\n", e));
             let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
             return;
         }
     };
 
     if let Err(e) = channel.exec(&format!("docker pull {} 2>&1", image)) {
-        let _ = ah.emit(
-            &format!("pull-data:{}", pull_id),
-            format!("执行失败: {}\n", e),
-        );
+        let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("执行失败: {}\n", e));
         let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
         return;
     }

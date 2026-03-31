@@ -13,8 +13,7 @@ pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
 
     let mut sess = Session::new().map_err(|e| format!("SSH 会话创建失败: {}", e))?;
     sess.set_tcp_stream(tcp);
-    sess.handshake()
-        .map_err(|e| format!("SSH 握手失败: {}", e))?;
+    sess.handshake().map_err(|e| format!("SSH 握手失败: {}", e))?;
 
     match config.auth_type.as_str() {
         "password" => {
@@ -28,13 +27,8 @@ pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
             } else {
                 raw.to_string()
             };
-            sess.userauth_pubkey_file(
-                &config.username,
-                None,
-                std::path::Path::new(&expanded),
-                None,
-            )
-            .map_err(|e| format!("密钥认证失败: {}", e))?;
+            sess.userauth_pubkey_file(&config.username, None, std::path::Path::new(&expanded), None)
+                .map_err(|e| format!("密钥认证失败: {}", e))?;
         }
         _ => return Err("不支持的认证类型".to_string()),
     }
@@ -50,12 +44,8 @@ pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
 pub fn ssh_exec(config: &ServerConfig, command: &str) -> Result<String, String> {
     let sess = create_ssh_session(config)?;
 
-    let mut channel = sess
-        .channel_session()
-        .map_err(|e| format!("创建通道失败: {}", e))?;
-    channel
-        .exec(command)
-        .map_err(|e| format!("执行命令失败: {}", e))?;
+    let mut channel = sess.channel_session().map_err(|e| format!("创建通道失败: {}", e))?;
+    channel.exec(command).map_err(|e| format!("执行命令失败: {}", e))?;
 
     let mut stdout = String::new();
     channel

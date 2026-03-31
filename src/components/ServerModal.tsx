@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { Server } from '../types'
-import { X, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Server as ServerIcon, X, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,8 +94,9 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton={false} className="max-w-md gap-0 overflow-hidden p-0 sm:max-w-md">
-        <DialogHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border px-6 py-4">
-          <DialogTitle className="text-base font-semibold text-(--text-strong)">
+        <DialogHeader className="flex flex-row items-center gap-2 space-y-0 border-b border-border px-4 py-3">
+          <ServerIcon className="size-4 text-(--accent-text)" />
+          <DialogTitle className="flex-1 text-sm font-semibold text-(--text-strong)">
             {isEdit ? '编辑服务器' : '添加服务器'}
           </DialogTitle>
           <Button
@@ -103,13 +104,14 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
             variant="ghost"
             size="icon-sm"
             className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+            disabled={loading}
             onClick={() => onOpenChange(false)}
           >
             <X className="size-4" />
           </Button>
         </DialogHeader>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="space-y-4 p-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-(--text-soft)">服务器名称 *</Label>
             <Input
@@ -206,7 +208,7 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border px-6 py-4">
+        <div className="flex items-center justify-between px-4 py-3">
           <Button
             type="button"
             variant="ghost"

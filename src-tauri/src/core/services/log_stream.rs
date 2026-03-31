@@ -30,10 +30,7 @@ fn run_log_stream_thread(
     };
 
     let ts_flag = if timestamps { "--timestamps " } else { "" };
-    let cmd = format!(
-        "docker logs -f --tail {} {}{}  2>&1",
-        tail, ts_flag, container_id
-    );
+    let cmd = format!("docker logs -f --tail {} {}{}  2>&1", tail, ts_flag, container_id);
 
     let mut channel = match sess.channel_session() {
         Ok(c) => c,

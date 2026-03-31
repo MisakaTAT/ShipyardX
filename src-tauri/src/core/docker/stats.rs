@@ -96,9 +96,8 @@ pub fn compute_stats(raw: RawStats) -> ContainerStats {
         .networks
         .as_ref()
         .map(|nets| {
-            nets.values().fold((0u64, 0u64), |(rx, tx), n| {
-                (rx + n.rx_bytes, tx + n.tx_bytes)
-            })
+            nets.values()
+                .fold((0u64, 0u64), |(rx, tx), n| (rx + n.rx_bytes, tx + n.tx_bytes))
         })
         .unwrap_or((0, 0));
 

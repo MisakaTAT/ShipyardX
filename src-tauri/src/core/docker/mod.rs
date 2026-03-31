@@ -3,7 +3,8 @@ pub mod stats;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use serde::Deserialize;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
 
 use crate::core::models::{DockerContainer, DockerImage, ServerConfig};
 use crate::core::ssh::ssh_exec;
@@ -28,11 +29,13 @@ pub fn resolve_api_version(config: &ServerConfig) -> Result<String, String> {
     }
     let cmd = "curl -s --unix-socket /var/run/docker.sock 'http://localhost/version'";
     let resp = ssh_exec(config, cmd)?;
-    let v: serde_json::Value = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
-    let api_ver = v["ApiVersion"]
-        .as_str()
-        .ok_or_else(|| "无法获取 Docker API 版本".to_string())?
-        .to_string();
+    #[derive(Deserialize)]
+    struct VersionResp {
+        #[serde(rename = "ApiVersion")]
+        api_version: String,
+    }
+    let v: VersionResp = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
+    let api_ver = v.api_version;
     api_version_cache().lock().unwrap().insert(key, api_ver.clone());
     Ok(api_ver)
 }
@@ -100,6 +103,19 @@ pub fn docker_post(config: &ServerConfig, path: &str) -> Result<(), String> {
     check_docker_error(&resp)
 }
 
+/// POST JSON body（经 base64 管道传入 curl，避免 SSH 侧 shell 转义问题）
+pub fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> Result<(), String> {
+    let body_str = serde_json::to_string(body).map_err(|e| format!("序列化请求体失败: {}", e))?;
+    let ver = resolve_api_version(config)?;
+    let b64 = STANDARD.encode(body_str);
+    let cmd = format!(
+        "printf '%s' '{}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- --unix-socket /var/run/docker.sock 'http://localhost/v{}{}'",
+        b64, ver, path
+    );
+    let resp = ssh_exec(config, &cmd)?;
+    check_docker_error(&resp)
+}
+
 pub fn docker_delete(config: &ServerConfig, path: &str) -> Result<(), String> {
     let ver = resolve_api_version(config)?;
     let cmd = format!(
@@ -115,9 +131,13 @@ pub fn check_docker_error(resp: &str) -> Result<(), String> {
     if trimmed.is_empty() {
         return Ok(());
     }
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        if let Some(msg) = v.get("message").and_then(|m| m.as_str()) {
-            return Err(msg.to_string());
+    #[derive(Deserialize)]
+    struct DockerError {
+        message: Option<String>,
+    }
+    if let Ok(v) = serde_json::from_str::<DockerError>(trimmed) {
+        if let Some(msg) = v.message {
+            return Err(msg);
         }
     }
     Ok(())

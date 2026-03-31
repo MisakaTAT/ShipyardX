@@ -171,10 +171,7 @@ enum WsClientMsg {
 fn start_terminal_ws_server_once(app_handle: AppHandle) {
     let _ = WS_PORT.get_or_init(move || {
         let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind terminal ws server");
-        let port = listener
-            .local_addr()
-            .expect("failed to read terminal ws addr")
-            .port();
+        let port = listener.local_addr().expect("failed to read terminal ws addr").port();
 
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
@@ -189,10 +186,7 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) {
                         Err(_) => return,
                     };
 
-                    let session_id = req_path
-                        .strip_prefix("/terminal/")
-                        .unwrap_or("")
-                        .to_string();
+                    let session_id = req_path.strip_prefix("/terminal/").unwrap_or("").to_string();
                     if session_id.is_empty() {
                         let _ = ws.close(None);
                         return;
@@ -231,9 +225,7 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) {
                                                 let _ = handle.tx.send(TerminalMsg::Data(data));
                                             }
                                             WsClientMsg::Resize { cols, rows } => {
-                                                let _ = handle
-                                                    .tx
-                                                    .send(TerminalMsg::Resize { cols, rows });
+                                                let _ = handle.tx.send(TerminalMsg::Resize { cols, rows });
                                             }
                                             WsClientMsg::Close => {
                                                 let _ = handle.tx.send(TerminalMsg::Close);
@@ -244,8 +236,7 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) {
                             }
                             Ok(Message::Close(_)) => break,
                             Ok(_) => {}
-                            Err(tungstenite::Error::Io(e))
-                                if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                            Err(tungstenite::Error::Io(e)) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                             Err(_) => break,
                         }
 
@@ -298,33 +289,18 @@ pub fn open_terminal(
         .lock()
         .unwrap()
         .insert(session_id.clone(), TerminalHandle { tx });
-    Ok(OpenTerminalResult {
-        session_id,
-        ws_port,
-    })
+    Ok(OpenTerminalResult { session_id, ws_port })
 }
 
-pub fn write_terminal(
-    session_id: String,
-    data: Vec<u8>,
-    state: State<AppState>,
-) -> Result<(), String> {
+pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {
     let terminals = state.terminals.lock().unwrap();
     if let Some(handle) = terminals.get(&session_id) {
-        handle
-            .tx
-            .send(TerminalMsg::Data(data))
-            .map_err(|e| e.to_string())?;
+        handle.tx.send(TerminalMsg::Data(data)).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
-pub fn resize_terminal(
-    session_id: String,
-    cols: u32,
-    rows: u32,
-    state: State<AppState>,
-) -> Result<(), String> {
+pub fn resize_terminal(session_id: String, cols: u32, rows: u32, state: State<AppState>) -> Result<(), String> {
     let terminals = state.terminals.lock().unwrap();
     if let Some(handle) = terminals.get(&session_id) {
         handle

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Database, Search, X, Loader2, Trash2 } from 'lucide-react'
-import type { DockerVolume } from '../types'
+import { Database, Search, X, Loader2, Trash2, Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import type { CreateVolumeRequest, DockerVolume } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatDateTimeString } from '@/utils/datetime'
 
@@ -19,6 +22,15 @@ export default function VolumePanel({ serverId }: Props) {
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerVolume | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createMode, setCreateMode] = useState<'local'>('local')
+  const [createEnableNfs, setCreateEnableNfs] = useState(false)
+  const [createNfsAddr, setCreateNfsAddr] = useState('')
+  const [createNfsVersion, setCreateNfsVersion] = useState('')
+  const [createNfsMount, setCreateNfsMount] = useState('')
+  const [createNfsOptions, setCreateNfsOptions] = useState('rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14')
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetchVolumes = useCallback(async () => {
@@ -107,11 +119,31 @@ export default function VolumePanel({ serverId }: Props) {
           ) : null}
         </div>
 
-        {lastUpdated ? (
-          <div className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
-            更新于 {lastUpdated}
-          </div>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {lastUpdated ? (
+            <span className="text-xs mr-1" style={{ color: 'var(--text-muted)' }}>
+              更新于 {lastUpdated}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setCreateName('')
+              setCreateMode('local')
+              setCreateEnableNfs(false)
+              setCreateNfsAddr('')
+              setCreateNfsVersion('')
+              setCreateNfsMount('')
+              setCreateNfsOptions('rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14')
+              setShowCreate(true)
+            }}
+          >
+            <Plus className="size-3.5 stroke-[2.5]" />
+            创建存储卷
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -237,6 +269,193 @@ export default function VolumePanel({ serverId }: Props) {
           </table>
         )}
       </div>
+
+      <Dialog
+        open={showCreate}
+        onOpenChange={(next) => {
+          if (!next && !createSubmitting) setShowCreate(false)
+        }}
+      >
+        <DialogContent showCloseButton={false} className="max-w-lg gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="flex flex-row items-center gap-2 space-y-0 border-b border-border px-4 py-3">
+            <Database className="size-4 text-(--accent-text)" />
+            <DialogTitle className="flex-1 text-sm font-semibold text-(--text-strong)">创建存储卷</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              disabled={createSubmitting}
+              onClick={() => setShowCreate(false)}
+            >
+              <X className="size-4" />
+            </Button>
+          </DialogHeader>
+
+          <div className="space-y-3 p-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-(--text-muted)">名称 *</label>
+              <Input
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="例如 my-volume"
+                disabled={createSubmitting}
+                className="border-(--border-sub) bg-(--bg-input) text-sm text-(--text-base)"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-(--text-muted)">模式</label>
+              <Select value={createMode} onValueChange={(v) => setCreateMode(v as 'local')} disabled={createSubmitting}>
+                <SelectTrigger
+                  className="w-full border-(--border-sub) bg-(--bg-input) font-mono text-sm"
+                  size="default"
+                >
+                  <SelectValue placeholder="选择 Driver" />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start">
+                  <SelectItem value="local">local</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+              <input
+                type="checkbox"
+                checked={createEnableNfs}
+                disabled={createSubmitting}
+                onChange={(e) => setCreateEnableNfs(e.target.checked)}
+                className="size-3.5 rounded border-(--border-sub)"
+              />
+              启用 NFS 存储
+            </label>
+
+            {createEnableNfs ? (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-(--text-muted)">地址 *</label>
+                  <Input
+                    value={createNfsAddr}
+                    onChange={(e) => setCreateNfsAddr(e.target.value)}
+                    placeholder="支持输入 IP 或域名，例如 10.0.0.10 或 nfs.example.com"
+                    disabled={createSubmitting}
+                    className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-(--text-muted)">版本</label>
+                    <Input
+                      value={createNfsVersion}
+                      onChange={(e) => setCreateNfsVersion(e.target.value)}
+                      placeholder="例如 4 或 4.1 或 3"
+                      disabled={createSubmitting}
+                      className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-(--text-muted)">挂载点 *</label>
+                    <Input
+                      value={createNfsMount}
+                      onChange={(e) => setCreateNfsMount(e.target.value)}
+                      placeholder="例如 /nfs 或 /nfs-share"
+                      disabled={createSubmitting}
+                      className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-(--text-muted)">可选参数</label>
+                  <Input
+                    value={createNfsOptions}
+                    onChange={(e) => setCreateNfsOptions(e.target.value)}
+                    placeholder="rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14"
+                    disabled={createSubmitting}
+                    className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                  />
+                </div>
+              </>
+            ) : null}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={createSubmitting}
+                onClick={() => setShowCreate(false)}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                disabled={!createName.trim() || createSubmitting}
+                onClick={async () => {
+                  setCreateSubmitting(true)
+                  try {
+                    const driverOpts: Record<string, string> = {}
+
+                    if (createEnableNfs) {
+                      const addr = createNfsAddr.trim()
+                      const mount = createNfsMount.trim()
+                      if (!addr) {
+                        toast.error('请填写 NFS 地址')
+                        return
+                      }
+                      if (!mount) {
+                        toast.error('请填写 NFS 挂载点')
+                        return
+                      }
+
+                      const oParts: string[] = []
+                      oParts.push(`addr=${addr}`)
+                      const ver = createNfsVersion.trim()
+                      if (ver) oParts.push(`nfsvers=${ver}`)
+                      const opt = createNfsOptions.trim()
+                      if (opt) {
+                        for (const p of opt
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean))
+                          oParts.push(p)
+                      }
+
+                      driverOpts.type = 'nfs'
+                      driverOpts.o = oParts.join(',')
+                      driverOpts.device = `:${mount}`
+                    }
+
+                    const req: CreateVolumeRequest = {
+                      name: createName.trim(),
+                      driver: 'local',
+                      driver_opts: Object.keys(driverOpts).length ? driverOpts : null,
+                    }
+                    await invoke('create_volume', { serverId, ...req })
+                    setShowCreate(false)
+                    await fetchVolumes()
+                  } catch (e) {
+                    toast.error(String(e))
+                  } finally {
+                    setCreateSubmitting(false)
+                  }
+                }}
+              >
+                {createSubmitting ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin stroke-[2.5]" />
+                    创建中
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-3.5 stroke-[2.5]" />
+                    创建
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={removeTarget !== null}

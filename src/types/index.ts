@@ -40,12 +40,27 @@ export interface DockerNetwork {
   attachable: boolean
 }
 
+export interface CreateNetworkRequest {
+  name: string
+  driver?: string | null
+  subnet?: string | null
+  gateway?: string | null
+  internal: boolean
+  attachable: boolean
+}
+
 export interface DockerVolume {
   name: string
   driver: string
   mountpoint: string
   scope: string
   created_at: string
+}
+
+export interface CreateVolumeRequest {
+  name: string
+  driver?: string | null
+  driver_opts?: Record<string, string> | null
 }
 
 export interface DockerInfo {

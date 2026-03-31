@@ -16,21 +16,12 @@ pub fn open_terminal(
 }
 
 #[tauri::command]
-pub fn write_terminal(
-    session_id: String,
-    data: Vec<u8>,
-    state: State<AppState>,
-) -> Result<(), String> {
+pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {
     services::terminal::write_terminal(session_id, data, state)
 }
 
 #[tauri::command]
-pub fn resize_terminal(
-    session_id: String,
-    cols: u32,
-    rows: u32,
-    state: State<AppState>,
-) -> Result<(), String> {
+pub fn resize_terminal(session_id: String, cols: u32, rows: u32, state: State<AppState>) -> Result<(), String> {
     services::terminal::resize_terminal(session_id, cols, rows, state)
 }
 

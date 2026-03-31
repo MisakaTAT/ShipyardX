@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Server as ServerIcon, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
 import type { Server } from '../types'
@@ -20,9 +20,21 @@ export default function ConnectPage({ onConnect }: ConnectPageProps) {
   const [showModal, setShowModal] = useState(false)
   const [editingServer, setEditingServer] = useState<Server | null>(null)
   const [deleteServerId, setDeleteServerId] = useState<string | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     invoke<Server[]>('get_servers').then(setServers).catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   const handleSave = (updated: Server[]) => {
@@ -74,9 +86,10 @@ export default function ConnectPage({ onConnect }: ConnectPageProps) {
               <div className="relative mt-4">
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-(--text-muted)" />
                 <Input
+                  ref={searchRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="搜索服务器名称或地址…"
+                  placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
                   className="pr-8 pl-9"
                 />
                 {search ? (

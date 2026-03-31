@@ -10,18 +10,12 @@ pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {
 }
 
 #[tauri::command]
-pub fn add_server(
-    server: ServerConfig,
-    state: State<AppState>,
-) -> Result<Vec<ServerConfig>, String> {
+pub fn add_server(server: ServerConfig, state: State<AppState>) -> Result<Vec<ServerConfig>, String> {
     services::servers::add_server(server, state)
 }
 
 #[tauri::command]
-pub fn update_server(
-    server: ServerConfig,
-    state: State<AppState>,
-) -> Result<Vec<ServerConfig>, String> {
+pub fn update_server(server: ServerConfig, state: State<AppState>) -> Result<Vec<ServerConfig>, String> {
     services::servers::update_server(server, state)
 }
 
@@ -31,16 +25,11 @@ pub fn delete_server(id: String, state: State<AppState>) -> Result<Vec<ServerCon
 }
 
 #[tauri::command]
-pub async fn test_connection(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> Result<String, String> {
     services::servers::test_connection(server_id, state).await
 }
 
 #[tauri::command]
-pub async fn test_connection_direct(
-    server: ServerConfig,
-) -> Result<String, String> {
+pub async fn test_connection_direct(server: ServerConfig) -> Result<String, String> {
     services::servers::test_connection_direct(server).await
 }

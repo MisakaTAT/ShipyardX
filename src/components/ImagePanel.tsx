@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, CheckCircle, XCircle } from 'lucide-react'
+import { Trash2, Download, Loader2, Image as ImageIcon, Search, X } from 'lucide-react'
 import type { DockerImage } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -462,19 +462,6 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
               <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-(--text-base)">
                 {lines.join('\n')}
               </pre>
-            </div>
-          ) : null}
-
-          {status === 'success' || status === 'error' ? (
-            <div
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                status === 'success'
-                  ? 'border-green-500/30 bg-green-500/10 text-green-500'
-                  : 'border-red-500/30 bg-red-500/10 text-red-500'
-              }`}
-            >
-              {status === 'success' ? <CheckCircle className="size-[15px]" /> : <XCircle className="size-[15px]" />}
-              {status === 'success' ? '镜像拉取成功，列表已刷新' : '拉取失败，请检查镜像名称'}
             </div>
           ) : null}
         </div>

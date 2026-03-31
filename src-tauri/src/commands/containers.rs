@@ -1,14 +1,11 @@
 use tauri::State;
 
-use crate::core::services;
 use crate::core::models::DockerContainer;
+use crate::core::services;
 use crate::core::state::AppState;
 
 #[tauri::command]
-pub async fn list_containers(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<DockerContainer>, String> {
+pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {
     services::containers::list_containers(server_id, state).await
 }
 
@@ -22,11 +19,7 @@ pub async fn start_container(
 }
 
 #[tauri::command]
-pub async fn stop_container(
-    server_id: String,
-    container_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> Result<(), String> {
     services::containers::stop_container(server_id, container_id, state).await
 }
 

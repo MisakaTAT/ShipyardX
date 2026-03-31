@@ -5,10 +5,7 @@ use crate::core::services;
 use crate::core::state::AppState;
 
 #[tauri::command]
-pub async fn list_images(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<DockerImage>, String> {
+pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
     services::images::list_images(server_id, state).await
 }
 

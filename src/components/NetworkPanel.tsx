@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Share2, Search, X, Loader2, Trash2 } from 'lucide-react'
-import type { DockerNetwork } from '../types'
+import { Share2, Search, X, Loader2, Trash2, Plus } from 'lucide-react'
+import type { CreateNetworkRequest, DockerNetwork } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatDateTimeString } from '@/utils/datetime'
 
@@ -19,6 +21,14 @@ export default function NetworkPanel({ serverId }: Props) {
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerNetwork | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createDriver, setCreateDriver] = useState('bridge')
+  const [createSubnet, setCreateSubnet] = useState('')
+  const [createGateway, setCreateGateway] = useState('')
+  const [createInternal, setCreateInternal] = useState(false)
+  const [createAttachable, setCreateAttachable] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetchNetworks = useCallback(async () => {
@@ -111,11 +121,30 @@ export default function NetworkPanel({ serverId }: Props) {
           ) : null}
         </div>
 
-        {lastUpdated ? (
-          <div className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
-            更新于 {lastUpdated}
-          </div>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {lastUpdated ? (
+            <span className="text-xs mr-1" style={{ color: 'var(--text-muted)' }}>
+              更新于 {lastUpdated}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setCreateName('')
+              setCreateDriver('bridge')
+              setCreateSubnet('')
+              setCreateGateway('')
+              setCreateInternal(false)
+              setCreateAttachable(false)
+              setShowCreate(true)
+            }}
+          >
+            <Plus className="size-3.5 stroke-[2.5]" />
+            创建网络
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -267,6 +296,157 @@ export default function NetworkPanel({ serverId }: Props) {
           </table>
         )}
       </div>
+
+      <Dialog
+        open={showCreate}
+        onOpenChange={(next) => {
+          if (!next && !createSubmitting) setShowCreate(false)
+        }}
+      >
+        <DialogContent showCloseButton={false} className="max-w-lg gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="flex flex-row items-center gap-2 space-y-0 border-b border-border px-4 py-3">
+            <Share2 className="size-4 text-(--accent-text)" />
+            <DialogTitle className="flex-1 text-sm font-semibold text-(--text-strong)">创建网络</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+              disabled={createSubmitting}
+              onClick={() => setShowCreate(false)}
+            >
+              <X className="size-4" />
+            </Button>
+          </DialogHeader>
+
+          <div className="space-y-3 p-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-(--text-muted)">名称 *</label>
+              <Input
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="例如 my-net"
+                disabled={createSubmitting}
+                className="border-(--border-sub) bg-(--bg-input) text-sm text-(--text-base)"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-(--text-muted)">Driver</label>
+              <Select value={createDriver} onValueChange={setCreateDriver} disabled={createSubmitting}>
+                <SelectTrigger
+                  className="w-full border-(--border-sub) bg-(--bg-input) font-mono text-sm"
+                  size="default"
+                >
+                  <SelectValue placeholder="选择 Driver" />
+                </SelectTrigger>
+                <SelectContent position="popper" align="start">
+                  <SelectItem value="bridge">bridge</SelectItem>
+                  <SelectItem value="host">host</SelectItem>
+                  <SelectItem value="overlay">overlay</SelectItem>
+                  <SelectItem value="macvlan">macvlan</SelectItem>
+                  <SelectItem value="ipvlan">ipvlan</SelectItem>
+                  <SelectItem value="none">none</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-(--text-muted)">子网（可选）</label>
+                <Input
+                  value={createSubnet}
+                  onChange={(e) => setCreateSubnet(e.target.value)}
+                  placeholder="172.28.0.0/16"
+                  disabled={createSubmitting}
+                  className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-(--text-muted)">网关（可选）</label>
+                <Input
+                  value={createGateway}
+                  onChange={(e) => setCreateGateway(e.target.value)}
+                  placeholder="172.28.0.1"
+                  disabled={createSubmitting}
+                  className="border-(--border-sub) bg-(--bg-input) font-mono text-sm text-(--text-base)"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-(--text-muted)">不填子网时由 Docker 自动分配地址池。</p>
+            <div className="flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                <input
+                  type="checkbox"
+                  checked={createInternal}
+                  disabled={createSubmitting}
+                  onChange={(e) => setCreateInternal(e.target.checked)}
+                  className="size-3.5 rounded border-(--border-sub)"
+                />
+                Internal（禁止对外路由）
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                <input
+                  type="checkbox"
+                  checked={createAttachable}
+                  disabled={createSubmitting}
+                  onChange={(e) => setCreateAttachable(e.target.checked)}
+                  className="size-3.5 rounded border-(--border-sub)"
+                />
+                Attachable（允许其它引擎附加容器）
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={createSubmitting}
+                onClick={() => setShowCreate(false)}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                disabled={!createName.trim() || createSubmitting}
+                onClick={async () => {
+                  setCreateSubmitting(true)
+                  setError('')
+                  try {
+                    const req: CreateNetworkRequest = {
+                      name: createName.trim(),
+                      driver: createDriver.trim() || null,
+                      subnet: createSubnet.trim() || null,
+                      gateway: createGateway.trim() || null,
+                      internal: createInternal,
+                      attachable: createAttachable,
+                    }
+                    await invoke('create_network', { serverId, ...req })
+                    setShowCreate(false)
+                    await fetchNetworks()
+                  } catch (e) {
+                    setError(String(e))
+                  } finally {
+                    setCreateSubmitting(false)
+                  }
+                }}
+              >
+                {createSubmitting ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin stroke-[2.5]" />
+                    创建中
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-3.5 stroke-[2.5]" />
+                    创建
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={removeTarget !== null}

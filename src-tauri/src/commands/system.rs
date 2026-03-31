@@ -1,22 +1,16 @@
 use tauri::State;
 
-use crate::core::services;
 use crate::core::models::{ContainerStats, DockerInfo};
+use crate::core::services;
 use crate::core::state::AppState;
 
 #[tauri::command]
-pub async fn check_docker_access(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> Result<(), String> {
     services::system::check_docker_access(server_id, state).await
 }
 
 #[tauri::command]
-pub async fn get_docker_info(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<DockerInfo, String> {
+pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerInfo, String> {
     services::system::get_docker_info(server_id, state).await
 }
 
