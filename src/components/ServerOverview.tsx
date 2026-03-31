@@ -110,7 +110,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
             </InfoSection>
 
             <InfoSection title="主机系统">
-              <InfoRow label="主机名" value={info?.name || '—'} icon={<Server size={12} />} />
+              <InfoRow label="主机名" value={info?.name || '—'} />
               <InfoRow label="操作系统" value={info?.os || '—'} />
               <InfoRow label="内核版本" value={info?.kernel_version || '—'} />
               <InfoRow label="架构" value={info?.architecture || '—'} />
