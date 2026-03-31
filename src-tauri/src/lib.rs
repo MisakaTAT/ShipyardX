@@ -24,6 +24,7 @@ pub fn run() {
                 terminals: Mutex::new(HashMap::new()),
                 streams: Mutex::new(HashMap::new()),
                 terminal_ws_clients: Mutex::new(HashMap::new()),
+                event_streams: Mutex::new(HashMap::new()),
             });
             Ok(())
         })
@@ -65,6 +66,9 @@ pub fn run() {
             // 日志流
             commands::log_stream::start_log_stream,
             commands::log_stream::stop_log_stream,
+            // Docker 事件流
+            commands::docker_events::start_event_stream,
+            commands::docker_events::stop_event_stream,
             // SSH 终端
             commands::terminal::open_terminal,
             commands::terminal::write_terminal,

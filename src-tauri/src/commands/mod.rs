@@ -1,4 +1,5 @@
 pub mod containers;
+pub mod docker_events;
 pub mod images;
 pub mod log_stream;
 pub mod networks;

@@ -14,6 +14,7 @@ import { formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
   serverId: string
+  refreshTick?: number
 }
 
 function parsePorts(ports: string): string[] {
@@ -60,7 +61,7 @@ function StateBadge({ state }: { state: string }) {
   )
 }
 
-export default function ContainerPanel({ serverId }: ContainerPanelProps) {
+export default function ContainerPanel({ serverId, refreshTick }: ContainerPanelProps) {
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<Record<string, string>>({})
@@ -91,9 +92,8 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   }, [fetchContainers])
 
   useEffect(() => {
-    const intervalId = setInterval(fetchContainers, 5000)
-    return () => clearInterval(intervalId)
-  }, [fetchContainers])
+    if (refreshTick && refreshTick > 0) fetchContainers()
+  }, [refreshTick, fetchContainers])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

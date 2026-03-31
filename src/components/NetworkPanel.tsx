@@ -12,9 +12,10 @@ import { formatDateTimeString } from '@/utils/datetime'
 
 interface Props {
   serverId: string
+  refreshTick?: number
 }
 
-export default function NetworkPanel({ serverId }: Props) {
+export default function NetworkPanel({ serverId, refreshTick }: Props) {
   const [networks, setNetworks] = useState<DockerNetwork[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -50,9 +51,8 @@ export default function NetworkPanel({ serverId }: Props) {
   }, [fetchNetworks])
 
   useEffect(() => {
-    const intervalId = setInterval(fetchNetworks, 5000)
-    return () => clearInterval(intervalId)
-  }, [fetchNetworks])
+    if (refreshTick && refreshTick > 0) fetchNetworks()
+  }, [refreshTick, fetchNetworks])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

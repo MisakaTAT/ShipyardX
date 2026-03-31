@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import {
+  Activity,
   Box,
   Layers,
   Terminal,
@@ -22,11 +23,13 @@ import TerminalPanel from '../components/TerminalPanel'
 import ServerOverview from '../components/ServerOverview'
 import VolumePanel from '../components/VolumePanel'
 import DockerManagePanel from '../components/DockerManagePanel'
+import EventPanel from '../components/EventPanel'
+import { useDockerEvents } from '@/lib/useDockerEvents'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'docker' | 'terminal'
+type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'docker' | 'events' | 'terminal'
 type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
 interface NavItem {
@@ -41,6 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'images', icon: <Layers className="size-[18px]" />, label: '镜像' },
   { key: 'networks', icon: <Share2 className="size-[18px]" />, label: '网络' },
   { key: 'volumes', icon: <Database className="size-[18px]" />, label: '存储卷' },
+  { key: 'events', icon: <Activity className="size-[18px]" />, label: '事件' },
   { key: 'docker', icon: <Settings2 className="size-[18px]" />, label: '配置' },
   { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
 ]
@@ -53,6 +57,8 @@ interface WorkspacePageProps {
 export default function WorkspacePage({ selectedServer, onDisconnect }: WorkspacePageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [dockerStatus, setDockerStatus] = useState<DockerStatus>('checking')
+  const [refreshTick, setRefreshTick] = useState(0)
+  const refreshTypesRef = useRef<Set<string>>(new Set())
 
   const checkDocker = useCallback(
     async (notify = false) => {
@@ -78,6 +84,19 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
     [selectedServer.id],
   )
 
+  const dockerOk = dockerStatus === 'ok'
+
+  const handleRefresh = useCallback((eventType: string) => {
+    refreshTypesRef.current.add(eventType)
+    setRefreshTick((t) => t + 1)
+  }, [])
+
+  const { events, status: eventStatus, clearEvents } = useDockerEvents({
+    serverId: selectedServer.id,
+    enabled: dockerOk,
+    onRefresh: handleRefresh,
+  })
+
   useEffect(() => {
     setActiveTab('overview')
     checkDocker()
@@ -97,7 +116,6 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
     )
   }
 
-  const dockerOk = dockerStatus === 'ok'
   const showGuide = !dockerOk && activeTab !== 'terminal'
 
   if (showGuide) {
@@ -166,12 +184,15 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
           )}
           style={activeTab === 'overview' || activeTab === 'docker' ? { background: 'transparent' } : undefined}
         >
-          {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} /> : null}
-          {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} /> : null}
-          {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} /> : null}
-          {activeTab === 'networks' ? <NetworkPanel serverId={selectedServer.id} /> : null}
-          {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
+          {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
+          {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
+          {activeTab === 'networks' ? <NetworkPanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
+          {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
+          {activeTab === 'events' ? (
+            <EventPanel events={events} status={eventStatus} onClear={clearEvents} />
+          ) : null}
           {activeTab === 'terminal' ? (
             <TerminalPanel
               serverId={selectedServer.id}

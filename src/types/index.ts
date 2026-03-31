@@ -112,3 +112,17 @@ export interface ContainerStats {
   blk_read: number
   blk_write: number
 }
+
+export interface DockerEvent {
+  event_type: string
+  action: string
+  actor_id: string
+  actor_name: string
+  actor_image: string
+  scope: string
+  time: number
+  time_nano: number
+  detail: string
+}
+
+export type EventStreamStatus = 'connecting' | 'connected' | 'disconnected' | 'stopped'

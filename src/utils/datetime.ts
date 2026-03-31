@@ -14,3 +14,9 @@ export function formatDateTimeString(raw: string): string {
   const d = dayjs(s)
   return d.isValid() ? d.format(DISPLAY) : s
 }
+
+export function formatUnixSecondsTime(ts: number): string {
+  if (ts == null || !Number.isFinite(ts) || ts <= 0) return '—'
+  const d = dayjs.unix(ts)
+  return d.isValid() ? d.format('HH:mm:ss') : '—'
+}

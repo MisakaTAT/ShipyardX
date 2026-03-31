@@ -13,9 +13,10 @@ import { formatDateTimeString } from '@/utils/datetime'
 
 interface Props {
   serverId: string
+  refreshTick?: number
 }
 
-export default function VolumePanel({ serverId }: Props) {
+export default function VolumePanel({ serverId, refreshTick }: Props) {
   const [volumes, setVolumes] = useState<DockerVolume[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -52,9 +53,8 @@ export default function VolumePanel({ serverId }: Props) {
   }, [fetchVolumes])
 
   useEffect(() => {
-    const intervalId = setInterval(fetchVolumes, 5000)
-    return () => clearInterval(intervalId)
-  }, [fetchVolumes])
+    if (refreshTick && refreshTick > 0) fetchVolumes()
+  }, [refreshTick, fetchVolumes])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -178,6 +178,14 @@ export default function VolumePanel({ serverId }: Props) {
           </div>
         ) : (
           <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '40%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '10%' }} />
+            </colgroup>
             <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
               <tr className="border-b border-border">
                 <th

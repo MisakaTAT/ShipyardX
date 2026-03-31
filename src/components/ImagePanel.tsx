@@ -13,9 +13,10 @@ import { formatUnixSeconds } from '@/utils/datetime'
 
 interface ImagePanelProps {
   serverId: string
+  refreshTick?: number
 }
 
-export default function ImagePanel({ serverId }: ImagePanelProps) {
+export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   const [images, setImages] = useState<DockerImage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -49,9 +50,8 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   }, [removeTarget?.id])
 
   useEffect(() => {
-    const intervalId = setInterval(fetchImages, 5000)
-    return () => clearInterval(intervalId)
-  }, [fetchImages])
+    if (refreshTick && refreshTick > 0) fetchImages()
+  }, [refreshTick, fetchImages])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

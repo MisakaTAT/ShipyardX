@@ -6,6 +6,7 @@ import type { DockerInfo } from '../types'
 
 interface Props {
   serverId: string
+  refreshTick?: number
 }
 
 function fmtMem(bytes: number): string {
@@ -18,7 +19,7 @@ function fmtPct(value: number, total: number): string {
   return `${Math.round((value / total) * 100)}%`
 }
 
-export default function ServerOverview({ serverId }: Props) {
+export default function ServerOverview({ serverId, refreshTick }: Props) {
   const [info, setInfo] = useState<DockerInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState('')
@@ -41,9 +42,8 @@ export default function ServerOverview({ serverId }: Props) {
   }, [fetch])
 
   useEffect(() => {
-    const intervalId = setInterval(fetch, 5000)
-    return () => clearInterval(intervalId)
-  }, [fetch])
+    if (refreshTick && refreshTick > 0) fetch()
+  }, [refreshTick, fetch])
 
   if (!info && !loading) return null
   const totalContainers = info?.containers ?? 0
