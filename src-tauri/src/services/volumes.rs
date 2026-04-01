@@ -4,6 +4,7 @@ use crate::docker::client::{docker_delete, docker_get, docker_post_json};
 use crate::models::app::docker::DockerVolume;
 use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
+use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {
     let server = get_server_config(&state, &server_id)?;
@@ -11,9 +12,11 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
         let resp = docker_get(&server, "/volumes")?;
         let api: VolumeList = serde_json::from_str(&resp).map_err(|e| format!("解析存储卷列表失败: {}", e))?;
         let mut list = api.volumes.unwrap_or_default();
-        // CreatedAt 一般为 RFC3339 / ISO8601 字符串，可直接按字符串倒序（最新在前）
-        // 同一 CreatedAt 下再按 name 排序，避免非稳定排序导致刷新顺序抖动
-        list.sort_by(|a, b| b.created_at.cmp(&a.created_at).then_with(|| a.name.cmp(&b.name)));
+        sort_by_created_desc_then_id(
+            &mut list,
+            |x| x.created_at.clone().unwrap_or_default(),
+            |x| x.name.clone().unwrap_or_default(),
+        );
         Ok(list
             .into_iter()
             .map(|v| DockerVolume {

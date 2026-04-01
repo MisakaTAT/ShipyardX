@@ -11,14 +11,14 @@ use crate::models::docker::engine::ImageSummary;
 use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
+use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/images/json")?;
         let mut api: Vec<ImageSummary> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
-        // 按创建时间倒序（最新在前）
-        api.sort_by(|a, b| b.created.cmp(&a.created));
+        sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
         Ok(api.into_iter().map(api_image_to_dto).collect())
     })
     .await

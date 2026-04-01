@@ -5,15 +5,18 @@ use crate::models::app::docker::DockerNetwork;
 use crate::models::app::network::NetworkCreate;
 use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
 use crate::state::{AppState, get_server_config};
+use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let api: Vec<Network> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
-        // 按创建时间倒序（最新在前）；字段缺失时排在后面
-        let mut api = api;
-        api.sort_by(|a, b| b.created.cmp(&a.created));
+        let mut api: Vec<Network> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        sort_by_created_desc_then_id(
+            &mut api,
+            |x| x.created.clone().unwrap_or_default(),
+            |x| x.id.clone().unwrap_or_default(),
+        );
         Ok(api
             .into_iter()
             .map(|n| {

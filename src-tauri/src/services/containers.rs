@@ -7,6 +7,7 @@ use crate::models::app::docker::DockerContainer;
 use crate::models::docker::engine::ContainerSummary;
 use crate::ssh::exec::ssh_exec;
 use crate::state::{AppState, get_server_config};
+use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {
     let server = get_server_config(&state, &server_id)?;
@@ -14,8 +15,7 @@ pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> R
         let resp = docker_get(&server, "/containers/json?all=1")?;
         let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp)
             .map_err(|e| format!("解析容器列表失败: {} — 原始响应: {}", e, &resp[..resp.len().min(200)]))?;
-        // 按创建时间倒序（最新在前）
-        api.sort_by(|a, b| b.created.cmp(&a.created));
+        sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
         Ok(api.into_iter().map(api_container_to_dto).collect())
     })
     .await
