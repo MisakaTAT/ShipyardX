@@ -1,9 +1,9 @@
 use tauri::State;
 
-use crate::core::docker::{docker_delete, docker_get, docker_post_json};
-use crate::core::state::{get_server_config, AppState};
-use crate::models::docker::volume::{VolumeCreate, VolumeList};
+use crate::docker::client::{docker_delete, docker_get, docker_post_json};
 use crate::models::app::docker::DockerVolume;
+use crate::models::docker::volume::{VolumeCreate, VolumeList};
+use crate::state::{AppState, get_server_config};
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {
     let server = get_server_config(&state, &server_id)?;

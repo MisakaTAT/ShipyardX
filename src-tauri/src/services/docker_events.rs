@@ -4,12 +4,12 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, State};
 
-use crate::core::docker::resolve_api_version;
-use crate::core::ssh::create_ssh_session;
-use crate::core::state::{get_server_config, AppState, EventStreamHandle};
-use crate::models::docker::events::StreamEvent;
+use crate::docker::client::resolve_api_version;
 use crate::models::app::events::DockerEvent;
 use crate::models::app::server::ServerConfig;
+use crate::models::docker::events::StreamEvent;
+use crate::ssh::session::create_ssh_session;
+use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
@@ -36,10 +36,14 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
             parts.push(format!("container={}", short));
         }
     }
-    if event_type == "volume" && let Some(driver) = attrs.get("driver") {
+    if event_type == "volume"
+        && let Some(driver) = attrs.get("driver")
+    {
         parts.push(format!("driver={}", driver));
     }
-    if action == "health_status" && let Some(hs) = attrs.get("health_status") {
+    if action == "health_status"
+        && let Some(hs) = attrs.get("health_status")
+    {
         parts.push(hs.clone());
     }
 

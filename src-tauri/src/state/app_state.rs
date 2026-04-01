@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 
 use crate::models::app::server::ServerConfig;
 

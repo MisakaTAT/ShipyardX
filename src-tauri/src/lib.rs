@@ -1,11 +1,13 @@
 mod commands;
 mod config;
-mod core;
+mod docker;
 mod models;
 mod services;
+mod ssh;
+mod state;
 mod utils;
 
-pub use core::state::AppState;
+pub use state::AppState;
 
 use std::collections::HashMap;
 use std::sync::Mutex;

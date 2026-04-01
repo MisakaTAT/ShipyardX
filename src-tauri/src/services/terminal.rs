@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::mpsc;
 use std::sync::OnceLock;
+use std::sync::mpsc;
 
 use serde::Deserialize;
 use serde_json::json;
@@ -12,10 +12,10 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
-use crate::core::ssh::create_ssh_session;
-use crate::core::state::{get_server_config, AppState, TerminalHandle, TerminalMsg};
 use crate::models::app::server::ServerConfig;
 use crate::models::app::terminal::TerminalSession;
+use crate::ssh::session::create_ssh_session;
+use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
 use crate::utils::id::generate_id;
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();

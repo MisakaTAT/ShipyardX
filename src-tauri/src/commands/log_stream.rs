@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub fn start_log_stream(

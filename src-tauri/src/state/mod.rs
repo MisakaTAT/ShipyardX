@@ -1,6 +1,10 @@
+mod app_state;
+
+pub use app_state::{AppState, EventStreamHandle, StreamHandle, TerminalHandle, TerminalMsg};
+
 use tauri::State;
+
 use crate::models::app::server::ServerConfig;
-pub use crate::models::state::{AppState, EventStreamHandle, StreamHandle, TerminalHandle, TerminalMsg};
 
 pub fn get_server_config(state: &State<AppState>, id: &str) -> Result<ServerConfig, String> {
     state

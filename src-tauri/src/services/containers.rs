@@ -1,11 +1,12 @@
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 
-use crate::core::docker::{api_container_to_dto, docker_delete, docker_get, docker_post, resolve_api_version};
-use crate::core::ssh::ssh_exec;
-use crate::core::state::{get_server_config, AppState};
-use crate::models::docker::engine::ContainerSummary;
+use crate::docker::client::{docker_delete, docker_get, docker_post, resolve_api_version};
+use crate::docker::mapping::api_container_to_dto;
 use crate::models::app::docker::DockerContainer;
+use crate::models::docker::engine::ContainerSummary;
+use crate::ssh::exec::ssh_exec;
+use crate::state::{AppState, get_server_config};
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {
     let server = get_server_config(&state, &server_id)?;
@@ -82,9 +83,7 @@ pub async fn get_container_logs(
         );
         let b64 = ssh_exec(&server, &cmd)?;
         let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
-        let raw = BASE64
-            .decode(clean)
-            .map_err(|e| format!("base64 解码失败: {}", e))?;
+        let raw = BASE64.decode(clean).map_err(|e| format!("base64 解码失败: {}", e))?;
         Ok(demux_log_stream(&raw))
     })
     .await
@@ -111,4 +110,3 @@ fn demux_log_stream(data: &[u8]) -> String {
     }
     out
 }
-

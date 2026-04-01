@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::models::app::docker::DockerVolume;
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {

@@ -1,19 +1,15 @@
 use tauri::State;
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 
-use crate::core::docker::{
-    docker_get, invalidate_api_version, resolve_api_version,
-    stats::compute_stats,
-};
-use crate::core::ssh::ssh_exec;
-use crate::core::state::{get_server_config, AppState};
+use crate::docker::client::{docker_get, invalidate_api_version, resolve_api_version};
+use crate::docker::stats::compute_stats;
+use crate::models::app::server::ServerConfig;
+use crate::models::app::system::{ContainerStats, DockerDaemonSettings, DockerDaemonUpdate, DockerInfo};
 use crate::models::docker::stats::DockerStats;
 use crate::models::docker::system::{DaemonConfig, SystemInfo};
-use crate::models::app::server::ServerConfig;
-use crate::models::app::system::{
-    ContainerStats, DockerDaemonSettings, DockerDaemonUpdate, DockerInfo,
-};
+use crate::ssh::exec::ssh_exec;
+use crate::state::{AppState, get_server_config};
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
 const ERR_BAD_SU_PASSWORD: &str = "__ERR_BAD_SU_PASSWORD__";
@@ -53,15 +49,18 @@ fn map_restart_error(err: String) -> String {
     format!("重启失败：{}", err)
 }
 
-fn restart_docker_service(
-    server: &ServerConfig,
-    sudo_password: Option<String>,
-) -> Result<(), String> {
+fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> Result<(), String> {
     let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
         let pwd_b64 = STANDARD.encode(pwd);
         format!(
             "PASS_B64='{}'; PASS=\"$(printf '%s' \"$PASS_B64\" | base64 -d)\"; has(){{ command -v \"$1\" >/dev/null 2>&1; }}; run(){{ if [ \"$(id -u)\" = \"0\" ]; then \"$@\"; elif has sudo; then if printf '%s\\n' \"$PASS\" | sudo -S -p '' -k -v >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | sudo -S -p '' \"$@\"; else echo \"{}\" 1>&2; return 1; fi; elif has su; then if printf '%s\\n' \"$PASS\" | su -c 'true' root >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | su -c \"$*\" root; else echo \"{}\" 1>&2; return 1; fi; else return 127; fi; }}; if has systemctl; then run systemctl restart docker.service || run systemctl restart docker || {{ echo \"{}\" 1>&2; exit 1; }}; elif has rc-service; then run rc-service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; elif has service; then run service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; else echo \"{}\" 1>&2; exit 1; fi",
-            pwd_b64, ERR_BAD_SUDO_PASSWORD, ERR_BAD_SU_PASSWORD, ERR_SYSTEMCTL, ERR_RC_SERVICE, ERR_SERVICE_OP, ERR_NO_MANAGER
+            pwd_b64,
+            ERR_BAD_SUDO_PASSWORD,
+            ERR_BAD_SU_PASSWORD,
+            ERR_SYSTEMCTL,
+            ERR_RC_SERVICE,
+            ERR_SERVICE_OP,
+            ERR_NO_MANAGER
         )
     } else {
         format!(
@@ -192,10 +191,7 @@ pub async fn get_docker_daemon_settings(
     .map_err(|e| e.to_string())?
 }
 
-pub async fn update_docker_daemon_settings(
-    req: DockerDaemonUpdate,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn update_docker_daemon_settings(req: DockerDaemonUpdate, state: State<'_, AppState>) -> Result<(), String> {
     let DockerDaemonUpdate {
         server_id,
         mirror_urls,

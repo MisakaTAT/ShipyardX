@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::models::app::system::{ContainerStats, DockerDaemonSettings, DockerDaemonUpdate, DockerInfo};
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> Result<(), String> {
@@ -32,10 +32,7 @@ pub async fn get_docker_daemon_settings(
 }
 
 #[tauri::command]
-pub async fn update_docker_daemon_settings(
-    req: DockerDaemonUpdate,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn update_docker_daemon_settings(req: DockerDaemonUpdate, state: State<'_, AppState>) -> Result<(), String> {
     services::system::update_docker_daemon_settings(req, state).await
 }
 

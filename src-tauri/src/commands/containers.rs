@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::models::app::docker::DockerContainer;
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {

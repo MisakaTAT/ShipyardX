@@ -1,10 +1,10 @@
 use tauri::State;
 
-use crate::core::docker::{docker_delete, docker_get, docker_post_json};
-use crate::core::state::{get_server_config, AppState};
-use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
+use crate::docker::client::{docker_delete, docker_get, docker_post_json};
 use crate::models::app::docker::DockerNetwork;
 use crate::models::app::network::NetworkCreate;
+use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
+use crate::state::{AppState, get_server_config};
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {
     let server = get_server_config(&state, &server_id)?;

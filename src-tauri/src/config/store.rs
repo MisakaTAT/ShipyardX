@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, OsRng},
     Aes256Gcm, KeyInit, Nonce,
+    aead::{Aead, AeadCore, OsRng},
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use tauri::{AppHandle, Manager};
 
 use crate::models::app::server::ServerConfig;

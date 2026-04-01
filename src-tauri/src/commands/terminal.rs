@@ -1,8 +1,8 @@
 use tauri::{AppHandle, State};
 
-use crate::services;
-use crate::core::state::AppState;
 use crate::models::app::terminal::TerminalSession;
+use crate::services;
+use crate::state::AppState;
 
 #[tauri::command]
 pub fn open_terminal(

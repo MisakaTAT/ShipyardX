@@ -2,7 +2,7 @@ use tauri::{AppHandle, State};
 
 use crate::models::app::docker::DockerImage;
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {

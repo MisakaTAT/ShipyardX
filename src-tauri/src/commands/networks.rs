@@ -3,7 +3,7 @@ use tauri::State;
 use crate::models::app::docker::DockerNetwork;
 use crate::models::app::network::NetworkCreate;
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {

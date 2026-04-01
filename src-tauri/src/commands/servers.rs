@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::models::app::server::ServerConfig;
 use crate::services;
-use crate::core::state::AppState;
+use crate::state::AppState;
 
 #[tauri::command]
 pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {
