@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "ShipyardX",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 900,
-        "minHeight": 600,
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1400,
+        "minHeight": 900,
         "resizable": true,
         "decorations": true
       }

@@ -198,10 +198,7 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'events' ? <EventPanel events={events} status={eventStatus} onClear={clearEvents} /> : null}
           {activeTab === 'terminal' ? (
-            <TerminalPanel
-              serverId={selectedServer.id}
-              serverName={`${selectedServer.username}@${selectedServer.host}`}
-            />
+            <TerminalPanel serverId={selectedServer.id} />
           ) : null}
         </div>
       </div>

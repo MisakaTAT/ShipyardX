@@ -17,7 +17,6 @@ use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_websocket::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_file = get_data_file(app.handle());
