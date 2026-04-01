@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct IpamConfigResp {
+pub struct IpamConfig {
     #[serde(rename = "Subnet")]
     pub subnet: Option<String>,
     #[serde(rename = "Gateway")]
@@ -11,14 +11,14 @@ pub struct IpamConfigResp {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct IpamResp {
+pub struct Ipam {
     #[serde(rename = "Config")]
-    pub config: Option<Vec<IpamConfigResp>>,
+    pub config: Option<Vec<IpamConfig>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct NetworkResp {
+pub struct Network {
     #[serde(rename = "Id")]
     pub id: Option<String>,
     #[serde(rename = "Name")]
@@ -28,7 +28,7 @@ pub struct NetworkResp {
     #[serde(rename = "Scope")]
     pub scope: Option<String>,
     #[serde(rename = "IPAM")]
-    pub ipam: Option<IpamResp>,
+    pub ipam: Option<Ipam>,
     #[serde(rename = "Labels")]
     pub labels: Option<std::collections::HashMap<String, String>>,
     #[serde(rename = "Created")]
@@ -39,24 +39,8 @@ pub struct NetworkResp {
     pub attachable: Option<bool>,
 }
 
-impl Default for NetworkResp {
-    fn default() -> Self {
-        Self {
-            id: None,
-            name: None,
-            driver: None,
-            scope: None,
-            ipam: None,
-            labels: None,
-            created: None,
-            internal: None,
-            attachable: None,
-        }
-    }
-}
-
 #[derive(Serialize)]
-pub struct CreateNetworkIpamConfigReq {
+pub struct NetworkCreateIpamConfig {
     #[serde(rename = "Subnet", skip_serializing_if = "Option::is_none")]
     pub subnet: Option<String>,
     #[serde(rename = "Gateway", skip_serializing_if = "Option::is_none")]
@@ -64,15 +48,15 @@ pub struct CreateNetworkIpamConfigReq {
 }
 
 #[derive(Serialize)]
-pub struct CreateNetworkIpamReq {
+pub struct NetworkCreateIpam {
     #[serde(rename = "Driver")]
     pub driver: String,
     #[serde(rename = "Config")]
-    pub config: Vec<CreateNetworkIpamConfigReq>,
+    pub config: Vec<NetworkCreateIpamConfig>,
 }
 
 #[derive(Serialize)]
-pub struct CreateNetworkReq {
+pub struct NetworkCreate {
     #[serde(rename = "Name")]
     pub name: String,
     #[serde(rename = "Driver")]
@@ -84,5 +68,5 @@ pub struct CreateNetworkReq {
     #[serde(rename = "Attachable", skip_serializing_if = "Option::is_none")]
     pub attachable: Option<bool>,
     #[serde(rename = "IPAM", skip_serializing_if = "Option::is_none")]
-    pub ipam: Option<CreateNetworkIpamReq>,
+    pub ipam: Option<NetworkCreateIpam>,
 }

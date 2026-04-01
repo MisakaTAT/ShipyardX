@@ -7,11 +7,12 @@ use crate::core::docker::{
     stats::compute_stats,
 };
 use crate::core::ssh::ssh_exec;
-use crate::models::docker_stats::RawStats;
 use crate::core::state::{get_server_config, AppState};
-use crate::models::server::ServerConfig;
-use crate::models::system::{
-    ContainerStats, DockerDaemonConfig, DockerDaemonSettings, DockerInfo, DockerInfoResp,
+use crate::models::docker::stats::DockerStats;
+use crate::models::docker::system::{DaemonConfig, SystemInfo};
+use crate::models::app::server::ServerConfig;
+use crate::models::app::system::{
+    ContainerStats, DockerDaemonSettings, DockerDaemonUpdate, DockerInfo,
 };
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
@@ -76,7 +77,7 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> R
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/info")?;
-        let v: DockerInfoResp = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
+        let v: SystemInfo = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
         Ok(DockerInfo {
             containers: v.containers.unwrap_or(0),
             containers_running: v.containers_running.unwrap_or(0),
@@ -135,7 +136,7 @@ pub async fn get_container_stats(
             &server,
             &format!("/containers/{}/stats?stream=false&one-shot=true", container_id),
         )?;
-        let raw: RawStats = serde_json::from_str(&resp).map_err(|e| format!("解析 stats 失败: {}", e))?;
+        let raw: DockerStats = serde_json::from_str(&resp).map_err(|e| format!("解析 stats 失败: {}", e))?;
         Ok(compute_stats(raw))
     })
     .await
@@ -150,7 +151,7 @@ pub async fn get_docker_daemon_settings(
     tokio::task::spawn_blocking(move || {
         let cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
         let raw = ssh_exec(&server, cmd)?;
-        let cfg: DockerDaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
+        let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
 
         let mirror_url = cfg.registry_mirrors.clone().unwrap_or_default();
         let cgroup_driver = cfg
@@ -191,24 +192,26 @@ pub async fn get_docker_daemon_settings(
     .map_err(|e| e.to_string())?
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn update_docker_daemon_settings(
-    server_id: String,
-    mirror_urls: Vec<String>,
-    log_rotation: bool,
-    log_max_size: String,
-    log_max_file: String,
-    live_restore: bool,
-    cgroup_driver: String,
-    socket_path: String,
-    sudo_password: Option<String>,
+    req: DockerDaemonUpdate,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let DockerDaemonUpdate {
+        server_id,
+        mirror_urls,
+        log_rotation,
+        log_max_size,
+        log_max_file,
+        live_restore,
+        cgroup_driver,
+        socket_path,
+        sudo_password,
+    } = req;
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let read_cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
         let current_raw = ssh_exec(&server, read_cmd)?;
-        let mut cfg: DockerDaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
+        let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
         let mirrors: Vec<String> = mirror_urls
             .into_iter()

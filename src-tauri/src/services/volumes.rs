@@ -2,14 +2,14 @@ use tauri::State;
 
 use crate::core::docker::{docker_delete, docker_get, docker_post_json};
 use crate::core::state::{get_server_config, AppState};
-use crate::models::docker::DockerVolume;
-use crate::models::volume::{VolumesResp, CreateVolumeReq};
+use crate::models::docker::volume::{VolumeCreate, VolumeList};
+use crate::models::app::docker::DockerVolume;
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/volumes")?;
-        let api: VolumesResp = serde_json::from_str(&resp).map_err(|e| format!("解析存储卷列表失败: {}", e))?;
+        let api: VolumeList = serde_json::from_str(&resp).map_err(|e| format!("解析存储卷列表失败: {}", e))?;
         let mut list = api.volumes.unwrap_or_default();
         // CreatedAt 一般为 RFC3339 / ISO8601 字符串，可直接按字符串倒序（最新在前）
         // 同一 CreatedAt 下再按 name 排序，避免非稳定排序导致刷新顺序抖动
@@ -51,7 +51,7 @@ pub async fn create_volume(
     let driver = if driver.is_empty() { "local".to_string() } else { driver };
 
     let driver_opts = driver_opts.filter(|m| !m.is_empty());
-    let body = CreateVolumeReq {
+    let body = VolumeCreate {
         name,
         driver,
         driver_opts,

@@ -1,5 +1,5 @@
 use tauri::State;
-use crate::models::server::ServerConfig;
+use crate::models::app::server::ServerConfig;
 pub use crate::models::state::{AppState, EventStreamHandle, StreamHandle, TerminalHandle, TerminalMsg};
 
 pub fn get_server_config(state: &State<AppState>, id: &str) -> Result<ServerConfig, String> {

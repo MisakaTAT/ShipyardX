@@ -77,7 +77,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<Container[]>('list_containers', { serverId })
+      const data = await invoke<Container[]>('list_containers', { server_id: serverId })
       setContainers(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -114,7 +114,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   ) => {
     setActionLoading((prev) => ({ ...prev, [containerId]: action }))
     try {
-      await invoke(command, { serverId, containerId, ...args })
+      await invoke(command, { server_id: serverId, container_id: containerId, ...args })
       await fetchContainers()
     } catch (e) {
       setError(String(e))

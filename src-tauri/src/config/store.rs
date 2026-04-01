@@ -7,22 +7,22 @@ use aes_gcm::{
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use tauri::{AppHandle, Manager};
 
-use crate::models::server::ServerConfig;
+use crate::models::app::server::ServerConfig;
 
 const KEY_FILE: &str = "encryption.key";
 
 fn get_or_create_key(data_dir: &Path) -> Result<[u8; 32], String> {
     let key_path = data_dir.join(KEY_FILE);
-    if let Ok(bytes) = std::fs::read(&key_path) {
-        if bytes.len() == 32 {
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&bytes);
-            return Ok(key);
-        }
+    if let Ok(bytes) = std::fs::read(&key_path)
+        && bytes.len() == 32
+    {
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&bytes);
+        return Ok(key);
     }
     let mut key = [0u8; 32];
     aes_gcm::aead::rand_core::RngCore::fill_bytes(&mut OsRng, &mut key);
-    std::fs::write(&key_path, &key).map_err(|e| format!("写入密钥文件失败: {e}"))?;
+    std::fs::write(&key_path, key).map_err(|e| format!("写入密钥文件失败: {e}"))?;
     Ok(key)
 }
 
@@ -76,12 +76,12 @@ pub fn load_servers(path: &Path) -> Vec<ServerConfig> {
         .and_then(|s| serde_json::from_str::<Vec<ServerConfig>>(&s).ok())
         .map(|mut servers| {
             for s in &mut servers {
-                if s.auth_type == "password" {
-                    if let Some(ref enc) = s.password {
-                        match decrypt(&key, enc) {
-                            Ok(p) => s.password = Some(p),
-                            Err(e) => eprintln!("[crypto] decrypt failed for {}: {e}", s.id),
-                        }
+                if s.auth_type == "password"
+                    && let Some(ref enc) = s.password
+                {
+                    match decrypt(&key, enc) {
+                        Ok(p) => s.password = Some(p),
+                        Err(e) => eprintln!("[crypto] decrypt failed for {}: {e}", s.id),
                     }
                 }
             }

@@ -1,9 +1,9 @@
-use crate::models::docker_stats::RawStats;
-use crate::models::system::ContainerStats;
+use crate::models::docker::stats::DockerStats;
+use crate::models::app::system::ContainerStats;
 
 // ── 计算逻辑 ─────────────────────────────────────────────────
 
-pub fn compute_stats(raw: RawStats) -> ContainerStats {
+pub fn compute_stats(raw: DockerStats) -> ContainerStats {
     // CPU %
     let cpu_delta = raw
         .cpu_stats

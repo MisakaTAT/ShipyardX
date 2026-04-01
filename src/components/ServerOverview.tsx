@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Box, Layers, Cpu, HardDrive, Server } from 'lucide-react'
+import { Box, Layers, Cpu, HardDrive } from 'lucide-react'
 import type { DockerInfo } from '../types'
 
 interface Props {
@@ -27,7 +27,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
   const fetch = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await invoke<DockerInfo>('get_docker_info', { serverId })
+      const d = await invoke<DockerInfo>('get_docker_info', { server_id: serverId })
       setInfo(d)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch {

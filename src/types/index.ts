@@ -40,7 +40,7 @@ export interface DockerNetwork {
   attachable: boolean
 }
 
-export interface CreateNetworkRequest {
+export interface NetworkCreate {
   name: string
   driver?: string | null
   subnet?: string | null
@@ -57,10 +57,10 @@ export interface DockerVolume {
   created_at: string
 }
 
-export interface CreateVolumeRequest {
+export interface VolumeCreate {
   name: string
   driver?: string | null
-  driverOpts?: Record<string, string> | null
+  driver_opts?: Record<string, string> | null
 }
 
 export interface DockerInfo {
@@ -92,14 +92,14 @@ export interface DockerDaemonSettings {
   socket_path: string
 }
 
-export interface UpdateDockerDaemonRequest {
-  mirrorUrls: string[]
-  logRotation: boolean
-  logMaxSize: string
-  logMaxFile: string
-  liveRestore: boolean
-  cgroupDriver: string
-  socketPath: string
+export interface DockerDaemonUpdate {
+  mirror_urls: string[]
+  log_rotation: boolean
+  log_max_size: string
+  log_max_file: string
+  live_restore: boolean
+  cgroup_driver: string
+  socket_path: string
 }
 
 export interface ContainerStats {
@@ -126,3 +126,8 @@ export interface DockerEvent {
 }
 
 export type EventStreamStatus = 'connecting' | 'connected' | 'disconnected' | 'stopped'
+
+export interface TerminalSession {
+  session_id: string
+  ws_port: number
+}

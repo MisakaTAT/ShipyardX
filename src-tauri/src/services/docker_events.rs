@@ -7,8 +7,9 @@ use tauri::{AppHandle, Emitter, State};
 use crate::core::docker::resolve_api_version;
 use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, EventStreamHandle};
-use crate::models::events::{DockerEvent, RawDockerEvent};
-use crate::models::server::ServerConfig;
+use crate::models::docker::events::StreamEvent;
+use crate::models::app::events::DockerEvent;
+use crate::models::app::server::ServerConfig;
 use crate::utils::id::generate_id;
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
@@ -35,21 +36,15 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
             parts.push(format!("container={}", short));
         }
     }
-    if event_type == "volume" {
-        if let Some(driver) = attrs.get("driver") {
-            parts.push(format!("driver={}", driver));
-        }
+    if event_type == "volume" && let Some(driver) = attrs.get("driver") {
+        parts.push(format!("driver={}", driver));
     }
-    if action == "health_status" {
-        if let Some(hs) = attrs.get("health_status") {
-            parts.push(hs.clone());
-        }
+    if action == "health_status" && let Some(hs) = attrs.get("health_status") {
+        parts.push(hs.clone());
     }
-    if action == "exec_create" || action == "exec_start" {
-        if let Some(cmd) = attrs.get("execID") {
-            let short = if cmd.len() > 12 { &cmd[..12] } else { cmd.as_str() };
-            parts.push(format!("exec={}", short));
-        }
+    if (action == "exec_create" || action == "exec_start") && let Some(cmd) = attrs.get("execID") {
+        let short = if cmd.len() > 12 { &cmd[..12] } else { cmd.as_str() };
+        parts.push(format!("exec={}", short));
     }
 
     if parts.is_empty() {
@@ -67,7 +62,7 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
 }
 
 fn parse_docker_event(json: &str) -> Option<DockerEvent> {
-    let raw: RawDockerEvent = serde_json::from_str(json).ok()?;
+    let raw: StreamEvent = serde_json::from_str(json).ok()?;
     let actor_id = if raw.actor.id.len() > 12 {
         raw.actor.id[..12].to_string()
     } else {

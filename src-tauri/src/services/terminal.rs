@@ -14,8 +14,8 @@ use tungstenite::{
 
 use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, TerminalHandle, TerminalMsg};
-use crate::models::server::ServerConfig;
-use crate::models::terminal::OpenTerminalResult;
+use crate::models::app::server::ServerConfig;
+use crate::models::app::terminal::TerminalSession;
 use crate::utils::id::generate_id;
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
@@ -178,6 +178,7 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) {
                 let ah = app_handle.clone();
                 std::thread::spawn(move || {
                     let mut req_path = String::new();
+                    #[allow(clippy::result_large_err)]
                     let mut ws = match accept_hdr(stream, |req: &Request, resp: Response| {
                         req_path = req.uri().path().to_string();
                         Ok(resp)
@@ -267,7 +268,7 @@ pub fn open_terminal(
     rows: u32,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<OpenTerminalResult, String> {
+) -> Result<TerminalSession, String> {
     start_terminal_ws_server_once(app_handle.clone());
     let ws_port = terminal_ws_port();
     let server = get_server_config(&state, &server_id)?;
@@ -283,7 +284,7 @@ pub fn open_terminal(
         .lock()
         .unwrap()
         .insert(session_id.clone(), TerminalHandle { tx });
-    Ok(OpenTerminalResult { session_id, ws_port })
+    Ok(TerminalSession { session_id, ws_port })
 }
 
 pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {

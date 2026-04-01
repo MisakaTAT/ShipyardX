@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct VersionResp {
+pub struct DockerVersion {
     #[serde(rename = "ApiVersion")]
     pub api_version: String,
 }
@@ -12,7 +12,7 @@ pub struct DockerError {
 }
 
 #[derive(Deserialize)]
-pub struct ContainerResp {
+pub struct ContainerSummary {
     #[serde(rename = "Id")]
     pub id: String,
     #[serde(rename = "Names")]
@@ -24,13 +24,13 @@ pub struct ContainerResp {
     #[serde(rename = "Status")]
     pub status: String,
     #[serde(rename = "Ports")]
-    pub ports: Vec<PortResp>,
+    pub ports: Vec<PortBinding>,
     #[serde(rename = "Created")]
     pub created: i64,
 }
 
 #[derive(Deserialize)]
-pub struct PortResp {
+pub struct PortBinding {
     #[serde(rename = "IP")]
     pub ip: Option<String>,
     #[serde(rename = "PrivatePort")]
@@ -42,7 +42,7 @@ pub struct PortResp {
 }
 
 #[derive(Deserialize)]
-pub struct ImageResp {
+pub struct ImageSummary {
     #[serde(rename = "Id")]
     pub id: String,
     #[serde(rename = "RepoTags")]
@@ -52,4 +52,3 @@ pub struct ImageResp {
     #[serde(rename = "Created")]
     pub created: i64,
 }
-

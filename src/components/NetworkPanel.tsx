@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Share2, Search, X, Loader2, Trash2, Plus } from 'lucide-react'
-import type { CreateNetworkRequest, DockerNetwork } from '../types'
+import type { DockerNetwork, NetworkCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,7 +36,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<DockerNetwork[]>('list_networks', { serverId })
+      const data = await invoke<DockerNetwork[]>('list_networks', { server_id: serverId })
       setNetworks(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -413,7 +413,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                   setCreateSubmitting(true)
                   setError('')
                   try {
-                    const req: CreateNetworkRequest = {
+                    const req: NetworkCreate = {
                       name: createName.trim(),
                       driver: createDriver.trim() || null,
                       subnet: createSubnet.trim() || null,
@@ -421,7 +421,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                       internal: createInternal,
                       attachable: createAttachable,
                     }
-                    await invoke('create_network', { serverId, ...req })
+                    await invoke('create_network', { server_id: serverId, ...req })
                     setShowCreate(false)
                     await fetchNetworks()
                   } catch (e) {
@@ -459,7 +459,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_network', { serverId, networkId: removeTarget.id })
+            await invoke('remove_network', { server_id: serverId, network_id: removeTarget.id })
             await fetchNetworks()
           } catch (e) {
             setError(String(e))

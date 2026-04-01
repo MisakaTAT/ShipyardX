@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Database, Search, X, Loader2, Trash2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import type { CreateVolumeRequest, DockerVolume } from '../types'
+import type { DockerVolume, VolumeCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +38,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<DockerVolume[]>('list_volumes', { serverId })
+      const data = await invoke<DockerVolume[]>('list_volumes', { server_id: serverId })
       setVolumes(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -433,12 +433,12 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                       driverOpts.device = `:${mount}`
                     }
 
-                    const req: CreateVolumeRequest = {
+                    const req: VolumeCreate = {
                       name: createName.trim(),
                       driver: 'local',
-                      driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
+                      driver_opts: Object.keys(driverOpts).length ? driverOpts : null,
                     }
-                    await invoke('create_volume', { serverId, ...req })
+                    await invoke('create_volume', { server_id: serverId, ...req })
                     setShowCreate(false)
                     await fetchVolumes()
                   } catch (e) {
@@ -478,7 +478,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_volume', { serverId, name: removeTarget.name })
+            await invoke('remove_volume', { server_id: serverId, name: removeTarget.name })
             await fetchVolumes()
           } catch (e) {
             setError(String(e))

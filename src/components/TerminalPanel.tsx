@@ -6,6 +6,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { Loader2, TerminalIcon } from 'lucide-react'
+import type { TerminalSession } from '../types'
 
 interface TerminalPanelProps {
   serverId: string
@@ -13,10 +14,6 @@ interface TerminalPanelProps {
 }
 
 type Status = 'connecting' | 'connected' | 'closed' | 'error'
-interface OpenTerminalResult {
-  session_id: string
-  ws_port: number
-}
 type ServerMsg = { type: 'output'; data: number[] } | { type: 'closed' }
 
 function extractTextPayload(msg: unknown): string | null {
@@ -130,7 +127,7 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
     const { cols, rows } = term
 
     // 打开 SSH 终端会话
-    invoke<OpenTerminalResult>('open_terminal', { serverId, cols, rows })
+    invoke<TerminalSession>('open_terminal', { server_id: serverId, cols, rows })
       .then(async ({ session_id, ws_port }) => {
         sessionIdRef.current = session_id
         const ws = await connectTerminalWs(session_id, ws_port)
@@ -204,7 +201,7 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
       if (sessionId) {
         void ws?.send(JSON.stringify({ type: 'close' })).catch(() => {})
         void ws?.disconnect().catch(() => {})
-        invoke('close_terminal', { sessionId }).catch(console.error)
+        invoke('close_terminal', { session_id: sessionId }).catch(console.error)
         sessionIdRef.current = null
       }
       term.dispose()

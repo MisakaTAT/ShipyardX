@@ -64,7 +64,7 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
     async (notify = false) => {
       setDockerStatus('checking')
       try {
-        await invoke('check_docker_access', { serverId: selectedServer.id })
+        await invoke('check_docker_access', { server_id: selectedServer.id })
         setDockerStatus('ok')
         if (notify) toast.success('Docker 连接正常')
       } catch (e) {
@@ -91,7 +91,11 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
     setRefreshTick((t) => t + 1)
   }, [])
 
-  const { events, status: eventStatus, clearEvents } = useDockerEvents({
+  const {
+    events,
+    status: eventStatus,
+    clearEvents,
+  } = useDockerEvents({
     serverId: selectedServer.id,
     enabled: dockerOk,
     onRefresh: handleRefresh,
@@ -185,14 +189,14 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
           style={activeTab === 'overview' || activeTab === 'docker' ? { background: 'transparent' } : undefined}
         >
           {activeTab === 'overview' ? <ServerOverview serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
-          {activeTab === 'containers' ? <ContainerPanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
+          {activeTab === 'containers' ? (
+            <ContainerPanel serverId={selectedServer.id} refreshTick={refreshTick} />
+          ) : null}
           {activeTab === 'images' ? <ImagePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'networks' ? <NetworkPanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
-          {activeTab === 'events' ? (
-            <EventPanel events={events} status={eventStatus} onClear={clearEvents} />
-          ) : null}
+          {activeTab === 'events' ? <EventPanel events={events} status={eventStatus} onClear={clearEvents} /> : null}
           {activeTab === 'terminal' ? (
             <TerminalPanel
               serverId={selectedServer.id}

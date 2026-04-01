@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
-import type { DockerDaemonSettings, UpdateDockerDaemonRequest } from '../types'
+import type { DockerDaemonSettings, DockerDaemonUpdate } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,7 +32,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerDaemonSettings>('get_docker_daemon_settings', { serverId })
+      const data = await invoke<DockerDaemonSettings>('get_docker_daemon_settings', { server_id: serverId })
       setForm({
         ...data,
         socket_path: data.socket_path === 'unix:///var/run/docker.sock' ? '' : data.socket_path,
@@ -63,18 +63,22 @@ export default function DockerManagePanel({ serverId }: Props) {
       .map((s) => s.trim())
       .filter(Boolean)
 
-    const payload: UpdateDockerDaemonRequest = {
-      mirrorUrls,
-      logRotation: form.log_rotation,
-      logMaxSize: form.log_max_size.trim(),
-      logMaxFile: form.log_max_file.trim(),
-      liveRestore: form.live_restore,
-      cgroupDriver: form.cgroup_driver.trim(),
-      socketPath: form.socket_path.trim(),
+    const payload: DockerDaemonUpdate = {
+      mirror_urls: mirrorUrls,
+      log_rotation: form.log_rotation,
+      log_max_size: form.log_max_size.trim(),
+      log_max_file: form.log_max_file.trim(),
+      live_restore: form.live_restore,
+      cgroup_driver: form.cgroup_driver.trim(),
+      socket_path: form.socket_path.trim(),
     }
     setSaving(true)
     try {
-      await invoke('update_docker_daemon_settings', { serverId, sudoPassword: password ?? null, ...payload })
+      await invoke('update_docker_daemon_settings', {
+        server_id: serverId,
+        sudo_password: password ?? null,
+        ...payload,
+      })
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setSudoPassword('')
@@ -96,13 +100,13 @@ export default function DockerManagePanel({ serverId }: Props) {
   const onRestart = async (password?: string) => {
     setRestarting(true)
     try {
-      await invoke('restart_docker_daemon', { serverId, sudoPassword: password ?? null })
+      await invoke('restart_docker_daemon', { server_id: serverId, sudo_password: password ?? null })
 
       let lastError = ''
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
-          await invoke('check_docker_access', { serverId })
+          await invoke('check_docker_access', { server_id: serverId })
           recovered = true
           break
         } catch (e) {

@@ -2,16 +2,15 @@ use tauri::State;
 
 use crate::core::docker::{docker_delete, docker_get, docker_post_json};
 use crate::core::state::{get_server_config, AppState};
-use crate::models::docker::DockerNetwork;
-use crate::models::network::{
-    NetworkResp, CreateNetworkReq, CreateNetworkIpamReq, CreateNetworkIpamConfigReq,
-};
+use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
+use crate::models::app::docker::DockerNetwork;
+use crate::models::app::network::NetworkCreate;
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let api: Vec<NetworkResp> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        let api: Vec<Network> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
         // 按创建时间倒序（最新在前）；字段缺失时排在后面
         let mut api = api;
         api.sort_by(|a, b| b.created.cmp(&a.created));
@@ -61,16 +60,16 @@ pub async fn remove_network(server_id: String, network_id: String, state: State<
         .map_err(|e| e.to_string())?
 }
 
-pub async fn create_network(
-    server_id: String,
-    name: String,
-    driver: Option<String>,
-    subnet: Option<String>,
-    gateway: Option<String>,
-    internal: bool,
-    attachable: bool,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn create_network(req: NetworkCreate, state: State<'_, AppState>) -> Result<(), String> {
+    let NetworkCreate {
+        server_id,
+        name,
+        driver,
+        subnet,
+        gateway,
+        internal,
+        attachable,
+    } = req;
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err("网络名称不能为空".to_string());
@@ -84,15 +83,15 @@ pub async fn create_network(
 
     let sub = subnet.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let gw = gateway.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let ipam = sub.map(|s| CreateNetworkIpamReq {
+    let ipam = sub.map(|s| NetworkCreateIpam {
         driver: "default".to_string(),
-        config: vec![CreateNetworkIpamConfigReq {
+        config: vec![NetworkCreateIpamConfig {
             subnet: Some(s.to_string()),
             gateway: gw.map(|g| g.to_string()),
         }],
     });
 
-    let body = CreateNetworkReq {
+    let body = network::NetworkCreate {
         name,
         driver,
         check_duplicate: true,

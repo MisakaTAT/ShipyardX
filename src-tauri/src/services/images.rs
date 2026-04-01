@@ -6,16 +6,16 @@ use tauri::{AppHandle, Emitter, State};
 use crate::core::docker::{api_image_to_dto, docker_delete, docker_get};
 use crate::core::ssh::create_ssh_session;
 use crate::core::state::{get_server_config, AppState, StreamHandle};
-use crate::models::docker_api::ImageResp;
-use crate::models::docker::DockerImage;
-use crate::models::server::ServerConfig;
+use crate::models::docker::engine::ImageSummary;
+use crate::models::app::docker::DockerImage;
+use crate::models::app::server::ServerConfig;
 use crate::utils::id::generate_id;
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/images/json")?;
-        let mut api: Vec<ImageResp> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
+        let mut api: Vec<ImageSummary> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
         // 按创建时间倒序（最新在前）
         api.sort_by(|a, b| b.created.cmp(&a.created));
         Ok(api.into_iter().map(api_image_to_dto).collect())

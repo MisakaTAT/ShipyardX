@@ -1,26 +1,13 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DockerEvent {
-    pub event_type: String,
-    pub action: String,
-    pub actor_id: String,
-    pub actor_name: String,
-    pub actor_image: String,
-    pub scope: String,
-    pub time: i64,
-    pub time_nano: i64,
-    pub detail: String,
-}
+use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct RawDockerEvent {
+pub struct StreamEvent {
     #[serde(rename = "Type")]
     pub event_type: String,
     #[serde(rename = "Action")]
     pub action: String,
     #[serde(rename = "Actor", default)]
-    pub actor: RawActor,
+    pub actor: StreamActor,
     #[serde(default)]
     pub scope: Option<String>,
     pub time: Option<i64>,
@@ -29,7 +16,7 @@ pub struct RawDockerEvent {
 }
 
 #[derive(Deserialize, Default)]
-pub struct RawActor {
+pub struct StreamActor {
     #[serde(rename = "ID", default)]
     pub id: String,
     #[serde(rename = "Attributes", default)]

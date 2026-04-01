@@ -4,14 +4,14 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use crate::core::docker::{api_container_to_dto, docker_delete, docker_get, docker_post, resolve_api_version};
 use crate::core::ssh::ssh_exec;
 use crate::core::state::{get_server_config, AppState};
-use crate::models::docker_api::ContainerResp;
-use crate::models::docker::DockerContainer;
+use crate::models::docker::engine::ContainerSummary;
+use crate::models::app::docker::DockerContainer;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/containers/json?all=1")?;
-        let mut api: Vec<ContainerResp> = serde_json::from_str(&resp)
+        let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp)
             .map_err(|e| format!("解析容器列表失败: {} — 原始响应: {}", e, &resp[..resp.len().min(200)]))?;
         // 按创建时间倒序（最新在前）
         api.sort_by(|a, b| b.created.cmp(&a.created));

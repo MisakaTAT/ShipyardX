@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{mpsc, Mutex};
 
-use crate::models::server::ServerConfig;
+use crate::models::app::server::ServerConfig;
 
 pub enum TerminalMsg {
     Data(Vec<u8>),

@@ -44,7 +44,7 @@ export function useDockerEvents({
 
     if (streamIdRef.current) {
       try {
-        await invoke('stop_event_stream', { serverId })
+        await invoke('stop_event_stream', { server_id: serverId })
       } catch {
         /* ignore */
       }
@@ -62,9 +62,9 @@ export function useDockerEvents({
 
     async function start() {
       try {
-        const id = await invoke<string>('start_event_stream', { serverId })
+        const id = await invoke<string>('start_event_stream', { server_id: serverId })
         if (cancelled) {
-          await invoke('stop_event_stream', { serverId }).catch(() => {})
+          await invoke('stop_event_stream', { server_id: serverId }).catch(() => {})
           return
         }
         streamIdRef.current = id
@@ -76,12 +76,9 @@ export function useDockerEvents({
           })
         })
 
-        const unStatus = await listen<EventStreamStatus>(
-          `docker-events-status:${id}`,
-          (e) => {
-            setStatus(e.payload)
-          },
-        )
+        const unStatus = await listen<EventStreamStatus>(`docker-events-status:${id}`, (e) => {
+          setStatus(e.payload)
+        })
 
         const unRefresh = await listen<string>(`docker-events-refresh:${id}`, (e) => {
           const eventType = e.payload

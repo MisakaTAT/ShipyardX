@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct VolumeResp {
+pub struct VolumeSummary {
     #[serde(rename = "Name")]
     pub name: Option<String>,
     #[serde(rename = "Driver")]
@@ -17,13 +17,13 @@ pub struct VolumeResp {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct VolumesResp {
+pub struct VolumeList {
     #[serde(rename = "Volumes")]
-    pub volumes: Option<Vec<VolumeResp>>,
+    pub volumes: Option<Vec<VolumeSummary>>,
 }
 
 #[derive(Serialize)]
-pub struct CreateVolumeReq {
+pub struct VolumeCreate {
     #[serde(rename = "Name")]
     pub name: String,
     #[serde(rename = "Driver")]

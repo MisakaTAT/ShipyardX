@@ -7,9 +7,9 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
 
 use crate::core::ssh::ssh_exec;
-use crate::models::docker_api::{ContainerResp, ImageResp, PortResp, DockerError, VersionResp};
-use crate::models::docker::{DockerContainer, DockerImage};
-use crate::models::server::ServerConfig;
+use crate::models::docker::engine::{ContainerSummary, DockerError, DockerVersion, ImageSummary, PortBinding};
+use crate::models::app::docker::{DockerContainer, DockerImage};
+use crate::models::app::server::ServerConfig;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -31,7 +31,7 @@ pub fn resolve_api_version(config: &ServerConfig) -> Result<String, String> {
     }
     let cmd = "curl -s --unix-socket /var/run/docker.sock 'http://localhost/version'";
     let resp = ssh_exec(config, cmd)?;
-    let v: VersionResp = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
+    let v: DockerVersion = serde_json::from_str(resp.trim()).map_err(|e| format!("解析 Docker 版本失败: {}", e))?;
     let api_ver = v.api_version;
     api_version_cache().lock().unwrap().insert(key, api_ver.clone());
     Ok(api_ver)
@@ -86,15 +86,15 @@ pub fn check_docker_error(resp: &str) -> Result<(), String> {
     if trimmed.is_empty() {
         return Ok(());
     }
-    if let Ok(v) = serde_json::from_str::<DockerError>(trimmed) {
-        if let Some(msg) = v.message {
-            return Err(msg);
-        }
+    if let Ok(v) = serde_json::from_str::<DockerError>(trimmed)
+        && let Some(msg) = v.message
+    {
+        return Err(msg);
     }
     Ok(())
 }
 
-pub fn format_ports(ports: &[PortResp]) -> String {
+pub fn format_ports(ports: &[PortBinding]) -> String {
     ports
         .iter()
         .filter_map(|p| {
@@ -120,7 +120,7 @@ pub fn format_bytes(bytes: i64) -> String {
     }
 }
 
-pub fn api_container_to_dto(c: ContainerResp) -> DockerContainer {
+pub fn api_container_to_dto(c: ContainerSummary) -> DockerContainer {
     let name = c
         .names
         .first()
@@ -137,7 +137,7 @@ pub fn api_container_to_dto(c: ContainerResp) -> DockerContainer {
     }
 }
 
-pub fn api_image_to_dto(img: ImageResp) -> DockerImage {
+pub fn api_image_to_dto(img: ImageSummary) -> DockerImage {
     let (repository, tag) = img
         .repo_tags
         .as_deref()

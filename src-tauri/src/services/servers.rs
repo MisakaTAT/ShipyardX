@@ -3,7 +3,7 @@ use tauri::State;
 use crate::config::store::save_servers;
 use crate::core::ssh::ssh_exec;
 use crate::core::state::{get_server_config, AppState};
-use crate::models::server::ServerConfig;
+use crate::models::app::server::ServerConfig;
 use crate::utils::id::generate_id;
 
 pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {
