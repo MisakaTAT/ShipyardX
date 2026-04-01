@@ -44,7 +44,7 @@ export function useDockerEvents({
 
     if (streamIdRef.current) {
       try {
-        await invoke('stop_event_stream', { server_id: serverId })
+        await invoke('stop_event_stream', { serverId })
       } catch {
         /* ignore */
       }
@@ -62,9 +62,9 @@ export function useDockerEvents({
 
     async function start() {
       try {
-        const id = await invoke<string>('start_event_stream', { server_id: serverId })
+        const id = await invoke<string>('start_event_stream', { serverId })
         if (cancelled) {
-          await invoke('stop_event_stream', { server_id: serverId }).catch(() => {})
+          await invoke('stop_event_stream', { serverId }).catch(() => {})
           return
         }
         streamIdRef.current = id

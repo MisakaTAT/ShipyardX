@@ -115,8 +115,8 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
     setError('')
     try {
       const s = await invoke<ContainerStats>('get_container_stats', {
-        server_id: serverId,
-        container_id: containerId,
+        serverId,
+        containerId,
       })
       setStats(s)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))

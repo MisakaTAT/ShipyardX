@@ -4,7 +4,7 @@ use crate::services;
 use crate::core::state::AppState;
 use crate::models::app::terminal::TerminalSession;
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn open_terminal(
     server_id: String,
     cols: u32,
@@ -15,17 +15,17 @@ pub fn open_terminal(
     services::terminal::open_terminal(server_id, cols, rows, state, app_handle)
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {
     services::terminal::write_terminal(session_id, data, state)
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn resize_terminal(session_id: String, cols: u32, rows: u32, state: State<AppState>) -> Result<(), String> {
     services::terminal::resize_terminal(session_id, cols, rows, state)
 }
 
-#[tauri::command(rename_all = "snake_case")]
+#[tauri::command]
 pub fn close_terminal(session_id: String, state: State<AppState>) -> Result<(), String> {
     services::terminal::close_terminal(session_id, state)
 }

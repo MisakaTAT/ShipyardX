@@ -38,7 +38,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<DockerVolume[]>('list_volumes', { server_id: serverId })
+      const data = await invoke<DockerVolume[]>('list_volumes', { serverId })
       setVolumes(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -436,9 +436,9 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                     const req: VolumeCreate = {
                       name: createName.trim(),
                       driver: 'local',
-                      driver_opts: Object.keys(driverOpts).length ? driverOpts : null,
+                      driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
                     }
-                    await invoke('create_volume', { server_id: serverId, ...req })
+                    await invoke('create_volume', { serverId, ...req })
                     setShowCreate(false)
                     await fetchVolumes()
                   } catch (e) {
@@ -478,7 +478,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_volume', { server_id: serverId, name: removeTarget.name })
+            await invoke('remove_volume', { serverId, name: removeTarget.name })
             await fetchVolumes()
           } catch (e) {
             setError(String(e))

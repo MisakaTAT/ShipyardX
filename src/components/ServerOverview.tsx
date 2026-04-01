@@ -27,7 +27,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
   const fetch = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await invoke<DockerInfo>('get_docker_info', { server_id: serverId })
+      const d = await invoke<DockerInfo>('get_docker_info', { serverId })
       setInfo(d)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch {

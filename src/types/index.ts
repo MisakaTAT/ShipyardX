@@ -60,7 +60,7 @@ export interface DockerVolume {
 export interface VolumeCreate {
   name: string
   driver?: string | null
-  driver_opts?: Record<string, string> | null
+  driverOpts?: Record<string, string> | null
 }
 
 export interface DockerInfo {
@@ -93,6 +93,7 @@ export interface DockerDaemonSettings {
 }
 
 export interface DockerDaemonUpdate {
+  server_id: string
   mirror_urls: string[]
   log_rotation: boolean
   log_max_size: string
@@ -100,6 +101,7 @@ export interface DockerDaemonUpdate {
   live_restore: boolean
   cgroup_driver: string
   socket_path: string
+  sudo_password?: string | null
 }
 
 export interface ContainerStats {

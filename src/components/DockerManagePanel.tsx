@@ -32,7 +32,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerDaemonSettings>('get_docker_daemon_settings', { server_id: serverId })
+      const data = await invoke<DockerDaemonSettings>('get_docker_daemon_settings', { serverId })
       setForm({
         ...data,
         socket_path: data.socket_path === 'unix:///var/run/docker.sock' ? '' : data.socket_path,
@@ -64,6 +64,7 @@ export default function DockerManagePanel({ serverId }: Props) {
       .filter(Boolean)
 
     const payload: DockerDaemonUpdate = {
+      server_id: serverId,
       mirror_urls: mirrorUrls,
       log_rotation: form.log_rotation,
       log_max_size: form.log_max_size.trim(),
@@ -71,14 +72,11 @@ export default function DockerManagePanel({ serverId }: Props) {
       live_restore: form.live_restore,
       cgroup_driver: form.cgroup_driver.trim(),
       socket_path: form.socket_path.trim(),
+      sudo_password: password ?? null,
     }
     setSaving(true)
     try {
-      await invoke('update_docker_daemon_settings', {
-        server_id: serverId,
-        sudo_password: password ?? null,
-        ...payload,
-      })
+      await invoke('update_docker_daemon_settings', { ...payload })
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setSudoPassword('')
@@ -100,13 +98,13 @@ export default function DockerManagePanel({ serverId }: Props) {
   const onRestart = async (password?: string) => {
     setRestarting(true)
     try {
-      await invoke('restart_docker_daemon', { server_id: serverId, sudo_password: password ?? null })
+      await invoke('restart_docker_daemon', { serverId, sudoPassword: password ?? null })
 
       let lastError = ''
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
-          await invoke('check_docker_access', { server_id: serverId })
+          await invoke('check_docker_access', { serverId })
           recovered = true
           break
         } catch (e) {

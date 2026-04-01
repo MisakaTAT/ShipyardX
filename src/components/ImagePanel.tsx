@@ -31,7 +31,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<DockerImage[]>('list_images', { server_id: serverId })
+      const data = await invoke<DockerImage[]>('list_images', { serverId })
       setImages(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -293,8 +293,8 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
           if (!removeTarget) return
           try {
             await invoke('remove_image', {
-              server_id: serverId,
-              image_id: removeTarget.id,
+              serverId,
+              imageId: removeTarget.id,
               force: removeForce,
             })
             await fetchImages()
@@ -348,7 +348,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
       const target = id ?? pullId
       if (target) {
         try {
-          await invoke('cancel_stream', { stream_id: target })
+          await invoke('cancel_stream', { streamId: target })
         } catch {
           /* ignore */
         }
@@ -367,7 +367,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
 
     try {
       const id = await invoke<string>('start_image_pull', {
-        server_id: serverId,
+        serverId,
         image: img,
       })
       setPullId(id)

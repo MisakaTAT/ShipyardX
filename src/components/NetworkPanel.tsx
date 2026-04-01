@@ -36,7 +36,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
     setLoading(true)
     setError('')
     try {
-      const data = await invoke<DockerNetwork[]>('list_networks', { server_id: serverId })
+      const data = await invoke<DockerNetwork[]>('list_networks', { serverId })
       setNetworks(data)
       setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
     } catch (e) {
@@ -459,7 +459,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_network', { server_id: serverId, network_id: removeTarget.id })
+            await invoke('remove_network', { serverId, networkId: removeTarget.id })
             await fetchNetworks()
           } catch (e) {
             setError(String(e))

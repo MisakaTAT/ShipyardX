@@ -64,7 +64,7 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
     async (notify = false) => {
       setDockerStatus('checking')
       try {
-        await invoke('check_docker_access', { server_id: selectedServer.id })
+        await invoke('check_docker_access', { serverId: selectedServer.id })
         setDockerStatus('ok')
         if (notify) toast.success('Docker 连接正常')
       } catch (e) {

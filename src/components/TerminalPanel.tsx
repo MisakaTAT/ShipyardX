@@ -127,7 +127,7 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
     const { cols, rows } = term
 
     // 打开 SSH 终端会话
-    invoke<TerminalSession>('open_terminal', { server_id: serverId, cols, rows })
+    invoke<TerminalSession>('open_terminal', { serverId, cols, rows })
       .then(async ({ session_id, ws_port }) => {
         sessionIdRef.current = session_id
         const ws = await connectTerminalWs(session_id, ws_port)
@@ -201,7 +201,7 @@ export default function TerminalPanel({ serverId, serverName }: TerminalPanelPro
       if (sessionId) {
         void ws?.send(JSON.stringify({ type: 'close' })).catch(() => {})
         void ws?.disconnect().catch(() => {})
-        invoke('close_terminal', { session_id: sessionId }).catch(console.error)
+        invoke('close_terminal', { sessionId }).catch(console.error)
         sessionIdRef.current = null
       }
       term.dispose()

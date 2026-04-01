@@ -75,7 +75,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
     if (streamIdRef.current) {
       try {
-        await invoke('stop_log_stream', { stream_id: streamIdRef.current })
+        await invoke('stop_log_stream', { streamId: streamIdRef.current })
       } catch {
         /* ignore */
       }
@@ -91,8 +91,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     streamLineBufferRef.current = ''
     try {
       const logs = await invoke<string>('get_container_logs', {
-        server_id: serverId,
-        container_id: containerId,
+        serverId,
+        containerId,
         tail,
         timestamps,
       })
@@ -114,8 +114,8 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
     try {
       const streamId = await invoke<string>('start_log_stream', {
-        server_id: serverId,
-        container_id: containerId,
+        serverId,
+        containerId,
         tail,
         timestamps,
       })
