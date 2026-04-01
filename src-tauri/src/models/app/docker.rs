@@ -7,6 +7,7 @@ pub struct DockerContainer {
     pub image: String,
     pub status: String,
     pub state: String,
+    pub ip: String,
     pub ports: String,
     pub created_ts: i64,
 }

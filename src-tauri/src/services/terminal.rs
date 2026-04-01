@@ -21,6 +21,18 @@ use crate::utils::id::generate_id;
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
 
+fn is_safe_docker_ident(v: &str) -> bool {
+    if v.is_empty() {
+        return false;
+    }
+    v.bytes()
+        .all(|b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' | b'.'))
+}
+
+fn shell_single_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
+}
+
 fn terminal_ws_send(app: &AppHandle, session_id: &str, message: String) {
     let tx = app
         .state::<AppState>()
@@ -75,6 +87,73 @@ fn run_terminal_thread(
         return;
     }
 
+    run_terminal_io_loop(session_id, rx, ah, sess, channel);
+}
+
+fn run_container_exec_thread(
+    config: ServerConfig,
+    session_id: String,
+    rx: mpsc::Receiver<TerminalMsg>,
+    ah: AppHandle,
+    cols: u32,
+    rows: u32,
+    container_id: String,
+    user: Option<String>,
+    shell: String,
+) {
+    if !is_safe_docker_ident(&container_id) {
+        fail_terminal(&ah, &session_id, "容器 ID/名称包含非法字符");
+        return;
+    }
+
+    let sess = match create_ssh_session(&config) {
+        Ok(s) => s,
+        Err(e) => {
+            fail_terminal(&ah, &session_id, e);
+            return;
+        }
+    };
+
+    let mut channel = match sess.channel_session() {
+        Ok(c) => c,
+        Err(e) => {
+            fail_terminal(&ah, &session_id, format!("通道创建失败: {}", e));
+            return;
+        }
+    };
+
+    if let Err(e) = channel.request_pty("xterm-256color", None, Some((cols, rows, 0, 0))) {
+        fail_terminal(&ah, &session_id, format!("PTY 请求失败: {}", e));
+        return;
+    }
+
+    let mut cmd = String::from("docker exec -it ");
+    if let Some(raw_user) = user {
+        let trimmed = raw_user.trim();
+        if !trimmed.is_empty() {
+            cmd.push_str("-u ");
+            cmd.push_str(&shell_single_quote(trimmed));
+            cmd.push(' ');
+        }
+    }
+    cmd.push_str(&shell_single_quote(&container_id));
+    cmd.push(' ');
+    cmd.push_str(&shell_single_quote(&shell));
+    if let Err(e) = channel.exec(&cmd) {
+        fail_terminal(&ah, &session_id, format!("docker exec 启动失败: {}", e));
+        return;
+    }
+
+    run_terminal_io_loop(session_id, rx, ah, sess, channel);
+}
+
+fn run_terminal_io_loop(
+    session_id: String,
+    rx: mpsc::Receiver<TerminalMsg>,
+    ah: AppHandle,
+    sess: ssh2::Session,
+    mut channel: ssh2::Channel,
+) {
     sess.set_blocking(true);
     sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
     let mut buf = [0u8; 8192];
@@ -245,6 +324,39 @@ pub fn open_terminal(
     let sid = session_id.clone();
     let ah = app_handle.clone();
     std::thread::spawn(move || run_terminal_thread(server, sid, rx, ah, cols, rows));
+
+    state
+        .terminals
+        .lock()
+        .unwrap()
+        .insert(session_id.clone(), TerminalHandle { tx });
+    Ok(TerminalSession { session_id, ws_port })
+}
+
+pub fn open_container_exec_terminal(
+    server_id: String,
+    container_id: String,
+    user: Option<String>,
+    shell: String,
+    cols: u32,
+    rows: u32,
+    state: State<AppState>,
+    app_handle: AppHandle,
+) -> Result<TerminalSession, String> {
+    start_terminal_ws_server_once(app_handle.clone());
+    let ws_port = terminal_ws_port();
+    let server = get_server_config(&state, &server_id)?;
+    let session_id = generate_id();
+    let (tx, rx) = mpsc::channel::<TerminalMsg>();
+
+    let shell = shell.trim().to_string();
+    if shell.is_empty() {
+        return Err("shell 不能为空".to_string());
+    }
+
+    let sid = session_id.clone();
+    let ah = app_handle.clone();
+    std::thread::spawn(move || run_container_exec_thread(server, sid, rx, ah, cols, rows, container_id, user, shell));
 
     state
         .terminals

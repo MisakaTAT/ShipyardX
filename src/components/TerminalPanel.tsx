@@ -7,14 +7,17 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { IDisposable } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
+import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import type { TerminalSession } from '../types'
 
 const WS_OPEN_RETRIES = 20
 const WS_OPEN_RETRY_DELAY_MS = 100
 const TERMINAL_RESIZE_DEBOUNCE_MS = 30
+const OVERLAY_FADE_OUT_MS = 220
 const TERMINAL_VIEW_PADDING_PX = 8
 const XTERM_SCROLLBAR_GUTTER_PX = 14
 const FIT_HEIGHT_SLACK_PX = 2
@@ -228,6 +231,9 @@ function mountXtermRenderAddons(term: Terminal): () => void {
 
 interface TerminalPanelProps {
   serverId: string
+  containerId?: string
+  title?: string
+  onRequestClose?: () => void
 }
 
 type ConnectionPhase = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -238,7 +244,12 @@ type EndSessionOptions = {
   errorMessage?: string
 }
 
-export default function TerminalPanel({ serverId }: TerminalPanelProps) {
+export default function TerminalPanel({
+  serverId,
+  containerId,
+  title,
+  onRequestClose,
+}: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -247,18 +258,24 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
   const detachSocketMessageRef = useRef<(() => void) | null>(null)
   const xtermInputDisposablesRef = useRef<IDisposable[]>([])
   const resizeDebounceTimerRef = useRef<number | null>(null)
+  const overlayFadeTimerRef = useRef<number | null>(null)
   const serverIdLiveRef = useRef(serverId)
   const connectInFlightRef = useRef(false)
   const mountAliveRef = useRef(true)
   const serverEpochRef = useRef(0)
   const shellReadyPendingRef = useRef(false)
-
+  const containerIdLiveRef = useRef<string | undefined>(containerId)
   const [phase, setPhase] = useState<ConnectionPhase>('disconnected')
   const [errorText, setErrorText] = useState('')
   const [wasEverConnected, setWasEverConnected] = useState(false)
   const [errorDetailsExpanded, setErrorDetailsExpanded] = useState(false)
+  const [overlayMounted, setOverlayMounted] = useState(true)
+  const [execUser, setExecUser] = useState('')
+  const [execShellPreset, setExecShellPreset] = useState<'/bin/ash' | '/bin/bash' | '/bin/sh' | 'custom'>('/bin/sh')
+  const [execCustomShell, setExecCustomShell] = useState('')
 
   serverIdLiveRef.current = serverId
+  containerIdLiveRef.current = containerId
 
   useEffect(() => {
     if (phase === 'error') setErrorDetailsExpanded(false)
@@ -269,7 +286,23 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
     setPhase('disconnected')
     setErrorText('')
     setWasEverConnected(false)
-  }, [serverId])
+    setOverlayMounted(true)
+  }, [serverId, containerId])
+
+  useEffect(() => {
+    if (overlayFadeTimerRef.current !== null) {
+      window.clearTimeout(overlayFadeTimerRef.current)
+      overlayFadeTimerRef.current = null
+    }
+    if (phase === 'connected') {
+      overlayFadeTimerRef.current = window.setTimeout(() => {
+        setOverlayMounted(false)
+        overlayFadeTimerRef.current = null
+      }, OVERLAY_FADE_OUT_MS)
+      return
+    }
+    setOverlayMounted(true)
+  }, [phase])
 
   const disposeXtermWireListeners = useCallback(() => {
     detachSocketMessageRef.current?.()
@@ -338,11 +371,22 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
         if (t && f) fitTerminalToContainer(t, f)
       })
 
-      const session = await invoke<TerminalSession>('open_terminal', {
-        serverId: serverIdLiveRef.current,
-        cols: term.cols,
-        rows: term.rows,
-      })
+      const targetContainerId = containerIdLiveRef.current
+      const targetShell = execShellPreset === 'custom' ? execCustomShell.trim() : execShellPreset
+      const session = targetContainerId
+        ? await invoke<TerminalSession>('open_container_exec_terminal', {
+            serverId: serverIdLiveRef.current,
+            containerId: targetContainerId,
+            user: execUser.trim() || null,
+            shell: targetShell || '/bin/sh',
+            cols: term.cols,
+            rows: term.rows,
+          })
+        : await invoke<TerminalSession>('open_terminal', {
+            serverId: serverIdLiveRef.current,
+            cols: term.cols,
+            rows: term.rows,
+          })
       if (isStale()) {
         void invoke('close_terminal', { sessionId: session.session_id }).catch(console.error)
         term.options.disableStdin = true
@@ -436,7 +480,7 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
     } finally {
       connectInFlightRef.current = false
     }
-  }, [disposeXtermWireListeners, endSession, scheduleFitAndFocus])
+  }, [disposeXtermWireListeners, endSession, scheduleFitAndFocus, execCustomShell, execShellPreset, execUser])
 
   useEffect(() => {
     const el = containerRef.current
@@ -495,6 +539,10 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
         window.clearTimeout(resizeDebounceTimerRef.current)
         resizeDebounceTimerRef.current = null
       }
+      if (overlayFadeTimerRef.current !== null) {
+        window.clearTimeout(overlayFadeTimerRef.current)
+        overlayFadeTimerRef.current = null
+      }
 
       const socket = socketRef.current
       socketRef.current = null
@@ -515,13 +563,39 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
       unmountRenderAddons()
       term.dispose()
     }
-  }, [serverId])
+  }, [serverId, containerId])
 
   const overlayVisible = phase !== 'connected'
   const xtermVisible = phase === 'connected'
+  const isContainerExec = Boolean(containerId)
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-panel)' }}>
+      {title ? (
+        <div
+          className="flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2"
+          style={{ borderColor: 'var(--border-sub)' }}
+        >
+          <div className="flex min-w-0 items-center gap-2 text-xs" style={{ color: 'var(--text-soft)' }}>
+            <TerminalIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{title}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {onRequestClose ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+                onClick={onRequestClose}
+                title="关闭"
+              >
+                <X className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="flex-1 relative overflow-hidden">
         <div
           ref={containerRef}
@@ -533,9 +607,12 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
           }}
         />
 
-        {overlayVisible && (
+        {overlayMounted && (
           <div
-            className="absolute inset-0 z-10 flex flex-1 items-center justify-center p-6"
+            className={cn(
+              'absolute inset-0 z-10 flex flex-1 items-center justify-center p-6 transition-all duration-200',
+              overlayVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0',
+            )}
             style={{ background: 'var(--bg-panel)' }}
           >
             <div className="mx-auto w-full max-w-lg space-y-6 text-center">
@@ -551,11 +628,58 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
                     <p className="text-sm text-(--text-soft)">
                       {wasEverConnected
                         ? '与远程主机的会话已结束，可重新建立连接。'
-                        : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
+                        : isContainerExec
+                          ? '将通过 SSH 在远程主机上执行 docker exec 并接入容器交互终端。'
+                          : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
                     </p>
                   </div>
+                  {isContainerExec && (
+                    <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-(--bg-surface) p-3 text-left">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-(--text-muted)">用户（可选）</p>
+                          <Input
+                            value={execUser}
+                            onChange={(e) => setExecUser(e.target.value)}
+                            placeholder="如 root 或 1000:1000"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="text-xs text-(--text-muted)">Shell</p>
+                          <Select value={execShellPreset} onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}>
+                            <SelectTrigger size="sm" className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="/bin/ash">/bin/ash</SelectItem>
+                              <SelectItem value="/bin/bash">/bin/bash</SelectItem>
+                              <SelectItem value="/bin/sh">/bin/sh</SelectItem>
+                              <SelectItem value="custom">自定义</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      {execShellPreset === 'custom' ? (
+                        <div className="mt-3 space-y-1.5">
+                          <p className="text-xs text-(--text-muted)">自定义 shell 命令</p>
+                          <Input
+                            value={execCustomShell}
+                            onChange={(e) => setExecCustomShell(e.target.value)}
+                            placeholder="例如 /busybox/sh"
+                            className="h-8"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                   <div className="flex items-center justify-center gap-3">
-                    <Button type="button" size="sm" onClick={connect}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={connect}
+                      disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
+                    >
                       <TerminalIcon className="size-3.5" />
                       {wasEverConnected ? '重新连接' : '开始连接'}
                     </Button>
@@ -569,7 +693,11 @@ export default function TerminalPanel({ serverId }: TerminalPanelProps) {
                     <Loader2 className="size-7 animate-spin text-(--accent-text)" />
                   </div>
                   <h2 className="text-lg font-semibold text-(--text-strong)">正在连接</h2>
-                  <p className="text-sm text-(--text-soft)">正在通过 SSH 登录远程主机并启动终端，请稍候。</p>
+                  <p className="text-sm text-(--text-soft)">
+                    {isContainerExec
+                      ? '正在通过 SSH 启动 docker exec 并连接容器终端，请稍候。'
+                      : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
+                  </p>
                 </div>
               )}
 

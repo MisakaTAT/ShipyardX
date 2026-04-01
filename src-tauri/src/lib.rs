@@ -74,6 +74,7 @@ pub fn run() {
             commands::docker_events::stop_event_stream,
             // SSH 终端
             commands::terminal::open_terminal,
+            commands::terminal::open_container_exec_terminal,
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,
             commands::terminal::close_terminal,

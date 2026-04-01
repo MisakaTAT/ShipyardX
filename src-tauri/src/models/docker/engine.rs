@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct DockerVersion {
@@ -27,6 +28,20 @@ pub struct ContainerSummary {
     pub ports: Vec<PortBinding>,
     #[serde(rename = "Created")]
     pub created: i64,
+    #[serde(rename = "NetworkSettings", default)]
+    pub network_settings: ContainerNetworkSettings,
+}
+
+#[derive(Deserialize, Default)]
+pub struct ContainerNetworkSettings {
+    #[serde(rename = "Networks", default)]
+    pub networks: HashMap<String, ContainerNetworkEndpoint>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct ContainerNetworkEndpoint {
+    #[serde(rename = "IPAddress", default)]
+    pub ip_address: String,
 }
 
 #[derive(Deserialize)]

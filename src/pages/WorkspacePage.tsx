@@ -197,9 +197,9 @@ export default function WorkspacePage({ selectedServer, onDisconnect }: Workspac
           {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'events' ? <EventPanel events={events} status={eventStatus} onClear={clearEvents} /> : null}
-          {activeTab === 'terminal' ? (
+          <div className={cn('h-full', activeTab === 'terminal' ? 'block' : 'hidden')}>
             <TerminalPanel serverId={selectedServer.id} />
-          ) : null}
+          </div>
         </div>
       </div>
     </div>

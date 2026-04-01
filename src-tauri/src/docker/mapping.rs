@@ -40,17 +40,27 @@ pub fn api_container_to_dto(c: ContainerSummary) -> DockerContainer {
         status,
         ports,
         created,
+        network_settings,
     } = c;
     let name = names
         .first()
         .map(|n| n.trim_start_matches('/').to_string())
         .unwrap_or_default();
+    let ip = network_settings
+        .networks
+        .values()
+        .map(|n| n.ip_address.as_str())
+        .find(|ip| !ip.is_empty())
+        .unwrap_or("-")
+        .to_string();
+
     DockerContainer {
         id: short_container_id(&id),
         name,
         image,
         state,
         status,
+        ip,
         ports: format_ports(&ports),
         created_ts: created,
     }

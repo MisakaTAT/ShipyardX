@@ -15,6 +15,7 @@ export interface Container {
   image: string
   status: string
   state: string
+  ip: string
   ports: string
   created_ts: number
 }

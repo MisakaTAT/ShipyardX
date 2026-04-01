@@ -1,15 +1,28 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Play, Square, RotateCcw, Trash2, FileText, Loader2, Box, Search, X, BarChart2 } from 'lucide-react'
+import {
+  Play,
+  Square,
+  RotateCcw,
+  Trash2,
+  FileText,
+  Loader2,
+  Box,
+  Search,
+  X,
+  BarChart2,
+  Terminal,
+  MoreHorizontal,
+} from 'lucide-react'
 import type { Container } from '../types'
 import LogModal from './LogModal'
 import StatsModal from './StatsModal'
+import ContainerExecModal from './ContainerExecModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { cn } from '@/lib/utils'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
@@ -68,6 +81,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const [error, setError] = useState('')
   const [logTarget, setLogTarget] = useState<Container | null>(null)
   const [statsTarget, setStatsTarget] = useState<Container | null>(null)
+  const [execTarget, setExecTarget] = useState<Container | null>(null)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Container | null>(null)
@@ -256,6 +270,12 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                   className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text-muted)' }}
                 >
+                  IP
+                </th>
+                <th
+                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   端口
                 </th>
                 <th
@@ -306,6 +326,11 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                         {c.status}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-mono" style={{ color: 'var(--text-soft)' }}>
+                        {c.ip || '-'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 max-w-[220px]">
                       {c.ports ? (
                         <PortCell ports={c.ports} />
@@ -320,53 +345,62 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {isRunning ? (
-                          <ActionBtn
-                            onClick={() => runAction(c.id, 'stop', 'stop_container')}
-                            loading={busy === 'stop'}
-                            icon={<Square className="w-3.5 h-3.5" />}
-                            title="停止"
-                            colorClass="hover:bg-yellow-500/10 hover:text-yellow-500"
-                          />
-                        ) : (
-                          <ActionBtn
-                            onClick={() => runAction(c.id, 'start', 'start_container')}
-                            loading={busy === 'start'}
-                            icon={<Play className="w-3.5 h-3.5" />}
-                            title="启动"
-                            colorClass="hover:bg-green-500/10 hover:text-green-500"
-                          />
-                        )}
-                        <ActionBtn
-                          onClick={() => runAction(c.id, 'restart', 'restart_container')}
-                          loading={busy === 'restart'}
-                          icon={<RotateCcw className="w-3.5 h-3.5" />}
-                          title="重启"
-                          colorClass="hover:bg-blue-500/10 hover:text-blue-500"
-                        />
-                        {isRunning && (
-                          <ActionBtn
-                            onClick={() => setStatsTarget(c)}
-                            loading={false}
-                            icon={<BarChart2 className="w-3.5 h-3.5" />}
-                            title="资源监控"
-                            colorClass="hover:bg-purple-500/10 hover:text-purple-500"
-                          />
-                        )}
-                        <ActionBtn
-                          onClick={() => setLogTarget(c)}
-                          loading={false}
-                          icon={<FileText className="w-3.5 h-3.5" />}
-                          title="日志"
-                          colorClass="hover:bg-(--bg-surface) hover:text-(--text-base)"
-                        />
-                        <ActionBtn
-                          onClick={() => setRemoveTarget(c)}
-                          loading={busy === 'remove'}
-                          icon={<Trash2 className="w-3.5 h-3.5" />}
-                          title="删除"
-                          colorClass="hover:bg-red-500/10 hover:text-red-500"
-                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="rounded-lg text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+                              title="更多操作"
+                            >
+                              <MoreHorizontal className="size-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onClick={() => runAction(c.id, 'start', 'start_container')}
+                              disabled={isRunning || Boolean(busy)}
+                            >
+                              <Play className="size-3.5" />
+                              启动
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => runAction(c.id, 'stop', 'stop_container')}
+                              disabled={!isRunning || Boolean(busy)}
+                            >
+                              <Square className="size-3.5" />
+                              停止
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => runAction(c.id, 'restart', 'restart_container')}
+                              disabled={Boolean(busy)}
+                            >
+                              <RotateCcw className="size-3.5" />
+                              重启
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setExecTarget(c)} disabled={!isRunning}>
+                              <Terminal className="size-3.5" />
+                              容器终端
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setStatsTarget(c)} disabled={!isRunning}>
+                              <BarChart2 className="size-3.5" />
+                              资源监控
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setLogTarget(c)}>
+                              <FileText className="size-3.5" />
+                              日志
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => setRemoveTarget(c)}
+                              disabled={Boolean(busy)}
+                            >
+                              <Trash2 className="size-3.5" />
+                              删除
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
@@ -392,6 +426,16 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
           containerId={statsTarget.id}
           containerName={statsTarget.name}
           onClose={() => setStatsTarget(null)}
+        />
+      )}
+
+      {execTarget && (
+        <ContainerExecModal
+          open={execTarget !== null}
+          serverId={serverId}
+          containerId={execTarget.id}
+          containerName={execTarget.name}
+          onClose={() => setExecTarget(null)}
         />
       )}
 
@@ -447,33 +491,5 @@ function PortCell({ ports }: { ports: string }) {
         </span>
       )}
     </div>
-  )
-}
-
-function ActionBtn({
-  onClick,
-  loading,
-  icon,
-  title,
-  colorClass,
-}: {
-  onClick: () => void
-  loading: boolean
-  icon: ReactNode
-  title: string
-  colorClass: string
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      title={title}
-      disabled={loading}
-      onClick={onClick}
-      className={cn('rounded-lg text-(--text-muted) disabled:opacity-40', colorClass)}
-    >
-      {loading ? <Loader2 className="size-3.5 animate-spin" /> : icon}
-    </Button>
   )
 }
