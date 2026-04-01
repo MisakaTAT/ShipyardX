@@ -42,10 +42,6 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
     if action == "health_status" && let Some(hs) = attrs.get("health_status") {
         parts.push(hs.clone());
     }
-    if (action == "exec_create" || action == "exec_start") && let Some(cmd) = attrs.get("execID") {
-        let short = if cmd.len() > 12 { &cmd[..12] } else { cmd.as_str() };
-        parts.push(format!("exec={}", short));
-    }
 
     if parts.is_empty() {
         for (k, v) in attrs {
@@ -63,6 +59,9 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
 
 fn parse_docker_event(json: &str) -> Option<DockerEvent> {
     let raw: StreamEvent = serde_json::from_str(json).ok()?;
+    if raw.action.starts_with("exec_") {
+        return None;
+    }
     let actor_id = if raw.actor.id.len() > 12 {
         raw.actor.id[..12].to_string()
     } else {
