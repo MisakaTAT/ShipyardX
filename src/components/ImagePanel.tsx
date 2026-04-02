@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { cn } from '@/lib/utils'
-import { formatUnixSeconds } from '@/utils/datetime'
+import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ImagePanelProps {
   serverId: string
@@ -35,7 +35,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
     try {
       const data = await invoke<DockerImage[]>('list_images', { serverId })
       setImages(data)
-      setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
+      setLastUpdated(formatNowTime())
     } catch (e) {
       setError(String(e))
     } finally {

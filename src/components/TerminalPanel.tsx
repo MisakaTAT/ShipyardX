@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import debounce from 'lodash-es/debounce'
 import { invoke } from '@tauri-apps/api/core'
 import { Terminal } from '@xterm/xterm'
 import { CanvasAddon } from '@xterm/addon-canvas'
@@ -252,7 +253,6 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
   const socketRef = useRef<WebSocket | null>(null)
   const detachSocketMessageRef = useRef<(() => void) | null>(null)
   const xtermInputDisposablesRef = useRef<IDisposable[]>([])
-  const resizeDebounceTimerRef = useRef<number | null>(null)
   const overlayFadeTimerRef = useRef<number | null>(null)
   const serverIdLiveRef = useRef(serverId)
   const connectInFlightRef = useRef(false)
@@ -513,27 +513,21 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
       sendTerminalWireJson(s, { type: 'resize', cols: t.cols, rows: t.rows })
     }
 
-    const onContainerResize = () => {
-      if (resizeDebounceTimerRef.current !== null) window.clearTimeout(resizeDebounceTimerRef.current)
-      resizeDebounceTimerRef.current = window.setTimeout(() => {
-        const t = xtermRef.current
-        const f = fitAddonRef.current
-        if (t && f) fitTerminalToContainer(t, f)
-        pushSizeToBackend()
-      }, TERMINAL_RESIZE_DEBOUNCE_MS)
-    }
+    const debouncedResize = debounce(() => {
+      const t = xtermRef.current
+      const f = fitAddonRef.current
+      if (t && f) fitTerminalToContainer(t, f)
+      pushSizeToBackend()
+    }, TERMINAL_RESIZE_DEBOUNCE_MS)
 
-    const ro = new ResizeObserver(onContainerResize)
+    const ro = new ResizeObserver(() => debouncedResize())
     ro.observe(el)
 
     return () => {
       mountAliveRef.current = false
       shellReadyPendingRef.current = false
       ro.disconnect()
-      if (resizeDebounceTimerRef.current !== null) {
-        window.clearTimeout(resizeDebounceTimerRef.current)
-        resizeDebounceTimerRef.current = null
-      }
+      debouncedResize.cancel()
       if (overlayFadeTimerRef.current !== null) {
         window.clearTimeout(overlayFadeTimerRef.current)
         overlayFadeTimerRef.current = null

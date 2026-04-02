@@ -20,3 +20,7 @@ export function formatUnixSecondsTime(ts: number): string {
   const d = dayjs.unix(ts)
   return d.isValid() ? d.format('HH:mm:ss') : '—'
 }
+
+export function formatNowTime(): string {
+  return dayjs().format('HH:mm:ss')
+}

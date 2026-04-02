@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { formatUnixSeconds } from '@/utils/datetime'
+import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
   serverId: string
@@ -135,7 +135,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
     try {
       const data = await invoke<Container[]>('list_containers', { serverId })
       setContainers(data)
-      setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
+      setLastUpdated(formatNowTime())
     } catch (e) {
       setError(String(e))
     } finally {

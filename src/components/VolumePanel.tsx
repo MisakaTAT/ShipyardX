@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { formatDateTimeString } from '@/utils/datetime'
+import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
   serverId: string
@@ -42,7 +42,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
     try {
       const data = await invoke<DockerVolume[]>('list_volumes', { serverId })
       setVolumes(data)
-      setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
+      setLastUpdated(formatNowTime())
     } catch (e) {
       setError(String(e))
     } finally {

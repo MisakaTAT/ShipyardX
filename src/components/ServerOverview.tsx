@@ -3,15 +3,12 @@ import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Box, Layers, Cpu, HardDrive } from 'lucide-react'
 import type { DockerInfo } from '../types'
+import { formatBytes } from '@/utils/formatBytes'
+import { formatNowTime } from '@/utils/datetime'
 
 interface Props {
   serverId: string
   refreshTick?: number
-}
-
-function fmtMem(bytes: number): string {
-  const gb = bytes / 1_073_741_824
-  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1_048_576).toFixed(0)} MB`
 }
 
 function fmtPct(value: number, total: number): string {
@@ -29,7 +26,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
     try {
       const d = await invoke<DockerInfo>('get_docker_info', { serverId })
       setInfo(d)
-      setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
+      setLastUpdated(formatNowTime())
     } catch {
       // 静默失败，服务器可能不支持 Docker
     } finally {
@@ -85,7 +82,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
             <MetricCard icon={<Box size={14} />} label="容器总数" value={String(totalContainers)} />
             <MetricCard icon={<Layers size={14} />} label="镜像数" value={String(info?.images ?? 0)} />
             <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '—')} />
-            <MetricCard icon={<HardDrive size={14} />} label="总内存" value={info ? fmtMem(info.mem_total) : '—'} />
+            <MetricCard icon={<HardDrive size={14} />} label="总内存" value={info ? formatBytes(info.mem_total) : '—'} />
           </div>
         </div>
 

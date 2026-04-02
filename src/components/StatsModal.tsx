@@ -4,19 +4,14 @@ import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
 import type { ContainerStats } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { formatBytes } from '@/utils/formatBytes'
+import { formatNowTime } from '@/utils/datetime'
 
 interface Props {
   serverId: string
   containerId: string
   containerName: string
   onClose: () => void
-}
-
-function fmtBytes(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(2)} GB`
-  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
 }
 
 interface GaugeProps {
@@ -119,7 +114,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
         containerId,
       })
       setStats(s)
-      setLastUpdated(new Date().toLocaleTimeString('zh-CN'))
+      setLastUpdated(formatNowTime())
     } catch (e) {
       setError(String(e))
     } finally {
@@ -183,7 +178,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
                   value={stats.mem_percent}
                   color="green"
                   label="内存使用率"
-                  sublabel={`${fmtBytes(stats.mem_usage)} / ${fmtBytes(stats.mem_limit)}`}
+                  sublabel={`${formatBytes(stats.mem_usage)} / ${formatBytes(stats.mem_limit)}`}
                 />
               </div>
 
@@ -191,21 +186,21 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
                 <StatRow
                   icon={<MemoryStick size={16} />}
                   label="内存使用"
-                  value={fmtBytes(stats.mem_usage)}
-                  subvalue={`限制: ${fmtBytes(stats.mem_limit)}`}
+                  value={formatBytes(stats.mem_usage)}
+                  subvalue={`限制: ${formatBytes(stats.mem_limit)}`}
                   color="green"
                 />
                 <StatRow icon={<Cpu size={16} />} label="CPU" value={`${stats.cpu_percent}%`} color="blue" />
                 <StatRow
                   icon={<Network size={16} />}
                   label="网络 接收 / 发送"
-                  value={`${fmtBytes(stats.net_rx)} / ${fmtBytes(stats.net_tx)}`}
+                  value={`${formatBytes(stats.net_rx)} / ${formatBytes(stats.net_tx)}`}
                   color="cyan"
                 />
                 <StatRow
                   icon={<HardDrive size={16} />}
                   label="磁盘 读 / 写"
-                  value={`${fmtBytes(stats.blk_read)} / ${fmtBytes(stats.blk_write)}`}
+                  value={`${formatBytes(stats.blk_read)} / ${formatBytes(stats.blk_write)}`}
                   color="purple"
                 />
               </div>

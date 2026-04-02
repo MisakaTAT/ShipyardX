@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { formatNowTime } from '@/utils/datetime'
 
 interface Props {
   serverId: string
@@ -17,10 +18,6 @@ interface Props {
 }
 
 const TAIL_OPTIONS = [50, 100, 200, 500, 1000] as const
-
-function formatTimestamp(): string {
-  return new Date().toLocaleTimeString('zh-CN')
-}
 
 function logPayloadToBytes(payload: unknown): Uint8Array | null {
   if (payload == null) return null
@@ -110,7 +107,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     setError('')
     streamDecoderRef.current = new TextDecoder('utf-8', { fatal: false })
     streamLineBufferRef.current = ''
-    setLines([`[${formatTimestamp()}] 正在连接日志流...`])
+    setLines([`[${formatNowTime()}] 正在连接日志流...`])
 
     try {
       const streamId = await invoke<string>('start_log_stream', {
@@ -141,7 +138,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
         const remaining = streamLineBufferRef.current
         streamLineBufferRef.current = ''
         const tailParts = remaining.length ? remaining.split('\n') : []
-        setLines((prev) => [...prev, ...tailParts, `[${formatTimestamp()}] 日志流已结束`])
+        setLines((prev) => [...prev, ...tailParts, `[${formatNowTime()}] 日志流已结束`])
         setFollow(false)
         streamIdRef.current = null
       })

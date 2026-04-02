@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import debounce from 'lodash-es/debounce'
+import type { DebouncedFunc } from 'lodash-es/debounce'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { DockerEvent, EventStreamStatus } from '../types'
@@ -27,7 +29,7 @@ export function useDockerEvents({
   const streamIdRef = useRef<string | null>(null)
   const unlistensRef = useRef<UnlistenFn[]>([])
   const onRefreshRef = useRef(onRefresh)
-  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const refreshDebouncers = useRef<Map<string, DebouncedFunc<() => void>>>(new Map())
 
   onRefreshRef.current = onRefresh
 
@@ -37,10 +39,10 @@ export function useDockerEvents({
     }
     unlistensRef.current = []
 
-    for (const timer of Object.values(debounceTimers.current)) {
-      clearTimeout(timer)
+    for (const d of refreshDebouncers.current.values()) {
+      d.cancel()
     }
-    debounceTimers.current = {}
+    refreshDebouncers.current.clear()
 
     if (streamIdRef.current) {
       try {
@@ -82,15 +84,14 @@ export function useDockerEvents({
 
         const unRefresh = await listen<string>(`docker-events-refresh:${id}`, (e) => {
           const eventType = e.payload
-
-          if (debounceTimers.current[eventType]) {
-            clearTimeout(debounceTimers.current[eventType])
+          let d = refreshDebouncers.current.get(eventType)
+          if (!d) {
+            d = debounce(() => {
+              onRefreshRef.current?.(eventType)
+            }, 600)
+            refreshDebouncers.current.set(eventType, d)
           }
-
-          debounceTimers.current[eventType] = setTimeout(() => {
-            delete debounceTimers.current[eventType]
-            onRefreshRef.current?.(eventType)
-          }, 600)
+          d()
         })
 
         const unError = await listen<string>(`docker-events-error:${id}`, () => {
