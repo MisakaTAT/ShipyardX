@@ -379,8 +379,9 @@ export default function PortForwardPage() {
                   ) : enabledCount > 0 ? (
                     <Button
                       type="button"
+                      variant="outline"
                       size="sm"
-                      className="gap-1.5 border border-green-500/30 bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                      className="gap-1.5  "
                       onClick={() => void handleStartAll()}
                       disabled={rulesLoading}
                     >
@@ -523,10 +524,7 @@ export default function PortForwardPage() {
                               {f.protocol}
                             </span>
                           </td>
-                          <td
-                            className="px-4 py-3 font-mono text-xs"
-                            style={{ color: 'var(--text-soft)', minWidth: '200px' }}
-                          >
+                          <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
                             {f.running ? (
                               <button
                                 type="button"
@@ -575,7 +573,7 @@ export default function PortForwardPage() {
                           </td>
                           <td
                             className="px-4 py-3 text-xs font-mono tabular-nums"
-                            style={{ color: 'var(--text-muted)', minWidth: '160px' }}
+                            style={{ color: 'var(--text-muted)' }}
                           >
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
@@ -594,7 +592,7 @@ export default function PortForwardPage() {
                           </td>
                           <td
                             className="px-4 py-3 text-xs font-mono tabular-nums"
-                            style={{ minWidth: '160px', color: 'var(--text-muted)' }}
+                            style={{ color: 'var(--text-muted)' }}
                           >
                             {(() => {
                               const sp = f.running ? speeds[f.id] : undefined

@@ -121,7 +121,7 @@ export default function InspectModal({ serverId, kind, targetId, targetLabel, on
 
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             className="gap-1.5"
             disabled={!json}

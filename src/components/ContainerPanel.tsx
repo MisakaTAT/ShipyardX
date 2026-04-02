@@ -304,7 +304,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                 </th>
                 <th
                   className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
+                  style={{ color: 'var(--text-muted)', minWidth: '160px' }}
                 >
                   状态
                 </th>

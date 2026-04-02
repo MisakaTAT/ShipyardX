@@ -209,7 +209,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
           <span className="mr-2 text-xs text-(--text-muted)">日志</span>
 
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
-            <SelectTrigger size="sm" className="h-8 border-(--border-sub) bg-(--bg-input) text-xs text-(--text-base)">
+            <SelectTrigger size="default" className="border-(--border-sub) bg-(--bg-input) text-xs text-(--text-base)">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -223,7 +223,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
           <Button
             type="button"
-            variant={timestamps ? 'secondary' : 'ghost'}
+            variant={timestamps ? 'default' : 'outline'}
             size="sm"
             className="gap-1.5"
             disabled={follow}
@@ -236,7 +236,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
           <Button
             type="button"
-            variant={follow ? 'outline' : 'default'}
+            variant={follow ? 'default' : 'outline'}
             size="sm"
             className="gap-1.5"
             title={follow ? '停止跟踪' : '实时跟踪'}
@@ -258,7 +258,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
           {!follow ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               className="gap-1.5"
               disabled={loading}
@@ -270,7 +270,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
             </Button>
           ) : null}
 
-          <Button type="button" variant="ghost" size="sm" className="gap-1.5" title="复制全部" onClick={handleCopy}>
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" title="复制全部" onClick={handleCopy}>
             {copied ? (
               <Check className="size-3.5 stroke-[2.5] text-green-500" />
             ) : (
