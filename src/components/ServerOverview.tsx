@@ -82,7 +82,11 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
             <MetricCard icon={<Box size={14} />} label="容器总数" value={String(totalContainers)} />
             <MetricCard icon={<Layers size={14} />} label="镜像数" value={String(info?.images ?? 0)} />
             <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '—')} />
-            <MetricCard icon={<HardDrive size={14} />} label="总内存" value={info ? formatBytes(info.mem_total) : '—'} />
+            <MetricCard
+              icon={<HardDrive size={14} />}
+              label="总内存"
+              value={info ? formatBytes(info.mem_total) : '—'}
+            />
           </div>
         </div>
 

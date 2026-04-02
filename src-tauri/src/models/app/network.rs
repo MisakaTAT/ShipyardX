@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 pub struct NetworkCreate {
@@ -9,4 +9,10 @@ pub struct NetworkCreate {
     pub gateway: Option<String>,
     pub internal: bool,
     pub attachable: bool,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LocalAddress {
+    pub ip: String,
+    pub name: String,
 }

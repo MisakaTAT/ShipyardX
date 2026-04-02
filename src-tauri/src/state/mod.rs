@@ -1,6 +1,6 @@
 mod app_state;
 
-pub use app_state::{AppState, EventStreamHandle, StreamHandle, TerminalHandle, TerminalMsg};
+pub use app_state::{AppState, EventStreamHandle, PortForwardHandle, StreamHandle, TerminalHandle, TerminalMsg};
 
 use tauri::State;
 

@@ -28,6 +28,8 @@ pub fn run() {
                 streams: Mutex::new(HashMap::new()),
                 terminal_ws_clients: Mutex::new(HashMap::new()),
                 event_streams: Mutex::new(HashMap::new()),
+                port_forwards: Mutex::new(HashMap::new()),
+                port_forward_last_errors: Mutex::new(HashMap::new()),
             });
             Ok(())
         })
@@ -76,6 +78,17 @@ pub fn run() {
             // Docker 事件流
             commands::docker_events::start_event_stream,
             commands::docker_events::stop_event_stream,
+            // 端口转发
+            commands::port_forward::list_local_addresses,
+            commands::port_forward::list_port_forwards,
+            commands::port_forward::list_port_forwards_all,
+            commands::port_forward::create_port_forward_rule,
+            commands::port_forward::set_port_forward_enabled,
+            commands::port_forward::delete_port_forward,
+            commands::port_forward::start_all_enabled,
+            commands::port_forward::start_all_enabled_global,
+            commands::port_forward::stop_all_global,
+            commands::port_forward::stop_port_forward,
             // SSH 终端
             commands::terminal::open_terminal,
             commands::terminal::open_container_exec_terminal,

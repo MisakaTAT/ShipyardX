@@ -134,3 +134,26 @@ export interface TerminalSession {
   session_id: string
   ws_port: number
 }
+
+export interface PortForward {
+  id: string
+  server_id: string
+  container_id: string
+  container_name?: string | null
+  enabled: boolean
+  protocol: string
+  container_port: number
+  remote_host: string
+  remote_port: number
+  local_port: number
+  bind_address: string
+  running?: boolean
+  tx_bytes: number
+  rx_bytes: number
+  last_error?: string | null
+}
+
+export interface LocalAddress {
+  ip: string
+  name: string
+}

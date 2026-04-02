@@ -5,10 +5,11 @@ import Sider from '@/layouts/Sider'
 import Connections from '@/pages/Connections'
 import Workspace from '@/pages/Workspace'
 import AppStore from '@/pages/AppStore'
+import PortForward from '@/pages/PortForward'
 
 export default function Layout() {
   const [selectedServer, setSelectedServer] = useState<Server | null>(null)
-  const [activeView, setActiveView] = useState<'workspace' | 'store'>('workspace')
+  const [activeView, setActiveView] = useState<'workspace' | 'port_forward' | 'store'>('workspace')
   const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
 
   useEffect(() => {
@@ -36,6 +37,8 @@ export default function Layout() {
           <div className="flex-1 overflow-auto p-2 md:p-3">
             <AppStore />
           </div>
+        ) : activeView === 'port_forward' ? (
+          <PortForward />
         ) : selectedServer ? (
           <Workspace selectedServer={selectedServer} onDisconnect={() => setSelectedServer(null)} />
         ) : (

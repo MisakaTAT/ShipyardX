@@ -1,5 +1,5 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { Server as ServerIcon, Stone, Settings, Sun, Moon } from 'lucide-react'
+import { Server as ServerIcon, Stone, Settings, Sun, Moon, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -15,8 +15,8 @@ function siderNavButtonClass(active?: boolean, disabled?: boolean) {
 
 interface SiderProps {
   light: boolean
-  activeView: 'workspace' | 'store'
-  onChangeView: (view: 'workspace' | 'store') => void
+  activeView: 'workspace' | 'port_forward' | 'store'
+  onChangeView: (view: 'workspace' | 'port_forward' | 'store') => void
   onToggleTheme: () => void
 }
 
@@ -35,6 +35,15 @@ export default function Sider({ light, activeView, onChangeView, onToggleTheme }
           onClick={() => onChangeView('workspace')}
         >
           <ServerIcon size={18} />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          title="端口转发"
+          className={siderNavButtonClass(activeView === 'port_forward')}
+          onClick={() => onChangeView('port_forward')}
+        >
+          <ArrowLeftRight size={18} />
         </Button>
         <Button
           type="button"
