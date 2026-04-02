@@ -26,7 +26,16 @@ pub fn open_container_exec_terminal(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> Result<TerminalSession, String> {
-    services::terminal::open_container_exec_terminal(server_id, container_id, user, shell, cols, rows, state, app_handle)
+    services::terminal::open_container_exec_terminal(
+        server_id,
+        container_id,
+        user,
+        shell,
+        cols,
+        rows,
+        state,
+        app_handle,
+    )
 }
 
 #[tauri::command]

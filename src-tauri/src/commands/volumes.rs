@@ -10,6 +10,11 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
 }
 
 #[tauri::command]
+pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> Result<String, String> {
+    services::volumes::inspect_volume(server_id, name, state).await
+}
+
+#[tauri::command]
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> Result<(), String> {
     services::volumes::remove_volume(server_id, name, state).await
 }

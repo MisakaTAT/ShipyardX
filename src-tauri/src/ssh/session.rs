@@ -41,8 +41,8 @@ pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
         .next()
         .ok_or_else(|| "未解析到任何可用地址".to_string())?;
 
-    let tcp = TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT)
-        .map_err(|e| format!("连接 {} 超时或失败: {}", addr, e))?;
+    let tcp =
+        TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT).map_err(|e| format!("连接 {} 超时或失败: {}", addr, e))?;
 
     let _ = tcp.set_read_timeout(Some(SOCKET_IO_TIMEOUT));
     let _ = tcp.set_write_timeout(Some(SOCKET_IO_TIMEOUT));

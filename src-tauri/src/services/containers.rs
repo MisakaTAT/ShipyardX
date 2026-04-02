@@ -1,7 +1,7 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
 
-use crate::docker::client::{docker_delete, docker_get, docker_post, resolve_api_version};
+use crate::docker::client::{docker_delete, docker_get, docker_post, pretty_json_response, resolve_api_version};
 use crate::docker::mapping::api_container_to_dto;
 use crate::models::app::docker::DockerContainer;
 use crate::models::docker::engine::ContainerSummary;
@@ -60,6 +60,20 @@ pub async fn remove_container(
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         docker_delete(&server, &format!("/containers/{}?force={}", container_id, force))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub async fn inspect_container(
+    server_id: String,
+    container_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let resp = docker_get(&server, &format!("/containers/{}/json", container_id))?;
+        pretty_json_response(&resp)
     })
     .await
     .map_err(|e| e.to_string())?

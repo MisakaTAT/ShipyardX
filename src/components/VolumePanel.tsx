@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Database, Search, X, Loader2, Trash2, Plus } from 'lucide-react'
+import { Database, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DockerVolume, VolumeCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
+import InspectModal from './InspectModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -23,6 +24,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerVolume | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<DockerVolume | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [createName, setCreateName] = useState('')
@@ -166,7 +168,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         </Alert>
       ) : null}
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-(--bg-panel)">
         {loading && volumes.length === 0 ? (
           <div className="flex items-center justify-center h-48">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
@@ -230,9 +232,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
               {filtered.map((v) => (
                 <tr
                   key={v.name}
-                  className="border-b border-border transition-colors"
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
                 >
                   <td className="px-5 py-3 min-w-0">
                     <span className="block truncate font-medium" style={{ color: 'var(--text-strong)' }} title={v.name}>
@@ -259,6 +259,16 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Inspect"
+                        onClick={() => setInspectTarget(v)}
+                        className="rounded-md text-(--text-muted) hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <ScanSearch className="size-3.5" />
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"
@@ -464,6 +474,16 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {inspectTarget && (
+        <InspectModal
+          serverId={serverId}
+          kind="volume"
+          targetId={inspectTarget.name}
+          targetLabel={inspectTarget.name}
+          onClose={() => setInspectTarget(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={removeTarget !== null}

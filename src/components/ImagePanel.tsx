@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { Trash2, Download, Loader2, Image as ImageIcon, Search, X } from 'lucide-react'
+import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, ScanSearch } from 'lucide-react'
 import type { DockerImage } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from './ConfirmDialog'
+import InspectModal from './InspectModal'
 import { cn } from '@/lib/utils'
 import { formatUnixSeconds } from '@/utils/datetime'
 
@@ -24,6 +25,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerImage | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<DockerImage | null>(null)
   const [removeForce, setRemoveForce] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -157,7 +159,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
       ) : null}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-(--bg-panel)">
         {loading && images.length === 0 ? (
           <div className="flex items-center justify-center h-48">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
@@ -213,9 +215,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
               {filtered.map((img) => (
                 <tr
                   key={img.id}
-                  className="border-b border-border transition-colors"
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
                 >
                   <td className="px-5 py-3 max-w-[220px]">
                     <span
@@ -252,6 +252,16 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
                         type="button"
                         variant="ghost"
                         size="icon-sm"
+                        title="Inspect"
+                        onClick={() => setInspectTarget(img)}
+                        className="rounded-md text-(--text-muted) hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <ScanSearch className="size-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
                         title="删除"
                         onClick={() => setRemoveTarget(img)}
                         className={cn('rounded-lg text-(--text-muted)', 'hover:bg-red-500/10 hover:text-red-500')}
@@ -269,6 +279,16 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
 
       {/* Pull Modal */}
       {showPull && <PullModal serverId={serverId} onSuccess={fetchImages} onClose={() => setShowPull(false)} />}
+
+      {inspectTarget && (
+        <InspectModal
+          serverId={serverId}
+          kind="image"
+          targetId={inspectTarget.id}
+          targetLabel={imageRefLabel(inspectTarget)}
+          onClose={() => setInspectTarget(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={removeTarget !== null}

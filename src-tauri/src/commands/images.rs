@@ -10,6 +10,11 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Resul
 }
 
 #[tauri::command]
+pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> Result<String, String> {
+    services::images::inspect_image(server_id, image_id, state).await
+}
+
+#[tauri::command]
 pub async fn remove_image(
     server_id: String,
     image_id: String,

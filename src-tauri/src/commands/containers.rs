@@ -43,6 +43,15 @@ pub async fn remove_container(
 }
 
 #[tauri::command]
+pub async fn inspect_container(
+    server_id: String,
+    container_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    services::containers::inspect_container(server_id, container_id, state).await
+}
+
+#[tauri::command]
 pub async fn get_container_logs(
     server_id: String,
     container_id: String,

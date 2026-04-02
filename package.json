@@ -11,6 +11,7 @@
     "fmt": "prettier --write ."
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@xterm/addon-canvas": "^0.7.0",
@@ -23,6 +24,7 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
     "lucide-react": "^1.7.0",
+    "monaco-editor": "^0.55.1",
     "radix-ui": "^1.4.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

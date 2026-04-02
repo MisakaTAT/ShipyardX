@@ -3,7 +3,7 @@ use std::sync::mpsc;
 
 use tauri::{AppHandle, Emitter, State};
 
-use crate::docker::client::{docker_delete, docker_get};
+use crate::docker::client::{docker_delete, docker_get, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::models::app::docker::DockerImage;
 use crate::models::app::server::ServerConfig;
@@ -20,6 +20,16 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Resul
         let mut api: Vec<ImageSummary> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
         sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
         Ok(api.into_iter().map(api_image_to_dto).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> Result<String, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let resp = docker_get(&server, &format!("/images/{}/json", image_id))?;
+        pretty_json_response(&resp)
     })
     .await
     .map_err(|e| e.to_string())?

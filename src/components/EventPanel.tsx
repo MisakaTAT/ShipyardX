@@ -36,20 +36,6 @@ const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] 
   { key: 'volume', label: '存储卷', icon: <Database className="size-3" /> },
 ]
 
-const KEY_ACTIONS = new Set([
-  'create',
-  'destroy',
-  'start',
-  'stop',
-  'die',
-  'kill',
-  'restart',
-  'pull',
-  'delete',
-  'remove',
-  'oom',
-])
-
 function typeIcon(t: string) {
   switch (t) {
     case 'container':
@@ -258,7 +244,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       {/* Event list */}
       <div
         ref={listRef}
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto bg-(--bg-panel)"
         onScroll={(e) => {
           const el = e.currentTarget
           setAutoScroll(el.scrollTop <= 10)
@@ -319,17 +305,10 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
             </thead>
             <tbody>
               {filtered.map((ev, i) => {
-                const isKey = KEY_ACTIONS.has(ev.action)
                 return (
                   <tr
                     key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
-                    className={cn('border-b border-border transition-colors', isKey && 'bg-(--bg-surface)/50')}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = isKey
-                        ? 'color-mix(in srgb, var(--bg-surface) 50%, transparent)'
-                        : 'transparent')
-                    }
+                    className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
                   >
                     <td
                       className="pl-5 pr-3 py-2 align-middle font-mono"

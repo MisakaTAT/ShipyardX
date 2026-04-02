@@ -13,11 +13,13 @@ import {
   BarChart2,
   Terminal,
   MoreHorizontal,
+  ScanSearch,
 } from 'lucide-react'
 import type { Container } from '../types'
 import LogModal from './LogModal'
 import StatsModal from './StatsModal'
 import ContainerExecModal from './ContainerExecModal'
+import InspectModal from './InspectModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -85,6 +87,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Container | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<Container | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetchContainers = useCallback(async () => {
@@ -234,7 +237,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       ) : null}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-(--bg-panel)">
         {loading && containers.length === 0 ? (
           <div className="flex items-center justify-center h-48">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
@@ -299,9 +302,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                 return (
                   <tr
                     key={c.id}
-                    className="border-b border-border transition-colors"
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
                   >
                     <td className="px-5 py-3">
                       <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
@@ -391,6 +392,10 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                               <FileText className="size-3.5" />
                               日志
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setInspectTarget(c)}>
+                              <ScanSearch className="size-3.5" />
+                              Inspect
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               variant="destructive"
                               onClick={() => setRemoveTarget(c)}
@@ -426,6 +431,16 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
           containerId={statsTarget.id}
           containerName={statsTarget.name}
           onClose={() => setStatsTarget(null)}
+        />
+      )}
+
+      {inspectTarget && (
+        <InspectModal
+          serverId={serverId}
+          kind="container"
+          targetId={inspectTarget.id}
+          targetLabel={inspectTarget.name}
+          onClose={() => setInspectTarget(null)}
         />
       )}
 

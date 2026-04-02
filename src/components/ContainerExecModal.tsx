@@ -28,4 +28,3 @@ export default function ContainerExecModal({ open, serverId, containerId, contai
     </Dialog>
   )
 }
-

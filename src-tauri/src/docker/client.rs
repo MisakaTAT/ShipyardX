@@ -105,3 +105,8 @@ pub fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &
 pub fn docker_delete(config: &ServerConfig, path: &str) -> Result<(), String> {
     docker_curl(config, path, CurlMethod::Delete).map(|_| ())
 }
+
+pub fn pretty_json_response(raw: &str) -> Result<String, String> {
+    let v: serde_json::Value = serde_json::from_str(raw.trim()).map_err(|e| format!("解析 JSON 失败: {}", e))?;
+    serde_json::to_string_pretty(&v).map_err(|e| format!("格式化 JSON 失败: {}", e))
+}

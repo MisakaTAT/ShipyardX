@@ -45,19 +45,23 @@ pub fn run() {
             commands::containers::stop_container,
             commands::containers::restart_container,
             commands::containers::remove_container,
+            commands::containers::inspect_container,
             commands::containers::get_container_logs,
             // 镜像管理
             commands::images::list_images,
+            commands::images::inspect_image,
             commands::images::remove_image,
             commands::images::start_image_pull,
             commands::images::cancel_stream,
             // 网络管理
             commands::networks::list_networks,
             commands::networks::create_network,
+            commands::networks::inspect_network,
             commands::networks::remove_network,
             // 存储卷管理
             commands::volumes::list_volumes,
             commands::volumes::create_volume,
+            commands::volumes::inspect_volume,
             commands::volumes::remove_volume,
             // 系统信息 & 统计
             commands::system::check_docker_access,

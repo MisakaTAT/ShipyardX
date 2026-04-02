@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::docker::client::{docker_delete, docker_get, docker_post_json};
+use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
 use crate::models::app::docker::DockerNetwork;
 use crate::models::app::network::NetworkCreate;
 use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
@@ -51,6 +51,20 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Res
                 }
             })
             .collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub async fn inspect_network(
+    server_id: String,
+    network_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let resp = docker_get(&server, &format!("/networks/{}", network_id))?;
+        pretty_json_response(&resp)
     })
     .await
     .map_err(|e| e.to_string())?

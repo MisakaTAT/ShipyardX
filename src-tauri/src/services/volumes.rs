@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::docker::client::{docker_delete, docker_get, docker_post_json};
+use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
 use crate::models::app::docker::DockerVolume;
 use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
@@ -27,6 +27,16 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
                 created_at: v.created_at.unwrap_or_default(),
             })
             .collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> Result<String, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let resp = docker_get(&server, &format!("/volumes/{}", name))?;
+        pretty_json_response(&resp)
     })
     .await
     .map_err(|e| e.to_string())?

@@ -244,12 +244,7 @@ type EndSessionOptions = {
   errorMessage?: string
 }
 
-export default function TerminalPanel({
-  serverId,
-  containerId,
-  title,
-  onRequestClose,
-}: TerminalPanelProps) {
+export default function TerminalPanel({ serverId, containerId, title, onRequestClose }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -647,7 +642,10 @@ export default function TerminalPanel({
                         </div>
                         <div className="space-y-1.5">
                           <p className="text-xs text-(--text-muted)">Shell</p>
-                          <Select value={execShellPreset} onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}>
+                          <Select
+                            value={execShellPreset}
+                            onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
+                          >
                             <SelectTrigger size="sm" className="w-full">
                               <SelectValue />
                             </SelectTrigger>

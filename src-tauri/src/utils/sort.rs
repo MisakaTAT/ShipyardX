@@ -9,4 +9,3 @@ where
 {
     list.sort_by(|a, b| created_of(b).cmp(&created_of(a)).then_with(|| id_of(a).cmp(&id_of(b))));
 }
-
