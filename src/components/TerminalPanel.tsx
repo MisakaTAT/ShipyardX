@@ -506,18 +506,10 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
     fitAddonRef.current = fitAddon
     xtermRef.current = term
 
-    const pushSizeToBackend = () => {
-      const t = xtermRef.current
-      const s = socketRef.current
-      if (!s || !t) return
-      sendTerminalWireJson(s, { type: 'resize', cols: t.cols, rows: t.rows })
-    }
-
     const debouncedResize = debounce(() => {
       const t = xtermRef.current
       const f = fitAddonRef.current
       if (t && f) fitTerminalToContainer(t, f)
-      pushSizeToBackend()
     }, TERMINAL_RESIZE_DEBOUNCE_MS)
 
     const ro = new ResizeObserver(() => debouncedResize())

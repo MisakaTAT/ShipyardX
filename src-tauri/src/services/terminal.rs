@@ -87,7 +87,7 @@ fn run_terminal_thread(
         return;
     }
 
-    run_terminal_io_loop(session_id, rx, ah, sess, channel);
+    run_terminal_io_loop(session_id, rx, ah, sess, channel, cols, rows);
 }
 
 fn run_container_exec_thread(
@@ -144,8 +144,10 @@ fn run_container_exec_thread(
         return;
     }
 
-    run_terminal_io_loop(session_id, rx, ah, sess, channel);
+    run_terminal_io_loop(session_id, rx, ah, sess, channel, cols, rows);
 }
+
+const TERMINAL_SSH_DRAIN_TIMEOUT_MS: u32 = 1;
 
 fn run_terminal_io_loop(
     session_id: String,
@@ -153,20 +155,32 @@ fn run_terminal_io_loop(
     ah: AppHandle,
     sess: ssh2::Session,
     mut channel: ssh2::Channel,
+    initial_cols: u32,
+    initial_rows: u32,
 ) {
     sess.set_blocking(true);
     sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
     let mut buf = [0u8; 8192];
+    let mut input_buf = Vec::<u8>::new();
+    let mut last_cols = initial_cols;
+    let mut last_rows = initial_rows;
 
     loop {
         loop {
             match rx.try_recv() {
                 Ok(TerminalMsg::Data(data)) => {
-                    let _ = channel.write_all(&data);
-                    let _ = channel.flush();
+                    input_buf.extend_from_slice(&data);
                 }
                 Ok(TerminalMsg::Resize { cols, rows }) => {
-                    let _ = channel.request_pty_size(cols, rows, None, None);
+                    if cols != last_cols || rows != last_rows {
+                        if !input_buf.is_empty() {
+                            let _ = channel.write_all(&input_buf);
+                            input_buf.clear();
+                        }
+                        last_cols = cols;
+                        last_rows = rows;
+                        let _ = channel.request_pty_size(cols, rows, None, None);
+                    }
                 }
                 Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
                     let _ = channel.close();
@@ -177,19 +191,44 @@ fn run_terminal_io_loop(
             }
         }
 
+        if !input_buf.is_empty() {
+            let _ = channel.write_all(&input_buf);
+            let _ = channel.flush();
+            input_buf.clear();
+        }
+
+        sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
         match channel.read(&mut buf) {
             Ok(0) => {
                 terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
                 return;
             }
             Ok(n) => {
+                let mut output = buf[..n].to_vec();
+                sess.set_timeout(TERMINAL_SSH_DRAIN_TIMEOUT_MS);
+                loop {
+                    match channel.read(&mut buf) {
+                        Ok(0) => {
+                            terminal_ws_send(
+                                &ah,
+                                &session_id,
+                                WsServerMsg::Output { data: output }.to_json(),
+                            );
+                            terminal_ws_send(
+                                &ah,
+                                &session_id,
+                                WsServerMsg::Closed.to_json(),
+                            );
+                            return;
+                        }
+                        Ok(extra) => output.extend_from_slice(&buf[..extra]),
+                        Err(_) => break,
+                    }
+                }
                 terminal_ws_send(
                     &ah,
                     &session_id,
-                    WsServerMsg::Output {
-                        data: buf[..n].to_vec(),
-                    }
-                    .to_json(),
+                    WsServerMsg::Output { data: output }.to_json(),
                 );
             }
             Err(ref e) if e.kind() == ErrorKind::TimedOut => {}
