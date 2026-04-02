@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ContainerStats } from '../types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -101,13 +102,11 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
 export default function StatsModal({ serverId, containerId, containerName, onClose }: Props) {
   const [stats, setStats] = useState<ContainerStats | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
-    setError('')
     try {
       const s = await invoke<ContainerStats>('get_container_stats', {
         serverId,
@@ -116,7 +115,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
       setStats(s)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -159,10 +158,6 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
         </DialogHeader>
 
         <div className="space-y-4 p-4">
-          {error ? (
-            <div className="rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-500">{error}</div>
-          ) : null}
-
           {loading && !stats ? (
             <div className="flex items-center justify-center gap-3 py-12 text-(--text-muted)">
               <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />

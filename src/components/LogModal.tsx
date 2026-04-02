@@ -4,6 +4,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
 import { X, RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -57,7 +58,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
   const [timestamps, setTimestamps] = useState(false)
   const [follow, setFollow] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [lines, setLines] = useState<string[]>([])
 
@@ -82,7 +82,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
   const loadStaticLogs = useCallback(async () => {
     await stopStream()
-    setError('')
     setLoading(true)
     setLines([])
     streamLineBufferRef.current = ''
@@ -96,7 +95,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
       const normalized = logs.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
       setLines(normalized.length ? normalized.split('\n') : [])
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -104,7 +103,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
 
   const startFollow = useCallback(async () => {
     await stopStream()
-    setError('')
     streamDecoderRef.current = new TextDecoder('utf-8', { fatal: false })
     streamLineBufferRef.current = ''
     setLines([`[${formatNowTime()}] 正在连接日志流...`])
@@ -143,7 +141,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
         streamIdRef.current = null
       })
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
       setFollow(false)
     }
   }, [serverId, containerId, tail, timestamps, stopStream])
@@ -292,12 +290,6 @@ export default function LogModal({ serverId, containerId, containerName, onClose
             </Button>
           </div>
         </div>
-
-        {error ? (
-          <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-2 text-xs text-red-500">
-            {error}
-          </div>
-        ) : null}
 
         <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
           {loading ? (

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { toast } from 'sonner'
 import {
   Play,
   Square,
@@ -23,7 +24,6 @@ import InspectModal from './InspectModal'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
@@ -119,7 +119,6 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<Record<string, string>>({})
-  const [error, setError] = useState('')
   const [logTarget, setLogTarget] = useState<Container | null>(null)
   const [statsTarget, setStatsTarget] = useState<Container | null>(null)
   const [execTarget, setExecTarget] = useState<Container | null>(null)
@@ -131,13 +130,12 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
 
   const fetchContainers = useCallback(async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await invoke<Container[]>('list_containers', { serverId })
       setContainers(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -173,7 +171,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       await invoke(command, { serverId, containerId, ...args })
       await fetchContainers()
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setActionLoading((prev) => {
         const next = { ...prev }
@@ -253,27 +251,6 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
           </div>
         ) : null}
       </div>
-
-      {/* Error */}
-      {error ? (
-        <Alert
-          variant="destructive"
-          className="mx-5 mt-3 border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-500"
-        >
-          <AlertDescription className="flex items-start gap-2 text-red-500">
-            <span className="flex-1">{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0 text-red-400 hover:bg-transparent hover:text-red-300"
-              onClick={() => setError('')}
-            >
-              <X className="size-3" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-(--bg-panel)">

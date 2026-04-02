@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, ScanSearch } from 'lucide-react'
+import { toast } from 'sonner'
 import type { DockerImage } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,6 @@ interface ImagePanelProps {
 export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   const [images, setImages] = useState<DockerImage[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [showPull, setShowPull] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
@@ -31,13 +30,12 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
 
   const fetchImages = useCallback(async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await invoke<DockerImage[]>('list_images', { serverId })
       setImages(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -136,27 +134,6 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
           </Button>
         </div>
       </div>
-
-      {/* Error */}
-      {error ? (
-        <Alert
-          variant="destructive"
-          className="mx-5 mt-3 border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-500"
-        >
-          <AlertDescription className="flex items-start gap-2 text-red-500">
-            <span className="flex-1">{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0 text-red-400 hover:bg-transparent hover:text-red-300"
-              onClick={() => setError('')}
-            >
-              <X className="size-3" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-(--bg-panel)">
@@ -319,7 +296,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             })
             await fetchImages()
           } catch (e) {
-            setError(String(e))
+            toast.error(String(e))
           }
         }}
       />

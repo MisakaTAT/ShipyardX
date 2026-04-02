@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import Editor from '@monaco-editor/react'
 import { X, RefreshCw, Copy, Check, ScanSearch } from 'lucide-react'
+import { toast } from 'sonner'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -18,12 +19,10 @@ interface Props {
 
 export default function InspectModal({ serverId, kind, targetId, targetLabel, onClose }: Props) {
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [json, setJson] = useState('')
   const [copied, setCopied] = useState(false)
 
   const load = useCallback(async () => {
-    setError('')
     setLoading(true)
     try {
       let text: string
@@ -46,7 +45,7 @@ export default function InspectModal({ serverId, kind, targetId, targetLabel, on
       setJson(text)
     } catch (e) {
       setJson('')
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -148,12 +147,6 @@ export default function InspectModal({ serverId, kind, targetId, targetLabel, on
             </Button>
           </div>
         </div>
-
-        {error ? (
-          <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-2 text-xs text-red-500">
-            {error}
-          </div>
-        ) : null}
 
         <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#1e1e1e' }}>
           {loading ? (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Share2, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
+import { toast } from 'sonner'
 import type { DockerNetwork, NetworkCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -19,7 +19,6 @@ interface Props {
 export default function NetworkPanel({ serverId, refreshTick }: Props) {
   const [networks, setNetworks] = useState<DockerNetwork[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerNetwork | null>(null)
@@ -36,13 +35,12 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
 
   const fetchNetworks = useCallback(async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await invoke<DockerNetwork[]>('list_networks', { serverId })
       setNetworks(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -148,26 +146,6 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
           </Button>
         </div>
       </div>
-
-      {error ? (
-        <Alert
-          variant="destructive"
-          className="mx-5 mt-3 border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-500"
-        >
-          <AlertDescription className="flex items-start gap-2 text-red-500">
-            <span className="flex-1">{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0 text-red-400 hover:bg-transparent hover:text-red-300"
-              onClick={() => setError('')}
-            >
-              <X className="size-3" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       <div className="flex-1 overflow-auto bg-(--bg-panel)">
         {loading && networks.length === 0 ? (
@@ -421,7 +399,6 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                 disabled={!createName.trim() || createSubmitting}
                 onClick={async () => {
                   setCreateSubmitting(true)
-                  setError('')
                   try {
                     const req: NetworkCreate = {
                       name: createName.trim(),
@@ -435,7 +412,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                     setShowCreate(false)
                     await fetchNetworks()
                   } catch (e) {
-                    setError(String(e))
+                    toast.error(String(e))
                   } finally {
                     setCreateSubmitting(false)
                   }
@@ -482,7 +459,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
             await invoke('remove_network', { serverId, networkId: removeTarget.id })
             await fetchNetworks()
           } catch (e) {
-            setError(String(e))
+            toast.error(String(e))
           }
         }}
       />

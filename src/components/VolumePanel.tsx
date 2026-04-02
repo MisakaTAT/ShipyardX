@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -20,7 +19,6 @@ interface Props {
 export default function VolumePanel({ serverId, refreshTick }: Props) {
   const [volumes, setVolumes] = useState<DockerVolume[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<DockerVolume | null>(null)
@@ -38,13 +36,12 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
 
   const fetchVolumes = useCallback(async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await invoke<DockerVolume[]>('list_volumes', { serverId })
       setVolumes(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      setError(String(e))
+      toast.error(String(e))
     } finally {
       setLoading(false)
     }
@@ -147,26 +144,6 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
           </Button>
         </div>
       </div>
-
-      {error ? (
-        <Alert
-          variant="destructive"
-          className="mx-5 mt-3 border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs text-red-500"
-        >
-          <AlertDescription className="flex items-start gap-2 text-red-500">
-            <span className="flex-1">{error}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="shrink-0 text-red-400 hover:bg-transparent hover:text-red-300"
-              onClick={() => setError('')}
-            >
-              <X className="size-3" />
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       <div className="flex-1 overflow-auto bg-(--bg-panel)">
         {loading && volumes.length === 0 ? (
@@ -501,7 +478,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
             await invoke('remove_volume', { serverId, name: removeTarget.name })
             await fetchVolumes()
           } catch (e) {
-            setError(String(e))
+            toast.error(String(e))
           }
         }}
       />
