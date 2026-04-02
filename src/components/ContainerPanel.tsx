@@ -39,39 +39,78 @@ function parsePorts(ports: string): string[] {
     .filter(Boolean)
 }
 
+const CONTAINER_STATE_LABEL: Record<string, string> = {
+  created: '已创建',
+  running: '运行中',
+  paused: '已暂停',
+  restarting: '重启中',
+  removing: '删除中',
+  exited: '已停止',
+  dead: '已停止',
+}
+
+type StateTone = 'green' | 'red' | 'yellow' | 'amber' | 'blue' | 'muted'
+
+function stateTone(s: string): StateTone {
+  if (s === 'running') return 'green'
+  if (s === 'exited' || s === 'dead') return 'red'
+  if (s === 'paused') return 'yellow'
+  if (s === 'restarting' || s === 'removing') return 'amber'
+  if (s === 'created') return 'blue'
+  return 'muted'
+}
+
+const TONE_CLASSES: Record<StateTone, { wrap: string; dot: string; pulse?: boolean }> = {
+  green: {
+    wrap: 'bg-green-500/10 text-green-500 border-green-500/30',
+    dot: 'bg-green-500',
+    pulse: true,
+  },
+  red: {
+    wrap: 'bg-red-500/10 text-red-500 border-red-500/30',
+    dot: 'bg-red-500',
+  },
+  yellow: {
+    wrap: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
+    dot: 'bg-yellow-500',
+  },
+  amber: {
+    wrap: 'bg-amber-500/10 text-amber-600 border-amber-500/35 dark:text-amber-400',
+    dot: 'bg-amber-500',
+    pulse: true,
+  },
+  blue: {
+    wrap: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
+    dot: 'bg-blue-500',
+  },
+  muted: {
+    wrap: '',
+    dot: '',
+  },
+}
+
 function StateBadge({ state }: { state: string }) {
-  const s = state.toLowerCase()
-  if (s === 'running') {
+  const s = state.toLowerCase().trim()
+  const label = CONTAINER_STATE_LABEL[s] ?? state
+  const tone = stateTone(s)
+  const t = TONE_CLASSES[tone]
+
+  if (tone === 'muted') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500 border border-green-500/30">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-        运行中
+      <span
+        className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+        style={{ background: 'var(--bg-surface)', color: 'var(--text-soft)', borderColor: 'var(--border-sub)' }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
+        {label}
       </span>
     )
   }
-  if (s === 'exited' || s === 'dead') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/30">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-        已停止
-      </span>
-    )
-  }
-  if (s === 'paused') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/30">
-        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-        已暂停
-      </span>
-    )
-  }
+
   return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
-      style={{ background: 'var(--bg-surface)', color: 'var(--text-soft)', borderColor: 'var(--border-sub)' }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
-      {state}
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${t.wrap}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${t.dot} ${t.pulse ? 'animate-pulse' : ''}`} />
+      {label}
     </span>
   )
 }
@@ -321,9 +360,9 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                         {c.image}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="max-w-40 px-4 py-3">
                       <StateBadge state={c.state} />
-                      <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                      <div className="mt-1 truncate text-xs" style={{ color: 'var(--text-muted)' }} title={c.status}>
                         {c.status}
                       </div>
                     </td>
