@@ -1,7 +1,30 @@
+import { Construction, Stone } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+
 export default function AppStore() {
   return (
-    <div>
-      <h1>App Store</h1>
+    <div className="flex min-h-[min(560px,calc(100vh-5rem))] flex-col items-center justify-center px-4 py-12">
+      <div className="max-w-md text-center">
+        <div
+          className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl"
+          style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}
+        >
+          <Stone className="size-7 text-(--accent-text)" />
+        </div>
+
+        <Badge
+          variant="secondary"
+          className="mb-3 gap-1 border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-400/95"
+        >
+          <Construction className="size-3" />
+          开发中
+        </Badge>
+
+        <h1 className="text-base font-semibold text-(--text-strong)">应用商店</h1>
+        <p className="mt-2 text-xs leading-relaxed text-(--text-muted)">
+          后续将在此提供应用模板、一键部署与扩展插件等能力，敬请期待。
+        </p>
+      </div>
     </div>
   )
 }
