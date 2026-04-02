@@ -15,15 +15,15 @@ import {
   Settings2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Server } from '../types'
-import ContainerPanel from '../components/ContainerPanel'
-import ImagePanel from '../components/ImagePanel'
-import NetworkPanel from '../components/NetworkPanel'
-import TerminalPanel from '../components/TerminalPanel'
-import ServerOverview from '../components/ServerOverview'
-import VolumePanel from '../components/VolumePanel'
-import DockerManagePanel from '../components/DockerManagePanel'
-import EventPanel from '../components/EventPanel'
+import type { Server } from '@/types'
+import ContainerPanel from '@/components/ContainerPanel'
+import ImagePanel from '@/components/ImagePanel'
+import NetworkPanel from '@/components/NetworkPanel'
+import TerminalPanel from '@/components/TerminalPanel'
+import ServerOverview from '@/components/ServerOverview'
+import VolumePanel from '@/components/VolumePanel'
+import DockerManagePanel from '@/components/DockerManagePanel'
+import EventPanel from '@/components/EventPanel'
 import { useDockerEvents } from '@/lib/useDockerEvents'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -49,12 +49,12 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
 ]
 
-interface WorkspacePageProps {
+interface WorkspaceProps {
   selectedServer: Server
   onDisconnect: () => void
 }
 
-export default function WorkspacePage({ selectedServer, onDisconnect }: WorkspacePageProps) {
+export default function Workspace({ selectedServer, onDisconnect }: WorkspaceProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [dockerStatus, setDockerStatus] = useState<DockerStatus>('checking')
   const [refreshTick, setRefreshTick] = useState(0)

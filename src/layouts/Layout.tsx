@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
-import type { Server } from '../types'
-import Sider from './Sider'
-import ConnectPage from '../pages/ConnectPage'
-import WorkspacePage from '../pages/WorkspacePage'
+import type { Server } from '@/types'
+import Sider from '@/layouts/Sider'
+import Connections from '@/pages/Connections'
+import Workspace from '@/pages/Workspace'
+import AppStore from '@/pages/AppStore'
 
 export default function Layout() {
   const [selectedServer, setSelectedServer] = useState<Server | null>(null)
+  const [activeView, setActiveView] = useState<'workspace' | 'store'>('workspace')
   const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
 
   useEffect(() => {
@@ -27,13 +29,17 @@ export default function Layout() {
       className="flex h-screen overflow-hidden select-none"
       style={{ background: 'var(--bg-app)', color: 'var(--text-base)' }}
     >
-      <Sider light={light} connectedServerName={selectedServer?.name ?? null} onToggleTheme={toggleTheme} />
+      <Sider light={light} activeView={activeView} onChangeView={setActiveView} onToggleTheme={toggleTheme} />
 
       <main className="flex flex-1 flex-col overflow-hidden" style={{ background: 'var(--bg-app)' }}>
-        {selectedServer ? (
-          <WorkspacePage selectedServer={selectedServer} onDisconnect={() => setSelectedServer(null)} />
+        {activeView === 'store' ? (
+          <div className="flex-1 overflow-auto p-2 md:p-3">
+            <AppStore />
+          </div>
+        ) : selectedServer ? (
+          <Workspace selectedServer={selectedServer} onDisconnect={() => setSelectedServer(null)} />
         ) : (
-          <ConnectPage onConnect={setSelectedServer} />
+          <Connections onConnect={setSelectedServer} />
         )}
       </main>
 

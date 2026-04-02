@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Server as ServerIcon, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
-import type { Server } from '../types'
+import type { Server } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import ServerModal from '../components/ServerModal'
-import { ConfirmDialog } from '../components/ConfirmDialog'
+import ServerModal from '@/components/ServerModal'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
-interface ConnectPageProps {
+interface ConnectionsProps {
   onConnect: (server: Server) => void
 }
 
-export default function ConnectPage({ onConnect }: ConnectPageProps) {
+export default function Connections({ onConnect }: ConnectionsProps) {
   const [servers, setServers] = useState<Server[]>([])
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
