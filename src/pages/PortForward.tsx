@@ -212,6 +212,7 @@ export default function PortForwardPage() {
   }, [createServerId])
 
   useEffect(() => {
+    void loadServers()
     void fetchRules()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
