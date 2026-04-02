@@ -3,5 +3,6 @@
   "tabWidth": 2,
   "printWidth": 120,
   "singleQuote": true,
-  "plugins": ["prettier-plugin-toml"]
+  "plugins": ["prettier-plugin-toml"],
+  "endOfLine": "lf"
 }
