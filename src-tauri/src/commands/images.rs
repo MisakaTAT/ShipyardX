@@ -1,11 +1,11 @@
 use tauri::{AppHandle, State};
 
-use crate::models::app::docker::DockerImage;
+use crate::models::app::image::Image;
 use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
-pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
+pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<Image>, String> {
     services::images::list_images(server_id, state).await
 }
 

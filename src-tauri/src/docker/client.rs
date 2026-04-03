@@ -5,7 +5,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::Serialize;
 
 use crate::models::app::server::ServerConfig;
-use crate::models::docker::engine::{DockerError, DockerVersion};
+use crate::models::docker::common::{DockerError, DockerVersion};
 use crate::ssh::exec::ssh_exec;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
@@ -100,6 +100,20 @@ pub fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &
     );
     let resp = ssh_exec(config, &cmd)?;
     check_docker_error(&resp)
+}
+
+pub fn docker_post_json_response<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> Result<String, String> {
+    let body_str = serde_json::to_string(body).map_err(|e| format!("序列化请求体失败: {}", e))?;
+    let ver = resolve_api_version(config)?;
+    let url = docker_sock_url(&ver, path);
+    let b64 = STANDARD.encode(body_str);
+    let cmd = format!(
+        "printf '%s' '{}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- --unix-socket /var/run/docker.sock '{}'",
+        b64, url
+    );
+    let resp = ssh_exec(config, &cmd)?;
+    check_docker_error(&resp)?;
+    Ok(resp.trim().to_string())
 }
 
 pub fn docker_delete(config: &ServerConfig, path: &str) -> Result<(), String> {

@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  checkDockerAccess,
-  getDockerDaemonSettings,
-  restartDockerDaemon,
-  updateDockerDaemonSettings,
-} from '@/lib/commands'
+import { checkEngineAccess, getDaemonSettings, restartDaemon, updateDaemonSettings } from '@/lib/commands'
 import { toast } from 'sonner'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
-import type { DockerDaemonSettings, DockerDaemonUpdate } from '../types'
+import type { DaemonSettings, DaemonUpdate } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -24,7 +19,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const [authOpen, setAuthOpen] = useState(false)
   const [sudoPassword, setSudoPassword] = useState('')
   const [pendingAction, setPendingAction] = useState<'save' | 'restart' | null>(null)
-  const [form, setForm] = useState<DockerDaemonSettings>({
+  const [form, setForm] = useState<DaemonSettings>({
     mirror_urls: [],
     log_rotation: false,
     log_max_size: '10m',
@@ -37,7 +32,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getDockerDaemonSettings({ serverId })
+      const data = await getDaemonSettings({ serverId })
       setForm({
         ...data,
         socket_path: data.socket_path === 'unix:///var/run/docker.sock' ? '' : data.socket_path,
@@ -54,7 +49,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     void load()
   }, [load])
 
-  const setField = <K extends keyof DockerDaemonSettings>(key: K, value: DockerDaemonSettings[K]) => {
+  const setField = <K extends keyof DaemonSettings>(key: K, value: DaemonSettings[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -68,8 +63,7 @@ export default function DockerManagePanel({ serverId }: Props) {
       .map((s) => s.trim())
       .filter(Boolean)
 
-    const payload: DockerDaemonUpdate = {
-      server_id: serverId,
+    const params: DaemonUpdate = {
       mirror_urls: mirrorUrls,
       log_rotation: form.log_rotation,
       log_max_size: form.log_max_size.trim(),
@@ -81,7 +75,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     }
     setSaving(true)
     try {
-      await updateDockerDaemonSettings(payload)
+      await updateDaemonSettings(serverId, params)
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setSudoPassword('')
@@ -103,13 +97,13 @@ export default function DockerManagePanel({ serverId }: Props) {
   const onRestart = async (password?: string) => {
     setRestarting(true)
     try {
-      await restartDockerDaemon({ serverId, sudoPassword: password ?? null })
+      await restartDaemon({ serverId, sudoPassword: password ?? null })
 
       let lastError = ''
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
-          await checkDockerAccess({ serverId })
+          await checkEngineAccess({ serverId })
           recovered = true
           break
         } catch (e) {

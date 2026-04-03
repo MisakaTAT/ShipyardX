@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createNetwork, listNetworks, removeNetwork } from '@/lib/commands'
 import { Share2, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DockerNetwork, NetworkCreate } from '../types'
+import type { Network, NetworkCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,12 @@ interface Props {
 }
 
 export default function NetworkPanel({ serverId, refreshTick }: Props) {
-  const [networks, setNetworks] = useState<DockerNetwork[]>([])
+  const [networks, setNetworks] = useState<Network[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
-  const [removeTarget, setRemoveTarget] = useState<DockerNetwork | null>(null)
-  const [inspectTarget, setInspectTarget] = useState<DockerNetwork | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Network | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<Network | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [createName, setCreateName] = useState('')
@@ -366,7 +366,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                       internal: createInternal,
                       attachable: createAttachable,
                     }
-                    await createNetwork({ server_id: serverId, ...req })
+                    await createNetwork({ serverId, params: req })
                     setShowCreate(false)
                     await fetchNetworks()
                   } catch (e) {

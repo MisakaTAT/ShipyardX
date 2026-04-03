@@ -1,4 +1,4 @@
-use crate::models::app::system::ContainerStats;
+use crate::models::app::container::ContainerStats;
 use crate::models::docker::stats::DockerStats;
 
 fn cpu_percent(raw: &DockerStats) -> f64 {

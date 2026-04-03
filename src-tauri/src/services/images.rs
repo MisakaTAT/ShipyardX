@@ -5,15 +5,15 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::docker::client::{docker_delete, docker_get, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
-use crate::models::app::docker::DockerImage;
+use crate::models::app::image::Image;
 use crate::models::app::server::ServerConfig;
-use crate::models::docker::engine::ImageSummary;
+use crate::models::docker::image::ImageSummary;
 use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerImage>, String> {
+pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<Image>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/images/json")?;

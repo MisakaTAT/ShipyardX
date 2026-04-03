@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createVolume, listVolumes, removeVolume } from '@/lib/commands'
 import { Database, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DockerVolume, VolumeCreate } from '../types'
+import type { Volume, VolumeCreate } from '../types'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,12 @@ interface Props {
 }
 
 export default function VolumePanel({ serverId, refreshTick }: Props) {
-  const [volumes, setVolumes] = useState<DockerVolume[]>([])
+  const [volumes, setVolumes] = useState<Volume[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
-  const [removeTarget, setRemoveTarget] = useState<DockerVolume | null>(null)
-  const [inspectTarget, setInspectTarget] = useState<DockerVolume | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Volume | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<Volume | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [createName, setCreateName] = useState('')

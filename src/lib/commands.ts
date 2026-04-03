@@ -2,15 +2,17 @@ import { invoke, type InvokeArgs } from '@tauri-apps/api/core'
 import type {
   Container,
   ContainerStats,
-  DockerDaemonSettings,
-  DockerDaemonUpdate,
-  DockerImage,
-  DockerInfo,
-  DockerNetwork,
-  DockerVolume,
+  DaemonSettings,
+  DaemonUpdate,
+  Image,
+  DockerEngineInfo,
+  Network,
+  Volume,
   LocalAddress,
   NetworkCreate,
   PortForward,
+  PortForwardCreate,
+  RunContainer,
   Server,
   TerminalSession,
   VolumeCreate,
@@ -23,20 +25,27 @@ export async function invokeContainerCommand(
   return invoke(command, args as InvokeArgs)
 }
 
-export async function checkDockerAccess(args: { serverId: string }): Promise<void> {
+export async function checkEngineAccess(args: { serverId: string }): Promise<void> {
   return invoke('check_docker_access', args)
 }
 
-export async function getDockerInfo(args: { serverId: string }): Promise<DockerInfo> {
-  return invoke<DockerInfo>('get_docker_info', args)
+export async function getEngineInfo(args: { serverId: string }): Promise<DockerEngineInfo> {
+  return invoke<DockerEngineInfo>('get_docker_info', args)
 }
 
 export async function listContainers(args: { serverId: string }): Promise<Container[]> {
   return invoke<Container[]>('list_containers', args)
 }
 
-export async function listImages(args: { serverId: string }): Promise<DockerImage[]> {
-  return invoke<DockerImage[]>('list_images', args)
+export async function runContainer(args: { serverId: string; params: RunContainer }): Promise<string> {
+  return invoke<string>('run_container', {
+    server_id: args.serverId,
+    params: args.params,
+  } as InvokeArgs)
+}
+
+export async function listImages(args: { serverId: string }): Promise<Image[]> {
+  return invoke<Image[]>('list_images', args)
 }
 
 export async function removeImage(args: { serverId: string; imageId: string; force: boolean }): Promise<void> {
@@ -51,20 +60,23 @@ export async function startImagePull(args: { serverId: string; image: string }):
   return invoke<string>('start_image_pull', args)
 }
 
-export async function listNetworks(args: { serverId: string }): Promise<DockerNetwork[]> {
-  return invoke<DockerNetwork[]>('list_networks', args)
+export async function listNetworks(args: { serverId: string }): Promise<Network[]> {
+  return invoke<Network[]>('list_networks', args)
 }
 
-export async function createNetwork(args: NetworkCreate & { server_id: string }): Promise<void> {
-  return invoke('create_network', args as unknown as InvokeArgs)
+export async function createNetwork(args: { serverId: string; params: NetworkCreate }): Promise<void> {
+  return invoke('create_network', {
+    server_id: args.serverId,
+    params: args.params,
+  } as InvokeArgs)
 }
 
 export async function removeNetwork(args: { serverId: string; networkId: string }): Promise<void> {
   return invoke('remove_network', args)
 }
 
-export async function listVolumes(args: { serverId: string }): Promise<DockerVolume[]> {
-  return invoke<DockerVolume[]>('list_volumes', args)
+export async function listVolumes(args: { serverId: string }): Promise<Volume[]> {
+  return invoke<Volume[]>('list_volumes', args)
 }
 
 export async function createVolume(args: { serverId: string } & VolumeCreate): Promise<void> {
@@ -75,16 +87,22 @@ export async function removeVolume(args: { serverId: string; name: string }): Pr
   return invoke('remove_volume', args)
 }
 
-export async function getDockerDaemonSettings(args: { serverId: string }): Promise<DockerDaemonSettings> {
-  return invoke<DockerDaemonSettings>('get_docker_daemon_settings', args)
+export async function getDaemonSettings(args: { serverId: string }): Promise<DaemonSettings> {
+  return invoke<DaemonSettings>('get_docker_daemon_settings', args)
 }
 
-export async function updateDockerDaemonSettings(payload: DockerDaemonUpdate): Promise<void> {
-  return invoke('update_docker_daemon_settings', { ...payload } as InvokeArgs)
+export async function updateDaemonSettings(serverId: string, params: DaemonUpdate): Promise<void> {
+  return invoke('update_docker_daemon_settings', {
+    server_id: serverId,
+    params,
+  } as InvokeArgs)
 }
 
-export async function restartDockerDaemon(args: { serverId: string; sudoPassword: string | null }): Promise<void> {
-  return invoke('restart_docker_daemon', args)
+export async function restartDaemon(args: { serverId: string; sudoPassword: string | null }): Promise<void> {
+  return invoke('restart_docker_daemon', {
+    server_id: args.serverId,
+    sudo_password: args.sudoPassword,
+  } as InvokeArgs)
 }
 
 export async function getServers(): Promise<Server[]> {
@@ -184,21 +202,14 @@ export async function listLocalAddresses(): Promise<LocalAddress[]> {
   return invoke<LocalAddress[]>('list_local_addresses')
 }
 
-export type CreatePortForwardReq = {
-  server_id: string
-  container_id: string
-  container_name: string
-  remote_host: string
-  remote_port: number
-  container_port: number
-  protocol: string
-  local_port: number
-  bind_address: string
-  enabled: boolean
-}
-
-export async function createPortForwardRule(args: { req: CreatePortForwardReq }): Promise<PortForward> {
-  return invoke<PortForward>('create_port_forward_rule', args)
+export async function createPortForwardRule(args: {
+  serverId: string
+  params: PortForwardCreate
+}): Promise<PortForward> {
+  return invoke<PortForward>('create_port_forward_rule', {
+    server_id: args.serverId,
+    params: args.params,
+  } as InvokeArgs)
 }
 
 export async function startAllEnabledGlobal(): Promise<void> {

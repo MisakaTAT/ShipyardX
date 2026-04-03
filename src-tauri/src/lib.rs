@@ -49,6 +49,7 @@ pub fn run() {
             commands::containers::remove_container,
             commands::containers::inspect_container,
             commands::containers::get_container_logs,
+            commands::containers::run_container,
             // 镜像管理
             commands::images::list_images,
             commands::images::inspect_image,

@@ -3,7 +3,7 @@ import { cancelStream, listImages, removeImage, startImagePull } from '@/lib/com
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { DockerImage } from '../types'
+import type { Image } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -28,13 +28,13 @@ interface ImagePanelProps {
 }
 
 export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
-  const [images, setImages] = useState<DockerImage[]>([])
+  const [images, setImages] = useState<Image[]>([])
   const [loading, setLoading] = useState(false)
   const [showPull, setShowPull] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
-  const [removeTarget, setRemoveTarget] = useState<DockerImage | null>(null)
-  const [inspectTarget, setInspectTarget] = useState<DockerImage | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Image | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<Image | null>(null)
   const [removeForce, setRemoveForce] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -70,7 +70,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const imageRefLabel = (img: DockerImage) => (img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.id)
+  const imageRefLabel = (img: Image) => (img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.id)
 
   const removeImageDescription =
     removeTarget == null

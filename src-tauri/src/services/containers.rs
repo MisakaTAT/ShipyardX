@@ -1,15 +1,22 @@
+use std::collections::HashMap;
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
 
-use crate::docker::client::{docker_delete, docker_get, docker_post, pretty_json_response, resolve_api_version};
+use crate::docker::client::{
+    docker_delete, docker_get, docker_post, docker_post_json_response, pretty_json_response, resolve_api_version,
+};
 use crate::docker::mapping::api_container_to_dto;
-use crate::models::app::docker::DockerContainer;
-use crate::models::docker::engine::ContainerSummary;
+use crate::models::app::container::{Container, RunContainer};
+use crate::models::docker::container::{
+    ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
+    ContainerCreateRestartPolicy, ContainerSummary,
+};
 use crate::ssh::exec::ssh_exec;
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerContainer>, String> {
+pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<Container>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/containers/json?all=1")?;
@@ -123,4 +130,164 @@ fn demux_log_stream(data: &[u8]) -> String {
         out = String::from_utf8_lossy(data).to_string();
     }
     out
+}
+
+fn validate_container_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("容器名称不能为空".to_string());
+    }
+    if name.len() > 255 {
+        return Err("容器名称过长".to_string());
+    }
+    let ok = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.');
+    if !ok {
+        return Err("容器名称仅允许字母、数字、下划线、连字符和点号".to_string());
+    }
+    Ok(())
+}
+
+fn build_run_container_body(params: &RunContainer) -> Result<ContainerCreate, String> {
+    let image = params.image.trim();
+    if image.is_empty() {
+        return Err("镜像不能为空".to_string());
+    }
+
+    if let Some(ref n) = params.name {
+        let t = n.trim();
+        if !t.is_empty() {
+            validate_container_name(t)?;
+        }
+    }
+
+    let env: Vec<String> = params
+        .env
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    for line in &env {
+        if !line.contains('=') {
+            return Err(format!("环境变量须为 KEY=value 格式: {}", line));
+        }
+    }
+
+    let mut exposed_ports: HashMap<String, serde_json::Value> = HashMap::new();
+    let mut port_bindings: HashMap<String, Vec<ContainerCreatePortBinding>> = HashMap::new();
+
+    for p in &params.ports {
+        if p.container_port == 0 {
+            return Err("容器端口无效".to_string());
+        }
+        let proto = p.protocol.trim().to_lowercase();
+        if proto != "tcp" && proto != "udp" {
+            return Err("端口协议仅支持 tcp 或 udp".to_string());
+        }
+        let key = format!("{}/{}", p.container_port, proto);
+        exposed_ports.insert(key.clone(), serde_json::json!({}));
+        let host_port_str = match p.host_port {
+            None | Some(0) => String::new(),
+            Some(hp) => {
+                if hp > 65535 {
+                    return Err("主机端口无效".to_string());
+                }
+                hp.to_string()
+            }
+        };
+        port_bindings.insert(
+            key,
+            vec![ContainerCreatePortBinding {
+                host_ip: String::new(),
+                host_port: host_port_str,
+            }],
+        );
+    }
+
+    let mut binds: Vec<String> = Vec::new();
+    for v in &params.volumes {
+        let host = v.host_path.trim();
+        let ctr = v.container_path.trim();
+        if host.is_empty() || ctr.is_empty() {
+            return Err("卷挂载的主机路径与容器路径均不能为空".to_string());
+        }
+        let bind = if v.read_only {
+            format!("{host}:{ctr}:ro")
+        } else {
+            format!("{host}:{ctr}")
+        };
+        binds.push(bind);
+    }
+
+    let rp = params.restart_policy.trim().to_lowercase().replace('_', "-");
+    let (policy_name, max_retry) = match rp.as_str() {
+        "" | "no" => ("no", 0u32),
+        "always" => ("always", 0u32),
+        "unless-stopped" => ("unless-stopped", 0u32),
+        "on-failure" => ("on-failure", params.restart_max_retry.unwrap_or(0)),
+        _ => {
+            return Err(format!(
+                "不支持的重启策略: {}（可选: no, always, unless-stopped, on-failure）",
+                params.restart_policy
+            ));
+        }
+    };
+
+    Ok(ContainerCreate {
+        image: image.to_string(),
+        env,
+        exposed_ports,
+        host_config: ContainerCreateHostConfig {
+            port_bindings,
+            binds,
+            restart_policy: ContainerCreateRestartPolicy {
+                name: policy_name.to_string(),
+                maximum_retry_count: max_retry,
+            },
+        },
+    })
+}
+
+pub async fn run_container(
+    server_id: String,
+    params: RunContainer,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let body = build_run_container_body(&params)?;
+        let path = match &params.name {
+            Some(n) => {
+                let t = n.trim();
+                if t.is_empty() {
+                    "/containers/create".to_string()
+                } else {
+                    format!("/containers/create?name={t}")
+                }
+            }
+            None => "/containers/create".to_string(),
+        };
+
+        let raw = docker_post_json_response(&server, &path, &body)?;
+
+        let created: ContainerCreateResponse = serde_json::from_str(&raw).map_err(|e| {
+            format!(
+                "解析创建容器响应失败: {} — {}",
+                e,
+                &raw.chars().take(120).collect::<String>()
+            )
+        })?;
+
+        let id = created.id.trim();
+        if id.is_empty() {
+            return Err("未返回容器 ID".to_string());
+        }
+
+        docker_post(&server, &format!("/containers/{id}/start"))?;
+
+        Ok(id.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

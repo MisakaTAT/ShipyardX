@@ -11,8 +11,7 @@ use std::collections::BTreeSet;
 
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 
-use crate::models::app::network::LocalAddress;
-use crate::models::app::port_forward::{PortForward, PortForwardCreate, PortForwardRule};
+use crate::models::app::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
 use crate::models::app::server::ServerConfig;
 use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, PortForwardHandle, get_server_config};
@@ -229,21 +228,25 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> Resu
     Ok(out)
 }
 
-pub fn create_port_forward_rule(req: PortForwardCreate, state: State<'_, AppState>) -> Result<PortForward, String> {
-    validate_port(req.remote_port, "remote_port")?;
-    validate_port(req.container_port, "container_port")?;
+pub fn create_port_forward_rule(
+    server_id: String,
+    params: PortForwardCreate,
+    state: State<'_, AppState>,
+) -> Result<PortForward, String> {
+    validate_port(params.remote_port, "remote_port")?;
+    validate_port(params.container_port, "container_port")?;
 
-    let protocol = req.protocol.trim().to_lowercase();
+    let protocol = params.protocol.trim().to_lowercase();
     if protocol != "tcp" {
         return Err("当前端口转发仅支持 TCP".to_string());
     }
 
-    let remote_host = normalize_host(&req.remote_host);
+    let remote_host = normalize_host(&params.remote_host);
     if remote_host.is_empty() {
         return Err("remote_host 不能为空".to_string());
     }
 
-    let bind_address = req
+    let bind_address = params
         .bind_address
         .as_deref()
         .unwrap_or(PORT_FORWARD_BIND_IP)
@@ -256,17 +259,17 @@ pub fn create_port_forward_rule(req: PortForwardCreate, state: State<'_, AppStat
     };
 
     // 非随机端口需要做可用性校验
-    if req.local_port != 0 {
-        let l = TcpListener::bind((bind_addr.as_str(), req.local_port))
+    if params.local_port != 0 {
+        let l = TcpListener::bind((bind_addr.as_str(), params.local_port))
             .map_err(|e| format!("本地端口被占用或无法绑定: {}", e))?;
         drop(l);
 
         let existing_rules = load_port_forward_rules_from_state(&state)?;
         if existing_rules
             .iter()
-            .any(|r| r.local_port == req.local_port && r.bind_address == bind_addr)
+            .any(|r| r.local_port == params.local_port && r.bind_address == bind_addr)
         {
-            return Err(format!("本地端口 {} 已被其他规则占用", req.local_port));
+            return Err(format!("本地端口 {} 已被其他规则占用", params.local_port));
         }
     }
 
@@ -274,15 +277,15 @@ pub fn create_port_forward_rule(req: PortForwardCreate, state: State<'_, AppStat
     let forward_id = generate_id();
     let rule = PortForwardRule {
         id: forward_id.clone(),
-        server_id: req.server_id.clone(),
-        container_id: req.container_id,
-        container_name: req.container_name,
-        enabled: req.enabled,
+        server_id: server_id.clone(),
+        container_id: params.container_id,
+        container_name: params.container_name,
+        enabled: params.enabled,
         protocol,
-        container_port: req.container_port,
+        container_port: params.container_port,
         remote_host,
-        remote_port: req.remote_port,
-        local_port: req.local_port,
+        remote_port: params.remote_port,
+        local_port: params.local_port,
         bind_address: bind_addr,
     };
 

@@ -1,7 +1,10 @@
-pub mod docker;
+pub mod container;
+pub mod daemon;
 pub mod events;
+pub mod image;
+pub mod info;
 pub mod network;
 pub mod port_forward;
 pub mod server;
-pub mod system;
 pub mod terminal;
+pub mod volume;

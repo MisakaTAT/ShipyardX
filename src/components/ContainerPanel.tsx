@@ -2,25 +2,27 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { invokeContainerCommand, listContainers } from '@/lib/commands'
 import { toast } from 'sonner'
 import {
-  Play,
-  Square,
-  RotateCcw,
-  Trash2,
+  BarChart2,
+  Box,
   FileText,
   Loader2,
-  Box,
-  Search,
-  X,
-  BarChart2,
-  Terminal,
   MoreHorizontal,
+  Play,
+  Plus,
+  RotateCcw,
   ScanSearch,
+  Search,
+  Square,
+  Terminal,
+  Trash2,
+  X,
 } from 'lucide-react'
 import type { Container } from '../types'
 import LogModal from './LogModal'
 import StatsModal from './StatsModal'
 import ContainerExecModal from './ContainerExecModal'
 import InspectModal from './InspectModal'
+import RunContainerDialog from './RunContainerDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -136,6 +138,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const [lastUpdated, setLastUpdated] = useState('')
   const [removeTarget, setRemoveTarget] = useState<Container | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Container | null>(null)
+  const [runDialogOpen, setRunDialogOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetchContainers = useCallback(async () => {
@@ -224,6 +227,17 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
             {runningCount}/{containers.length} 运行中
           </span>
         )}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-1 h-8 gap-1 border-(--border-sub) bg-(--bg-input) text-xs"
+          onClick={() => setRunDialogOpen(true)}
+        >
+          <Plus className="size-3.5" />
+          运行容器
+        </Button>
 
         {/* 搜索 */}
         <div className="relative ml-2">
@@ -439,6 +453,13 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
           onClose={() => setExecTarget(null)}
         />
       )}
+
+      <RunContainerDialog
+        open={runDialogOpen}
+        onOpenChange={setRunDialogOpen}
+        serverId={serverId}
+        onSuccess={() => void fetchContainers()}
+      />
 
       <ConfirmDialog
         open={removeTarget !== null}

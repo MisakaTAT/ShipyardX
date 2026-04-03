@@ -20,7 +20,30 @@ export interface Container {
   created_ts: number
 }
 
-export interface DockerImage {
+export interface RunContainerPortSpec {
+  container_port: number
+  /** 留空或 0 表示由 Docker 随机分配主机端口 */
+  host_port?: number | null
+  protocol?: string
+}
+
+export interface RunContainerVolumeSpec {
+  host_path: string
+  container_path: string
+  read_only?: boolean
+}
+
+export interface RunContainer {
+  image: string
+  name?: string | null
+  env: string[]
+  ports: RunContainerPortSpec[]
+  volumes: RunContainerVolumeSpec[]
+  restart_policy: string
+  restart_max_retry?: number | null
+}
+
+export interface Image {
   id: string
   repository: string
   tag: string
@@ -28,7 +51,7 @@ export interface DockerImage {
   created_ts: number
 }
 
-export interface DockerNetwork {
+export interface Network {
   id: string
   name: string
   driver: string
@@ -50,7 +73,7 @@ export interface NetworkCreate {
   attachable: boolean
 }
 
-export interface DockerVolume {
+export interface Volume {
   name: string
   driver: string
   mountpoint: string
@@ -64,7 +87,7 @@ export interface VolumeCreate {
   driverOpts?: Record<string, string> | null
 }
 
-export interface DockerInfo {
+export interface DockerEngineInfo {
   containers: number
   containers_running: number
   containers_paused: number
@@ -83,7 +106,7 @@ export interface DockerInfo {
   warnings: number
 }
 
-export interface DockerDaemonSettings {
+export interface DaemonSettings {
   mirror_urls: string[]
   log_rotation: boolean
   log_max_size: string
@@ -93,8 +116,7 @@ export interface DockerDaemonSettings {
   socket_path: string
 }
 
-export interface DockerDaemonUpdate {
-  server_id: string
+export interface DaemonUpdate {
   mirror_urls: string[]
   log_rotation: boolean
   log_max_size: string
@@ -133,6 +155,18 @@ export type EventStreamStatus = 'connecting' | 'connected' | 'disconnected' | 's
 export interface TerminalSession {
   session_id: string
   ws_port: number
+}
+
+export interface PortForwardCreate {
+  container_id: string
+  container_name?: string | null
+  remote_host: string
+  remote_port: number
+  container_port: number
+  protocol: string
+  local_port: number
+  bind_address?: string | null
+  enabled: boolean
 }
 
 export interface PortForward {

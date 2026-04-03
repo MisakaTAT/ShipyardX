@@ -1,8 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Clone)]
+pub struct LocalAddress {
+    pub ip: String,
+    pub name: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PortForwardCreate {
-    pub server_id: String,
     pub container_id: String,
     pub container_name: Option<String>,
     pub remote_host: String,

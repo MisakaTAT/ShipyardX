@@ -307,16 +307,16 @@ export default function PortForwardPage() {
     setCreateSubmitting(true)
     try {
       const created = await createPortForwardRule({
-        req: {
-          server_id: createServerId,
+        serverId: createServerId,
+        params: {
           container_id: selectedCreateContainer.id,
-          container_name: selectedCreateContainer.name,
+          container_name: selectedCreateContainer.name || null,
           remote_host: selectedCreateContainer.ip,
           remote_port: createContainerPort,
           container_port: createContainerPort,
           protocol: 'tcp',
           local_port: localPort,
-          bind_address: bindAddress,
+          bind_address: bindAddress.trim() || null,
           enabled: true,
         },
       })

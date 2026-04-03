@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { checkDockerAccess } from '@/lib/commands'
+import { checkEngineAccess } from '@/lib/commands'
 import {
   Activity,
   Box,
@@ -24,7 +24,7 @@ import ServerOverview from '@/components/ServerOverview'
 import VolumePanel from '@/components/VolumePanel'
 import DockerManagePanel from '@/components/DockerManagePanel'
 import EventPanel from '@/components/EventPanel'
-import { useDockerEvents } from '@/lib/useDockerEvents'
+import { useEngineEvents } from '@/lib/useEngineEvents'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { KeepAlive } from '@/components/KeepAlive'
@@ -74,7 +74,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     async (notify = false) => {
       setDockerStatus('checking')
       try {
-        await checkDockerAccess({ serverId: selectedServer.id })
+        await checkEngineAccess({ serverId: selectedServer.id })
         setDockerStatus('ok')
         if (notify) toast.success('Docker 连接正常')
       } catch (e) {
@@ -105,7 +105,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     events,
     status: eventStatus,
     clearEvents,
-  } = useDockerEvents({
+  } = useEngineEvents({
     serverId: selectedServer.id,
     enabled: dockerOk,
     onRefresh: handleRefresh,

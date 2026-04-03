@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { getDockerInfo } from '@/lib/commands'
+import { getEngineInfo } from '@/lib/commands'
 import { Box, Layers, Cpu, HardDrive } from 'lucide-react'
-import type { DockerInfo } from '../types'
+import type { DockerEngineInfo } from '../types'
 import { formatBytes } from '@/utils/formatBytes'
 import { formatNowTime } from '@/utils/datetime'
 
@@ -17,14 +17,14 @@ function fmtPct(value: number, total: number): string {
 }
 
 export default function ServerOverview({ serverId, refreshTick }: Props) {
-  const [info, setInfo] = useState<DockerInfo | null>(null)
+  const [info, setInfo] = useState<DockerEngineInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState('')
 
   const fetch = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await getDockerInfo({ serverId })
+      const d = await getEngineInfo({ serverId })
       setInfo(d)
       setLastUpdated(formatNowTime())
     } catch {

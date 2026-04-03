@@ -1,17 +1,18 @@
 use tauri::State;
 
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
-use crate::models::app::docker::DockerNetwork;
-use crate::models::app::network::NetworkCreate;
-use crate::models::docker::network::{self, Network, NetworkCreateIpam, NetworkCreateIpamConfig};
+use crate::models::app::network::{Network, NetworkCreate};
+use crate::models::docker::network::{
+    self as engine_network, Network as EngineNetwork, NetworkCreateIpam, NetworkCreateIpamConfig,
+};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerNetwork>, String> {
+pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<Network>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let mut api: Vec<Network> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        let mut api: Vec<EngineNetwork> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
         sort_by_created_desc_then_id(
             &mut api,
             |x| x.created.clone().unwrap_or_default(),
@@ -37,7 +38,7 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Res
                     .collect();
                 labels.sort();
 
-                DockerNetwork {
+                Network {
                     id: n.id.unwrap_or_default(),
                     name: n.name.unwrap_or_default(),
                     driver: n.driver.unwrap_or_default(),
@@ -77,29 +78,24 @@ pub async fn remove_network(server_id: String, network_id: String, state: State<
         .map_err(|e| e.to_string())?
 }
 
-pub async fn create_network(req: NetworkCreate, state: State<'_, AppState>) -> Result<(), String> {
-    let NetworkCreate {
-        server_id,
-        name,
-        driver,
-        subnet,
-        gateway,
-        internal,
-        attachable,
-    } = req;
-    let name = name.trim().to_string();
+pub async fn create_network(
+    server_id: String,
+    params: NetworkCreate,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let name = params.name.trim().to_string();
     if name.is_empty() {
         return Err("网络名称不能为空".to_string());
     }
-    let driver = driver.unwrap_or_default().trim().to_string();
+    let driver = params.driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() {
         "bridge".to_string()
     } else {
         driver
     };
 
-    let sub = subnet.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let gw = gateway.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let sub = params.subnet.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let gw = params.gateway.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let ipam = sub.map(|s| NetworkCreateIpam {
         driver: "default".to_string(),
         config: vec![NetworkCreateIpamConfig {
@@ -108,12 +104,12 @@ pub async fn create_network(req: NetworkCreate, state: State<'_, AppState>) -> R
         }],
     });
 
-    let body = network::NetworkCreate {
+    let body = engine_network::NetworkCreate {
         name,
         driver,
         check_duplicate: true,
-        internal: if internal { Some(true) } else { None },
-        attachable: if attachable { Some(true) } else { None },
+        internal: if params.internal { Some(true) } else { None },
+        attachable: if params.attachable { Some(true) } else { None },
         ipam,
     };
     let server = get_server_config(&state, &server_id)?;

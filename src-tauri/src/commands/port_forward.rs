@@ -1,7 +1,6 @@
 use tauri::State;
 
-use crate::models::app::network::LocalAddress;
-use crate::models::app::port_forward::{PortForward, PortForwardCreate};
+use crate::models::app::port_forward::{LocalAddress, PortForward, PortForwardCreate};
 use crate::services::port_forward;
 use crate::state::AppState;
 
@@ -16,8 +15,12 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> Resu
 }
 
 #[tauri::command]
-pub fn create_port_forward_rule(req: PortForwardCreate, state: State<'_, AppState>) -> Result<PortForward, String> {
-    port_forward::create_port_forward_rule(req, state)
+pub fn create_port_forward_rule(
+    server_id: String,
+    params: PortForwardCreate,
+    state: State<'_, AppState>,
+) -> Result<PortForward, String> {
+    port_forward::create_port_forward_rule(server_id, params, state)
 }
 
 #[tauri::command]

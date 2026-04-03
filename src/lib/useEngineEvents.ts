@@ -7,23 +7,23 @@ import type { DockerEvent, EventStreamStatus } from '../types'
 
 const MAX_EVENTS = 500
 
-interface UseDockerEventsOptions {
+interface UseEngineEventsOptions {
   serverId: string
   enabled?: boolean
   onRefresh?: (eventType: string) => void
 }
 
-interface UseDockerEventsReturn {
+interface UseEngineEventsReturn {
   events: DockerEvent[]
   status: EventStreamStatus
   clearEvents: () => void
 }
 
-export function useDockerEvents({
+export function useEngineEvents({
   serverId,
   enabled = true,
   onRefresh,
-}: UseDockerEventsOptions): UseDockerEventsReturn {
+}: UseEngineEventsOptions): UseEngineEventsReturn {
   const [events, setEvents] = useState<DockerEvent[]>([])
   const [status, setStatus] = useState<EventStreamStatus>('connecting')
   const streamIdRef = useRef<string | null>(null)

@@ -1,11 +1,11 @@
 use tauri::State;
 
-use crate::models::app::docker::DockerVolume;
+use crate::models::app::volume::Volume;
 use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
-pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {
+pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<Volume>, String> {
     services::volumes::list_volumes(server_id, state).await
 }
 

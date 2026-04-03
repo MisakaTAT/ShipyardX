@@ -1,5 +1,7 @@
-use crate::models::app::docker::{DockerContainer, DockerImage};
-use crate::models::docker::engine::{ContainerSummary, ImageSummary, PortBinding};
+use crate::models::app::container::Container;
+use crate::models::app::image::Image;
+use crate::models::docker::container::{ContainerSummary, PortBinding};
+use crate::models::docker::image::ImageSummary;
 
 fn format_ports(ports: &[PortBinding]) -> String {
     ports
@@ -31,7 +33,7 @@ fn short_container_id(id: &str) -> String {
     id.get(..12.min(id.len())).unwrap_or(id).to_string()
 }
 
-pub fn api_container_to_dto(c: ContainerSummary) -> DockerContainer {
+pub fn api_container_to_dto(c: ContainerSummary) -> Container {
     let ContainerSummary {
         id,
         names,
@@ -54,7 +56,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> DockerContainer {
         .unwrap_or("-")
         .to_string();
 
-    DockerContainer {
+    Container {
         id: short_container_id(&id),
         name,
         image,
@@ -66,7 +68,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> DockerContainer {
     }
 }
 
-pub fn api_image_to_dto(img: ImageSummary) -> DockerImage {
+pub fn api_image_to_dto(img: ImageSummary) -> Image {
     let ImageSummary {
         id,
         repo_tags,
@@ -83,7 +85,7 @@ pub fn api_image_to_dto(img: ImageSummary) -> DockerImage {
         })
         .unwrap_or_else(|| ("<none>".to_string(), "<none>".to_string()));
 
-    DockerImage {
+    Image {
         id,
         repository,
         tag,

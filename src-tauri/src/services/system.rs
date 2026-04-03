@@ -5,7 +5,9 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use crate::docker::client::{docker_get, invalidate_api_version, resolve_api_version};
 use crate::docker::stats::compute_stats;
 use crate::models::app::server::ServerConfig;
-use crate::models::app::system::{ContainerStats, DockerDaemonSettings, DockerDaemonUpdate, DockerInfo};
+use crate::models::app::container::ContainerStats;
+use crate::models::app::daemon::{DaemonSettings, DaemonUpdate};
+use crate::models::app::info::DockerEngineInfo;
 use crate::models::docker::stats::DockerStats;
 use crate::models::docker::system::{DaemonConfig, SystemInfo};
 use crate::ssh::exec::ssh_exec;
@@ -72,12 +74,12 @@ fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) 
     Ok(())
 }
 
-pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerInfo, String> {
+pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerEngineInfo, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/info")?;
         let v: SystemInfo = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
-        Ok(DockerInfo {
+        Ok(DockerEngineInfo {
             containers: v.containers.unwrap_or(0),
             containers_running: v.containers_running.unwrap_or(0),
             containers_paused: v.containers_paused.unwrap_or(0),
@@ -145,7 +147,7 @@ pub async fn get_container_stats(
 pub async fn get_docker_daemon_settings(
     server_id: String,
     state: State<'_, AppState>,
-) -> Result<DockerDaemonSettings, String> {
+) -> Result<DaemonSettings, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
@@ -177,7 +179,7 @@ pub async fn get_docker_daemon_settings(
             .unwrap_or_else(|| "3".to_string());
         let log_rotation = cfg.log_opts.as_ref().map(|m| !m.is_empty()).unwrap_or(false);
 
-        Ok(DockerDaemonSettings {
+        Ok(DaemonSettings {
             mirror_urls: mirror_url,
             log_rotation,
             log_max_size,
@@ -191,25 +193,18 @@ pub async fn get_docker_daemon_settings(
     .map_err(|e| e.to_string())?
 }
 
-pub async fn update_docker_daemon_settings(req: DockerDaemonUpdate, state: State<'_, AppState>) -> Result<(), String> {
-    let DockerDaemonUpdate {
-        server_id,
-        mirror_urls,
-        log_rotation,
-        log_max_size,
-        log_max_file,
-        live_restore,
-        cgroup_driver,
-        socket_path,
-        sudo_password,
-    } = req;
+pub async fn update_docker_daemon_settings(
+    server_id: String,
+    params: DaemonUpdate,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let read_cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
         let current_raw = ssh_exec(&server, read_cmd)?;
         let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
-        let mirrors: Vec<String> = mirror_urls
+        let mirrors: Vec<String> = params.mirror_urls
             .into_iter()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
@@ -219,30 +214,30 @@ pub async fn update_docker_daemon_settings(req: DockerDaemonUpdate, state: State
         } else {
             Some(mirrors)
         };
-        cfg.live_restore = if live_restore { Some(true) } else { None };
+        cfg.live_restore = if params.live_restore { Some(true) } else { None };
 
-        let cgroup = cgroup_driver.trim();
+        let cgroup = params.cgroup_driver.trim().to_string();
         cfg.exec_opts = if cgroup.is_empty() {
             None
         } else {
             Some(vec![format!("native.cgroupdriver={}", cgroup)])
         };
 
-        let socket = socket_path.trim();
+        let socket = params.socket_path.trim();
         cfg.hosts = if socket.is_empty() { None } else { Some(vec![socket.to_string()]) };
 
-        if log_rotation {
+        if params.log_rotation {
             cfg.log_driver = Some("json-file".to_string());
             let mut opts = std::collections::HashMap::new();
-            let max_size = if log_max_size.trim().is_empty() {
+            let max_size = if params.log_max_size.trim().is_empty() {
                 "10m".to_string()
             } else {
-                log_max_size.trim().to_string()
+                params.log_max_size.trim().to_string()
             };
-            let max_file = if log_max_file.trim().is_empty() {
+            let max_file = if params.log_max_file.trim().is_empty() {
                 "3".to_string()
             } else {
-                log_max_file.trim().to_string()
+                params.log_max_file.trim().to_string()
             };
             opts.insert("max-size".to_string(), max_size);
             opts.insert("max-file".to_string(), max_file);
@@ -254,7 +249,7 @@ pub async fn update_docker_daemon_settings(req: DockerDaemonUpdate, state: State
 
         let json = serde_json::to_string_pretty(&cfg).map_err(|e| format!("序列化 daemon 配置失败: {}", e))?;
         let b64 = STANDARD.encode(json);
-        let write_cmd = if let Some(pwd) = sudo_password.clone().filter(|s| !s.is_empty()) {
+        let write_cmd = if let Some(pwd) = params.sudo_password.clone().filter(|s| !s.is_empty()) {
             let pwd_b64 = STANDARD.encode(pwd);
             format!(
                 "CFG_B64='{}'; PASS_B64='{}'; PASS=\"$(printf '%s' \"$PASS_B64\" | base64 -d)\"; if [ \"$(id -u)\" = \"0\" ]; then printf '%s' \"$CFG_B64\" | base64 -d | tee /etc/docker/daemon.json >/dev/null; elif command -v sudo >/dev/null 2>&1; then if printf '%s\\n' \"$PASS\" | sudo -S -p '' -k -v >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | sudo -S -p '' sh -c \"printf '%s' '$CFG_B64' | base64 -d | tee /etc/docker/daemon.json >/dev/null\"; else echo \"{}\" 1>&2; exit 1; fi; elif command -v su >/dev/null 2>&1; then if printf '%s\\n' \"$PASS\" | su -c 'true' root >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | su -c \"printf '%s' '$CFG_B64' | base64 -d | tee /etc/docker/daemon.json >/dev/null\" root; else echo \"{}\" 1>&2; exit 1; fi; else exit 1; fi",

@@ -1,12 +1,12 @@
 use tauri::State;
 
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
-use crate::models::app::docker::DockerVolume;
+use crate::models::app::volume::Volume;
 use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<DockerVolume>, String> {
+pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<Volume>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/volumes")?;
@@ -19,7 +19,7 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
         );
         Ok(list
             .into_iter()
-            .map(|v| DockerVolume {
+            .map(|v| Volume {
                 name: v.name.unwrap_or_default(),
                 driver: v.driver.unwrap_or_default(),
                 mountpoint: v.mountpoint.unwrap_or_default(),
