@@ -9,6 +9,16 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  dataTableHead,
+} from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
@@ -147,54 +157,21 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             <p className="text-sm">{search ? `无匹配的镜像 "${search}"` : '没有镜像'}</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  仓库
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  标签
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  ID
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  大小
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  创建时间
-                </th>
-                <th
-                  className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                <TableHead className={dataTableHead.first}>仓库</TableHead>
+                <TableHead className={dataTableHead.mid}>标签</TableHead>
+                <TableHead className={dataTableHead.mid}>ID</TableHead>
+                <TableHead className={dataTableHead.mid}>大小</TableHead>
+                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
+                <TableHead className={dataTableHead.last}>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((img) => (
-                <tr
-                  key={img.id}
-                  className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                >
-                  <td className="px-5 py-3 max-w-[220px]">
+                <TableBodyRow key={img.id}>
+                  <TableCell className="px-5 py-3 max-w-[220px]">
                     <span
                       className="font-mono text-xs truncate block"
                       style={{ color: 'var(--text-base)' }}
@@ -202,8 +179,8 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
                     >
                       {img.repository}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     {img.tag === '<none>' ? (
                       <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
                         无标签
@@ -213,17 +190,17 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
                         {img.tag}
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
                     {img.id.replace('sha256:', '').slice(0, 12)}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {img.size}
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                     <span title={formatUnixSeconds(img.created_ts)}>{formatUnixSeconds(img.created_ts)}</span>
-                  </td>
-                  <td className="px-5 py-3">
+                  </TableCell>
+                  <TableCell className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         type="button"
@@ -246,11 +223,11 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
                         <Trash2 className="size-3.5" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableBodyRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 

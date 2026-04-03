@@ -25,6 +25,16 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  dataTableHead,
+} from '@/components/ui/table'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
@@ -264,71 +274,35 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
             <p className="text-sm">{search ? `无匹配的容器 "${search}"` : '没有容器'}</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  名称
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  镜像
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)', minWidth: '160px' }}
-                >
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                <TableHead className={dataTableHead.first}>名称</TableHead>
+                <TableHead className={dataTableHead.mid}>镜像</TableHead>
+                <TableHead className={dataTableHead.mid} style={{ minWidth: '160px' }}>
                   状态
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  IP
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  端口
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  创建时间
-                </th>
-                <th
-                  className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+                <TableHead className={dataTableHead.mid}>IP</TableHead>
+                <TableHead className={dataTableHead.mid}>端口</TableHead>
+                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
+                <TableHead className={dataTableHead.last}>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((c) => {
                 const busy = actionLoading[c.id]
                 const isRunning = c.state === 'running'
                 return (
-                  <tr
-                    key={c.id}
-                    className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                  >
-                    <td className="px-5 py-3">
+                  <TableBodyRow key={c.id}>
+                    <TableCell className="px-5 py-3">
                       <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
                         {c.name}
                       </div>
                       <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
                         {c.id}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 max-w-[200px]">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 max-w-[200px]">
                       <span
                         className="text-xs font-mono truncate block"
                         style={{ color: 'var(--text-soft)' }}
@@ -336,19 +310,19 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                       >
                         {c.image}
                       </span>
-                    </td>
-                    <td className="max-w-40 px-4 py-3">
+                    </TableCell>
+                    <TableCell className="max-w-40 px-4 py-3">
                       <StateBadge state={c.state} />
                       <div className="mt-1 truncate text-xs" style={{ color: 'var(--text-muted)' }} title={c.status}>
                         {c.status}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       <span className="text-xs font-mono" style={{ color: 'var(--text-soft)' }}>
                         {c.ip || '-'}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[220px]">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 max-w-[220px]">
                       {c.ports ? (
                         <PortCell ports={c.ports} />
                       ) : (
@@ -356,11 +330,11 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                           —
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
                       <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>
-                    </td>
-                    <td className="px-5 py-3">
+                    </TableCell>
+                    <TableCell className="px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -423,12 +397,12 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableBodyRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 

@@ -17,6 +17,16 @@ import {
 import type { DockerEvent, EventStreamStatus } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  eventTableHead,
+} from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatUnixSecondsTime } from '@/utils/datetime'
 
@@ -256,80 +266,42 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
             <p className="text-sm">{events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'}</p>
           </div>
         ) : (
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left pl-5 pr-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  ID
-                </th>
-                <th
-                  className="text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  时间
-                </th>
-                <th
-                  className="text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  类型
-                </th>
-                <th
-                  className="text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  动作
-                </th>
-                <th
-                  className="text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[180px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  名称
-                </th>
-                <th
-                  className="text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[180px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  镜像
-                </th>
-                <th
-                  className="text-left px-3 pr-5 py-2.5 font-semibold uppercase tracking-wider text-[11px]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  详情
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead className={eventTableHead.first}>ID</TableHead>
+                <TableHead className={eventTableHead.mid}>时间</TableHead>
+                <TableHead className={eventTableHead.mid}>类型</TableHead>
+                <TableHead className={eventTableHead.mid}>动作</TableHead>
+                <TableHead className={eventTableHead.wide}>名称</TableHead>
+                <TableHead className={eventTableHead.wide}>镜像</TableHead>
+                <TableHead className={eventTableHead.last}>详情</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((ev, i) => {
                 return (
-                  <tr
-                    key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
-                    className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                  >
-                    <td
+                  <TableBodyRow key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}>
+                    <TableCell
                       className="pl-5 pr-3 py-2 align-middle font-mono"
                       style={{ color: 'var(--text-muted)' }}
                       title={ev.actor_id || undefined}
                     >
                       {ev.actor_id || '—'}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className="px-3 py-2 font-mono tabular-nums align-middle whitespace-nowrap"
                       style={{ color: 'var(--text-muted)' }}
                     >
                       {formatUnixSecondsTime(ev.time)}
-                    </td>
-                    <td className="px-3 py-2 align-middle">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 align-middle">
                       <span className="inline-flex items-center gap-1.5" style={{ color: 'var(--text-soft)' }}>
                         {typeIcon(ev.event_type)}
                         <span className="text-[11px]">{ev.event_type}</span>
                       </span>
-                    </td>
-                    <td className="px-3 py-2 align-middle">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 align-middle">
                       <span
                         className={cn(
                           'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border whitespace-nowrap',
@@ -338,8 +310,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                       >
                         {ev.action}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 align-middle max-w-[160px]">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 align-middle max-w-[160px]">
                       <span
                         className="block truncate font-medium"
                         style={{ color: ev.actor_name ? 'var(--text-base)' : 'var(--text-muted)' }}
@@ -347,8 +319,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                       >
                         {ev.actor_name || '—'}
                       </span>
-                    </td>
-                    <td className="px-3 py-2 align-middle max-w-0">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 align-middle max-w-0">
                       <span
                         className="block truncate font-mono"
                         style={{ color: ev.actor_image ? 'var(--text-soft)' : 'var(--text-muted)' }}
@@ -356,8 +328,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                       >
                         {ev.actor_image || '—'}
                       </span>
-                    </td>
-                    <td className="px-3 pr-5 py-2 align-middle max-w-0">
+                    </TableCell>
+                    <TableCell className="px-3 pr-5 py-2 align-middle max-w-0">
                       <span
                         className="block truncate font-mono"
                         style={{ color: ev.detail ? 'var(--text-soft)' : 'var(--text-muted)' }}
@@ -365,12 +337,12 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                       >
                         {ev.detail || '—'}
                       </span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableBodyRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

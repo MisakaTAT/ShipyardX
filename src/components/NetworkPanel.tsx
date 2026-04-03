@@ -9,6 +9,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  dataTableHead,
+} from '@/components/ui/table'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -158,103 +168,55 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
             <p className="text-sm">{search ? `无匹配的网络 \"${search}\"` : '没有网络'}</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  名称
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Driver
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Scope
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  子网
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  网关
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  标签
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  属性
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  创建时间
-                </th>
-                <th
-                  className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                <TableHead className={dataTableHead.first}>名称</TableHead>
+                <TableHead className={dataTableHead.mid}>Driver</TableHead>
+                <TableHead className={dataTableHead.mid}>Scope</TableHead>
+                <TableHead className={dataTableHead.mid}>子网</TableHead>
+                <TableHead className={dataTableHead.mid}>网关</TableHead>
+                <TableHead className={dataTableHead.mid}>标签</TableHead>
+                <TableHead className={dataTableHead.mid}>属性</TableHead>
+                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
+                <TableHead className={dataTableHead.last}>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((n) => (
-                <tr
-                  key={n.id}
-                  className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                >
-                  <td className="px-5 py-3">
+                <TableBodyRow key={n.id}>
+                  <TableCell className="px-5 py-3">
                     <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
                       {n.name}
                     </div>
                     <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
                       {n.id.slice(0, 12)}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {n.driver || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {n.scope || '—'}
-                  </td>
-                  <td className="px-4 py-3 max-w-[220px]">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 max-w-[220px]">
                     <ChipCell items={n.subnets} />
-                  </td>
-                  <td className="px-4 py-3 max-w-[220px]">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 max-w-[220px]">
                     <ChipCell items={n.gateways} />
-                  </td>
-                  <td className="px-4 py-3 max-w-[320px]">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 max-w-[320px]">
                     <ChipCell items={n.labels} />
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {n.internal ? 'internal' : ''}
                     {n.internal && n.attachable ? ' · ' : ''}
                     {n.attachable ? 'attachable' : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                     <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>
-                  </td>
-                  <td className="px-5 py-3">
+                  </TableCell>
+                  <TableCell className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         type="button"
@@ -277,11 +239,11 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                         <Trash2 className="size-3.5" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableBodyRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 

@@ -9,6 +9,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  dataTableHead,
+} from '@/components/ui/table'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -156,7 +166,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
             <p className="text-sm">{search ? `无匹配的存储卷 \"${search}\"` : '没有存储卷'}</p>
           </div>
         ) : (
-          <table className="w-full table-fixed text-sm">
+          <Table className="w-full table-fixed text-sm">
             <colgroup>
               <col style={{ width: '20%' }} />
               <col style={{ width: '10%' }} />
@@ -165,64 +175,31 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
               <col style={{ width: '10%' }} />
               <col style={{ width: '10%' }} />
             </colgroup>
-            <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  名称
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Driver
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Scope
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Mountpoint
-                </th>
-                <th
-                  className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  创建时间
-                </th>
-                <th
-                  className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+            <TableHeader>
+              <TableRow>
+                <TableHead className={dataTableHead.first}>名称</TableHead>
+                <TableHead className={dataTableHead.mid}>Driver</TableHead>
+                <TableHead className={dataTableHead.mid}>Scope</TableHead>
+                <TableHead className={dataTableHead.mid}>Mountpoint</TableHead>
+                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
+                <TableHead className={dataTableHead.last}>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((v) => (
-                <tr
-                  key={v.name}
-                  className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                >
-                  <td className="px-5 py-3 min-w-0">
+                <TableBodyRow key={v.name}>
+                  <TableCell className="px-5 py-3 min-w-0">
                     <span className="block truncate font-medium" style={{ color: 'var(--text-strong)' }} title={v.name}>
                       {v.name}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {v.driver || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
                     {v.scope || '—'}
-                  </td>
-                  <td className="px-4 py-3 min-w-0">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 min-w-0">
                     <span
                       className="block truncate font-mono text-xs"
                       style={{ color: 'var(--text-muted)' }}
@@ -230,11 +207,11 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                     >
                       {v.mountpoint || '—'}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                     <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>
-                  </td>
-                  <td className="px-5 py-3">
+                  </TableCell>
+                  <TableCell className="px-5 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         type="button"
@@ -257,11 +234,11 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                         <Trash2 className="size-3.5" />
                       </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableBodyRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 

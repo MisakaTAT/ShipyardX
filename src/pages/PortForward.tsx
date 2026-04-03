@@ -9,6 +9,16 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableBodyRow,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  dataTableHead,
+} from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatBytes, formatSpeed } from '@/utils/formatBytes'
 
@@ -439,92 +449,50 @@ export default function PortForwardPage() {
               </div>
             ) : (
               <div className="h-full overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 backdrop-blur-sm" style={{ background: 'var(--bg-panel)' }}>
-                    <tr className="border-b border-border">
-                      <th
-                        className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        主机
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        容器
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        协议
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)', minWidth: '200px' }}
-                      >
+                <Table className="w-full text-sm">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={dataTableHead.first}>主机</TableHead>
+                      <TableHead className={dataTableHead.mid}>容器</TableHead>
+                      <TableHead className={dataTableHead.mid}>协议</TableHead>
+                      <TableHead className={dataTableHead.mid} style={{ minWidth: '200px' }}>
                         本地端口
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        目标
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        状态
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)', minWidth: '160px' }}
-                      >
+                      </TableHead>
+                      <TableHead className={dataTableHead.mid}>目标</TableHead>
+                      <TableHead className={dataTableHead.mid}>状态</TableHead>
+                      <TableHead className={dataTableHead.mid} style={{ minWidth: '160px' }}>
                         流量
-                      </th>
-                      <th
-                        className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)', minWidth: '160px' }}
-                      >
+                      </TableHead>
+                      <TableHead className={dataTableHead.mid} style={{ minWidth: '160px' }}>
                         速度
-                      </th>
-                      <th
-                        className="text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        操作
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                      <TableHead className={dataTableHead.last}>操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filteredRules.map((f) => {
                       const server = serverById.get(f.server_id)
                       return (
-                        <tr
-                          key={f.id}
-                          className="border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)"
-                        >
-                          <td className="px-5 py-3">
+                        <TableBodyRow key={f.id}>
+                          <TableCell className="px-5 py-3">
                             <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
                               {server?.name ?? f.server_id}
                             </div>
-                          </td>
-                          <td className="px-4 py-3">
+                          </TableCell>
+                          <TableCell className="px-4 py-3">
                             <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
                               {f.container_name ?? f.container_id.slice(0, 12)}
                             </div>
                             <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
                               {f.container_id.slice(0, 12)}
                             </div>
-                          </td>
-                          <td className="px-4 py-3">
+                          </TableCell>
+                          <TableCell className="px-4 py-3">
                             <span className="inline-block rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase text-blue-500">
                               {f.protocol}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
                             {f.running ? (
                               <button
                                 type="button"
@@ -546,11 +514,11 @@ export default function PortForwardPage() {
                                 random
                               </span>
                             )}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
                             {f.remote_host}:{f.remote_port}
-                          </td>
-                          <td className="px-4 py-3">
+                          </TableCell>
+                          <TableCell className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
                               <StatusBadge running={f.running} enabled={f.enabled} />
                               {f.last_error ? (
@@ -570,8 +538,8 @@ export default function PortForwardPage() {
                                 </span>
                               ) : null}
                             </div>
-                          </td>
-                          <td
+                          </TableCell>
+                          <TableCell
                             className="px-4 py-3 text-xs font-mono tabular-nums"
                             style={{ color: 'var(--text-muted)' }}
                           >
@@ -589,8 +557,8 @@ export default function PortForwardPage() {
                                 <span>{formatBytes(f.rx_bytes)}</span>
                               </div>
                             </div>
-                          </td>
-                          <td
+                          </TableCell>
+                          <TableCell
                             className="px-4 py-3 text-xs font-mono tabular-nums"
                             style={{ color: 'var(--text-muted)' }}
                           >
@@ -613,8 +581,8 @@ export default function PortForwardPage() {
                                 </div>
                               )
                             })()}
-                          </td>
-                          <td className="px-5 py-3">
+                          </TableCell>
+                          <TableCell className="px-5 py-3">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 type="button"
@@ -645,12 +613,12 @@ export default function PortForwardPage() {
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableBodyRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>
