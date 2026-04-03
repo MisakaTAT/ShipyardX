@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { cancelStream, listImages, removeImage, startImagePull } from '@/lib/commands'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
@@ -41,7 +41,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   const fetchImages = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerImage[]>('list_images', { serverId })
+      const data = await listImages({ serverId })
       setImages(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -262,7 +262,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_image', {
+            await removeImage({
               serverId,
               imageId: removeTarget.id,
               force: removeForce,
@@ -318,7 +318,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
       const target = id ?? pullId
       if (target) {
         try {
-          await invoke('cancel_stream', { streamId: target })
+          await cancelStream({ streamId: target })
         } catch {
           /* ignore */
         }
@@ -336,7 +336,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
     setLines([`> docker pull ${img}`, ''])
 
     try {
-      const id = await invoke<string>('start_image_pull', {
+      const id = await startImagePull({
         serverId,
         image: img,
       })

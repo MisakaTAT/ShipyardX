@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { createNetwork, listNetworks, removeNetwork } from '@/lib/commands'
 import { Share2, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DockerNetwork, NetworkCreate } from '../types'
@@ -46,7 +46,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
   const fetchNetworks = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerNetwork[]>('list_networks', { serverId })
+      const data = await listNetworks({ serverId })
       setNetworks(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -366,7 +366,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                       internal: createInternal,
                       attachable: createAttachable,
                     }
-                    await invoke('create_network', { server_id: serverId, ...req })
+                    await createNetwork({ server_id: serverId, ...req })
                     setShowCreate(false)
                     await fetchNetworks()
                   } catch (e) {
@@ -414,7 +414,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_network', { serverId, networkId: removeTarget.id })
+            await removeNetwork({ serverId, networkId: removeTarget.id })
             await fetchNetworks()
           } catch (e) {
             toast.error(String(e))

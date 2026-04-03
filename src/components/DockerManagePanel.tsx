@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import {
+  checkDockerAccess,
+  getDockerDaemonSettings,
+  restartDockerDaemon,
+  updateDockerDaemonSettings,
+} from '@/lib/commands'
 import { toast } from 'sonner'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
 import type { DockerDaemonSettings, DockerDaemonUpdate } from '../types'
@@ -32,7 +37,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerDaemonSettings>('get_docker_daemon_settings', { serverId })
+      const data = await getDockerDaemonSettings({ serverId })
       setForm({
         ...data,
         socket_path: data.socket_path === 'unix:///var/run/docker.sock' ? '' : data.socket_path,
@@ -76,7 +81,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     }
     setSaving(true)
     try {
-      await invoke('update_docker_daemon_settings', { ...payload })
+      await updateDockerDaemonSettings(payload)
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setSudoPassword('')
@@ -98,13 +103,13 @@ export default function DockerManagePanel({ serverId }: Props) {
   const onRestart = async (password?: string) => {
     setRestarting(true)
     try {
-      await invoke('restart_docker_daemon', { serverId, sudoPassword: password ?? null })
+      await restartDockerDaemon({ serverId, sudoPassword: password ?? null })
 
       let lastError = ''
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
-          await invoke('check_docker_access', { serverId })
+          await checkDockerAccess({ serverId })
           recovered = true
           break
         } catch (e) {

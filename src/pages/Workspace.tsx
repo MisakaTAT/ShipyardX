@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { checkDockerAccess } from '@/lib/commands'
 import {
   Activity,
   Box,
@@ -74,7 +74,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     async (notify = false) => {
       setDockerStatus('checking')
       try {
-        await invoke('check_docker_access', { serverId: selectedServer.id })
+        await checkDockerAccess({ serverId: selectedServer.id })
         setDockerStatus('ok')
         if (notify) toast.success('Docker 连接正常')
       } catch (e) {

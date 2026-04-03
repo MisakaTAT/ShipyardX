@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { getContainerLogs, startLogStream, stopLogStream } from '@/lib/commands'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
@@ -72,7 +72,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
     if (streamIdRef.current) {
       try {
-        await invoke('stop_log_stream', { streamId: streamIdRef.current })
+        await stopLogStream({ streamId: streamIdRef.current })
       } catch {
         /* ignore */
       }
@@ -86,7 +86,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     setLines([])
     streamLineBufferRef.current = ''
     try {
-      const logs = await invoke<string>('get_container_logs', {
+      const logs = await getContainerLogs({
         serverId,
         containerId,
         tail,
@@ -108,7 +108,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     setLines([`[${formatNowTime()}] 正在连接日志流...`])
 
     try {
-      const streamId = await invoke<string>('start_log_stream', {
+      const streamId = await startLogStream({
         serverId,
         containerId,
         tail,

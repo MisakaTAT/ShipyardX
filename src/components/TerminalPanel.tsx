@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import debounce from 'lodash-es/debounce'
-import { invoke } from '@tauri-apps/api/core'
+import { closeTerminal, openContainerExecTerminal, openTerminal } from '@/lib/commands'
 import { Terminal } from '@xterm/xterm'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { FitAddon } from '@xterm/addon-fit'
@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { TerminalSession } from '../types'
 
 const WS_OPEN_RETRIES = 20
 const WS_OPEN_RETRY_DELAY_MS = 100
@@ -317,7 +316,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
       backendSessionIdRef.current = null
 
       if (socket) closeTerminalSocket(socket)
-      if (sid) void invoke('close_terminal', { sessionId: sid }).catch(console.error)
+      if (sid) void closeTerminal({ sessionId: sid }).catch(console.error)
 
       const term = xtermRef.current
       if (term) term.options.disableStdin = true
@@ -369,7 +368,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
       const targetContainerId = containerIdLiveRef.current
       const targetShell = execShellPreset === 'custom' ? execCustomShell.trim() : execShellPreset
       const session = targetContainerId
-        ? await invoke<TerminalSession>('open_container_exec_terminal', {
+        ? await openContainerExecTerminal({
             serverId: serverIdLiveRef.current,
             containerId: targetContainerId,
             user: execUser.trim() || null,
@@ -377,13 +376,13 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
             cols: term.cols,
             rows: term.rows,
           })
-        : await invoke<TerminalSession>('open_terminal', {
+        : await openTerminal({
             serverId: serverIdLiveRef.current,
             cols: term.cols,
             rows: term.rows,
           })
       if (isStale()) {
-        void invoke('close_terminal', { sessionId: session.session_id }).catch(console.error)
+        void closeTerminal({ sessionId: session.session_id }).catch(console.error)
         term.options.disableStdin = true
         return
       }
@@ -392,7 +391,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
 
       const socket = await openTerminalSocket(session.session_id, session.ws_port)
       if (isStale()) {
-        void invoke('close_terminal', { sessionId: session.session_id }).catch(console.error)
+        void closeTerminal({ sessionId: session.session_id }).catch(console.error)
         socket.close()
         backendSessionIdRef.current = null
         openedBackendSessionId = null
@@ -465,7 +464,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
         }
       }
       if (openedBackendSessionId) {
-        void invoke('close_terminal', { sessionId: openedBackendSessionId }).catch(console.error)
+        void closeTerminal({ sessionId: openedBackendSessionId }).catch(console.error)
       }
       term.options.disableStdin = true
       if (mountAliveRef.current && epochAtStart === serverEpochRef.current) {
@@ -536,7 +535,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
       backendSessionIdRef.current = null
       if (sid) {
         if (socket) closeTerminalSocket(socket)
-        void invoke('close_terminal', { sessionId: sid }).catch(console.error)
+        void closeTerminal({ sessionId: sid }).catch(console.error)
       }
 
       xtermRef.current = null

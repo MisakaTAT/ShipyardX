@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import debounce from 'lodash-es/debounce'
 import type { DebouncedFunc } from 'lodash-es/debounce'
-import { invoke } from '@tauri-apps/api/core'
+import { startEventStream, stopEventStream } from '@/lib/commands'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { DockerEvent, EventStreamStatus } from '../types'
 
@@ -46,7 +46,7 @@ export function useDockerEvents({
 
     if (streamIdRef.current) {
       try {
-        await invoke('stop_event_stream', { serverId })
+        await stopEventStream({ serverId })
       } catch {
         /* ignore */
       }
@@ -64,9 +64,9 @@ export function useDockerEvents({
 
     async function start() {
       try {
-        const id = await invoke<string>('start_event_stream', { serverId })
+        const id = await startEventStream({ serverId })
         if (cancelled) {
-          await invoke('stop_event_stream', { serverId }).catch(() => {})
+          await stopEventStream({ serverId }).catch(() => {})
           return
         }
         streamIdRef.current = id

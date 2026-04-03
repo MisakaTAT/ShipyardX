@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { createVolume, listVolumes, removeVolume } from '@/lib/commands'
 import { Database, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import type { DockerVolume, VolumeCreate } from '../types'
@@ -47,7 +47,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
   const fetchVolumes = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<DockerVolume[]>('list_volumes', { serverId })
+      const data = await listVolumes({ serverId })
       setVolumes(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -398,7 +398,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                       driver: 'local',
                       driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
                     }
-                    await invoke('create_volume', { serverId, ...req })
+                    await createVolume({ serverId, ...req })
                     setShowCreate(false)
                     await fetchVolumes()
                   } catch (e) {
@@ -448,7 +448,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await invoke('remove_volume', { serverId, name: removeTarget.name })
+            await removeVolume({ serverId, name: removeTarget.name })
             await fetchVolumes()
           } catch (e) {
             toast.error(String(e))

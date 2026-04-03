@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { getContainerStats } from '@/lib/commands'
 import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ContainerStats } from '../types'
@@ -108,7 +108,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const s = await invoke<ContainerStats>('get_container_stats', {
+      const s = await getContainerStats({
         serverId,
         containerId,
       })

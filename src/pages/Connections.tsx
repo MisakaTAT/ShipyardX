@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { deleteServer, getServers } from '@/lib/commands'
 import { Server as ServerIcon, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
 import type { Server } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    invoke<Server[]>('get_servers').then(setServers).catch(console.error)
+    getServers().then(setServers).catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
     const id = deleteServerId
     if (!id) return
     try {
-      const updated = await invoke<Server[]>('delete_server', { id })
+      const updated = await deleteServer({ id })
       setServers(updated)
     } catch (e) {
       console.error(e)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { addServer, testConnectionDirect, updateServer } from '@/lib/commands'
 import { toast } from 'sonner'
 import { Server } from '../types'
 import { Server as ServerIcon, X, Loader2, Eye, EyeOff } from 'lucide-react'
@@ -56,11 +56,11 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
     try {
       let servers: Server[]
       if (isEdit && server) {
-        servers = await invoke<Server[]>('update_server', {
+        servers = await updateServer({
           server: { ...form, id: server.id },
         })
       } else {
-        servers = await invoke<Server[]>('add_server', {
+        servers = await addServer({
           server: { ...form, id: '' },
         })
       }
@@ -80,7 +80,7 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
     if (form.auth_type === 'key' && !form.key_path?.trim()) return toast.warning('请填写密钥路径')
     setLoading(true)
     try {
-      const msg = await invoke<string>('test_connection_direct', {
+      const msg = await testConnectionDirect({
         server: { ...form, id: server?.id ?? '' },
       })
       toast.success(msg)

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { inspectContainer, inspectImage, inspectNetwork, inspectVolume } from '@/lib/commands'
 import Editor from '@monaco-editor/react'
 import { X, RefreshCw, Copy, Check, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,16 +28,16 @@ export default function InspectModal({ serverId, kind, targetId, targetLabel, on
       let text: string
       switch (kind) {
         case 'container':
-          text = await invoke<string>('inspect_container', { serverId, containerId: targetId })
+          text = await inspectContainer({ serverId, containerId: targetId })
           break
         case 'image':
-          text = await invoke<string>('inspect_image', { serverId, imageId: targetId })
+          text = await inspectImage({ serverId, imageId: targetId })
           break
         case 'network':
-          text = await invoke<string>('inspect_network', { serverId, networkId: targetId })
+          text = await inspectNetwork({ serverId, networkId: targetId })
           break
         case 'volume':
-          text = await invoke<string>('inspect_volume', { serverId, name: targetId })
+          text = await inspectVolume({ serverId, name: targetId })
           break
         default:
           text = ''

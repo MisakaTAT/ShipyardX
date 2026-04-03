@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { invokeContainerCommand, listContainers } from '@/lib/commands'
 import { toast } from 'sonner'
 import {
   Play,
@@ -141,7 +141,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const fetchContainers = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await invoke<Container[]>('list_containers', { serverId })
+      const data = await listContainers({ serverId })
       setContainers(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -174,7 +174,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   ) => {
     setActionLoading((prev) => ({ ...prev, [containerId]: action }))
     try {
-      await invoke(command, { serverId, containerId, ...args })
+      await invokeContainerCommand(command, { serverId, containerId, ...args })
       await fetchContainers()
     } catch (e) {
       toast.error(String(e))
