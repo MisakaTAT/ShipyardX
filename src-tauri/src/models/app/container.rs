@@ -38,6 +38,34 @@ pub struct RunContainer {
     pub restart_policy: String,
     #[serde(default)]
     pub restart_max_retry: Option<u32>,
+    #[serde(default)]
+    pub publish_all_ports: bool,
+    #[serde(default)]
+    pub network: String,
+    #[serde(default)]
+    pub ipv4_address: String,
+    #[serde(default)]
+    pub ipv6_address: String,
+    #[serde(default)]
+    pub command: Vec<String>,
+    #[serde(default)]
+    pub entrypoint: Vec<String>,
+    #[serde(default)]
+    pub labels: Vec<String>,
+    #[serde(default)]
+    pub auto_remove: bool,
+    #[serde(default)]
+    pub privileged: bool,
+    #[serde(default)]
+    pub tty: bool,
+    #[serde(default)]
+    pub open_stdin: bool,
+    #[serde(default)]
+    pub cpu_shares: u32,
+    #[serde(default)]
+    pub cpu_quota_cores: f64,
+    #[serde(default)]
+    pub memory_mb: u32,
 }
 
 #[derive(Debug, Deserialize, Type)]

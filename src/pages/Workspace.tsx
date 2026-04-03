@@ -16,18 +16,19 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ServerConfig } from '@/types/app-bindings'
-import ContainerPanel from '@/components/ContainerPanel'
-import ImagePanel from '@/components/ImagePanel'
-import NetworkPanel from '@/components/NetworkPanel'
-import TerminalPanel from '@/components/TerminalPanel'
-import ServerOverview from '@/components/ServerOverview'
-import VolumePanel from '@/components/VolumePanel'
-import DockerManagePanel from '@/components/DockerManagePanel'
-import EventPanel from '@/components/EventPanel'
+import ContainerPanel from '@/components/docker/panels/ContainerPanel'
+import ImagePanel from '@/components/docker/panels/ImagePanel'
+import NetworkPanel from '@/components/docker/panels/NetworkPanel'
+import TerminalPanel from '@/components/docker/panels/TerminalPanel'
+import ServerOverview from '@/components/server/ServerOverview'
+import VolumePanel from '@/components/docker/panels/VolumePanel'
+import DockerManagePanel from '@/components/docker/panels/DockerManagePanel'
+import EventPanel from '@/components/docker/panels/EventPanel'
 import { useEngineEvents } from '@/lib/useEngineEvents'
 import { Button } from '@/components/ui/button'
+import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { KeepAlive } from '@/components/KeepAlive'
+import { KeepAlive } from '@/components/common/KeepAlive'
 import { cn } from '@/lib/utils'
 
 export type WorkspaceTab =
@@ -144,8 +145,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   }
 
   return (
-    <div className="flex-1 overflow-auto p-2 md:p-3">
-      <div className="flex h-full flex-col gap-3">
+    <PageScrollArea>
+      <PageListColumn gap>
         <Tabs
           value={activeTab}
           onValueChange={(v) => onActiveTabChange(v as WorkspaceTab)}
@@ -172,8 +173,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-9 rounded-full  hover:bg-amber-500/15 hover:text-amber-500"
+                  icon
+                  className="rounded-full hover:bg-amber-500/15 hover:text-amber-500"
                   title="重新检测 Docker"
                   onClick={() => checkDocker(true)}
                 >
@@ -183,8 +184,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                className="size-9 rounded-full text-(--text-muted) hover:bg-red-500/15 hover:text-red-500"
+                icon
+                className="rounded-full text-(--text-muted) hover:bg-red-500/15 hover:text-red-500"
                 title="断开连接"
                 onClick={handleDisconnect}
               >
@@ -214,8 +215,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
             <TerminalPanel serverId={selectedServer.id} />
           </KeepAlive>
         </div>
-      </div>
-    </div>
+      </PageListColumn>
+    </PageScrollArea>
   )
 }
 
@@ -287,16 +288,16 @@ function DockerAccessGuide({
         ) : null}
 
         <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" size="sm" onClick={onDisconnect}>
-            <Unplug className="size-3.5" />
+          <Button variant="outline" onClick={onDisconnect}>
+            <Unplug />
             断开连接
           </Button>
-          <Button variant="outline" size="sm" onClick={onOpenTerminal}>
-            <Terminal className="size-3.5" />
+          <Button variant="outline" onClick={onOpenTerminal}>
+            <Terminal />
             打开终端
           </Button>
-          <Button size="sm" onClick={onRetry}>
-            <RefreshCw className="size-3.5" />
+          <Button onClick={onRetry}>
+            <RefreshCw />
             重新检测
           </Button>
         </div>

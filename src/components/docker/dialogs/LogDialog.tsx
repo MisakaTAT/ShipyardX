@@ -3,12 +3,21 @@ import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
-import { X, RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
+import { RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogCloseIconButton,
+  DialogContent,
+  DialogFullscreenBody,
+  DialogLoadingOverlay,
+  DialogPanelMeta,
+  DialogPanelTitle,
+  DialogPanelToolbar,
+  DialogPanelToolbarEnd,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
 import { formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -45,7 +54,7 @@ function LogLine({ line, ansi }: { line: string; ansi: AnsiUp }) {
   )
 }
 
-export default function LogModal({ serverId, containerId, containerName, onClose }: Props) {
+export default function LogDialog({ serverId, containerId, containerName, onClose }: Props) {
   const ansi = useMemo(() => new AnsiUp(), [])
 
   const streamDecoderRef = useRef(new TextDecoder('utf-8', { fatal: false }))
@@ -145,19 +154,16 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     return () => {
       void stopStream()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- follow 切换驱动拉流/静态
   }, [follow])
 
   useEffect(() => {
     if (!follow) {
       void loadStaticLogs()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- tail/timestamps 变更刷新静态日志
   }, [tail, timestamps])
 
   useEffect(() => {
     void loadStaticLogs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 挂载时加载
   }, [])
 
   const handleClose = useCallback(async () => {
@@ -181,23 +187,13 @@ export default function LogModal({ serverId, containerId, containerName, onClose
         if (!next) void handleClose()
       }}
     >
-      <DialogContent
-        showCloseButton={false}
-        className={cn(
-          'flex! h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none',
-          'fixed! inset-0! left-0! top-0! translate-x-0! translate-y-0!',
-          'sm:max-w-full',
-        )}
-      >
-        <div
-          className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
-          style={{ background: 'var(--bg-panel)' }}
-        >
-          <span className="mr-1 font-mono text-sm font-semibold text-(--text-strong)">{containerName}</span>
-          <span className="mr-2 text-xs text-(--text-muted)">日志</span>
+      <DialogContent variant="fullscreen">
+        <DialogPanelToolbar>
+          <DialogPanelTitle>{containerName}</DialogPanelTitle>
+          <DialogPanelMeta>日志</DialogPanelMeta>
 
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
-            <SelectTrigger size="default" className="border-(--border-sub) bg-(--bg-input) text-xs text-(--text-base)">
+            <SelectTrigger className="w-fit shrink-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -212,32 +208,28 @@ export default function LogModal({ serverId, containerId, containerName, onClose
           <Button
             type="button"
             variant={timestamps ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1.5"
             disabled={follow}
             title="显示时间戳"
             onClick={() => setTimestamps((t) => !t)}
           >
-            <Clock className="size-3.5 stroke-[2.5]" />
+            <Clock />
             时间戳
           </Button>
 
           <Button
             type="button"
             variant={follow ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1.5"
             title={follow ? '停止跟踪' : '实时跟踪'}
             onClick={() => setFollow((f) => !f)}
           >
             {follow ? (
               <>
-                <Square className="size-3.5 stroke-[2.5]" />
+                <Square />
                 停止
               </>
             ) : (
               <>
-                <Play className="size-3.5 stroke-[2.5]" />
+                <Play />
                 跟踪
               </>
             )}
@@ -247,49 +239,28 @@ export default function LogModal({ serverId, containerId, containerName, onClose
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="gap-1.5"
               disabled={loading}
               title="刷新"
               onClick={() => void loadStaticLogs()}
             >
-              <RefreshCw className={`size-3.5 stroke-[2.5] ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />
               刷新
             </Button>
           ) : null}
 
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" title="复制全部" onClick={handleCopy}>
-            {copied ? (
-              <Check className="size-3.5 stroke-[2.5] text-green-500" />
-            ) : (
-              <Copy className="size-3.5 stroke-[2.5]" />
-            )}
+          <Button type="button" variant="outline" title="复制全部" onClick={handleCopy}>
+            {copied ? <Check className="text-green-500" /> : <Copy />}
             复制
           </Button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <DialogPanelToolbarEnd>
             {lineCount > 0 ? <span className="text-xs text-(--text-muted)">{lineCount} 行</span> : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-lg text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
-              onClick={() => void handleClose()}
-            >
-              <X className="size-3.5 stroke-[2.5]" />
-            </Button>
-          </div>
-        </div>
+            <DialogCloseIconButton onClick={() => void handleClose()} />
+          </DialogPanelToolbarEnd>
+        </DialogPanelToolbar>
 
-        <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
-          {loading ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-              <div className="flex items-center gap-2 text-sm text-(--text-soft)">
-                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                加载中...
-              </div>
-            </div>
-          ) : null}
+        <DialogFullscreenBody tone="log">
+          {loading ? <DialogLoadingOverlay>加载中...</DialogLoadingOverlay> : null}
           <div className="absolute inset-0 min-h-0 p-2">
             <Virtuoso
               className="rounded-sm"
@@ -300,7 +271,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
               itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
             />
           </div>
-        </div>
+        </DialogFullscreenBody>
       </DialogContent>
     </Dialog>
   )

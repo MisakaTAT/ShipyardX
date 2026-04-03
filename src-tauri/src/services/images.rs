@@ -1,10 +1,12 @@
 use std::io::Read;
 use std::sync::mpsc;
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
+use tauri_specta::Event;
 
 use crate::docker::client::{docker_delete, docker_get, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
+use crate::models::app::events::{DockerSshStreamChunk, DockerSshStreamDone};
 use crate::models::app::image::Image;
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::image::ImageSummary;
@@ -51,8 +53,16 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
     let sess = match create_ssh_session(&config) {
         Ok(s) => s,
         Err(e) => {
-            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("连接失败: {}\n", e));
-            let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
+            let _ = DockerSshStreamChunk {
+                stream_id: pull_id.clone(),
+                chunk: format!("连接失败: {}\n", e),
+            }
+            .emit(&ah);
+            let _ = DockerSshStreamDone {
+                stream_id: pull_id.clone(),
+                success: false,
+            }
+            .emit(&ah);
             return;
         }
     };
@@ -60,15 +70,31 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
     let mut channel = match sess.channel_session() {
         Ok(c) => c,
         Err(e) => {
-            let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("通道失败: {}\n", e));
-            let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
+            let _ = DockerSshStreamChunk {
+                stream_id: pull_id.clone(),
+                chunk: format!("通道失败: {}\n", e),
+            }
+            .emit(&ah);
+            let _ = DockerSshStreamDone {
+                stream_id: pull_id.clone(),
+                success: false,
+            }
+            .emit(&ah);
             return;
         }
     };
 
     if let Err(e) = channel.exec(&format!("docker pull {} 2>&1", image)) {
-        let _ = ah.emit(&format!("pull-data:{}", pull_id), format!("执行失败: {}\n", e));
-        let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
+        let _ = DockerSshStreamChunk {
+            stream_id: pull_id.clone(),
+            chunk: format!("执行失败: {}\n", e),
+        }
+        .emit(&ah);
+        let _ = DockerSshStreamDone {
+            stream_id: pull_id.clone(),
+            success: false,
+        }
+        .emit(&ah);
         return;
     }
 
@@ -78,7 +104,11 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
     loop {
         match rx.try_recv() {
             Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                let _ = ah.emit(&format!("pull-done:{}", pull_id), false);
+                let _ = DockerSshStreamDone {
+                    stream_id: pull_id.clone(),
+                    success: false,
+                }
+                .emit(&ah);
                 return;
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -86,10 +116,11 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
         match channel.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                let _ = ah.emit(
-                    &format!("pull-data:{}", pull_id),
-                    String::from_utf8_lossy(&buf[..n]).to_string(),
-                );
+                let _ = DockerSshStreamChunk {
+                    stream_id: pull_id.clone(),
+                    chunk: String::from_utf8_lossy(&buf[..n]).to_string(),
+                }
+                .emit(&ah);
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(std::time::Duration::from_millis(20));
@@ -103,7 +134,11 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
 
     channel.wait_close().ok();
     let success = channel.exit_status().unwrap_or(-1) == 0;
-    let _ = ah.emit(&format!("pull-done:{}", pull_id), success);
+    let _ = DockerSshStreamDone {
+        stream_id: pull_id.clone(),
+        success,
+    }
+    .emit(&ah);
 }
 
 pub fn start_image_pull(

@@ -85,9 +85,6 @@ pub async fn create_network(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let name = params.name.trim().to_string();
-    if name.is_empty() {
-        return Err("网络名称不能为空".to_string());
-    }
     let driver = params.driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() {
         "bridge".to_string()

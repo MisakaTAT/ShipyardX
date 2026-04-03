@@ -14,7 +14,8 @@ use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
 use models::app::events::{
-    DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
+    DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
+    DockerStreamStatus, EventStreamStatus,
 };
 use specta_typescript::Typescript;
 use tauri::Manager;
@@ -82,6 +83,8 @@ pub fn run() {
             DockerStreamStatus,
             DockerStreamRefresh,
             DockerStreamError,
+            DockerSshStreamChunk,
+            DockerSshStreamDone,
         ])
         .typ::<EventStreamStatus>();
 

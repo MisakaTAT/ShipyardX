@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Activity,
-  Search,
-  X,
   Trash2,
   Box,
   Layers,
@@ -16,7 +14,7 @@ import {
 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import {
   Table,
   TableBody,
@@ -39,11 +37,11 @@ interface EventPanelProps {
 type TypeFilter = 'all' | 'container' | 'image' | 'network' | 'volume'
 
 const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] = [
-  { key: 'all', label: '全部', icon: <Activity className="size-3" /> },
-  { key: 'container', label: '容器', icon: <Box className="size-3" /> },
-  { key: 'image', label: '镜像', icon: <Layers className="size-3" /> },
-  { key: 'network', label: '网络', icon: <Share2 className="size-3" /> },
-  { key: 'volume', label: '存储卷', icon: <Database className="size-3" /> },
+  { key: 'all', label: '全部', icon: <Activity className="size-3.5" /> },
+  { key: 'container', label: '容器', icon: <Box className="size-3.5" /> },
+  { key: 'image', label: '镜像', icon: <Layers className="size-3.5" /> },
+  { key: 'network', label: '网络', icon: <Share2 className="size-3.5" /> },
+  { key: 'volume', label: '存储卷', icon: <Database className="size-3.5" /> },
 ]
 
 function typeIcon(t: string) {
@@ -159,71 +157,41 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
       {/* Toolbar */}
-      <div
-        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
-        style={{ background: 'var(--bg-panel)' }}
-      >
-        <Activity className="w-4 h-4 shrink-0" style={{ color: 'var(--text-soft)' }} />
-        <span className="text-sm font-medium mr-1" style={{ color: 'var(--text-base)' }}>
-          事件
-        </span>
-        {events.length > 0 && (
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            ({events.length})
-          </span>
-        )}
+      <PanelToolbar>
+        <PanelToolbarHeading icon={<Activity />} title="事件" meta={events.length > 0 ? `(${events.length})` : null} />
 
-        <div className="relative ml-2">
-          <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-            style={{ color: 'var(--text-muted)' }}
-          />
-          <Input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder='搜索… ("/" 快速聚焦)'
-            className="h-8 w-52 border-(--border-sub) bg-(--bg-input) pr-8 pl-8 text-xs text-(--text-base)"
-          />
-          {search ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="absolute top-1/2 right-2 -translate-y-1/2 text-(--text-muted)"
-              onClick={() => setSearch('')}
-            >
-              <X className="size-3" />
-            </Button>
-          ) : null}
-        </div>
+        <PanelToolbarSearch
+          ref={searchRef}
+          value={search}
+          onValueChange={setSearch}
+          placeholder='搜索… ("/" 快速聚焦)'
+        />
 
         <Button
           type="button"
-          variant="ghost"
-          size="icon-sm"
+          variant="ghostAccent"
+          icon
+          className={showFilters ? 'bg-(--bg-surface) text-(--text-base)' : undefined}
           title="类型过滤"
-          className={cn('rounded-lg text-(--text-muted)', showFilters && 'bg-(--bg-surface) text-(--text-base)')}
           onClick={() => setShowFilters(!showFilters)}
         >
-          <Filter className="size-3.5" />
+          <Filter />
         </Button>
 
         <div className="ml-auto flex items-center gap-2">
           {statusIndicator(status)}
           <Button
             type="button"
-            variant="ghost"
-            size="icon-sm"
+            variant="ghostDanger"
+            icon
             title="清空事件"
-            className="rounded-lg text-(--text-muted) hover:bg-red-500/10 hover:text-red-500"
             onClick={onClear}
             disabled={events.length === 0}
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 />
           </Button>
         </div>
-      </div>
+      </PanelToolbar>
 
       {/* Filter chips */}
       {showFilters && (

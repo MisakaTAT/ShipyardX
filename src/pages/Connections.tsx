@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Server, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
+import { Server, Plus, Pencil, Trash2, Search, KeyRound, Lock, ArrowRight } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
+import { PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import ServerModal from '@/components/ServerModal'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
+import ServerDialog from '@/components/server/dialogs/ServerDialog'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 
 interface ConnectionsProps {
   onConnect: (server: ServerConfig) => void
@@ -17,7 +17,7 @@ interface ConnectionsProps {
 export default function Connections({ onConnect }: ConnectionsProps) {
   const [servers, setServers] = useState<ServerConfig[]>([])
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
+  const [showDialog, setShowDialog] = useState(false)
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null)
   const [deleteServerId, setDeleteServerId] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -43,12 +43,12 @@ export default function Connections({ onConnect }: ConnectionsProps) {
 
   const handleAdd = () => {
     setEditingServer(null)
-    setShowModal(true)
+    setShowDialog(true)
   }
 
   const handleEdit = (server: ServerConfig) => {
     setEditingServer(server)
-    setShowModal(true)
+    setShowDialog(true)
   }
 
   const executeDeleteServer = async () => {
@@ -68,8 +68,8 @@ export default function Connections({ onConnect }: ConnectionsProps) {
 
   return (
     <>
-      <div className="flex-1 overflow-auto p-2 md:p-3">
-        <div className={cn('flex h-full flex-col', servers.length > 0 && 'gap-3')}>
+      <PageScrollArea>
+        <PageListColumn gap={servers.length > 0}>
           {servers.length > 0 ? (
             <div className="shrink-0">
               <div className="flex items-center justify-between">
@@ -77,33 +77,19 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                   <h1 className="text-lg font-semibold text-(--text-strong)">服务器</h1>
                   <p className="mt-0.5 text-xs text-(--text-muted)">管理远程服务器连接，选择一个服务器进入工作区。</p>
                 </div>
-                <Button size="sm" className="gap-1.5" onClick={handleAdd}>
-                  <Plus className="size-3.5 stroke-[2.5]" />
+                <Button onClick={handleAdd}>
+                  <Plus />
                   添加服务器
                 </Button>
               </div>
 
-              <div className="relative mt-4">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-(--text-muted)" />
-                <Input
-                  ref={searchRef}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
-                  className="pr-8 pl-9"
-                />
-                {search ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="absolute top-1/2 right-2 -translate-y-1/2 text-(--text-muted)"
-                    onClick={() => setSearch('')}
-                  >
-                    <X className="size-3" />
-                  </Button>
-                ) : null}
-              </div>
+              <PanelToolbarSearch
+                ref={searchRef}
+                variant="page"
+                value={search}
+                onValueChange={setSearch}
+                placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
+              />
             </div>
           ) : null}
 
@@ -129,14 +115,14 @@ export default function Connections({ onConnect }: ConnectionsProps) {
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </PageListColumn>
+      </PageScrollArea>
 
-      <ServerModal
-        open={showModal}
+      <ServerDialog
+        open={showDialog}
         onOpenChange={(open) => {
           if (!open) {
-            setShowModal(false)
+            setShowDialog(false)
             setEditingServer(null)
           }
         }}
@@ -206,45 +192,20 @@ function ServerCard({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <ActionBtn icon={<Pencil className="size-3" />} label="编辑" onClick={onEdit} />
-          <ActionBtn icon={<Trash2 className="size-3" />} label="删除" onClick={onDelete} danger />
+          <Button type="button" variant="ghostAccent" icon title="编辑" onClick={onEdit}>
+            <Pencil />
+          </Button>
+          <Button type="button" variant="ghostDanger" icon title="删除" onClick={onDelete}>
+            <Trash2 />
+          </Button>
         </div>
 
-        <div className="flex items-center gap-1 text-[11px] font-medium text-(--accent-text)">
+        <div className="flex items-center gap-1 text-[12px] font-medium text-(--accent-text)">
           连接
-          <ArrowRight className="size-3" />
+          <ArrowRight className="size-3.5" />
         </div>
       </CardFooter>
     </Card>
-  )
-}
-
-function ActionBtn({
-  icon,
-  label,
-  onClick,
-  danger,
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  danger?: boolean
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      title={label}
-      onClick={onClick}
-      className={cn(
-        'text-(--text-muted)',
-        danger && 'hover:bg-red-500/10 hover:text-red-500',
-        !danger && 'hover:bg-(--bg-panel) hover:text-(--text-base)',
-      )}
-    >
-      {icon}
-    </Button>
   )
 }
 
@@ -263,8 +224,8 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           配置完成后，可在此查看系统概览、管理 Docker
           容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
         </p>
-        <Button size="sm" className="mt-5 gap-1.5" onClick={onAdd}>
-          <Plus className="size-3.5 stroke-[2.5]" />
+        <Button className="mt-5" onClick={onAdd}>
+          <Plus />
           添加服务器
         </Button>
       </div>

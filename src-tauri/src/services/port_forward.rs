@@ -20,6 +20,28 @@ use crate::utils::id::generate_id;
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";
 const PORT_FORWARD_IO_POLL_MS: u32 = 400;
 
+struct PortForwardBridgeArgs {
+    local_stream: TcpStream,
+    server_cfg: ServerConfig,
+    remote_host: String,
+    remote_port: u16,
+    shutdown: Arc<AtomicBool>,
+    last_error: Arc<Mutex<Option<String>>>,
+    tx_bytes: Arc<AtomicU64>,
+    rx_bytes: Arc<AtomicU64>,
+}
+
+struct PortForwardAcceptArgs {
+    listener: TcpListener,
+    server_cfg: ServerConfig,
+    remote_host: String,
+    remote_port: u16,
+    shutdown: Arc<AtomicBool>,
+    last_error: Arc<Mutex<Option<String>>>,
+    tx_bytes: Arc<AtomicU64>,
+    rx_bytes: Arc<AtomicU64>,
+}
+
 fn normalize_host(ip: &str) -> String {
     let v = ip.trim();
     if v.is_empty() || v == "0.0.0.0" || v == "::" || v == "::0" {
@@ -29,28 +51,22 @@ fn normalize_host(ip: &str) -> String {
     }
 }
 
-fn validate_port(v: u16, name: &str) -> Result<(), String> {
-    if v == 0 {
-        return Err(format!("{} 无效", name));
-    }
-    Ok(())
-}
+fn bridge_once(args: PortForwardBridgeArgs) {
+    let PortForwardBridgeArgs {
+        mut local_stream,
+        server_cfg,
+        remote_host,
+        remote_port,
+        shutdown,
+        last_error,
+        tx_bytes,
+        rx_bytes,
+    } = args;
 
-fn bridge_once(
-    local_stream: TcpStream,
-    server_cfg: ServerConfig,
-    remote_host: String,
-    remote_port: u16,
-    shutdown: Arc<AtomicBool>,
-    last_error: Arc<Mutex<Option<String>>>,
-    tx_bytes: Arc<AtomicU64>,
-    rx_bytes: Arc<AtomicU64>,
-) {
     if shutdown.load(Ordering::Relaxed) {
         return;
     }
 
-    let mut local_stream = local_stream;
     let io_timeout = Some(Duration::from_millis(PORT_FORWARD_IO_POLL_MS as u64));
     let _ = local_stream.set_read_timeout(io_timeout);
     let _ = local_stream.set_write_timeout(io_timeout);
@@ -113,16 +129,18 @@ fn bridge_once(
     }
 }
 
-fn accept_loop(
-    listener: TcpListener,
-    server_cfg: ServerConfig,
-    remote_host: String,
-    remote_port: u16,
-    shutdown: Arc<AtomicBool>,
-    last_error: Arc<Mutex<Option<String>>>,
-    tx_bytes: Arc<AtomicU64>,
-    rx_bytes: Arc<AtomicU64>,
-) {
+fn accept_loop(args: PortForwardAcceptArgs) {
+    let PortForwardAcceptArgs {
+        listener,
+        server_cfg,
+        remote_host,
+        remote_port,
+        shutdown,
+        last_error,
+        tx_bytes,
+        rx_bytes,
+    } = args;
+
     let _ = listener.set_nonblocking(true);
 
     loop {
@@ -138,7 +156,19 @@ fn accept_loop(
                 let le = last_error.clone();
                 let tx = tx_bytes.clone();
                 let rx = rx_bytes.clone();
-                thread::spawn(move || bridge_once(stream, cfg, rh, remote_port, sd, le, tx, rx));
+                let rp = remote_port;
+                thread::spawn(move || {
+                    bridge_once(PortForwardBridgeArgs {
+                        local_stream: stream,
+                        server_cfg: cfg,
+                        remote_host: rh,
+                        remote_port: rp,
+                        shutdown: sd,
+                        last_error: le,
+                        tx_bytes: tx,
+                        rx_bytes: rx,
+                    })
+                });
             }
             Err(e) if e.kind() == ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(50));
@@ -233,18 +263,9 @@ pub fn create_port_forward_rule(
     params: PortForwardCreate,
     state: State<'_, AppState>,
 ) -> Result<PortForward, String> {
-    validate_port(params.remote_port, "remote_port")?;
-    validate_port(params.container_port, "container_port")?;
-
     let protocol = params.protocol.trim().to_lowercase();
-    if protocol != "tcp" {
-        return Err("当前端口转发仅支持 TCP".to_string());
-    }
 
     let remote_host = normalize_host(&params.remote_host);
-    if remote_host.is_empty() {
-        return Err("remote_host 不能为空".to_string());
-    }
 
     let bind_address = params
         .bind_address
@@ -328,12 +349,10 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
     save_port_forward_rules_to_state(&state, &rules)?;
 
     // 同步运行时状态：禁用即停止。
-    if !enabled {
-        if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
-            handle.shutdown.store(true, Ordering::Relaxed);
-            // 清理错误信息
-            state.port_forward_last_errors.lock().unwrap().remove(&id);
-        }
+    if !enabled && let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
+        handle.shutdown.store(true, Ordering::Relaxed);
+        // 清理错误信息
+        state.port_forward_last_errors.lock().unwrap().remove(&id);
     }
 
     Ok(())
@@ -409,7 +428,18 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     let rp = rule.remote_port;
     let sd = shutdown.clone();
     let le = last_error.clone();
-    thread::spawn(move || accept_loop(listener, cfg, rh, rp, sd, le, tx_bytes, rx_bytes));
+    thread::spawn(move || {
+        accept_loop(PortForwardAcceptArgs {
+            listener,
+            server_cfg: cfg,
+            remote_host: rh,
+            remote_port: rp,
+            shutdown: sd,
+            last_error: le,
+            tx_bytes,
+            rx_bytes,
+        })
+    });
 
     Ok(())
 }

@@ -5,3 +5,5 @@ src-tauri/gen/
 
 target
 Cargo.lock
+
+src/types/app-bindings.ts

@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
+import { Cpu, MemoryStick, Network, HardDrive } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ContainerStats } from '@/types/app-bindings'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Dialog, DialogBody, DialogContent, DialogHeaderBar } from '@/components/ui/dialog'
 import { formatBytes } from '@/utils/formatBytes'
 import { formatNowTime } from '@/utils/datetime'
 
@@ -99,7 +98,7 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
   )
 }
 
-export default function StatsModal({ serverId, containerId, containerName, onClose }: Props) {
+export default function StatsDialog({ serverId, containerId, containerName, onClose }: Props) {
   const [stats, setStats] = useState<ContainerStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState('')
@@ -136,25 +135,10 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
         if (!next) onClose()
       }}
     >
-      <DialogContent showCloseButton={false} className="max-w-xl gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="flex flex-row items-center gap-2 space-y-0 border-b border-border px-4 py-3">
-          <Cpu className="size-4 text-(--accent-text)" />
-          <DialogTitle className="flex-1 truncate font-mono text-sm font-semibold text-(--text-strong)">
-            {containerName}
-          </DialogTitle>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
-            onClick={onClose}
-          >
-            <X className="size-4" />
-            <span className="sr-only">关闭</span>
-          </Button>
-        </DialogHeader>
+      <DialogContent variant="panelXl">
+        <DialogHeaderBar icon={<Cpu />} title={containerName} titleClassName="truncate font-mono" onClose={onClose} />
 
-        <div className="space-y-4 p-4">
+        <DialogBody variant="stack">
           {loading && !stats ? (
             <div className="flex items-center justify-center gap-3 py-12 text-(--text-muted)">
               <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
@@ -200,7 +184,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
               {lastUpdated ? <div className="text-center text-xs text-(--text-muted)">更新于 {lastUpdated}</div> : null}
             </>
           ) : null}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )

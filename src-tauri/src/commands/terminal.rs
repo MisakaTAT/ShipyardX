@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::models::app::terminal::TerminalSession;
+use crate::models::app::terminal::{ContainerExecTerminalParams, TerminalSession};
 use crate::services;
 use crate::state::AppState;
 
@@ -20,24 +20,11 @@ pub fn open_terminal(
 #[specta::specta]
 pub fn open_container_exec_terminal(
     server_id: String,
-    container_id: String,
-    user: Option<String>,
-    shell: String,
-    cols: u32,
-    rows: u32,
+    params: ContainerExecTerminalParams,
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> Result<TerminalSession, String> {
-    services::terminal::open_container_exec_terminal(
-        server_id,
-        container_id,
-        user,
-        shell,
-        cols,
-        rows,
-        state,
-        app_handle,
-    )
+    services::terminal::open_container_exec_terminal(server_id, params, state, app_handle)
 }
 
 #[tauri::command]

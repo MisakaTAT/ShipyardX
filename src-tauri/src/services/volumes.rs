@@ -57,9 +57,6 @@ pub async fn create_volume(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let name = name.trim().to_string();
-    if name.is_empty() {
-        return Err("存储卷名称不能为空".to_string());
-    }
     let driver = driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() { "local".to_string() } else { driver };
 

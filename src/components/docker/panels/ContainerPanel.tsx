@@ -11,21 +11,19 @@ import {
   Plus,
   RotateCcw,
   ScanSearch,
-  Search,
   Square,
   Terminal,
   Trash2,
-  X,
 } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
-import LogModal from './LogModal'
-import StatsModal from './StatsModal'
-import ContainerExecModal from './ContainerExecModal'
-import InspectModal from './InspectModal'
-import RunContainerDialog from './RunContainerDialog'
-import { ConfirmDialog } from './ConfirmDialog'
+import LogDialog from '@/components/docker/dialogs/LogDialog'
+import StatsDialog from '@/components/docker/dialogs/StatsDialog'
+import ContainerExecDialog from '@/components/docker/dialogs/ContainerExecDialog'
+import InspectDialog from '@/components/docker/dialogs/InspectDialog'
+import RunContainerDialog from '@/components/docker/dialogs/RunContainerDialog'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   Table,
@@ -228,64 +226,28 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
-      {/* Toolbar */}
-      <div
-        className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3"
-        style={{ background: 'var(--bg-panel)' }}
-      >
-        <Box className="w-4 h-4 shrink-0" style={{ color: 'var(--text-soft)' }} />
-        <span className="text-sm font-medium mr-1" style={{ color: 'var(--text-base)' }}>
-          容器
-        </span>
-        {containers.length > 0 && (
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {runningCount}/{containers.length} 运行中
-          </span>
-        )}
+      <PanelToolbar>
+        <PanelToolbarHeading
+          icon={<Box />}
+          title="容器"
+          meta={containers.length > 0 ? `${runningCount}/${containers.length} 运行中` : null}
+        />
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="ml-1 h-8 gap-1 border-(--border-sub) bg-(--bg-input) text-xs"
-          onClick={() => setRunDialogOpen(true)}
-        >
-          <Plus className="size-3.5" />
-          运行容器
-        </Button>
+        <PanelToolbarSearch
+          ref={searchRef}
+          value={search}
+          onValueChange={setSearch}
+          placeholder='搜索… ("/" 快速聚焦)'
+        />
 
-        {/* 搜索 */}
-        <div className="relative ml-2">
-          <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-            style={{ color: 'var(--text-muted)' }}
-          />
-          <Input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder='搜索… ("/" 快速聚焦)'
-            className="h-8 w-52 border-(--border-sub) bg-(--bg-input) pr-8 pl-8 text-xs text-(--text-base)"
-          />
-          {search ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="absolute top-1/2 right-2 -translate-y-1/2 text-(--text-muted)"
-              onClick={() => setSearch('')}
-            >
-              <X className="size-3" />
-            </Button>
-          ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {lastUpdated ? <span className="mr-1 text-xs text-(--text-muted)">更新于 {lastUpdated}</span> : null}
+          <Button type="button" variant="default" className="gap-1" onClick={() => setRunDialogOpen(true)}>
+            <Plus />
+            启动新容器
+          </Button>
         </div>
-
-        {lastUpdated ? (
-          <div className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
-            更新于 {lastUpdated}
-          </div>
-        ) : null}
-      </div>
+      </PanelToolbar>
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-(--bg-panel)">
@@ -363,14 +325,8 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                       <div className="flex items-center justify-end gap-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="rounded-lg text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
-                              title="更多操作"
-                            >
-                              <MoreHorizontal className="size-3.5" />
+                            <Button type="button" variant="ghostAccent" icon title="更多操作">
+                              <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-40">
@@ -378,37 +334,37 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                               onClick={() => runAction(c.id, 'start', 'start_container')}
                               disabled={isRunning || Boolean(busy)}
                             >
-                              <Play className="size-3.5" />
+                              <Play />
                               启动
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => runAction(c.id, 'stop', 'stop_container')}
                               disabled={!isRunning || Boolean(busy)}
                             >
-                              <Square className="size-3.5" />
+                              <Square />
                               停止
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => runAction(c.id, 'restart', 'restart_container')}
                               disabled={Boolean(busy)}
                             >
-                              <RotateCcw className="size-3.5" />
+                              <RotateCcw />
                               重启
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setExecTarget(c)} disabled={!isRunning}>
-                              <Terminal className="size-3.5" />
+                              <Terminal />
                               容器终端
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setStatsTarget(c)} disabled={!isRunning}>
-                              <BarChart2 className="size-3.5" />
+                              <BarChart2 />
                               资源监控
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setLogTarget(c)}>
-                              <FileText className="size-3.5" />
+                              <FileText />
                               日志
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setInspectTarget(c)}>
-                              <ScanSearch className="size-3.5" />
+                              <ScanSearch />
                               Inspect
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -416,7 +372,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                               onClick={() => setRemoveTarget(c)}
                               disabled={Boolean(busy)}
                             >
-                              <Trash2 className="size-3.5" />
+                              <Trash2 />
                               删除
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -432,7 +388,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       </div>
 
       {logTarget && (
-        <LogModal
+        <LogDialog
           serverId={serverId}
           containerId={logTarget.id}
           containerName={logTarget.name}
@@ -441,7 +397,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       )}
 
       {statsTarget && (
-        <StatsModal
+        <StatsDialog
           serverId={serverId}
           containerId={statsTarget.id}
           containerName={statsTarget.name}
@@ -450,7 +406,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       )}
 
       {inspectTarget && (
-        <InspectModal
+        <InspectDialog
           serverId={serverId}
           kind="container"
           targetId={inspectTarget.id}
@@ -460,7 +416,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       )}
 
       {execTarget && (
-        <ContainerExecModal
+        <ContainerExecDialog
           open={execTarget !== null}
           serverId={serverId}
           containerId={execTarget.id}

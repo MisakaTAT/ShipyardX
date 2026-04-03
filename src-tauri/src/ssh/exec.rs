@@ -6,9 +6,6 @@ use super::session::create_ssh_session;
 
 pub fn ssh_exec(config: &ServerConfig, command: &str) -> Result<String, String> {
     let command = command.trim();
-    if command.is_empty() {
-        return Err("远程命令不能为空".to_string());
-    }
 
     let sess = create_ssh_session(config)?;
 

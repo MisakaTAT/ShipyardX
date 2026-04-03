@@ -47,3 +47,15 @@ pub struct DockerStreamError {
     pub stream_id: String,
     pub message: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct DockerSshStreamChunk {
+    pub stream_id: String,
+    pub chunk: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct DockerSshStreamDone {
+    pub stream_id: String,
+    pub success: bool,
+}

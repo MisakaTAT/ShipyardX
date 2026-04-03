@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import TerminalPanel from '@/components/TerminalPanel'
+import TerminalPanel from '@/components/docker/panels/TerminalPanel'
 
 interface Props {
   open: boolean
@@ -9,13 +9,10 @@ interface Props {
   onClose: () => void
 }
 
-export default function ContainerExecModal({ open, serverId, containerId, containerName, onClose }: Props) {
+export default function ContainerExecDialog({ open, serverId, containerId, containerName, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : null)}>
-      <DialogContent
-        showCloseButton={false}
-        className="fixed! inset-0! left-0! top-0! flex! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:max-w-full"
-      >
+      <DialogContent variant="fullscreen">
         <div className="h-full w-full">
           <TerminalPanel
             serverId={serverId}

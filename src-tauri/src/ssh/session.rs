@@ -7,19 +7,6 @@ use crate::models::app::server::ServerConfig;
 
 use super::limits::{CONNECT_TIMEOUT, SOCKET_IO_TIMEOUT};
 
-fn validate_config(config: &ServerConfig) -> Result<(), String> {
-    if config.host.trim().is_empty() {
-        return Err("服务器地址不能为空".to_string());
-    }
-    if config.port == 0 {
-        return Err("SSH 端口无效".to_string());
-    }
-    if config.username.trim().is_empty() {
-        return Err("用户名不能为空".to_string());
-    }
-    Ok(())
-}
-
 fn expand_key_path(raw: &str) -> String {
     if let Some(rest) = raw.strip_prefix("~/") {
         format!("{}/{}", std::env::var("HOME").unwrap_or_default(), rest)
@@ -29,8 +16,6 @@ fn expand_key_path(raw: &str) -> String {
 }
 
 pub fn create_ssh_session(config: &ServerConfig) -> Result<Session, String> {
-    validate_config(config)?;
-
     let addrs: Vec<_> = (config.host.as_str(), config.port)
         .to_socket_addrs()
         .map_err(|e| format!("解析地址失败: {}", e))?

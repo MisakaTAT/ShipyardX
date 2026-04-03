@@ -1,5 +1,5 @@
-import { listen } from '@tauri-apps/api/event'
 import { commands } from '@/types/app-bindings'
+import { appendSshStreamChunkToLines, subscribeDockerSshStream } from '@/lib/dockerSshStream'
 
 export async function pullImage(
   serverId: string,
@@ -13,30 +13,22 @@ export async function pullImage(
   const streamId = await commands.startImagePull(serverId, image)
   options?.onStreamId?.(streamId)
 
-  const unData = await listen<string>(`pull-data:${streamId}`, (event) => {
-    const chunk = event.payload
-    const newLines = chunk.split('\n')
-    if (lines.length > 0 && !lines[lines.length - 1].endsWith('\n')) {
-      const updated = [...lines]
-      updated[updated.length - 1] += newLines[0]
-      lines = [...updated, ...newLines.slice(1)]
-    } else {
-      lines = [...lines, ...newLines]
-    }
-    onLogsUpdate([...lines])
-  })
-
   let resolveDone!: (v: boolean) => void
   const donePromise = new Promise<boolean>((r) => {
     resolveDone = r
   })
-  const unDone = await listen<boolean>(`pull-done:${streamId}`, (e) => {
-    resolveDone(e.payload)
-  })
+
+  const unlisten = await subscribeDockerSshStream(
+    streamId,
+    (chunk) => {
+      lines = appendSshStreamChunkToLines(lines, chunk)
+      onLogsUpdate([...lines])
+    },
+    resolveDone,
+  )
 
   const success = await donePromise
-  unData()
-  unDone()
+  unlisten()
 
   if (!success) {
     try {

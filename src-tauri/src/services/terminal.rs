@@ -13,7 +13,7 @@ use tungstenite::{
 };
 
 use crate::models::app::server::ServerConfig;
-use crate::models::app::terminal::{TerminalSession, WsServerMsg};
+use crate::models::app::terminal::{ContainerExecTerminalParams, TerminalSession, WsServerMsg};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
 use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
@@ -90,7 +90,7 @@ fn run_terminal_thread(
     run_terminal_io_loop(session_id, rx, ah, sess, channel, cols, rows);
 }
 
-fn run_container_exec_thread(
+struct ContainerExecThreadCtx {
     config: ServerConfig,
     session_id: String,
     rx: mpsc::Receiver<TerminalMsg>,
@@ -100,7 +100,21 @@ fn run_container_exec_thread(
     container_id: String,
     user: Option<String>,
     shell: String,
-) {
+}
+
+fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
+    let ContainerExecThreadCtx {
+        config,
+        session_id,
+        rx,
+        ah,
+        cols,
+        rows,
+        container_id,
+        user,
+        shell,
+    } = ctx;
+
     if !is_safe_docker_ident(&container_id) {
         fail_terminal(&ah, &session_id, "容器 ID/名称包含非法字符");
         return;
@@ -362,11 +376,7 @@ pub fn open_terminal(
 
 pub fn open_container_exec_terminal(
     server_id: String,
-    container_id: String,
-    user: Option<String>,
-    shell: String,
-    cols: u32,
-    rows: u32,
+    params: ContainerExecTerminalParams,
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> Result<TerminalSession, String> {
@@ -376,14 +386,23 @@ pub fn open_container_exec_terminal(
     let session_id = generate_id();
     let (tx, rx) = mpsc::channel::<TerminalMsg>();
 
-    let shell = shell.trim().to_string();
-    if shell.is_empty() {
-        return Err("shell 不能为空".to_string());
-    }
+    let shell = params.shell.trim().to_string();
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_container_exec_thread(server, sid, rx, ah, cols, rows, container_id, user, shell));
+    std::thread::spawn(move || {
+        run_container_exec_thread(ContainerExecThreadCtx {
+            config: server,
+            session_id: sid,
+            rx,
+            ah,
+            cols: params.cols,
+            rows: params.rows,
+            container_id: params.container_id,
+            user: params.user,
+            shell,
+        })
+    });
 
     state
         .terminals

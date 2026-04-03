@@ -368,14 +368,13 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
       const targetContainerId = containerIdLiveRef.current
       const targetShell = execShellPreset === 'custom' ? execCustomShell.trim() : execShellPreset
       const session = targetContainerId
-        ? await commands.openContainerExecTerminal(
-            serverIdLiveRef.current,
-            targetContainerId,
-            execUser.trim() || null,
-            targetShell || '/bin/sh',
-            term.cols,
-            term.rows,
-          )
+        ? await commands.openContainerExecTerminal(serverIdLiveRef.current, {
+            container_id: targetContainerId,
+            user: execUser.trim() || null,
+            shell: targetShell || '/bin/sh',
+            cols: term.cols,
+            rows: term.rows,
+          })
         : await commands.openTerminal(serverIdLiveRef.current, term.cols, term.rows)
       if (isStale()) {
         void commands.closeTerminal(session.session_id).catch(console.error)
@@ -553,7 +552,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
           style={{ borderColor: 'var(--border-sub)' }}
         >
           <div className="flex min-w-0 items-center gap-2 text-xs" style={{ color: 'var(--text-soft)' }}>
-            <TerminalIcon className="size-3.5 shrink-0" />
+            <TerminalIcon className="shrink-0" />
             <span className="truncate">{title}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -561,12 +560,12 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-xs"
+                icon
                 className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
                 onClick={onRequestClose}
                 title="关闭"
               >
-                <X className="size-3.5" />
+                <X />
               </Button>
             ) : null}
           </div>
@@ -617,8 +616,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                           <Input
                             value={execUser}
                             onChange={(e) => setExecUser(e.target.value)}
-                            placeholder="如 root 或 1000:1000"
-                            className="h-8"
+                            placeholder="root 或 1000:1000"
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -627,7 +625,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                             value={execShellPreset}
                             onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
                           >
-                            <SelectTrigger size="sm" className="w-full">
+                            <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -645,8 +643,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                           <Input
                             value={execCustomShell}
                             onChange={(e) => setExecCustomShell(e.target.value)}
-                            placeholder="例如 /busybox/sh"
-                            className="h-8"
+                            placeholder="示例 /busybox/sh"
                           />
                         </div>
                       ) : null}
@@ -655,11 +652,10 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                   <div className="flex items-center justify-center gap-3">
                     <Button
                       type="button"
-                      size="sm"
                       onClick={connect}
                       disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
                     >
-                      <TerminalIcon className="size-3.5" />
+                      <TerminalIcon />
                       {wasEverConnected ? '重新连接' : '开始连接'}
                     </Button>
                   </div>
@@ -701,10 +697,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                     >
                       查看详情
                       <ChevronDown
-                        className={cn(
-                          'size-3.5 transition-transform duration-200',
-                          errorDetailsExpanded && 'rotate-180',
-                        )}
+                        className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
                       />
                     </button>
                     {errorDetailsExpanded ? (
@@ -718,7 +711,6 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
                       onClick={() => {
                         setPhase('disconnected')
                         setErrorText('')
@@ -726,8 +718,8 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                     >
                       返回
                     </Button>
-                    <Button type="button" size="sm" onClick={connect}>
-                      <RefreshCw className="size-3.5" />
+                    <Button type="button" onClick={connect}>
+                      <RefreshCw />
                       重试
                     </Button>
                   </div>

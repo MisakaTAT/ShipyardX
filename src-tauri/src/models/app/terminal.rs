@@ -1,7 +1,16 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Serialize)]
+#[derive(Debug, Deserialize, Type)]
+pub struct ContainerExecTerminalParams {
+    pub container_id: String,
+    pub user: Option<String>,
+    pub shell: String,
+    pub cols: u32,
+    pub rows: u32,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum WsServerMsg {
     #[serde(rename = "closed")]
