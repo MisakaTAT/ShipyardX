@@ -81,6 +81,14 @@ export type Container = {
 	created_ts: number,
 };
 
+export type ContainerExecTerminalParams = {
+	container_id: string,
+	user: string | null,
+	shell: string,
+	cols: number,
+	rows: number,
+};
+
 export type ContainerStats = {
 	cpu_percent: number,
 	mem_usage: number,
@@ -90,14 +98,6 @@ export type ContainerStats = {
 	net_tx: number,
 	blk_read: number,
 	blk_write: number,
-};
-
-export type ContainerExecTerminalParams = {
-	container_id: string,
-	user: string | null,
-	shell: string,
-	cols: number,
-	rows: number,
 };
 
 export type DaemonSettings = {
