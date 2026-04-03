@@ -228,7 +228,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       {/* Filter chips */}
       {showFilters && (
         <div
-          className="flex shrink-0 items-center gap-1 border-b border-border px-5 py-2"
+          className="flex shrink-0 items-center gap-1 border-b border-border px-5 py-3"
           style={{ background: 'var(--bg-panel)' }}
         >
           {TYPE_FILTERS.map((f) => (

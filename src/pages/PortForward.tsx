@@ -363,7 +363,7 @@ export default function PortForwardPage() {
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--bg-app)' }}>
       <div className="flex-1 overflow-auto p-2 md:p-3">
-        <div className={cn('flex h-full flex-col', rules.length > 0 && 'gap-4')}>
+        <div className={cn('flex h-full flex-col', rules.length > 0 && 'gap-3')}>
           {/* Page Header */}
           {rules.length > 0 ? (
             <div className="shrink-0">
