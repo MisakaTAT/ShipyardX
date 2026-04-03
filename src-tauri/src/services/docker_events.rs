@@ -7,8 +7,7 @@ use tauri_specta::Event;
 
 use crate::docker::client::resolve_api_version;
 use crate::models::app::events::{
-    DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus,
-    EventStreamStatus,
+    DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::events::StreamEvent;

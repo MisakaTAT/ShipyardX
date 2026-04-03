@@ -3,7 +3,7 @@ use tauri::State;
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
 use crate::models::app::network::{Network, NetworkCreate};
 use crate::models::docker::network::{
-    self as engine_network, Network as EngineNetwork, NetworkCreateIpam, NetworkCreateIpamConfig,
+    self as engine_network, NetworkCreateIpam, NetworkCreateIpamConfig, NetworkSummary,
 };
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -12,7 +12,8 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Res
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let mut api: Vec<EngineNetwork> = serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        let mut api: Vec<NetworkSummary> =
+            serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
         sort_by_created_desc_then_id(
             &mut api,
             |x| x.created.clone().unwrap_or_default(),

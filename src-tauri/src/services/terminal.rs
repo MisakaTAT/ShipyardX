@@ -209,27 +209,15 @@ fn run_terminal_io_loop(
                 loop {
                     match channel.read(&mut buf) {
                         Ok(0) => {
-                            terminal_ws_send(
-                                &ah,
-                                &session_id,
-                                WsServerMsg::Output { data: output }.to_json(),
-                            );
-                            terminal_ws_send(
-                                &ah,
-                                &session_id,
-                                WsServerMsg::Closed.to_json(),
-                            );
+                            terminal_ws_send(&ah, &session_id, WsServerMsg::Output { data: output }.to_json());
+                            terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
                             return;
                         }
                         Ok(extra) => output.extend_from_slice(&buf[..extra]),
                         Err(_) => break,
                     }
                 }
-                terminal_ws_send(
-                    &ah,
-                    &session_id,
-                    WsServerMsg::Output { data: output }.to_json(),
-                );
+                terminal_ws_send(&ah, &session_id, WsServerMsg::Output { data: output }.to_json());
             }
             Err(ref e) if e.kind() == ErrorKind::TimedOut => {}
             Err(_) => {

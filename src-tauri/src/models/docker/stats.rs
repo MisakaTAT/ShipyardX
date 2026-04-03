@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
-/// `GET /containers/{id}/stats` 非流式 JSON
 #[derive(Deserialize)]
 pub struct DockerStats {
     pub cpu_stats: CpuStats,

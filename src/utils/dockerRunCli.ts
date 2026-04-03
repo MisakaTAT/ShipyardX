@@ -103,9 +103,7 @@ function parseVolume(spec: string): { host_path: string; container_path: string;
   }
 }
 
-function parseRestart(
-  value: string,
-): { restart_policy: string; restart_max_retry: number | null } {
+function parseRestart(value: string): { restart_policy: string; restart_max_retry: number | null } {
   const v = value.trim().toLowerCase()
   if (v.startsWith('on-failure')) {
     const colon = v.indexOf(':')
@@ -223,7 +221,7 @@ export function parseContainerRun(input: string): ParseContainerRunResult {
         ports,
         volumes,
         restart_policy,
-        restart_max_retry: restart_policy === 'on-failure' ? restart_max_retry ?? 0 : null,
+        restart_max_retry: restart_policy === 'on-failure' ? (restart_max_retry ?? 0) : null,
       },
     }
   }

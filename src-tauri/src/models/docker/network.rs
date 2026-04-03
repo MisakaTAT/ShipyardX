@@ -18,7 +18,7 @@ pub struct Ipam {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
-pub struct Network {
+pub struct NetworkSummary {
     #[serde(rename = "Id")]
     pub id: Option<String>,
     #[serde(rename = "Name")]
