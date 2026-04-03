@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { getEngineInfo } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { Box, Layers, Cpu, HardDrive } from 'lucide-react'
-import type { DockerEngineInfo } from '../types'
+import type { DockerEngineInfo } from '@/types/app-bindings'
 import { formatBytes } from '@/utils/formatBytes'
 import { formatNowTime } from '@/utils/datetime'
 
@@ -24,7 +24,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
   const fetch = useCallback(async () => {
     setLoading(true)
     try {
-      const d = await getEngineInfo({ serverId })
+      const d = await commands.getDockerInfo(serverId)
       setInfo(d)
       setLastUpdated(formatNowTime())
     } catch {

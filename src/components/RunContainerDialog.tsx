@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { cancelStream, listImages, runContainer } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/lib/pullImageStream'
 import { cn } from '@/lib/utils'
-import type { Image, RunContainer } from '@/types'
+import type { Image, RunContainer } from '@/types/app-bindings'
 import { imageRefExistsOnHost, listSelectableImageRefs } from '@/utils/dockerImageRef'
 import {
   buildRunParamsFromForm,
@@ -18,7 +18,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-/** 与 NetworkPanel 等创建弹窗内 Input 一致 */
 const dialogFieldClass = 'border-(--border-sub) bg-(--bg-input) text-sm text-(--text-base)'
 
 const RESTART_OPTIONS = [
@@ -143,7 +142,8 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
     pullStreamIdRef.current = null
 
     setImagesLoading(true)
-    void listImages({ serverId })
+    void commands
+      .listImages(serverId)
       .then((data) => {
         if (mountedRef.current) setImages(data)
       })
@@ -165,7 +165,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
   const handleBackFromProgress = useCallback(async () => {
     if (pullStreamIdRef.current) {
       try {
-        await cancelStream({ streamId: pullStreamIdRef.current })
+        await commands.cancelStream(pullStreamIdRef.current)
       } catch {
         /* ignore */
       }
@@ -213,7 +213,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
       if (!mountedRef.current) return
       setRunStep('active')
-      const containerId = await runContainer({ serverId, params })
+      const containerId = await commands.runContainer(serverId, params)
       if (!mountedRef.current) return
       setRunStep('done')
 

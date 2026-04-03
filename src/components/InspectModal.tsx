@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { inspectContainer, inspectImage, inspectNetwork, inspectVolume } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import Editor from '@monaco-editor/react'
 import { X, RefreshCw, Copy, Check, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
@@ -28,16 +28,16 @@ export default function InspectModal({ serverId, kind, targetId, targetLabel, on
       let text: string
       switch (kind) {
         case 'container':
-          text = await inspectContainer({ serverId, containerId: targetId })
+          text = await commands.inspectContainer(serverId, targetId)
           break
         case 'image':
-          text = await inspectImage({ serverId, imageId: targetId })
+          text = await commands.inspectImage(serverId, targetId)
           break
         case 'network':
-          text = await inspectNetwork({ serverId, networkId: targetId })
+          text = await commands.inspectNetwork(serverId, targetId)
           break
         case 'volume':
-          text = await inspectVolume({ serverId, name: targetId })
+          text = await commands.inspectVolume(serverId, targetId)
           break
         default:
           text = ''

@@ -14,7 +14,7 @@ import {
   Loader2,
   Filter,
 } from 'lucide-react'
-import type { DockerEvent, EventStreamStatus } from '../types'
+import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {

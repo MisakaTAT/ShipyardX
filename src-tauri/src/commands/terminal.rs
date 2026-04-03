@@ -5,6 +5,7 @@ use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_terminal(
     server_id: String,
     cols: u32,
@@ -16,6 +17,7 @@ pub fn open_terminal(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_container_exec_terminal(
     server_id: String,
     container_id: String,
@@ -39,16 +41,19 @@ pub fn open_container_exec_terminal(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {
     services::terminal::write_terminal(session_id, data, state)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn resize_terminal(session_id: String, cols: u32, rows: u32, state: State<AppState>) -> Result<(), String> {
     services::terminal::resize_terminal(session_id, cols, rows, state)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn close_terminal(session_id: String, state: State<AppState>) -> Result<(), String> {
     services::terminal::close_terminal(session_id, state)
 }

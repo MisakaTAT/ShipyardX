@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createNetwork, listNetworks, removeNetwork } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { Share2, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Network, NetworkCreate } from '../types'
+import type { Network, NetworkCreate } from '@/types/app-bindings'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { Button } from '@/components/ui/button'
@@ -46,7 +46,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
   const fetchNetworks = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listNetworks({ serverId })
+      const data = await commands.listNetworks(serverId)
       setNetworks(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -366,7 +366,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
                       internal: createInternal,
                       attachable: createAttachable,
                     }
-                    await createNetwork({ serverId, params: req })
+                    await commands.createNetwork(serverId, req)
                     setShowCreate(false)
                     await fetchNetworks()
                   } catch (e) {
@@ -414,7 +414,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await removeNetwork({ serverId, networkId: removeTarget.id })
+            await commands.removeNetwork(serverId, removeTarget.id)
             await fetchNetworks()
           } catch (e) {
             toast.error(String(e))

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Type)]
 pub struct Network {
     pub id: String,
     pub name: String,
@@ -14,7 +15,7 @@ pub struct Network {
     pub attachable: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Type)]
 pub struct NetworkCreate {
     pub name: String,
     pub driver: Option<String>,

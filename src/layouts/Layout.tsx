@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Router, useLocation } from 'wouter'
 import { Toaster } from '@/components/ui/sonner'
-import type { Server } from '@/types'
+import type { ServerConfig } from '@/types/app-bindings'
 import Sider from '@/layouts/Sider'
 import Connections from '@/pages/Connections'
 import Workspace, { type WorkspaceTab } from '@/pages/Workspace'
@@ -20,7 +20,7 @@ export default function Layout() {
 
 function LayoutContent() {
   const [location] = useLocation()
-  const [selectedServer, setSelectedServer] = useState<Server | null>(null)
+  const [selectedServer, setSelectedServer] = useState<ServerConfig | null>(null)
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview')
   const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
 

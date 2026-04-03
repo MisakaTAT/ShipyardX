@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import debounce from 'lodash-es/debounce'
 import type { DebouncedFunc } from 'lodash-es/debounce'
-import { startEventStream, stopEventStream } from '@/lib/commands'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { DockerEvent, EventStreamStatus } from '../types'
+import { commands, events } from '@/types/app-bindings'
+import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 
 const MAX_EVENTS = 500
 
@@ -24,10 +23,10 @@ export function useEngineEvents({
   enabled = true,
   onRefresh,
 }: UseEngineEventsOptions): UseEngineEventsReturn {
-  const [events, setEvents] = useState<DockerEvent[]>([])
+  const [eventsList, setEventsList] = useState<DockerEvent[]>([])
   const [status, setStatus] = useState<EventStreamStatus>('connecting')
   const streamIdRef = useRef<string | null>(null)
-  const unlistensRef = useRef<UnlistenFn[]>([])
+  const unlistensRef = useRef<Array<() => void>>([])
   const onRefreshRef = useRef(onRefresh)
   const refreshDebouncers = useRef<Map<string, DebouncedFunc<() => void>>>(new Map())
 
@@ -46,7 +45,7 @@ export function useEngineEvents({
 
     if (streamIdRef.current) {
       try {
-        await stopEventStream({ serverId })
+        await commands.stopEventStream(serverId)
       } catch {
         /* ignore */
       }
@@ -64,26 +63,29 @@ export function useEngineEvents({
 
     async function start() {
       try {
-        const id = await startEventStream({ serverId })
+        const id = await commands.startEventStream(serverId)
         if (cancelled) {
-          await stopEventStream({ serverId }).catch(() => {})
+          await commands.stopEventStream(serverId).catch(() => {})
           return
         }
         streamIdRef.current = id
 
-        const unEvent = await listen<DockerEvent>(`docker-event:${id}`, (e) => {
-          setEvents((prev) => {
-            const next = [e.payload, ...prev]
+        const unPayload = await events.dockerStreamPayload.listen((e) => {
+          if (e.payload.stream_id !== id) return
+          setEventsList((prev) => {
+            const next = [e.payload.event, ...prev]
             return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next
           })
         })
 
-        const unStatus = await listen<EventStreamStatus>(`docker-events-status:${id}`, (e) => {
-          setStatus(e.payload)
+        const unStatus = await events.dockerStreamStatus.listen((e) => {
+          if (e.payload.stream_id !== id) return
+          setStatus(e.payload.status)
         })
 
-        const unRefresh = await listen<string>(`docker-events-refresh:${id}`, (e) => {
-          const eventType = e.payload
+        const unRefresh = await events.dockerStreamRefresh.listen((e) => {
+          if (e.payload.stream_id !== id) return
+          const eventType = e.payload.resource
           let d = refreshDebouncers.current.get(eventType)
           if (!d) {
             d = debounce(() => {
@@ -94,19 +96,20 @@ export function useEngineEvents({
           d()
         })
 
-        const unError = await listen<string>(`docker-events-error:${id}`, () => {
-          /* errors are transient, status handles UI */
+        const unError = await events.dockerStreamError.listen((e) => {
+          if (e.payload.stream_id !== id) return
+          /* 错误为瞬时提示，状态由 status 事件反映 */
         })
 
         if (cancelled) {
-          unEvent()
+          unPayload()
           unStatus()
           unRefresh()
           unError()
           return
         }
 
-        unlistensRef.current = [unEvent, unStatus, unRefresh, unError]
+        unlistensRef.current = [unPayload, unStatus, unRefresh, unError]
       } catch {
         if (!cancelled) setStatus('disconnected')
       }
@@ -120,7 +123,7 @@ export function useEngineEvents({
     }
   }, [serverId, enabled, cleanup])
 
-  const clearEvents = useCallback(() => setEvents([]), [])
+  const clearEvents = useCallback(() => setEventsList([]), [])
 
-  return { events, status, clearEvents }
+  return { events: eventsList, status, clearEvents }
 }

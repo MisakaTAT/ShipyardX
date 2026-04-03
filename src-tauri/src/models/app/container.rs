@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Type)]
 pub struct Container {
     pub id: String,
     pub name: String,
@@ -12,7 +13,7 @@ pub struct Container {
     pub created_ts: i64,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Type)]
 pub struct ContainerStats {
     pub cpu_percent: f64,
     pub mem_usage: u64,
@@ -24,7 +25,7 @@ pub struct ContainerStats {
     pub blk_write: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Type)]
 pub struct RunContainer {
     pub image: String,
     pub name: Option<String>,
@@ -39,7 +40,7 @@ pub struct RunContainer {
     pub restart_max_retry: Option<u32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Type)]
 pub struct RunContainerPortSpec {
     pub container_port: u16,
     pub host_port: Option<u16>,
@@ -51,7 +52,7 @@ fn default_port_protocol() -> String {
     "tcp".to_string()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Type)]
 pub struct RunContainerVolumeSpec {
     pub host_path: String,
     pub container_path: String,

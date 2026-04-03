@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Type)]
 pub struct LocalAddress {
     pub ip: String,
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct PortForwardCreate {
     pub container_id: String,
     pub container_name: Option<String>,
@@ -19,7 +20,7 @@ pub struct PortForwardCreate {
     pub enabled: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct PortForwardRule {
     pub id: String,
     pub server_id: String,
@@ -39,7 +40,7 @@ fn default_bind_address() -> String {
     "127.0.0.1".to_string()
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Type)]
 pub struct PortForward {
     pub id: String,
     pub server_id: String,
@@ -55,6 +56,5 @@ pub struct PortForward {
     pub running: bool,
     pub tx_bytes: u64,
     pub rx_bytes: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
 }

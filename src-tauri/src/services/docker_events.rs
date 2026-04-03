@@ -2,10 +2,14 @@ use std::io::Read;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
+use tauri_specta::Event;
 
 use crate::docker::client::resolve_api_version;
-use crate::models::app::events::DockerEvent;
+use crate::models::app::events::{
+    DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus,
+    EventStreamStatus,
+};
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::events::StreamEvent;
 use crate::ssh::session::create_ssh_session;
@@ -108,19 +112,28 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
 
     loop {
         if rx.try_recv().is_ok() || matches!(rx.try_recv(), Err(mpsc::TryRecvError::Disconnected)) {
-            let _ = ah.emit(&format!("docker-events-status:{}", stream_id), "stopped");
+            let _ = DockerStreamStatus {
+                stream_id: stream_id.clone(),
+                status: EventStreamStatus::Stopped,
+            }
+            .emit(&ah);
             return;
         }
 
-        let _ = ah.emit(&format!("docker-events-status:{}", stream_id), "connecting");
+        let _ = DockerStreamStatus {
+            stream_id: stream_id.clone(),
+            status: EventStreamStatus::Connecting,
+        }
+        .emit(&ah);
 
         let ver = match resolve_api_version(&config) {
             Ok(v) => v,
             Err(e) => {
-                let _ = ah.emit(
-                    &format!("docker-events-error:{}", stream_id),
-                    format!("获取 API 版本失败: {}", e),
-                );
+                let _ = DockerStreamError {
+                    stream_id: stream_id.clone(),
+                    message: format!("获取 API 版本失败: {}", e),
+                }
+                .emit(&ah);
                 wait_or_stop(&rx, reconnect_delay(attempt));
                 attempt += 1;
                 continue;
@@ -130,10 +143,11 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
         let sess = match create_ssh_session(&config) {
             Ok(s) => s,
             Err(e) => {
-                let _ = ah.emit(
-                    &format!("docker-events-error:{}", stream_id),
-                    format!("SSH 连接失败: {}", e),
-                );
+                let _ = DockerStreamError {
+                    stream_id: stream_id.clone(),
+                    message: format!("SSH 连接失败: {}", e),
+                }
+                .emit(&ah);
                 wait_or_stop(&rx, reconnect_delay(attempt));
                 attempt += 1;
                 continue;
@@ -143,10 +157,11 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
         let mut channel = match sess.channel_session() {
             Ok(c) => c,
             Err(e) => {
-                let _ = ah.emit(
-                    &format!("docker-events-error:{}", stream_id),
-                    format!("通道创建失败: {}", e),
-                );
+                let _ = DockerStreamError {
+                    stream_id: stream_id.clone(),
+                    message: format!("通道创建失败: {}", e),
+                }
+                .emit(&ah);
                 wait_or_stop(&rx, reconnect_delay(attempt));
                 attempt += 1;
                 continue;
@@ -159,17 +174,22 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
         );
 
         if let Err(e) = channel.exec(&cmd) {
-            let _ = ah.emit(
-                &format!("docker-events-error:{}", stream_id),
-                format!("启动事件流失败: {}", e),
-            );
+            let _ = DockerStreamError {
+                stream_id: stream_id.clone(),
+                message: format!("启动事件流失败: {}", e),
+            }
+            .emit(&ah);
             wait_or_stop(&rx, reconnect_delay(attempt));
             attempt += 1;
             continue;
         }
 
         sess.set_blocking(false);
-        let _ = ah.emit(&format!("docker-events-status:{}", stream_id), "connected");
+        let _ = DockerStreamStatus {
+            stream_id: stream_id.clone(),
+            status: EventStreamStatus::Connected,
+        }
+        .emit(&ah);
         attempt = 0;
 
         let mut buf = [0u8; 4096];
@@ -179,7 +199,11 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
         loop {
             match rx.try_recv() {
                 Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                    let _ = ah.emit(&format!("docker-events-status:{}", stream_id), "stopped");
+                    let _ = DockerStreamStatus {
+                        stream_id: stream_id.clone(),
+                        status: EventStreamStatus::Stopped,
+                    }
+                    .emit(&ah);
                     return;
                 }
                 Err(mpsc::TryRecvError::Empty) => {}
@@ -199,16 +223,26 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
                         }
 
                         if let Some(event) = parse_docker_event(trimmed) {
-                            let _ = ah.emit(&format!("docker-event:{}", stream_id), &event);
+                            let event_type = event.event_type.clone();
+                            let action = event.action.clone();
+                            let _ = DockerStreamPayload {
+                                stream_id: stream_id.clone(),
+                                event,
+                            }
+                            .emit(&ah);
 
-                            if is_refresh_event(&event.event_type, &event.action) {
+                            if is_refresh_event(&event_type, &action) {
                                 let now = Instant::now();
                                 let should_emit = match last_refresh {
                                     Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
                                     None => true,
                                 };
                                 if should_emit {
-                                    let _ = ah.emit(&format!("docker-events-refresh:{}", stream_id), &event.event_type);
+                                    let _ = DockerStreamRefresh {
+                                        stream_id: stream_id.clone(),
+                                        resource: event_type,
+                                    }
+                                    .emit(&ah);
                                     last_refresh = Some(now);
                                 }
                             }
@@ -226,7 +260,11 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
             }
         }
 
-        let _ = ah.emit(&format!("docker-events-status:{}", stream_id), "disconnected");
+        let _ = DockerStreamStatus {
+            stream_id: stream_id.clone(),
+            status: EventStreamStatus::Disconnected,
+        }
+        .emit(&ah);
     }
 }
 

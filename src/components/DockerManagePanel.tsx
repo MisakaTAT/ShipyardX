@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { checkEngineAccess, getDaemonSettings, restartDaemon, updateDaemonSettings } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { toast } from 'sonner'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
-import type { DaemonSettings, DaemonUpdate } from '../types'
+import type { DaemonSettings, DaemonUpdate } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,7 +32,7 @@ export default function DockerManagePanel({ serverId }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getDaemonSettings({ serverId })
+      const data = await commands.getDockerDaemonSettings(serverId)
       setForm({
         ...data,
         socket_path: data.socket_path === 'unix:///var/run/docker.sock' ? '' : data.socket_path,
@@ -75,7 +75,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     }
     setSaving(true)
     try {
-      await updateDaemonSettings(serverId, params)
+      await commands.updateDockerDaemonSettings(serverId, params)
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setSudoPassword('')
@@ -97,13 +97,13 @@ export default function DockerManagePanel({ serverId }: Props) {
   const onRestart = async (password?: string) => {
     setRestarting(true)
     try {
-      await restartDaemon({ serverId, sudoPassword: password ?? null })
+      await commands.restartDockerDaemon(serverId, password ?? null)
 
       let lastError = ''
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
-          await checkEngineAccess({ serverId })
+          await commands.checkDockerAccess(serverId)
           recovered = true
           break
         } catch (e) {

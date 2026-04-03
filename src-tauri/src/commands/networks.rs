@@ -5,11 +5,13 @@ use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<Network>, String> {
     services::networks::list_networks(server_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn inspect_network(
     server_id: String,
     network_id: String,
@@ -19,11 +21,13 @@ pub async fn inspect_network(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> Result<(), String> {
     services::networks::remove_network(server_id, network_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn create_network(
     server_id: String,
     params: NetworkCreate,

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { addServer, testConnectionDirect, updateServer } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { toast } from 'sonner'
-import { Server } from '../types'
+import type { ServerConfig } from '@/types/app-bindings'
 import { Server as ServerIcon, X, Loader2, Eye, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,11 @@ import { Label } from '@/components/ui/label'
 interface ServerModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  server?: Server | null
-  onSave: (servers: Server[]) => void
+  server?: ServerConfig | null
+  onSave: (servers: ServerConfig[]) => void
 }
 
-const defaultForm = (): Omit<Server, 'id'> => ({
+const defaultForm = (): Omit<ServerConfig, 'id'> => ({
   name: '',
   host: '',
   port: 22,
@@ -26,7 +26,7 @@ const defaultForm = (): Omit<Server, 'id'> => ({
 })
 
 export default function ServerModal({ open, onOpenChange, server, onSave }: ServerModalProps) {
-  const [form, setForm] = useState<Omit<Server, 'id'>>(server ? { ...server } : defaultForm())
+  const [form, setForm] = useState<Omit<ServerConfig, 'id'>>(server ? { ...server } : defaultForm())
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const isEdit = !!server
@@ -41,7 +41,7 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
     onOpenChange(next)
   }
 
-  const update = (key: keyof Omit<Server, 'id'>, value: string | number) => {
+  const update = (key: keyof Omit<ServerConfig, 'id'>, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -54,15 +54,11 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
 
     setLoading(true)
     try {
-      let servers: Server[]
+      let servers: ServerConfig[]
       if (isEdit && server) {
-        servers = await updateServer({
-          server: { ...form, id: server.id },
-        })
+        servers = await commands.updateServer({ ...form, id: server.id })
       } else {
-        servers = await addServer({
-          server: { ...form, id: '' },
-        })
+        servers = await commands.addServer({ ...form, id: '' })
       }
       onSave(servers)
       onOpenChange(false)
@@ -80,9 +76,7 @@ export default function ServerModal({ open, onOpenChange, server, onSave }: Serv
     if (form.auth_type === 'key' && !form.key_path?.trim()) return toast.warning('请填写密钥路径')
     setLoading(true)
     try {
-      const msg = await testConnectionDirect({
-        server: { ...form, id: server?.id ?? '' },
-      })
+      const msg = await commands.testConnectionDirect({ ...form, id: server?.id ?? '' })
       toast.success(msg)
     } catch (e) {
       toast.error(String(e))

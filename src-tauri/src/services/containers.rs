@@ -189,12 +189,7 @@ fn build_run_container_body(params: &RunContainer) -> Result<ContainerCreate, St
         exposed_ports.insert(key.clone(), serde_json::json!({}));
         let host_port_str = match p.host_port {
             None | Some(0) => String::new(),
-            Some(hp) => {
-                if hp > 65535 {
-                    return Err("主机端口无效".to_string());
-                }
-                hp.to_string()
-            }
+            Some(hp) => hp.to_string(),
         };
         port_bindings.insert(
             key,

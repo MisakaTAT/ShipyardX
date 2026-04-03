@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { getContainerStats } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
 import { toast } from 'sonner'
-import type { ContainerStats } from '../types'
+import type { ContainerStats } from '@/types/app-bindings'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatBytes } from '@/utils/formatBytes'
@@ -108,10 +108,7 @@ export default function StatsModal({ serverId, containerId, containerName, onClo
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const s = await getContainerStats({
-        serverId,
-        containerId,
-      })
+      const s = await commands.getContainerStats(serverId, containerId)
       setStats(s)
       setLastUpdated(formatNowTime())
     } catch (e) {

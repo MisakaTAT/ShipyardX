@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { cancelStream, listImages, removeImage, startImagePull } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { Trash2, Download, Loader2, Image as ImageIcon, Search, X, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Image } from '../types'
+import type { Image } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -41,7 +41,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   const fetchImages = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listImages({ serverId })
+      const data = await commands.listImages(serverId)
       setImages(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -262,11 +262,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await removeImage({
-              serverId,
-              imageId: removeTarget.id,
-              force: removeForce,
-            })
+            await commands.removeImage(serverId, removeTarget.id, removeForce)
             await fetchImages()
           } catch (e) {
             toast.error(String(e))
@@ -318,7 +314,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
       const target = id ?? pullId
       if (target) {
         try {
-          await cancelStream({ streamId: target })
+          await commands.cancelStream(target)
         } catch {
           /* ignore */
         }
@@ -336,10 +332,7 @@ function PullModal({ serverId, onSuccess, onClose }: PullModalProps) {
     setLines([`> docker pull ${img}`, ''])
 
     try {
-      const id = await startImagePull({
-        serverId,
-        image: img,
-      })
+      const id = await commands.startImagePull(serverId, img)
       setPullId(id)
 
       unlistenDataRef.current = await listen<string>(`pull-data:${id}`, (event) => {

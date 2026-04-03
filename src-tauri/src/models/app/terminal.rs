@@ -1,4 +1,5 @@
 use serde::Serialize;
+use specta::Type;
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -17,7 +18,7 @@ impl WsServerMsg {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Type)]
 pub struct TerminalSession {
     pub session_id: String,
     pub ws_port: u16,

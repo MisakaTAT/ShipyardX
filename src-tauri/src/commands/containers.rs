@@ -5,11 +5,13 @@ use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> Result<Vec<Container>, String> {
     services::containers::list_containers(server_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn start_container(
     server_id: String,
     container_id: String,
@@ -19,11 +21,13 @@ pub async fn start_container(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> Result<(), String> {
     services::containers::stop_container(server_id, container_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn restart_container(
     server_id: String,
     container_id: String,
@@ -33,6 +37,7 @@ pub async fn restart_container(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn remove_container(
     server_id: String,
     container_id: String,
@@ -43,6 +48,7 @@ pub async fn remove_container(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn inspect_container(
     server_id: String,
     container_id: String,
@@ -52,6 +58,7 @@ pub async fn inspect_container(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn run_container(
     server_id: String,
     params: RunContainer,
@@ -61,6 +68,7 @@ pub async fn run_container(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_container_logs(
     server_id: String,
     container_id: String,

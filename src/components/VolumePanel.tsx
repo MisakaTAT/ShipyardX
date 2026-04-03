@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createVolume, listVolumes, removeVolume } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { Database, Search, X, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Volume, VolumeCreate } from '../types'
+import type { Volume } from '@/types/app-bindings'
 import { ConfirmDialog } from './ConfirmDialog'
 import InspectModal from './InspectModal'
 import { Button } from '@/components/ui/button'
@@ -47,7 +47,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
   const fetchVolumes = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listVolumes({ serverId })
+      const data = await commands.listVolumes(serverId)
       setVolumes(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -393,12 +393,12 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                       driverOpts.device = `:${mount}`
                     }
 
-                    const req: VolumeCreate = {
-                      name: createName.trim(),
-                      driver: 'local',
-                      driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
-                    }
-                    await createVolume({ serverId, ...req })
+                    await commands.createVolume(
+                      serverId,
+                      createName.trim(),
+                      'local',
+                      Object.keys(driverOpts).length ? driverOpts : null,
+                    )
                     setShowCreate(false)
                     await fetchVolumes()
                   } catch (e) {
@@ -448,7 +448,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         onConfirm={async () => {
           if (!removeTarget) return
           try {
-            await removeVolume({ serverId, name: removeTarget.name })
+            await commands.removeVolume(serverId, removeTarget.name)
             await fetchVolumes()
           } catch (e) {
             toast.error(String(e))

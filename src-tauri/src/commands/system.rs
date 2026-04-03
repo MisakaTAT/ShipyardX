@@ -7,16 +7,19 @@ use crate::services;
 use crate::state::AppState;
 
 #[tauri::command]
+#[specta::specta]
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> Result<(), String> {
     services::system::check_docker_access(server_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerEngineInfo, String> {
     services::system::get_docker_info(server_id, state).await
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_container_stats(
     server_id: String,
     container_id: String,
@@ -26,6 +29,7 @@ pub async fn get_container_stats(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn get_docker_daemon_settings(
     server_id: String,
     state: State<'_, AppState>,
@@ -34,6 +38,7 @@ pub async fn get_docker_daemon_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn update_docker_daemon_settings(
     server_id: String,
     params: DaemonUpdate,
@@ -43,6 +48,7 @@ pub async fn update_docker_daemon_settings(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn restart_docker_daemon(
     server_id: String,
     sudo_password: Option<String>,

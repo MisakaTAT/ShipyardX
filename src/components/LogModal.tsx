@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { getContainerLogs, startLogStream, stopLogStream } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
@@ -72,7 +72,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     }
     if (streamIdRef.current) {
       try {
-        await stopLogStream({ streamId: streamIdRef.current })
+        await commands.stopLogStream(streamIdRef.current)
       } catch {
         /* ignore */
       }
@@ -86,12 +86,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     setLines([])
     streamLineBufferRef.current = ''
     try {
-      const logs = await getContainerLogs({
-        serverId,
-        containerId,
-        tail,
-        timestamps,
-      })
+      const logs = await commands.getContainerLogs(serverId, containerId, tail, timestamps)
       const normalized = logs.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
       setLines(normalized.length ? normalized.split('\n') : [])
     } catch (e) {
@@ -108,12 +103,7 @@ export default function LogModal({ serverId, containerId, containerName, onClose
     setLines([`[${formatNowTime()}] 正在连接日志流...`])
 
     try {
-      const streamId = await startLogStream({
-        serverId,
-        containerId,
-        tail,
-        timestamps,
-      })
+      const streamId = await commands.startLogStream(serverId, containerId, tail, timestamps)
       streamIdRef.current = streamId
 
       unlistenDataRef.current = await listen(`log-data:${streamId}`, (event) => {

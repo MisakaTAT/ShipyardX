@@ -1,10 +1,6 @@
 import { listen } from '@tauri-apps/api/event'
-import { cancelStream, startImagePull } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 
-/**
- * 拉取镜像并流式更新日志行（与 ImagePanel PullModal 拼接逻辑一致）。
- * `onStreamId` 可用于用户取消时 `cancelStream`。
- */
 export async function pullImage(
   serverId: string,
   image: string,
@@ -14,7 +10,7 @@ export async function pullImage(
   let lines: string[] = [`> docker pull ${image}`, '']
   onLogsUpdate(lines)
 
-  const streamId = await startImagePull({ serverId, image })
+  const streamId = await commands.startImagePull(serverId, image)
   options?.onStreamId?.(streamId)
 
   const unData = await listen<string>(`pull-data:${streamId}`, (event) => {
@@ -44,7 +40,7 @@ export async function pullImage(
 
   if (!success) {
     try {
-      await cancelStream({ streamId })
+      await commands.cancelStream(streamId)
     } catch {
       /* ignore */
     }

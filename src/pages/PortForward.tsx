@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  createPortForwardRule,
-  deletePortForward,
-  listContainers,
-  listLocalAddresses,
-  listPortForwardsAll,
-  getServers,
-  setPortForwardEnabled,
-  startAllEnabledGlobal,
-  stopAllGlobal,
-} from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { toast } from 'sonner'
 import { ArrowLeftRight, Loader2, Play, Plus, Search, Square, Trash2, X } from 'lucide-react'
 
-import type { Container, LocalAddress, PortForward, Server } from '@/types'
+import type { Container, LocalAddress, PortForward, ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -111,7 +101,7 @@ export default function PortForwardPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
 
-  const [servers, setServers] = useState<Server[]>([])
+  const [servers, setServers] = useState<ServerConfig[]>([])
   const [serversLoading, setServersLoading] = useState(false)
   const [createServerId, setCreateServerId] = useState<string>('')
 
@@ -133,7 +123,7 @@ export default function PortForwardPage() {
   const [bindAddress, setBindAddress] = useState('127.0.0.1')
 
   const serverById = useMemo(() => {
-    const m = new Map<string, Server>()
+    const m = new Map<string, ServerConfig>()
     for (const s of servers) m.set(s.id, s)
     return m
   }, [servers])
@@ -166,7 +156,7 @@ export default function PortForwardPage() {
   const fetchRules = useCallback(async () => {
     setRulesLoading(true)
     try {
-      const data = await listPortForwardsAll()
+      const data = await commands.listPortForwardsAll()
       setRules(data)
 
       const now = Date.now()
@@ -197,7 +187,7 @@ export default function PortForwardPage() {
 
   const loadLocalAddresses = useCallback(async () => {
     try {
-      const data = await listLocalAddresses()
+      const data = await commands.listLocalAddresses()
       if (data.length > 0) setLocalAddresses(data)
     } catch {
       // fallback to defaults already set
@@ -207,7 +197,7 @@ export default function PortForwardPage() {
   const loadServers = useCallback(async () => {
     setServersLoading(true)
     try {
-      const data = await getServers()
+      const data = await commands.getServers()
       setServers(data)
       if (!createServerId && data.length > 0) setCreateServerId(data[0].id)
     } catch (e) {
@@ -221,7 +211,7 @@ export default function PortForwardPage() {
     if (!createServerId) return
     setContainersLoading(true)
     try {
-      const data = await listContainers({ serverId: createServerId })
+      const data = await commands.listContainers(createServerId)
       setContainers(data)
       setCreateContainerId(data.length > 0 ? data[0].id : '')
     } catch (e) {
@@ -306,19 +296,16 @@ export default function PortForwardPage() {
 
     setCreateSubmitting(true)
     try {
-      const created = await createPortForwardRule({
-        serverId: createServerId,
-        params: {
-          container_id: selectedCreateContainer.id,
-          container_name: selectedCreateContainer.name || null,
-          remote_host: selectedCreateContainer.ip,
-          remote_port: createContainerPort,
-          container_port: createContainerPort,
-          protocol: 'tcp',
-          local_port: localPort,
-          bind_address: bindAddress.trim() || null,
-          enabled: true,
-        },
+      const created = await commands.createPortForwardRule(createServerId, {
+        container_id: selectedCreateContainer.id,
+        container_name: selectedCreateContainer.name || null,
+        remote_host: selectedCreateContainer.ip,
+        remote_port: createContainerPort,
+        container_port: createContainerPort,
+        protocol: 'tcp',
+        local_port: localPort,
+        bind_address: bindAddress.trim() || null,
+        enabled: true,
       })
       toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
       setShowCreate(false)
@@ -332,7 +319,7 @@ export default function PortForwardPage() {
 
   const handleStartAll = async () => {
     try {
-      await startAllEnabledGlobal()
+      await commands.startAllEnabledGlobal()
       toast.success('已启动所有已启用规则')
       await fetchRules()
     } catch (e) {
@@ -342,7 +329,7 @@ export default function PortForwardPage() {
 
   const handleStopAll = async () => {
     try {
-      await stopAllGlobal()
+      await commands.stopAllGlobal()
       toast.success('已停止所有转发')
       await fetchRules()
     } catch (e) {
@@ -352,7 +339,7 @@ export default function PortForwardPage() {
 
   const handleSetEnabled = async (id: string, enabled: boolean) => {
     try {
-      await setPortForwardEnabled({ id, enabled })
+      await commands.setPortForwardEnabled(id, enabled)
       toast.success(enabled ? '规则已启用' : '规则已禁用')
       await fetchRules()
     } catch (e) {
@@ -362,7 +349,7 @@ export default function PortForwardPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deletePortForward({ id })
+      await commands.deletePortForward(id)
       toast.success('已删除规则')
       await fetchRules()
     } catch (e) {

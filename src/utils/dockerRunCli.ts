@@ -1,6 +1,5 @@
-import type { RunContainer } from '@/types'
+import type { RunContainer } from '@/types/app-bindings'
 
-/** 拆分为 shell 风格参数（支持双引号、单引号、反斜杠续行） */
 export function splitShellArgs(input: string): string[] {
   const s = input.replace(/\\\r?\n/g, ' ').replace(/\\\n/g, ' ')
   const out: string[] = []
@@ -36,7 +35,6 @@ export function splitShellArgs(input: string): string[] {
   return out
 }
 
-/** `--foo=bar` → `--foo`,`bar`；`-p80:80` → `-p`,`80:80` */
 function expandRunTokens(tokens: string[]): string[] {
   const res: string[] = []
   for (const t of tokens) {
@@ -105,7 +103,9 @@ function parseVolume(spec: string): { host_path: string; container_path: string;
   }
 }
 
-function parseRestart(value: string): { restart_policy: string; restart_max_retry: number | null } {
+function parseRestart(
+  value: string,
+): { restart_policy: string; restart_max_retry: number | null } {
   const v = value.trim().toLowerCase()
   if (v.startsWith('on-failure')) {
     const colon = v.indexOf(':')
@@ -223,7 +223,7 @@ export function parseContainerRun(input: string): ParseContainerRunResult {
         ports,
         volumes,
         restart_policy,
-        restart_max_retry: restart_policy === 'on-failure' ? (restart_max_retry ?? 0) : null,
+        restart_max_retry: restart_policy === 'on-failure' ? restart_max_retry ?? 0 : null,
       },
     }
   }
@@ -250,11 +250,11 @@ export function formatContainerRun(params: RunContainer): string {
     body.push(`--restart ${rp}`)
   }
 
-  for (const e of params.env) {
+  for (const e of params.env ?? []) {
     if (e.trim()) body.push(`-e ${shellQuote(e.trim())}`)
   }
 
-  for (const p of params.ports) {
+  for (const p of params.ports ?? []) {
     const proto = (p.protocol || 'tcp').toLowerCase()
     const suffix = proto === 'udp' ? '/udp' : ''
     let spec: string
@@ -266,7 +266,7 @@ export function formatContainerRun(params: RunContainer): string {
     body.push(`-p ${spec}`)
   }
 
-  for (const v of params.volumes) {
+  for (const v of params.volumes ?? []) {
     const hp = v.host_path.trim()
     const cp = v.container_path.trim()
     if (!hp || !cp) continue
@@ -285,24 +285,22 @@ export function formatContainerRun(params: RunContainer): string {
     .join('\n')
 }
 
-/** 与运行前校验一致；通过返回 null */
 export function validateRunParams(params: RunContainer): string | null {
   if (!params.image.trim()) return '镜像不能为空'
-  for (const line of params.env) {
+  for (const line of params.env ?? []) {
     if (!line.includes('=')) return `环境变量须为 KEY=value：${line}`
   }
-  for (const p of params.ports) {
+  for (const p of params.ports ?? []) {
     if (!p.container_port || p.container_port < 1 || p.container_port > 65535) return '容器端口须在 1–65535'
     const hp = p.host_port
     if (hp != null && hp !== 0 && (hp < 1 || hp > 65535)) return '主机端口须为空、0 或 1–65535'
   }
-  for (const v of params.volumes) {
+  for (const v of params.volumes ?? []) {
     if (!v.host_path.trim() || !v.container_path.trim()) return '卷挂载路径不能为空'
   }
   return null
 }
 
-/** 从当前表单字段构造 RunContainer（与 RunContainerDialog 校验规则一致） */
 export function buildRunParamsFromForm(args: {
   image: string
   name: string
@@ -333,7 +331,6 @@ export function buildRunParamsFromForm(args: {
   }
 }
 
-/** 将解析结果写回表单用的结构 */
 export function paramsToFormState(params: RunContainer): {
   image: string
   name: string
@@ -346,13 +343,13 @@ export function paramsToFormState(params: RunContainer): {
   return {
     image: params.image.trim(),
     name: params.name?.trim() ?? '',
-    envText: params.env.join('\n'),
-    ports: params.ports.map((p) => ({
+    envText: (params.env ?? []).join('\n'),
+    ports: (params.ports ?? []).map((p) => ({
       containerPort: p.container_port,
       hostPort: p.host_port ?? null,
       protocol: p.protocol || 'tcp',
     })),
-    volumes: params.volumes.map((v) => ({
+    volumes: (params.volumes ?? []).map((v) => ({
       hostPath: v.host_path,
       containerPath: v.container_path,
       readOnly: Boolean(v.read_only),

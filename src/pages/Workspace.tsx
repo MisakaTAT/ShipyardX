@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { checkEngineAccess } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import {
   Activity,
   Box,
@@ -15,7 +15,7 @@ import {
   Settings2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Server } from '@/types'
+import type { ServerConfig } from '@/types/app-bindings'
 import ContainerPanel from '@/components/ContainerPanel'
 import ImagePanel from '@/components/ImagePanel'
 import NetworkPanel from '@/components/NetworkPanel'
@@ -59,7 +59,7 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 interface WorkspaceProps {
-  selectedServer: Server
+  selectedServer: ServerConfig
   onDisconnect: () => void
   activeTab: WorkspaceTab
   onActiveTabChange: (tab: WorkspaceTab) => void
@@ -74,7 +74,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     async (notify = false) => {
       setDockerStatus('checking')
       try {
-        await checkEngineAccess({ serverId: selectedServer.id })
+        await commands.checkDockerAccess(selectedServer.id)
         setDockerStatus('ok')
         if (notify) toast.success('Docker 连接正常')
       } catch (e) {

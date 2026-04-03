@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { invokeContainerCommand, listContainers } from '@/lib/commands'
+import { commands } from '@/types/app-bindings'
 import { toast } from 'sonner'
 import {
   BarChart2,
@@ -17,7 +17,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { Container } from '../types'
+import type { Container } from '@/types/app-bindings'
 import LogModal from './LogModal'
 import StatsModal from './StatsModal'
 import ContainerExecModal from './ContainerExecModal'
@@ -144,7 +144,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const fetchContainers = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listContainers({ serverId })
+      const data = await commands.listContainers(serverId)
       setContainers(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
@@ -177,7 +177,22 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   ) => {
     setActionLoading((prev) => ({ ...prev, [containerId]: action }))
     try {
-      await invokeContainerCommand(command, { serverId, containerId, ...args })
+      switch (command) {
+        case 'start_container':
+          await commands.startContainer(serverId, containerId)
+          break
+        case 'stop_container':
+          await commands.stopContainer(serverId, containerId)
+          break
+        case 'restart_container':
+          await commands.restartContainer(serverId, containerId)
+          break
+        case 'remove_container':
+          await commands.removeContainer(serverId, containerId, Boolean(args.force))
+          break
+        default:
+          throw new Error(`Unknown container command: ${command}`)
+      }
       await fetchContainers()
     } catch (e) {
       toast.error(String(e))

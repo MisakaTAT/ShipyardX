@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { deleteServer, getServers } from '@/lib/commands'
-import { Server as ServerIcon, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
-import type { Server } from '@/types'
+import { commands } from '@/types/app-bindings'
+import { Server, Plus, Pencil, Trash2, Search, X, KeyRound, Lock, ArrowRight } from 'lucide-react'
+import type { ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -11,19 +11,19 @@ import ServerModal from '@/components/ServerModal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 interface ConnectionsProps {
-  onConnect: (server: Server) => void
+  onConnect: (server: ServerConfig) => void
 }
 
 export default function Connections({ onConnect }: ConnectionsProps) {
-  const [servers, setServers] = useState<Server[]>([])
+  const [servers, setServers] = useState<ServerConfig[]>([])
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [editingServer, setEditingServer] = useState<Server | null>(null)
+  const [editingServer, setEditingServer] = useState<ServerConfig | null>(null)
   const [deleteServerId, setDeleteServerId] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    getServers().then(setServers).catch(console.error)
+    commands.getServers().then(setServers).catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const handleSave = (updated: Server[]) => {
+  const handleSave = (updated: ServerConfig[]) => {
     setServers(updated)
   }
 
@@ -46,7 +46,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
     setShowModal(true)
   }
 
-  const handleEdit = (server: Server) => {
+  const handleEdit = (server: ServerConfig) => {
     setEditingServer(server)
     setShowModal(true)
   }
@@ -55,7 +55,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
     const id = deleteServerId
     if (!id) return
     try {
-      const updated = await deleteServer({ id })
+      const updated = await commands.deleteServer(id)
       setServers(updated)
     } catch (e) {
       console.error(e)
@@ -164,7 +164,7 @@ function ServerCard({
   onEdit,
   onDelete,
 }: {
-  server: Server
+  server: ServerConfig
   onConnect: () => void
   onEdit: () => void
   onDelete: () => void
@@ -180,7 +180,7 @@ function ServerCard({
             className="flex size-8 items-center justify-center rounded-lg"
             style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)' }}
           >
-            <ServerIcon className="size-[15px] text-(--accent-text)" />
+            <Server className="size-[15px] text-(--accent-text)" />
           </div>
           <Badge
             variant="secondary"
@@ -256,7 +256,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl"
           style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}
         >
-          <ServerIcon className="size-7 text-(--accent-text)" />
+          <Server className="size-7 text-(--accent-text)" />
         </div>
         <h2 className="text-sm font-semibold text-(--text-strong)">尚未配置远程服务器</h2>
         <p className="mt-1.5 text-xs leading-relaxed text-(--text-muted)">

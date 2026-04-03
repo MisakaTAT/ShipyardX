@@ -13,12 +13,90 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
+use models::app::events::{
+    DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
+};
+use specta_typescript::Typescript;
 use tauri::Manager;
+use tauri_specta::{Builder, ErrorHandlingMode, collect_commands, collect_events};
 
 pub fn run() {
+    let specta_builder = Builder::<tauri::Wry>::new()
+        .error_handling(ErrorHandlingMode::Throw)
+        .commands(collect_commands![
+            commands::servers::get_servers,
+            commands::servers::add_server,
+            commands::servers::update_server,
+            commands::servers::delete_server,
+            commands::servers::test_connection,
+            commands::servers::test_connection_direct,
+            commands::containers::list_containers,
+            commands::containers::start_container,
+            commands::containers::stop_container,
+            commands::containers::restart_container,
+            commands::containers::remove_container,
+            commands::containers::inspect_container,
+            commands::containers::get_container_logs,
+            commands::containers::run_container,
+            commands::images::list_images,
+            commands::images::inspect_image,
+            commands::images::remove_image,
+            commands::images::start_image_pull,
+            commands::images::cancel_stream,
+            commands::networks::list_networks,
+            commands::networks::create_network,
+            commands::networks::inspect_network,
+            commands::networks::remove_network,
+            commands::volumes::list_volumes,
+            commands::volumes::create_volume,
+            commands::volumes::inspect_volume,
+            commands::volumes::remove_volume,
+            commands::system::check_docker_access,
+            commands::system::get_docker_info,
+            commands::system::get_container_stats,
+            commands::system::get_docker_daemon_settings,
+            commands::system::update_docker_daemon_settings,
+            commands::system::restart_docker_daemon,
+            commands::log_stream::start_log_stream,
+            commands::log_stream::stop_log_stream,
+            commands::docker_events::start_event_stream,
+            commands::docker_events::stop_event_stream,
+            commands::port_forward::list_local_addresses,
+            commands::port_forward::list_port_forwards,
+            commands::port_forward::list_port_forwards_all,
+            commands::port_forward::create_port_forward_rule,
+            commands::port_forward::set_port_forward_enabled,
+            commands::port_forward::delete_port_forward,
+            commands::port_forward::start_all_enabled,
+            commands::port_forward::start_all_enabled_global,
+            commands::port_forward::stop_all_global,
+            commands::port_forward::stop_port_forward,
+            commands::terminal::open_terminal,
+            commands::terminal::open_container_exec_terminal,
+            commands::terminal::write_terminal,
+            commands::terminal::resize_terminal,
+            commands::terminal::close_terminal,
+        ])
+        .events(collect_events![
+            DockerStreamPayload,
+            DockerStreamStatus,
+            DockerStreamRefresh,
+            DockerStreamError,
+        ])
+        .typ::<EventStreamStatus>();
+
+    #[cfg(debug_assertions)]
+    specta_builder
+        .export(Typescript::default(), "../src/types/app-bindings.ts")
+        .expect("导出 Tauri Specta TypeScript 绑定失败");
+
+    let invoke_handler = specta_builder.invoke_handler();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .invoke_handler(invoke_handler)
+        .setup(move |app| {
+            specta_builder.mount_events(app);
             let data_file = get_data_file(app.handle());
             let servers = load_servers(&data_file);
             app.manage(AppState {
@@ -33,70 +111,6 @@ pub fn run() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            // 服务器管理
-            commands::servers::get_servers,
-            commands::servers::add_server,
-            commands::servers::update_server,
-            commands::servers::delete_server,
-            commands::servers::test_connection,
-            commands::servers::test_connection_direct,
-            // 容器管理
-            commands::containers::list_containers,
-            commands::containers::start_container,
-            commands::containers::stop_container,
-            commands::containers::restart_container,
-            commands::containers::remove_container,
-            commands::containers::inspect_container,
-            commands::containers::get_container_logs,
-            commands::containers::run_container,
-            // 镜像管理
-            commands::images::list_images,
-            commands::images::inspect_image,
-            commands::images::remove_image,
-            commands::images::start_image_pull,
-            commands::images::cancel_stream,
-            // 网络管理
-            commands::networks::list_networks,
-            commands::networks::create_network,
-            commands::networks::inspect_network,
-            commands::networks::remove_network,
-            // 存储卷管理
-            commands::volumes::list_volumes,
-            commands::volumes::create_volume,
-            commands::volumes::inspect_volume,
-            commands::volumes::remove_volume,
-            // 系统信息 & 统计
-            commands::system::check_docker_access,
-            commands::system::get_docker_info,
-            commands::system::get_container_stats,
-            commands::system::get_docker_daemon_settings,
-            commands::system::update_docker_daemon_settings,
-            commands::system::restart_docker_daemon,
-            // 日志流
-            commands::log_stream::start_log_stream,
-            commands::log_stream::stop_log_stream,
-            // Docker 事件流
-            commands::docker_events::start_event_stream,
-            commands::docker_events::stop_event_stream,
-            // 端口转发
-            commands::port_forward::list_local_addresses,
-            commands::port_forward::list_port_forwards,
-            commands::port_forward::list_port_forwards_all,
-            commands::port_forward::create_port_forward_rule,
-            commands::port_forward::set_port_forward_enabled,
-            commands::port_forward::delete_port_forward,
-            commands::port_forward::start_all_enabled,
-            commands::port_forward::start_all_enabled_global,
-            commands::port_forward::stop_all_global,
-            commands::port_forward::stop_port_forward,
-            // SSH 终端
-            commands::terminal::open_terminal,
-            commands::terminal::open_container_exec_terminal,
-            commands::terminal::write_terminal,
-            commands::terminal::resize_terminal,
-            commands::terminal::close_terminal,
-        ])
         .run(tauri::generate_context!())
         .expect("运行应用时出错");
 }
