@@ -153,11 +153,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
 
   useEffect(() => {
     fetchContainers()
-  }, [fetchContainers])
-
-  useEffect(() => {
-    if (refreshTick && refreshTick > 0) fetchContainers()
-  }, [refreshTick, fetchContainers])
+  }, [fetchContainers, refreshTick])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

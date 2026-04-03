@@ -27,13 +27,22 @@ import EventPanel from '@/components/EventPanel'
 import { useDockerEvents } from '@/lib/useDockerEvents'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { KeepAlive } from '@/components/KeepAlive'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'containers' | 'images' | 'networks' | 'volumes' | 'docker' | 'events' | 'terminal'
+export type WorkspaceTab =
+  | 'overview'
+  | 'containers'
+  | 'images'
+  | 'networks'
+  | 'volumes'
+  | 'docker'
+  | 'events'
+  | 'terminal'
 type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
 interface NavItem {
-  key: Tab
+  key: WorkspaceTab
   icon: React.ReactNode
   label: string
 }
@@ -52,10 +61,11 @@ const NAV_ITEMS: NavItem[] = [
 interface WorkspaceProps {
   selectedServer: Server
   onDisconnect: () => void
+  activeTab: WorkspaceTab
+  onActiveTabChange: (tab: WorkspaceTab) => void
 }
 
-export default function Workspace({ selectedServer, onDisconnect }: WorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+export default function Workspace({ selectedServer, onDisconnect, activeTab, onActiveTabChange }: WorkspaceProps) {
   const [dockerStatus, setDockerStatus] = useState<DockerStatus>('checking')
   const [refreshTick, setRefreshTick] = useState(0)
   const refreshTypesRef = useRef<Set<string>>(new Set())
@@ -102,7 +112,6 @@ export default function Workspace({ selectedServer, onDisconnect }: WorkspacePro
   })
 
   useEffect(() => {
-    setActiveTab('overview')
     checkDocker()
   }, [selectedServer.id, checkDocker])
 
@@ -129,7 +138,7 @@ export default function Workspace({ selectedServer, onDisconnect }: WorkspacePro
         username={selectedServer.username}
         onRetry={() => checkDocker(true)}
         onDisconnect={handleDisconnect}
-        onOpenTerminal={() => setActiveTab('terminal')}
+        onOpenTerminal={() => onActiveTabChange('terminal')}
       />
     )
   }
@@ -137,7 +146,11 @@ export default function Workspace({ selectedServer, onDisconnect }: WorkspacePro
   return (
     <div className="flex-1 overflow-auto p-2 md:p-3">
       <div className="flex h-full flex-col gap-3">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)} className="flex flex-col gap-3">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => onActiveTabChange(v as WorkspaceTab)}
+          className="flex flex-col gap-3"
+        >
           <TabsList
             variant="line"
             className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-(--bg-panel) p-1.5"
@@ -183,7 +196,7 @@ export default function Workspace({ selectedServer, onDisconnect }: WorkspacePro
 
         <div
           className={cn(
-            'min-h-[360px] flex-1 overflow-hidden',
+            'flex min-h-[360px] flex-1 flex-col overflow-hidden',
             activeTab === 'overview' || activeTab === 'docker' ? '' : 'rounded-xl border border-border bg-(--bg-panel)',
           )}
           style={activeTab === 'overview' || activeTab === 'docker' ? { background: 'transparent' } : undefined}
@@ -197,9 +210,9 @@ export default function Workspace({ selectedServer, onDisconnect }: WorkspacePro
           {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'events' ? <EventPanel events={events} status={eventStatus} onClear={clearEvents} /> : null}
-          <div className={cn('h-full', activeTab === 'terminal' ? 'block' : 'hidden')}>
+          <KeepAlive lazy show={activeTab === 'terminal'} className="min-h-0 flex-1 flex flex-col overflow-hidden">
             <TerminalPanel serverId={selectedServer.id} />
-          </div>
+          </KeepAlive>
         </div>
       </div>
     </div>

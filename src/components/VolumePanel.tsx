@@ -59,11 +59,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
 
   useEffect(() => {
     fetchVolumes()
-  }, [fetchVolumes])
-
-  useEffect(() => {
-    if (refreshTick && refreshTick > 0) fetchVolumes()
-  }, [refreshTick, fetchVolumes])
+  }, [fetchVolumes, refreshTick])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

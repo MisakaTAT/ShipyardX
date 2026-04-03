@@ -53,15 +53,11 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
 
   useEffect(() => {
     fetchImages()
-  }, [fetchImages])
+  }, [fetchImages, refreshTick])
 
   useEffect(() => {
     setRemoveForce(false)
   }, [removeTarget?.id])
-
-  useEffect(() => {
-    if (refreshTick && refreshTick > 0) fetchImages()
-  }, [refreshTick, fetchImages])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

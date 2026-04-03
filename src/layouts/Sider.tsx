@@ -1,7 +1,9 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { useLocation } from 'wouter'
 import { Server as ServerIcon, Stone, Settings, Sun, Moon, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { APP_PATHS } from '@/lib/appRouter'
 
 function siderNavButtonClass(active?: boolean, disabled?: boolean) {
   return cn(
@@ -15,12 +17,12 @@ function siderNavButtonClass(active?: boolean, disabled?: boolean) {
 
 interface SiderProps {
   light: boolean
-  activeView: 'workspace' | 'port_forward' | 'store'
-  onChangeView: (view: 'workspace' | 'port_forward' | 'store') => void
   onToggleTheme: () => void
 }
 
-export default function Sider({ light, activeView, onChangeView, onToggleTheme }: SiderProps) {
+export default function Sider({ light, onToggleTheme }: SiderProps) {
+  const [location, navigate] = useLocation()
+
   return (
     <nav
       className="flex w-14 shrink-0 flex-col items-center border-r border-border py-3"
@@ -31,8 +33,8 @@ export default function Sider({ light, activeView, onChangeView, onToggleTheme }
           type="button"
           variant="ghost"
           title="服务器列表"
-          className={siderNavButtonClass(activeView === 'workspace')}
-          onClick={() => onChangeView('workspace')}
+          className={siderNavButtonClass(location === APP_PATHS.workspace)}
+          onClick={() => navigate(APP_PATHS.workspace)}
         >
           <ServerIcon size={18} />
         </Button>
@@ -40,8 +42,8 @@ export default function Sider({ light, activeView, onChangeView, onToggleTheme }
           type="button"
           variant="ghost"
           title="端口转发"
-          className={siderNavButtonClass(activeView === 'port_forward')}
-          onClick={() => onChangeView('port_forward')}
+          className={siderNavButtonClass(location === APP_PATHS.portForward)}
+          onClick={() => navigate(APP_PATHS.portForward)}
         >
           <ArrowLeftRight size={18} />
         </Button>
@@ -49,8 +51,8 @@ export default function Sider({ light, activeView, onChangeView, onToggleTheme }
           type="button"
           variant="ghost"
           title="应用商店"
-          className={siderNavButtonClass(activeView === 'store')}
-          onClick={() => onChangeView('store')}
+          className={siderNavButtonClass(location === APP_PATHS.store)}
+          onClick={() => navigate(APP_PATHS.store)}
         >
           <Stone size={18} />
         </Button>

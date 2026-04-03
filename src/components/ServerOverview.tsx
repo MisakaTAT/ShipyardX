@@ -36,11 +36,7 @@ export default function ServerOverview({ serverId, refreshTick }: Props) {
 
   useEffect(() => {
     fetch()
-  }, [fetch])
-
-  useEffect(() => {
-    if (refreshTick && refreshTick > 0) fetch()
-  }, [refreshTick, fetch])
+  }, [fetch, refreshTick])
 
   if (!info && !loading) return null
   const totalContainers = info?.containers ?? 0

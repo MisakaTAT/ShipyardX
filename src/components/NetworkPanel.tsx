@@ -58,11 +58,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
 
   useEffect(() => {
     fetchNetworks()
-  }, [fetchNetworks])
-
-  useEffect(() => {
-    if (refreshTick && refreshTick > 0) fetchNetworks()
-  }, [refreshTick, fetchNetworks])
+  }, [fetchNetworks, refreshTick])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
