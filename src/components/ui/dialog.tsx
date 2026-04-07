@@ -10,17 +10,17 @@ const dialogContentAnimate =
 
 const dialogContentVariants = {
   panel:
-    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-(--border-sub) bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-2xl ring-0 sm:max-w-lg',
+    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-popover p-0 text-sm text-foreground shadow-2xl ring-0 sm:max-w-lg',
   panelMd:
-    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-(--border-sub) bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-2xl ring-0 sm:max-w-md',
+    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-popover p-0 text-sm text-foreground shadow-2xl ring-0 sm:max-w-md',
   panelXl:
-    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-(--border-sub) bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-2xl ring-0 sm:max-w-xl',
+    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,calc(100dvh-2rem))] w-full max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-popover p-0 text-sm text-foreground shadow-2xl ring-0 sm:max-w-xl',
   runContainer:
-    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,900px)] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-(--border-sub) bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-2xl ring-0',
+    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,900px)] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-popover p-0 text-sm text-foreground shadow-2xl ring-0',
   fullscreen:
-    'fixed! inset-0! left-0! top-0! z-50 flex! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-none sm:max-w-full',
+    'fixed! inset-0! left-0! top-0! z-50 flex! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 bg-popover p-0 text-sm text-foreground shadow-none sm:max-w-full',
   confirm:
-    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(85vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-(--border-sub) bg-(--bg-overlay) p-0 text-sm text-(--text-base) shadow-2xl ring-0 sm:max-w-md',
+    'fixed top-1/2 left-1/2 z-50 flex max-h-[min(85vh,calc(100dvh-2rem))] min-h-0 w-full max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-popover p-0 text-sm text-foreground shadow-2xl ring-0 sm:max-w-md',
 } as const
 
 export type DialogContentVariant = keyof typeof dialogContentVariants
@@ -37,7 +37,7 @@ export type DialogBodyVariant = keyof typeof dialogBodyVariants
 
 const dialogFooterVariants = {
   confirm:
-    'mx-0 mb-0 flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-(--bg-surface)/40 px-6 pt-3 pb-4 sm:flex-row sm:justify-end',
+    'mx-0 mb-0 flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-muted/40 px-6 pt-3 pb-4 sm:flex-row sm:justify-end',
   panelSplit: 'shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3',
   actionsEnd: 'shrink-0 justify-end gap-2 border-t border-border px-4 py-3',
 } as const
@@ -56,7 +56,7 @@ function DialogOverlay({ className, ...props }: React.ComponentProps<typeof Dial
       data-slot="dialog-overlay"
       className={cn(
         'fixed inset-0 isolate z-50 bg-black/60 duration-100 supports-backdrop-filter:backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
-        className,
+        className
       )}
       {...props}
     />
@@ -141,7 +141,7 @@ function DialogCloseIconButton({ className, ...props }: React.ComponentProps<'bu
       type="button"
       variant="ghost"
       icon
-      className={cn('text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)', className)}
+      className={cn('text-muted-foreground hover:bg-muted hover:text-foreground', className)}
       aria-label="关闭"
       {...props}
     >
@@ -173,11 +173,11 @@ function DialogHeaderBar({
       className={cn('flex shrink-0 flex-row items-center gap-2 border-b border-border px-4 py-3', className)}
     >
       {icon != null ? (
-        <span className="flex shrink-0 text-(--accent-text) [&_svg]:size-4" aria-hidden>
+        <span className="flex shrink-0 text-primary [&_svg]:size-4" aria-hidden>
           {icon}
         </span>
       ) : null}
-      <DialogTitle className={cn('flex-1 text-sm font-semibold leading-none text-(--text-strong)', titleClassName)}>
+      <DialogTitle className={cn('flex-1 text-sm leading-none font-semibold text-foreground', titleClassName)}>
         {title}
       </DialogTitle>
       {headerTrailing != null ? (
@@ -193,8 +193,8 @@ function DialogPanelToolbar({ className, style, ...props }: React.ComponentProps
   return (
     <div
       data-slot="dialog-panel-toolbar"
-      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3', className)}
-      style={{ background: 'var(--bg-panel)', ...style }}
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3', className)}
+      style={style}
       {...props}
     />
   )
@@ -202,7 +202,7 @@ function DialogPanelToolbar({ className, style, ...props }: React.ComponentProps
 
 function DialogPanelToolbarIcon({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex shrink-0 text-(--accent-text) [&_svg]:size-4" aria-hidden>
+    <span className="flex shrink-0 text-primary [&_svg]:size-4" aria-hidden>
       {children}
     </span>
   )
@@ -235,7 +235,7 @@ function DialogLoadingOverlay({ children, className, ...props }: React.Component
       className={cn('absolute inset-0 z-10 flex items-center justify-center bg-black/40', className)}
       {...props}
     >
-      <div className="flex items-center gap-2 text-sm text-(--text-soft)">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         {children}
       </div>
@@ -247,14 +247,16 @@ function DialogPanelTitle({ className, ...props }: React.ComponentProps<'span'>)
   return (
     <span
       data-slot="dialog-panel-title"
-      className={cn('mr-1 font-mono text-sm font-semibold text-(--text-strong)', className)}
+      className={cn('mr-1 font-mono text-sm font-semibold text-foreground', className)}
       {...props}
     />
   )
 }
 
 function DialogPanelMeta({ className, ...props }: React.ComponentProps<'span'>) {
-  return <span data-slot="dialog-panel-meta" className={cn('mr-2 text-xs text-(--text-muted)', className)} {...props} />
+  return (
+    <span data-slot="dialog-panel-meta" className={cn('mr-2 text-xs text-muted-foreground', className)} {...props} />
+  )
 }
 
 function DialogPanelToolbarEnd({ className, ...props }: React.ComponentProps<'div'>) {
@@ -279,7 +281,7 @@ function DialogDescription({ className, ...props }: React.ComponentProps<typeof 
       data-slot="dialog-description"
       className={cn(
         'text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
-        className,
+        className
       )}
       {...props}
     />

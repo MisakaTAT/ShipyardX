@@ -66,7 +66,7 @@ function actionColor(action: string): string {
     return 'text-red-500 bg-red-500/10 border-red-500/30'
   if (['restart', 'pause', 'unpause', 'rename', 'update', 'tag', 'untag'].includes(action))
     return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/30'
-  return 'text-(--text-soft) bg-(--bg-surface) border-(--border-sub)'
+  return 'text-muted-foreground bg-muted border-border'
 }
 
 function statusIndicator(status: EventStreamStatus) {
@@ -80,7 +80,7 @@ function statusIndicator(status: EventStreamStatus) {
       )
     case 'connecting':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-(--text-muted)">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 className="size-3 animate-spin" />
           连接中
         </span>
@@ -94,7 +94,7 @@ function statusIndicator(status: EventStreamStatus) {
       )
     case 'stopped':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-(--text-muted)">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
           <Unplug className="size-3" />
           已停止
         </span>
@@ -155,7 +155,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
   }, [events])
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       {/* Toolbar */}
       <PanelToolbar>
         <PanelToolbarHeading icon={<Activity />} title="事件" meta={events.length > 0 ? `(${events.length})` : null} />
@@ -171,7 +171,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
           type="button"
           variant="ghostAccent"
           icon
-          className={showFilters ? 'bg-(--bg-surface) text-(--text-base)' : undefined}
+          className={showFilters ? 'bg-muted text-foreground' : undefined}
           title="类型过滤"
           onClick={() => setShowFilters(!showFilters)}
         >
@@ -195,10 +195,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
 
       {/* Filter chips */}
       {showFilters && (
-        <div
-          className="flex shrink-0 items-center gap-1 border-b border-border px-5 py-3"
-          style={{ background: 'var(--bg-panel)' }}
-        >
+        <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-5 py-3">
           {TYPE_FILTERS.map((f) => (
             <button
               key={f.key}
@@ -207,8 +204,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
                 typeFilter === f.key
-                  ? 'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-(--accent-text)'
-                  : 'text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)',
+                  ? 'bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
               {f.icon}
@@ -222,15 +219,15 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       {/* Event list */}
       <div
         ref={listRef}
-        className="flex-1 overflow-auto bg-(--bg-panel)"
+        className="flex-1 overflow-auto bg-card"
         onScroll={(e) => {
           const el = e.currentTarget
           setAutoScroll(el.scrollTop <= 10)
         }}
       >
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48" style={{ color: 'var(--text-muted)' }}>
-            <Activity className="w-10 h-10 mb-3" style={{ color: 'var(--border-sub)' }} />
+          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
+            <Activity className="mb-3 h-10 w-10 text-border" />
             <p className="text-sm">{events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'}</p>
           </div>
         ) : (
@@ -251,20 +248,16 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                 return (
                   <TableBodyRow key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}>
                     <TableCell
-                      className="pl-5 pr-3 py-2 align-middle font-mono"
-                      style={{ color: 'var(--text-muted)' }}
+                      className="py-2 pr-3 pl-5 align-middle font-mono text-muted-foreground"
                       title={ev.actor_id || undefined}
                     >
                       {ev.actor_id || '—'}
                     </TableCell>
-                    <TableCell
-                      className="px-3 py-2 font-mono tabular-nums align-middle whitespace-nowrap"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
+                    <TableCell className="px-3 py-2 align-middle font-mono whitespace-nowrap text-muted-foreground tabular-nums">
                       {formatUnixSecondsTime(ev.time)}
                     </TableCell>
                     <TableCell className="px-3 py-2 align-middle">
-                      <span className="inline-flex items-center gap-1.5" style={{ color: 'var(--text-soft)' }}>
+                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                         {typeIcon(ev.event_type)}
                         <span className="text-[11px]">{ev.event_type}</span>
                       </span>
@@ -272,37 +265,34 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
                     <TableCell className="px-3 py-2 align-middle">
                       <span
                         className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border whitespace-nowrap',
-                          actionColor(ev.action),
+                          'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+                          actionColor(ev.action)
                         )}
                       >
                         {ev.action}
                       </span>
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-middle max-w-[160px]">
+                    <TableCell className="max-w-[160px] px-3 py-2 align-middle">
                       <span
-                        className="block truncate font-medium"
-                        style={{ color: ev.actor_name ? 'var(--text-base)' : 'var(--text-muted)' }}
+                        className={cn(
+                          'block truncate font-medium',
+                          ev.actor_name ? 'text-foreground' : 'text-muted-foreground'
+                        )}
                         title={ev.actor_name || undefined}
                       >
                         {ev.actor_name || '—'}
                       </span>
                     </TableCell>
-                    <TableCell className="px-3 py-2 align-middle max-w-0">
+                    <TableCell className="max-w-0 px-3 py-2 align-middle">
                       <span
-                        className="block truncate font-mono"
-                        style={{ color: ev.actor_image ? 'var(--text-soft)' : 'var(--text-muted)' }}
+                        className="block truncate font-mono text-muted-foreground"
                         title={ev.actor_image || undefined}
                       >
                         {ev.actor_image || '—'}
                       </span>
                     </TableCell>
-                    <TableCell className="px-3 pr-5 py-2 align-middle max-w-0">
-                      <span
-                        className="block truncate font-mono"
-                        style={{ color: ev.detail ? 'var(--text-soft)' : 'var(--text-muted)' }}
-                        title={ev.detail || undefined}
-                      >
+                    <TableCell className="max-w-0 px-3 py-2 pr-5 align-middle">
+                      <span className="block truncate font-mono text-muted-foreground" title={ev.detail || undefined}>
                         {ev.detail || '—'}
                       </span>
                     </TableCell>

@@ -1,8 +1,17 @@
 {
+  "endOfLine": "lf",
   "semi": false,
-  "tabWidth": 2,
-  "printWidth": 120,
   "singleQuote": true,
-  "plugins": ["prettier-plugin-toml"],
-  "endOfLine": "lf"
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 120,
+  "plugins": [
+    "prettier-plugin-tailwindcss",
+    "prettier-plugin-toml"
+  ],
+  "tailwindStylesheet": "src/App.css",
+  "tailwindFunctions": [
+    "cn",
+    "cva"
+  ]
 }

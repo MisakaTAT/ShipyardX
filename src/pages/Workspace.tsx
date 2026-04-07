@@ -92,7 +92,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
         }
       }
     },
-    [selectedServer.id],
+    [selectedServer.id]
   )
 
   const dockerOk = dockerStatus === 'ok'
@@ -125,7 +125,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   if (dockerStatus === 'checking') {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-(--text-muted)" />
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -154,7 +154,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
         >
           <TabsList
             variant="line"
-            className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-(--bg-panel) p-1.5"
+            className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-card p-1.5"
           >
             {NAV_ITEMS.map((item) => (
               <TabsTrigger
@@ -185,7 +185,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
                 type="button"
                 variant="ghost"
                 icon
-                className="rounded-full text-(--text-muted) hover:bg-red-500/15 hover:text-red-500"
+                className="rounded-full text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
                 title="断开连接"
                 onClick={handleDisconnect}
               >
@@ -198,7 +198,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
         <div
           className={cn(
             'flex min-h-[360px] flex-1 flex-col overflow-hidden',
-            activeTab === 'overview' || activeTab === 'docker' ? '' : 'rounded-xl border border-border bg-(--bg-panel)',
+            activeTab === 'overview' || activeTab === 'docker' ? '' : 'rounded-xl border border-border bg-card'
           )}
           style={activeTab === 'overview' || activeTab === 'docker' ? { background: 'transparent' } : undefined}
         >
@@ -211,7 +211,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
           {activeTab === 'volumes' ? <VolumePanel serverId={selectedServer.id} refreshTick={refreshTick} /> : null}
           {activeTab === 'docker' ? <DockerManagePanel serverId={selectedServer.id} /> : null}
           {activeTab === 'events' ? <EventPanel events={events} status={eventStatus} onClear={clearEvents} /> : null}
-          <KeepAlive lazy show={activeTab === 'terminal'} className="min-h-0 flex-1 flex flex-col overflow-hidden">
+          <KeepAlive lazy show={activeTab === 'terminal'} className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <TerminalPanel serverId={selectedServer.id} />
           </KeepAlive>
         </div>
@@ -243,10 +243,10 @@ function DockerAccessGuide({
           <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
             <ShieldAlert className="size-7 text-amber-500" />
           </div>
-          <h2 className="text-lg font-semibold text-(--text-strong)">
+          <h2 className="text-lg font-semibold text-foreground">
             {isPermission ? 'Docker 权限不足' : isNoDocker ? 'Docker 未就绪' : '无法连接 Docker'}
           </h2>
-          <p className="text-sm text-(--text-soft)">
+          <p className="text-sm text-muted-foreground">
             {isPermission
               ? `当前用户 ${username} 没有访问 Docker socket 的权限，请将该用户加入 docker 用户组。`
               : isNoDocker
@@ -256,8 +256,8 @@ function DockerAccessGuide({
         </div>
 
         {isPermission ? (
-          <div className="space-y-3 rounded-xl border border-border bg-(--bg-panel) p-4">
-            <p className="text-xs font-medium text-(--text-base)">按以下步骤配置：</p>
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-medium text-foreground">按以下步骤配置：</p>
             <div className="space-y-2.5">
               <Step index={1} title="将用户加入 docker 组">
                 <Code>{`sudo usermod -aG docker ${username}`}</Code>
@@ -271,8 +271,8 @@ function DockerAccessGuide({
             </div>
           </div>
         ) : isNoDocker ? (
-          <div className="space-y-3 rounded-xl border border-border bg-(--bg-panel) p-4">
-            <p className="text-xs font-medium text-(--text-base)">可能的原因与解决方式：</p>
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-medium text-foreground">可能的原因与解决方式：</p>
             <div className="space-y-2.5">
               <Step index={1} title="Docker 未安装">
                 <Code>curl -fsSL https://get.docker.com | sh</Code>
@@ -309,11 +309,11 @@ function DockerAccessGuide({
 function Step({ index, title, children }: { index: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-(--accent)/15 text-[11px] font-semibold text-(--accent-text)">
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
         {index}
       </span>
       <div className="flex-1">
-        <p className="text-xs font-medium text-(--text-soft)">{title}</p>
+        <p className="text-xs font-medium text-muted-foreground">{title}</p>
         {children}
       </div>
     </div>
@@ -321,7 +321,5 @@ function Step({ index, title, children }: { index: number; title: string; childr
 }
 
 function Code({ children }: { children: React.ReactNode }) {
-  return (
-    <pre className="mt-1 rounded-lg bg-(--bg-surface) px-3 py-2 font-mono text-xs text-(--text-base)">{children}</pre>
-  )
+  return <pre className="mt-1 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-foreground">{children}</pre>
 }

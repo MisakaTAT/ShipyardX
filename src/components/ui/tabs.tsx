@@ -16,18 +16,18 @@ function Tabs({ className, orientation = 'horizontal', ...props }: React.Compone
 }
 
 const tabsListVariants = cva(
-  'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-(--text-muted) group-data-horizontal/tabs:h-auto group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col',
+  'group/tabs-list inline-flex w-fit items-center justify-center rounded-lg p-[3px] text-muted-foreground group-data-horizontal/tabs:h-auto group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col',
   {
     variants: {
       variant: {
-        default: 'bg-(--bg-surface)',
+        default: 'bg-muted',
         line: 'gap-1 bg-transparent',
       },
     },
     defaultVariants: {
       variant: 'default',
     },
-  },
+  }
 )
 
 function TabsList({
@@ -50,11 +50,11 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--accent-text)/40 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
-        'text-(--text-soft) hover:bg-(--bg-surface) hover:text-(--text-base)',
-        'data-[state=active]:bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] data-[state=active]:text-(--accent-text)',
+        "relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start focus-visible:ring-1 focus-visible:ring-ring/40 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
+        'text-muted-foreground hover:bg-muted hover:text-foreground',
+        'data-[state=active]:bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] data-[state=active]:text-primary',
         'group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none',
-        className,
+        className
       )}
       {...props}
     />

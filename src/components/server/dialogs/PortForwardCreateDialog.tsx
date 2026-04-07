@@ -47,7 +47,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
 
   const selectedContainer = useMemo(
     () => containers.find((c) => c.id === watchContainerId) ?? null,
-    [containers, watchContainerId],
+    [containers, watchContainerId]
   )
   const portOptions = useMemo(() => parseContainerTcpPortOptions(selectedContainer?.ports ?? ''), [selectedContainer])
 
@@ -234,7 +234,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     <FieldContent>
                       {containersLoading ? (
                         <div className="flex h-9 items-center justify-center">
-                          <Loader2 className="size-4 animate-spin text-(--text-muted)" />
+                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
                         </div>
                       ) : (
                         <Select

@@ -59,7 +59,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
         setPullId(null)
       }
     },
-    [pullId],
+    [pullId]
   )
 
   const runPull = async (img: string) => {
@@ -146,8 +146,8 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
             </FieldGroup>
 
             {lines.length > 0 ? (
-              <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-(--bg-app) p-3">
-                <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-(--text-base)">
+              <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-background p-3">
+                <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground">
                   {lines.join('\n')}
                 </pre>
               </div>

@@ -79,7 +79,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
   })
 
   return (
-    <div className="flex h-full flex-col" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
         <PanelToolbarHeading
           icon={<Share2 />}
@@ -95,7 +95,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {lastUpdated ? <span className="mr-1 text-xs text-(--text-muted)">更新于 {lastUpdated}</span> : null}
+          {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowCreate(true)}>
             <Plus />
             创建网络
@@ -103,14 +103,14 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         </div>
       </PanelToolbar>
 
-      <div className="flex-1 overflow-auto bg-(--bg-panel)">
+      <div className="flex-1 overflow-auto bg-card">
         {loading && networks.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48" style={{ color: 'var(--text-muted)' }}>
-            <Share2 className="w-10 h-10 mb-3" style={{ color: 'var(--border-sub)' }} />
+          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
+            <Share2 className="mb-3 h-10 w-10 text-border" />
             <p className="text-sm">{search ? `无匹配的网络 \"${search}\"` : '没有网络'}</p>
           </div>
         ) : (
@@ -132,34 +132,26 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
               {filtered.map((n) => (
                 <TableBodyRow key={n.id}>
                   <TableCell className="px-5 py-3">
-                    <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
-                      {n.name}
-                    </div>
-                    <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {n.id.slice(0, 12)}
-                    </div>
+                    <div className="font-medium text-foreground">{n.name}</div>
+                    <div className="mt-0.5 font-mono text-xs text-muted-foreground">{n.id.slice(0, 12)}</div>
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
-                    {n.driver || '—'}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
-                    {n.scope || '—'}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 max-w-[220px]">
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{n.driver || '—'}</TableCell>
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{n.scope || '—'}</TableCell>
+                  <TableCell className="max-w-[220px] px-4 py-3">
                     <ChipCell items={n.subnets} />
                   </TableCell>
-                  <TableCell className="px-4 py-3 max-w-[220px]">
+                  <TableCell className="max-w-[220px] px-4 py-3">
                     <ChipCell items={n.gateways} />
                   </TableCell>
-                  <TableCell className="px-4 py-3 max-w-[320px]">
+                  <TableCell className="max-w-[320px] px-4 py-3">
                     <ChipCell items={n.labels} />
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">
                     {n.internal ? 'internal' : ''}
                     {n.internal && n.attachable ? ' · ' : ''}
                     {n.attachable ? 'attachable' : '—'}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">
                     <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>
                   </TableCell>
                   <TableCell className="px-5 py-3">
@@ -230,11 +222,7 @@ function ChipCell({ items }: { items: string[] }) {
   const hiddenCount = list.length - visible.length
 
   if (list.length === 0) {
-    return (
-      <span className="text-xs font-mono" style={{ color: 'var(--text-soft)' }}>
-        —
-      </span>
-    )
+    return <span className="font-mono text-xs text-muted-foreground">—</span>
   }
 
   const full = list.join(', ')
@@ -244,25 +232,13 @@ function ChipCell({ items }: { items: string[] }) {
       {visible.map((item, i) => (
         <span
           key={`${i}-${item}`}
-          className="inline-block max-w-[200px] truncate px-1.5 py-0.5 rounded border text-[10px] font-mono"
-          style={{
-            color: 'var(--text-soft)',
-            borderColor: 'var(--border-sub)',
-            background: 'var(--bg-surface)',
-          }}
+          className="inline-block max-w-[200px] truncate rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
         >
           {item}
         </span>
       ))}
       {hiddenCount > 0 ? (
-        <span
-          className="inline-block px-1.5 py-0.5 rounded border text-[10px]"
-          style={{
-            color: 'var(--text-muted)',
-            borderColor: 'var(--border-sub)',
-            background: 'var(--bg-surface)',
-          }}
-        >
+        <span className="inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
           +{hiddenCount}
         </span>
       ) : null}

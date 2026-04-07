@@ -75,7 +75,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
   })
 
   return (
-    <div className="flex h-full flex-col" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
         <PanelToolbarHeading
           icon={<Database />}
@@ -91,7 +91,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {lastUpdated ? <span className="mr-1 text-xs text-(--text-muted)">更新于 {lastUpdated}</span> : null}
+          {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowCreate(true)}>
             <Plus />
             创建存储卷
@@ -99,14 +99,14 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         </div>
       </PanelToolbar>
 
-      <div className="flex-1 overflow-auto bg-(--bg-panel)">
+      <div className="flex-1 overflow-auto bg-card">
         {loading && volumes.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48" style={{ color: 'var(--text-muted)' }}>
-            <Database className="w-10 h-10 mb-3" style={{ color: 'var(--border-sub)' }} />
+          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
+            <Database className="mb-3 h-10 w-10 text-border" />
             <p className="text-sm">{search ? `无匹配的存储卷 \"${search}\"` : '没有存储卷'}</p>
           </div>
         ) : (
@@ -132,27 +132,19 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
             <TableBody>
               {filtered.map((v) => (
                 <TableBodyRow key={v.name}>
-                  <TableCell className="px-5 py-3 min-w-0">
-                    <span className="block truncate font-medium" style={{ color: 'var(--text-strong)' }} title={v.name}>
+                  <TableCell className="min-w-0 px-5 py-3">
+                    <span className="block truncate font-medium text-foreground" title={v.name}>
                       {v.name}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
-                    {v.driver || '—'}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
-                    {v.scope || '—'}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 min-w-0">
-                    <span
-                      className="block truncate font-mono text-xs"
-                      style={{ color: 'var(--text-muted)' }}
-                      title={v.mountpoint}
-                    >
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{v.driver || '—'}</TableCell>
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{v.scope || '—'}</TableCell>
+                  <TableCell className="min-w-0 px-4 py-3">
+                    <span className="block truncate font-mono text-xs text-muted-foreground" title={v.mountpoint}>
                       {v.mountpoint || '—'}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">
                     <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>
                   </TableCell>
                   <TableCell className="px-5 py-3">

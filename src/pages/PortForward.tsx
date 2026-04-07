@@ -25,7 +25,7 @@ function StatusBadge({ running, enabled }: { running?: boolean; enabled: boolean
   if (running) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-500">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
         监听中
       </span>
     )
@@ -39,8 +39,8 @@ function StatusBadge({ running, enabled }: { running?: boolean; enabled: boolean
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-(--bg-surface) px-2 py-0.5 text-xs font-medium text-(--text-muted)">
-      <span className="h-1.5 w-1.5 rounded-full bg-(--text-muted)/40" />
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
       已禁用
     </span>
   )
@@ -219,7 +219,7 @@ export default function PortForwardPage() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       <PageScrollArea>
         <PageListColumn gap={rules.length > 0}>
           {/* Page Header */}
@@ -227,8 +227,8 @@ export default function PortForwardPage() {
             <div className="shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-lg font-semibold text-(--text-strong)">端口转发</h1>
-                  <p className="mt-0.5 text-xs text-(--text-muted)">
+                  <h1 className="text-lg font-semibold text-foreground">端口转发</h1>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     管理 SSH 隧道端口转发规则，将远程容器端口映射到本地。
                   </p>
                 </div>
@@ -272,20 +272,17 @@ export default function PortForwardPage() {
           ) : null}
 
           {/* Content */}
-          <div
-            className="flex-1 overflow-hidden rounded-xl border border-border"
-            style={{ background: 'var(--bg-panel)' }}
-          >
+          <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
             {rulesLoading && rules.length === 0 ? (
               <div className="flex h-full items-center justify-center">
-                <Loader2 className="size-6 animate-spin text-(--text-muted)" />
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
               </div>
             ) : rules.length === 0 ? (
               <EmptyState onCreate={() => setShowCreate(true)} />
             ) : filteredRules.length === 0 ? (
               <div className="flex h-48 flex-col items-center justify-center text-center">
-                <Search className="size-7 text-(--border-sub)" />
-                <p className="mt-2 text-sm text-(--text-muted)">没有匹配「{search}」的规则</p>
+                <Search className="size-7 text-border" />
+                <p className="mt-2 text-sm text-muted-foreground">没有匹配「{search}」的规则</p>
               </div>
             ) : (
               <div className="h-full overflow-auto">
@@ -315,29 +312,26 @@ export default function PortForwardPage() {
                       return (
                         <TableBodyRow key={f.id}>
                           <TableCell className="px-5 py-3">
-                            <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
-                              {server?.name ?? f.server_id}
-                            </div>
+                            <div className="font-medium text-foreground">{server?.name ?? f.server_id}</div>
                           </TableCell>
                           <TableCell className="px-4 py-3">
-                            <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
+                            <div className="font-medium text-foreground">
                               {f.container_name ?? f.container_id.slice(0, 12)}
                             </div>
-                            <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                               {f.container_id.slice(0, 12)}
                             </div>
                           </TableCell>
                           <TableCell className="px-4 py-3">
-                            <span className="inline-block rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium uppercase text-blue-500">
+                            <span className="inline-block rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-blue-500 uppercase">
                               {f.protocol}
                             </span>
                           </TableCell>
-                          <TableCell className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
+                          <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
                             {f.running ? (
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1 hover:underline cursor-pointer"
-                                style={{ color: 'var(--text-strong)' }}
+                                className="inline-flex cursor-pointer items-center gap-1 text-foreground hover:underline"
                                 title="在浏览器中打开"
                                 onClick={() => {
                                   void openUrl(`http://${f.bind_address}:${f.local_port}`)
@@ -350,19 +344,17 @@ export default function PortForwardPage() {
                                 {f.bind_address}:{f.local_port}
                               </>
                             ) : (
-                              <span className="uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                                random
-                              </span>
+                              <span className="tracking-wide text-muted-foreground uppercase">random</span>
                             )}
                           </TableCell>
-                          <TableCell className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-soft)' }}>
+                          <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
                             {f.remote_host}:{f.remote_port}
                           </TableCell>
                           <TableCell className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
                               <StatusBadge running={f.running} enabled={f.enabled} />
                               {f.last_error ? (
-                                <span className="text-red-500 cursor-help" title={f.last_error}>
+                                <span className="cursor-help text-red-500" title={f.last_error}>
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
                                     <path
                                       fillRule="evenodd"
@@ -374,41 +366,35 @@ export default function PortForwardPage() {
                               ) : null}
                             </div>
                           </TableCell>
-                          <TableCell
-                            className="px-4 py-3 text-xs font-mono tabular-nums"
-                            style={{ color: 'var(--text-muted)' }}
-                          >
+                          <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">
                             <div className="space-y-0.5">
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex w-5 justify-center rounded font-sans text-[10px] font-medium bg-emerald-500/15 text-emerald-400">
+                                <span className="inline-flex w-5 justify-center rounded bg-emerald-500/15 font-sans text-[10px] font-medium text-emerald-400">
                                   TX
                                 </span>
                                 <span>{formatBytes(f.tx_bytes)}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex w-5 justify-center rounded font-sans text-[10px] font-medium bg-sky-500/15 text-sky-400">
+                                <span className="inline-flex w-5 justify-center rounded bg-sky-500/15 font-sans text-[10px] font-medium text-sky-400">
                                   RX
                                 </span>
                                 <span>{formatBytes(f.rx_bytes)}</span>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell
-                            className="px-4 py-3 text-xs font-mono tabular-nums"
-                            style={{ color: 'var(--text-muted)' }}
-                          >
+                          <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">
                             {(() => {
                               const sp = f.running ? speeds[f.id] : undefined
                               return (
                                 <div className="space-y-0.5">
                                   <div className="flex items-center gap-2">
-                                    <span className="inline-flex w-5 justify-center rounded font-sans text-[10px] font-medium bg-emerald-500/15 text-emerald-400">
+                                    <span className="inline-flex w-5 justify-center rounded bg-emerald-500/15 font-sans text-[10px] font-medium text-emerald-400">
                                       TX
                                     </span>
                                     <span>{formatSpeed(sp?.txSpeed ?? 0)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="inline-flex w-5 justify-center rounded font-sans text-[10px] font-medium bg-sky-500/15 text-sky-400">
+                                    <span className="inline-flex w-5 justify-center rounded bg-sky-500/15 font-sans text-[10px] font-medium text-sky-400">
                                       RX
                                     </span>
                                     <span>{formatSpeed(sp?.rxSpeed ?? 0)}</span>
@@ -471,14 +457,11 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex h-full items-center justify-center">
       <div className="max-w-xs text-center">
-        <div
-          className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl"
-          style={{ background: 'color-mix(in srgb, var(--accent) 10%, transparent)' }}
-        >
-          <ArrowLeftRight className="size-7 text-(--accent-text)" />
+        <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10">
+          <ArrowLeftRight className="size-7 text-primary" />
         </div>
-        <h2 className="text-sm font-semibold text-(--text-strong)">尚未创建转发规则</h2>
-        <p className="mt-1.5 text-xs leading-relaxed text-(--text-muted)">
+        <h2 className="text-sm font-semibold text-foreground">尚未创建转发规则</h2>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
           创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。
         </p>
         <Button className="mt-5" onClick={onCreate}>

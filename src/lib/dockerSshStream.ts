@@ -13,7 +13,7 @@ export function appendSshStreamChunkToLines(lines: string[], chunk: string): str
 export async function subscribeDockerSshStream(
   streamId: string,
   onChunk: (chunk: string) => void,
-  onDone: (success: boolean) => void,
+  onDone: (success: boolean) => void
 ): Promise<() => void> {
   const unChunk = await events.dockerSshStreamChunk.listen((e) => {
     if (e.payload.stream_id !== streamId) return

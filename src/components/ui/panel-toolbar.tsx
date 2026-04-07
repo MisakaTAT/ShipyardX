@@ -9,14 +9,13 @@ function PanelToolbar({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="panel-toolbar"
-      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-3', className)}
-      style={{ background: 'var(--bg-panel)' }}
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3', className)}
       {...props}
     />
   )
 }
 
-const headingIconClass = 'h-4 w-4 shrink-0 text-(--text-soft)'
+const headingIconClass = 'h-4 w-4 shrink-0 text-muted-foreground'
 
 function PanelToolbarHeading({ icon, title, meta }: { icon: React.ReactNode; title: string; meta?: React.ReactNode }) {
   const iconNode = React.isValidElement(icon)
@@ -28,8 +27,8 @@ function PanelToolbarHeading({ icon, title, meta }: { icon: React.ReactNode; tit
   return (
     <>
       {iconNode}
-      <span className="mr-1 text-sm font-medium text-(--text-base)">{title}</span>
-      {meta != null && meta !== false ? <span className="text-xs text-(--text-muted)">{meta}</span> : null}
+      <span className="mr-1 text-sm font-medium text-foreground">{title}</span>
+      {meta != null && meta !== false ? <span className="text-xs text-muted-foreground">{meta}</span> : null}
     </>
   )
 }
@@ -44,7 +43,7 @@ type PanelToolbarSearchProps = Omit<React.ComponentProps<'input'>, 'type' | 'val
 
 const PanelToolbarSearch = React.forwardRef<HTMLInputElement, PanelToolbarSearchProps>(function PanelToolbarSearch(
   { value, onValueChange, placeholder, variant = 'toolbar', ...inputProps },
-  ref,
+  ref
 ) {
   const isPage = variant === 'page'
 
@@ -52,8 +51,8 @@ const PanelToolbarSearch = React.forwardRef<HTMLInputElement, PanelToolbarSearch
     <div className={cn('relative', isPage ? 'mt-4 w-full' : 'ml-2')}>
       <Search
         className={cn(
-          'pointer-events-none absolute top-1/2 size-3.5 -translate-y-1/2 text-(--text-muted)',
-          isPage ? 'left-3' : 'left-2.5',
+          'pointer-events-none absolute top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground',
+          isPage ? 'left-3' : 'left-2.5'
         )}
         aria-hidden
       />
@@ -70,7 +69,7 @@ const PanelToolbarSearch = React.forwardRef<HTMLInputElement, PanelToolbarSearch
           type="button"
           variant="ghost"
           icon
-          className="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-full text-(--text-muted)"
+          className="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-full text-muted-foreground"
           aria-label="清除搜索"
           onClick={() => onValueChange('')}
         >

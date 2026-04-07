@@ -164,7 +164,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                 name="internal"
                 render={({ field }) => (
                   <Field orientation="horizontal">
-                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-(--text-base)">
+                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-foreground">
                       <Checkbox
                         checked={field.value}
                         disabled={submitting}
@@ -180,7 +180,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                 name="attachable"
                 render={({ field }) => (
                   <Field orientation="horizontal">
-                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-(--text-base)">
+                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-foreground">
                       <Checkbox
                         checked={field.value}
                         disabled={submitting}

@@ -332,7 +332,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
         }
       }
     },
-    [disposeXtermWireListeners],
+    [disposeXtermWireListeners]
   )
 
   const scheduleFitAndFocus = useCallback(() => {
@@ -437,7 +437,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
         term.onResize(({ cols, rows }) => {
           const s = socketRef.current
           if (s) sendTerminalWireJson(s, { type: 'resize', cols, rows })
-        }),
+        })
       )
 
       if (!mountAliveRef.current || isStale()) {
@@ -545,13 +545,10 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
   const isContainerExec = Boolean(containerId)
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg-panel)' }}>
+    <div className="flex h-full flex-col bg-card">
       {title ? (
-        <div
-          className="flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2"
-          style={{ borderColor: 'var(--border-sub)' }}
-        >
-          <div className="flex min-w-0 items-center gap-2 text-xs" style={{ color: 'var(--text-soft)' }}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
             <TerminalIcon className="shrink-0" />
             <span className="truncate">{title}</span>
           </div>
@@ -561,7 +558,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                 type="button"
                 variant="ghost"
                 icon
-                className="text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={onRequestClose}
                 title="关闭"
               >
@@ -571,10 +568,10 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
           </div>
         </div>
       ) : null}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <div
           ref={containerRef}
-          className="h-full w-full box-border"
+          className="box-border h-full w-full"
           style={{
             padding: TERMINAL_VIEW_PADDING_PX,
             background: TERMINAL_SURFACE_BG,
@@ -585,22 +582,21 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
         {overlayMounted && (
           <div
             className={cn(
-              'absolute inset-0 z-10 flex flex-1 items-center justify-center p-6 transition-all duration-200',
-              overlayVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0',
+              'absolute inset-0 z-10 flex flex-1 items-center justify-center bg-card p-6 transition-all duration-200',
+              overlayVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
             )}
-            style={{ background: 'var(--bg-panel)' }}
           >
             <div className="mx-auto w-full max-w-lg space-y-6 text-center">
               {phase === 'disconnected' && (
                 <>
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-(--accent)/10">
-                      <TerminalIcon className="size-7 text-(--accent-text)" />
+                    <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                      <TerminalIcon className="size-7 text-primary" />
                     </div>
-                    <h2 className="text-lg font-semibold text-(--text-strong)">
+                    <h2 className="text-lg font-semibold text-foreground">
                       {wasEverConnected ? '连接已断开' : '远程终端未连接'}
                     </h2>
-                    <p className="text-sm text-(--text-soft)">
+                    <p className="text-sm text-muted-foreground">
                       {wasEverConnected
                         ? '与远程主机的会话已结束，可重新建立连接。'
                         : isContainerExec
@@ -609,10 +605,10 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                     </p>
                   </div>
                   {isContainerExec && (
-                    <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-(--bg-surface) p-3 text-left">
+                    <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                          <p className="text-xs text-(--text-muted)">用户（可选）</p>
+                          <p className="text-xs text-muted-foreground">用户（可选）</p>
                           <Input
                             value={execUser}
                             onChange={(e) => setExecUser(e.target.value)}
@@ -620,7 +616,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <p className="text-xs text-(--text-muted)">Shell</p>
+                          <p className="text-xs text-muted-foreground">Shell</p>
                           <Select
                             value={execShellPreset}
                             onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
@@ -639,7 +635,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                       </div>
                       {execShellPreset === 'custom' ? (
                         <div className="mt-3 space-y-1.5">
-                          <p className="text-xs text-(--text-muted)">自定义 shell 命令</p>
+                          <p className="text-xs text-muted-foreground">自定义 shell 命令</p>
                           <Input
                             value={execCustomShell}
                             onChange={(e) => setExecCustomShell(e.target.value)}
@@ -664,11 +660,11 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
 
               {phase === 'connecting' && (
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="flex size-14 items-center justify-center rounded-2xl bg-(--accent)/10">
-                    <Loader2 className="size-7 animate-spin text-(--accent-text)" />
+                  <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                    <Loader2 className="size-7 animate-spin text-primary" />
                   </div>
-                  <h2 className="text-lg font-semibold text-(--text-strong)">正在连接</h2>
-                  <p className="text-sm text-(--text-soft)">
+                  <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
+                  <p className="text-sm text-muted-foreground">
                     {isContainerExec
                       ? '正在通过 SSH 启动 docker exec 并连接容器终端，请稍候。'
                       : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
@@ -682,8 +678,8 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                     <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
                       <ShieldAlert className="size-7 text-amber-500" />
                     </div>
-                    <h2 className="text-lg font-semibold text-(--text-strong)">无法建立 SSH 连接</h2>
-                    <p className="text-sm text-(--text-soft)">
+                    <h2 className="text-lg font-semibold text-foreground">无法建立 SSH 连接</h2>
+                    <p className="text-sm text-muted-foreground">
                       请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。
                     </p>
                   </div>
@@ -691,7 +687,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                   <div className="flex w-full flex-col items-center">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 text-xs text-(--text-muted) transition-colors hover:text-(--text-base)"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                       onClick={() => setErrorDetailsExpanded((v) => !v)}
                       aria-expanded={errorDetailsExpanded}
                     >
@@ -701,7 +697,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                       />
                     </button>
                     {errorDetailsExpanded ? (
-                      <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center font-mono text-[11px] leading-relaxed text-(--text-soft) wrap-break-word whitespace-pre-wrap">
+                      <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center font-mono text-[11px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
                         {errorText}
                       </pre>
                     ) : null}

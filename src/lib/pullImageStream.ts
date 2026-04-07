@@ -5,7 +5,7 @@ export async function pullImage(
   serverId: string,
   image: string,
   onLogsUpdate: (lines: string[]) => void,
-  options?: { onStreamId?: (streamId: string) => void },
+  options?: { onStreamId?: (streamId: string) => void }
 ): Promise<void> {
   let lines: string[] = [`> docker pull ${image}`, '']
   onLogsUpdate(lines)
@@ -24,7 +24,7 @@ export async function pullImage(
       lines = appendSshStreamChunkToLines(lines, chunk)
       onLogsUpdate([...lines])
     },
-    resolveDone,
+    resolveDone
   )
 
   const success = await donePromise

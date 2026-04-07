@@ -31,7 +31,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
-const checkRowClass = 'flex cursor-pointer items-start gap-2.5 text-left text-xs leading-snug text-(--text-base)'
+const checkRowClass = 'flex cursor-pointer items-start gap-2.5 text-left text-xs leading-snug text-foreground'
 
 const RESTART_OPTIONS = [
   { value: 'no', label: '不自动重启' },
@@ -256,7 +256,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
       setPhase('progress')
       void executeRun()
     },
-    [executeRun],
+    [executeRun]
   )
 
   const stepActive = imageStep === 'active' || runStep === 'active'
@@ -295,7 +295,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
               <Button
                 type="button"
                 variant="ghost"
-                className="text-(--text-muted)"
+                className="text-muted-foreground"
                 disabled={runStep === 'active'}
                 onClick={() => void handleBackFromProgress()}
               >
@@ -474,11 +474,11 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                         className="flex flex-col gap-2"
                         aria-label="端口映射方式"
                       >
-                        <label className="flex cursor-pointer items-center gap-2 text-xs text-(--text-base)">
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
                           <RadioGroupItem value="mapped" id="run-port-mode-mapped" />
                           <span>自定义主机与容器端口</span>
                         </label>
-                        <label className="flex cursor-pointer items-center gap-2 text-xs text-(--text-base)">
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
                           <RadioGroupItem value="all" id="run-port-mode-all" />
                           <span>映射镜像中 EXPOSE 的全部端口（-P）</span>
                         </label>
@@ -495,7 +495,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       {portFields.map((row, i) => (
                         <div
                           key={row.id}
-                          className="flex flex-col gap-2 rounded-lg border border-border bg-(--bg-surface) p-2 sm:flex-row sm:items-center"
+                          className="flex flex-col gap-2 rounded-lg border border-border bg-muted p-2 sm:flex-row sm:items-center"
                         >
                           <div className="grid min-w-0 flex-1 grid-cols-3 gap-2">
                             <Controller
@@ -549,7 +549,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                                   <SelectTrigger
                                     aria-label="协议"
                                     aria-invalid={fieldState.invalid}
-                                    className="min-w-0 w-full"
+                                    className="w-full min-w-0"
                                   >
                                     <SelectValue />
                                   </SelectTrigger>
@@ -565,7 +565,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                             type="button"
                             variant="ghost"
                             icon
-                            className="shrink-0 text-(--text-muted) hover:text-red-500"
+                            className="shrink-0 text-muted-foreground hover:text-red-500"
                             onClick={() => removePortRow(i)}
                           >
                             <Trash2 />
@@ -660,7 +660,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   {volumeFields.map((row, i) => (
                     <div
                       key={row.id}
-                      className="flex flex-col gap-2 rounded-lg border border-border bg-(--bg-surface) p-2 sm:flex-row sm:items-center"
+                      className="flex flex-col gap-2 rounded-lg border border-border bg-muted p-2 sm:flex-row sm:items-center"
                     >
                       <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
                         <Controller
@@ -693,7 +693,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           control={form.control}
                           name={`volumes.${i}.readOnly`}
                           render={({ field }) => (
-                            <label className="flex cursor-pointer items-start gap-2.5 text-left text-xs text-(--text-base)">
+                            <label className="flex cursor-pointer items-start gap-2.5 text-left text-xs text-foreground">
                               <Checkbox
                                 checked={field.value}
                                 onCheckedChange={(c) => field.onChange(c === true)}
@@ -707,7 +707,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           type="button"
                           variant="ghost"
                           icon
-                          className="text-(--text-muted) hover:text-red-500"
+                          className="text-muted-foreground hover:text-red-500"
                           onClick={() => removeVolumeRow(i)}
                         >
                           <Trash2 />
@@ -970,7 +970,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
           </>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-            <div className="space-y-4 rounded-xl border border-border bg-(--bg-panel) p-4">
+            <div className="space-y-4 rounded-xl border border-border bg-card p-4">
               {progressStepRows.map((row, i) => (
                 <div key={i} className="flex gap-3">
                   {row.status === 'done' ? (
@@ -978,24 +978,21 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   ) : row.status === 'error' ? (
                     <XCircle className="size-5 shrink-0 text-red-500" />
                   ) : row.status === 'active' ? (
-                    <Loader2 className="size-5 shrink-0 animate-spin text-(--accent-text)" />
+                    <Loader2 className="size-5 shrink-0 animate-spin text-primary" />
                   ) : (
-                    <Circle className="size-5 shrink-0 text-(--text-muted)" />
+                    <Circle className="size-5 shrink-0 text-muted-foreground" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-(--text-strong)">{row.title}</p>
-                    {row.detail ? <p className="mt-0.5 text-xs text-(--text-muted)">{row.detail}</p> : null}
+                    <p className="text-sm font-medium text-foreground">{row.title}</p>
+                    {row.detail ? <p className="mt-0.5 text-xs text-muted-foreground">{row.detail}</p> : null}
                   </div>
                 </div>
               ))}
             </div>
 
             {showPullLog ? (
-              <div className="flex min-h-0 max-h-[min(40vh,320px)] flex-1 flex-col overflow-hidden rounded-xl border border-border bg-(--bg-surface)">
-                <div
-                  className="min-h-[120px] flex-1 overflow-auto p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-(--text-soft)"
-                  style={{ background: 'var(--bg-app)' }}
-                >
+              <div className="flex max-h-[min(40vh,320px)] min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted">
+                <div className="min-h-[120px] flex-1 overflow-auto bg-background p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
                   {pullLines.join('\n')}
                   <div ref={logEndRef} />
                 </div>

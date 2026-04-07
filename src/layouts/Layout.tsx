@@ -23,37 +23,19 @@ function LayoutContent() {
   const [location] = useLocation()
   const [selectedServer, setSelectedServer] = useState<ServerConfig | null>(null)
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview')
-  const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
-
   const isStore = location === APP_PATHS.store
   const isPortForward = location === APP_PATHS.portForward
   const isWorkspace = location === APP_PATHS.workspace
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (light) {
-      root.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    } else {
-      root.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    }
-  }, [light])
-
-  const toggleTheme = () => setLight((v) => !v)
 
   useEffect(() => {
     setWorkspaceTab('overview')
   }, [selectedServer?.id])
 
   return (
-    <div
-      className="flex h-screen overflow-hidden select-none"
-      style={{ background: 'var(--bg-app)', color: 'var(--text-base)' }}
-    >
-      <Sider light={light} onToggleTheme={toggleTheme} />
+    <div className="flex h-screen overflow-hidden bg-background text-foreground select-none">
+      <Sider />
 
-      <main className="flex flex-1 flex-col overflow-hidden" style={{ background: 'var(--bg-app)' }}>
+      <main className="flex flex-1 flex-col overflow-hidden bg-background">
         {isStore ? (
           <PageScrollArea>
             <AppStore />

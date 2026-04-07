@@ -107,11 +107,8 @@ function StateBadge({ state }: { state: string }) {
 
   if (tone === 'muted') {
     return (
-      <span
-        className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-        style={{ background: 'var(--bg-surface)', color: 'var(--text-soft)', borderColor: 'var(--border-sub)' }}
-      >
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
+      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
         {label}
       </span>
     )
@@ -171,7 +168,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
     containerId: string,
     action: string,
     command: string,
-    args: Record<string, unknown> = {},
+    args: Record<string, unknown> = {}
   ) => {
     setActionLoading((prev) => ({ ...prev, [containerId]: action }))
     try {
@@ -225,7 +222,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
   const removeConfirmText = removeTarget?.state === 'running' ? '强制删除' : '删除'
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
         <PanelToolbarHeading
           icon={<Box />}
@@ -241,7 +238,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {lastUpdated ? <span className="mr-1 text-xs text-(--text-muted)">更新于 {lastUpdated}</span> : null}
+          {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" variant="default" className="gap-1" onClick={() => setRunDialogOpen(true)}>
             <Plus />
             启动新容器
@@ -250,14 +247,14 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       </PanelToolbar>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto bg-(--bg-panel)">
+      <div className="flex-1 overflow-auto bg-card">
         {loading && containers.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48" style={{ color: 'var(--text-muted)' }}>
-            <Box className="w-10 h-10 mb-3" style={{ color: 'var(--border-sub)' }} />
+          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
+            <Box className="mb-3 h-10 w-10 text-border" />
             <p className="text-sm">{search ? `无匹配的容器 "${search}"` : '没有容器'}</p>
           </div>
         ) : (
@@ -282,43 +279,31 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
                 return (
                   <TableBodyRow key={c.id}>
                     <TableCell className="px-5 py-3">
-                      <div className="font-medium" style={{ color: 'var(--text-strong)' }}>
-                        {c.name}
-                      </div>
-                      <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {c.id}
-                      </div>
+                      <div className="font-medium text-foreground">{c.name}</div>
+                      <div className="mt-0.5 font-mono text-xs text-muted-foreground">{c.id}</div>
                     </TableCell>
-                    <TableCell className="px-4 py-3 max-w-[200px]">
-                      <span
-                        className="text-xs font-mono truncate block"
-                        style={{ color: 'var(--text-soft)' }}
-                        title={c.image}
-                      >
+                    <TableCell className="max-w-[200px] px-4 py-3">
+                      <span className="block truncate font-mono text-xs text-muted-foreground" title={c.image}>
                         {c.image}
                       </span>
                     </TableCell>
                     <TableCell className="max-w-40 px-4 py-3">
                       <StateBadge state={c.state} />
-                      <div className="mt-1 truncate text-xs" style={{ color: 'var(--text-muted)' }} title={c.status}>
+                      <div className="mt-1 truncate text-xs text-muted-foreground" title={c.status}>
                         {c.status}
                       </div>
                     </TableCell>
                     <TableCell className="px-4 py-3">
-                      <span className="text-xs font-mono" style={{ color: 'var(--text-soft)' }}>
-                        {c.ip || '-'}
-                      </span>
+                      <span className="font-mono text-xs text-muted-foreground">{c.ip || '-'}</span>
                     </TableCell>
-                    <TableCell className="px-4 py-3 max-w-[220px]">
+                    <TableCell className="max-w-[220px] px-4 py-3">
                       {c.ports ? (
                         <PortCell ports={c.ports} />
                       ) : (
-                        <span className="text-xs font-mono" style={{ color: 'var(--text-soft)' }}>
-                          —
-                        </span>
+                        <span className="font-mono text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <TableCell className="px-4 py-3 text-xs text-muted-foreground">
                       <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>
                     </TableCell>
                     <TableCell className="px-5 py-3">
@@ -461,25 +446,13 @@ function PortCell({ ports }: { ports: string }) {
       {visible.map((port) => (
         <span
           key={port}
-          className="inline-block max-w-[200px] truncate px-1.5 py-0.5 rounded border text-[10px] font-mono"
-          style={{
-            color: 'var(--text-soft)',
-            borderColor: 'var(--border-sub)',
-            background: 'var(--bg-surface)',
-          }}
+          className="inline-block max-w-[200px] truncate rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
         >
           {port}
         </span>
       ))}
       {hiddenCount > 0 && (
-        <span
-          className="inline-block px-1.5 py-0.5 rounded border text-[10px]"
-          style={{
-            color: 'var(--text-muted)',
-            borderColor: 'var(--border-sub)',
-            background: 'var(--bg-surface)',
-          }}
-        >
+        <span className="inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
           +{hiddenCount}
         </span>
       )}

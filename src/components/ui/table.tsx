@@ -3,21 +3,22 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 
 export const tableHeaderStickyClassName =
-  'sticky top-0 z-10 backdrop-blur-sm bg-(--bg-panel) outline-1 outline-solid outline-border outline-offset-0'
+  'sticky top-0 z-10 backdrop-blur-sm bg-card outline-1 outline-solid outline-border outline-offset-0'
 
-export const tableBodyRowClassName = 'border-b border-border bg-(--bg-panel) transition-colors hover:bg-(--bg-surface)'
+export const tableBodyRowClassName = 'border-b border-border bg-card transition-colors hover:bg-muted'
 
 export const dataTableHead = {
-  first: 'text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-(--text-muted)',
-  mid: 'text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-(--text-muted)',
-  last: 'text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider text-(--text-muted)',
+  first: 'text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+  mid: 'text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+  last: 'text-right px-5 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground',
 } as const
 
 export const eventTableHead = {
-  first: 'text-left pl-5 pr-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px] text-(--text-muted)',
-  mid: 'text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px] text-(--text-muted)',
-  wide: 'text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[180px] text-(--text-muted)',
-  last: 'text-left px-3 pr-5 py-2.5 font-semibold uppercase tracking-wider text-[11px] text-(--text-muted)',
+  first:
+    'text-left pl-5 pr-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px] text-muted-foreground',
+  mid: 'text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[100px] text-muted-foreground',
+  wide: 'text-left px-3 py-2.5 font-semibold uppercase tracking-wider text-[11px] w-[180px] text-muted-foreground',
+  last: 'text-left px-3 pr-5 py-2.5 font-semibold uppercase tracking-wider text-[11px] text-muted-foreground',
 } as const
 
 function Table({ className, ...props }: React.ComponentProps<'table'>) {

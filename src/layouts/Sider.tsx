@@ -4,30 +4,26 @@ import { Server as ServerIcon, Stone, Settings, Sun, Moon, ArrowLeftRight } from
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { APP_PATHS } from '@/lib/appRouter'
+import { useTheme, useIsLightMode } from '@/components/theme-provider'
 
 function siderNavButtonClass(active?: boolean, disabled?: boolean) {
   return cn(
     'h-10 w-full rounded-lg p-2.5 [&_svg]:size-5',
     active &&
-      'bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-(--accent-text) hover:bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] hover:text-(--accent-text)',
-    !active && 'text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)',
-    disabled && 'opacity-30',
+      'bg-[color-mix(in_srgb,var(--primary)_15%,transparent)] text-primary hover:bg-[color-mix(in_srgb,var(--primary)_18%,transparent)] hover:text-primary',
+    !active && 'text-muted-foreground hover:bg-muted hover:text-foreground',
+    disabled && 'opacity-30'
   )
 }
 
-interface SiderProps {
-  light: boolean
-  onToggleTheme: () => void
-}
-
-export default function Sider({ light, onToggleTheme }: SiderProps) {
+export default function Sider() {
   const [location, navigate] = useLocation()
+  const { setTheme } = useTheme()
+  const light = useIsLightMode()
+  const toggleTheme = () => setTheme(light ? 'dark' : 'light')
 
   return (
-    <nav
-      className="flex w-14 shrink-0 flex-col items-center border-r border-border py-3"
-      style={{ background: 'var(--bg-nav)' }}
-    >
+    <nav className="flex w-14 shrink-0 flex-col items-center border-r border-border bg-sidebar py-3">
       <div className="flex w-full flex-col gap-1 px-2">
         <Button
           type="button"
@@ -77,7 +73,7 @@ export default function Sider({ light, onToggleTheme }: SiderProps) {
           variant="ghost"
           title={light ? '切换深色' : '切换浅色'}
           className={siderNavButtonClass()}
-          onClick={onToggleTheme}
+          onClick={toggleTheme}
         >
           {light ? <Moon className="size-5" /> : <Sun className="size-5" />}
         </Button>

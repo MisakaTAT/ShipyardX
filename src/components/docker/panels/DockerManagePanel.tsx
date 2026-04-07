@@ -129,7 +129,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     <>
       {loading ? (
         <div className="flex h-full items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-(--text-muted)" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <form id={`${daemonFormId}-daemon`} onSubmit={onDaemonSubmit} className="contents">
@@ -138,8 +138,8 @@ export default function DockerManagePanel({ serverId }: Props) {
               <SettingsCard>
                 <div className="flex flex-wrap items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-(--text-base)">镜像加速</div>
-                    <div className="mt-1 text-xs text-(--text-muted)">多个地址换行填写（为空则取消镜像加速）</div>
+                    <div className="text-sm font-medium text-foreground">镜像加速</div>
+                    <div className="mt-1 text-xs text-muted-foreground">多个地址换行填写（为空则取消镜像加速）</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -185,10 +185,10 @@ export default function DockerManagePanel({ serverId }: Props) {
                     name="live_restore"
                     render={({ field }) => (
                       <Field>
-                        <FieldLabel className="text-sm font-medium text-(--text-base)">Live restore</FieldLabel>
+                        <FieldLabel className="text-sm font-medium text-foreground">Live restore</FieldLabel>
                         <FieldDescription>允许在 Docker 守护进程异常停机时保留正在运行的容器状态</FieldDescription>
                         <FieldContent className="mt-3">
-                          <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <Checkbox
                               checked={field.value}
                               disabled={saving || restarting}
@@ -208,7 +208,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                     name="cgroup_driver"
                     render={({ field }) => (
                       <Field>
-                        <FieldLabel className="text-sm font-medium text-(--text-base)">cgroup driver</FieldLabel>
+                        <FieldLabel className="text-sm font-medium text-foreground">cgroup driver</FieldLabel>
                         <FieldDescription>当前 {cgroupDriver || '默认'}</FieldDescription>
                         <FieldContent className="mt-3">
                           <RadioGroup
@@ -217,15 +217,15 @@ export default function DockerManagePanel({ serverId }: Props) {
                             disabled={saving || restarting}
                             className="flex flex-row flex-wrap items-center gap-x-5 gap-y-2"
                           >
-                            <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                               <RadioGroupItem value="default" id={`${daemonFormId}-cgroup-default`} />
                               默认
                             </label>
-                            <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                               <RadioGroupItem value="systemd" id={`${daemonFormId}-cgroup-systemd`} />
                               systemd
                             </label>
-                            <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                               <RadioGroupItem value="cgroupfs" id={`${daemonFormId}-cgroup-cgroupfs`} />
                               cgroupfs
                             </label>
@@ -243,7 +243,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                   name="socket_path"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel className="text-sm font-medium text-(--text-base)">Socket 路径</FieldLabel>
+                      <FieldLabel className="text-sm font-medium text-foreground">Socket 路径</FieldLabel>
                       <FieldDescription>Docker 守护进程（Docker Daemon）与客户端之间的通信通道</FieldDescription>
                       <FieldContent className="mt-3">
                         <Input
@@ -265,9 +265,9 @@ export default function DockerManagePanel({ serverId }: Props) {
                   name="log_rotation"
                   render={({ field }) => (
                     <Field>
-                      <FieldLabel className="text-sm font-medium text-(--text-base)">日志切割</FieldLabel>
+                      <FieldLabel className="text-sm font-medium text-foreground">日志切割</FieldLabel>
                       <FieldContent className="mt-3">
-                        <label className="flex cursor-pointer items-center gap-2 text-sm text-(--text-base)">
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                           <Checkbox
                             checked={field.value}
                             disabled={saving || restarting}
@@ -340,5 +340,5 @@ export default function DockerManagePanel({ serverId }: Props) {
 }
 
 function SettingsCard({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-border bg-(--bg-panel) p-4">{children}</div>
+  return <div className="rounded-xl border border-border bg-card p-4">{children}</div>
 }

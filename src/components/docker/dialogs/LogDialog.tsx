@@ -254,7 +254,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
           </Button>
 
           <DialogPanelToolbarEnd>
-            {lineCount > 0 ? <span className="text-xs text-(--text-muted)">{lineCount} 行</span> : null}
+            {lineCount > 0 ? <span className="text-xs text-muted-foreground">{lineCount} 行</span> : null}
             <DialogCloseIconButton onClick={() => void handleClose()} />
           </DialogPanelToolbarEnd>
         </DialogPanelToolbar>

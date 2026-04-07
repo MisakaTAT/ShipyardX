@@ -85,7 +85,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
   })
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg-app)' }}>
+    <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
         <PanelToolbarHeading icon={<ImageIcon />} title="镜像" meta={images.length > 0 ? `(${images.length})` : null} />
 
@@ -97,7 +97,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          {lastUpdated ? <span className="mr-1 text-xs text-(--text-muted)">更新于 {lastUpdated}</span> : null}
+          {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowPull(true)}>
             <Download />
             拉取镜像
@@ -106,14 +106,14 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
       </PanelToolbar>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto bg-(--bg-panel)">
+      <div className="flex-1 overflow-auto bg-card">
         {loading && images.length === 0 ? (
-          <div className="flex items-center justify-center h-48">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-muted)' }} />
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-48" style={{ color: 'var(--text-muted)' }}>
-            <ImageIcon className="w-10 h-10 mb-3" style={{ color: 'var(--border-sub)' }} />
+          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
+            <ImageIcon className="mb-3 h-10 w-10 text-border" />
             <p className="text-sm">{search ? `无匹配的镜像 "${search}"` : '没有镜像'}</p>
           </div>
         ) : (
@@ -131,33 +131,25 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             <TableBody>
               {filtered.map((img) => (
                 <TableBodyRow key={img.id}>
-                  <TableCell className="px-5 py-3 max-w-[220px]">
-                    <span
-                      className="font-mono text-xs truncate block"
-                      style={{ color: 'var(--text-base)' }}
-                      title={img.repository}
-                    >
+                  <TableCell className="max-w-[220px] px-5 py-3">
+                    <span className="block truncate font-mono text-xs text-foreground" title={img.repository}>
                       {img.repository}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3">
                     {img.tag === '<none>' ? (
-                      <span className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
-                        无标签
-                      </span>
+                      <span className="text-xs text-muted-foreground italic">无标签</span>
                     ) : (
-                      <span className="inline-block px-2 py-0.5 rounded text-xs font-mono bg-blue-500/10 text-blue-500 border border-blue-500/30">
+                      <span className="inline-block rounded border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 font-mono text-xs text-blue-500">
                         {img.tag}
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                  <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {img.id.replace('sha256:', '').slice(0, 12)}
                   </TableCell>
-                  <TableCell className="px-4 py-3 text-xs" style={{ color: 'var(--text-soft)' }}>
-                    {img.size}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{img.size}</TableCell>
+                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">
                     <span title={formatUnixSeconds(img.created_ts)}>{formatUnixSeconds(img.created_ts)}</span>
                   </TableCell>
                   <TableCell className="px-5 py-3">
@@ -217,7 +209,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         extra={
           <label className="flex cursor-pointer items-start gap-2.5 text-left">
             <Checkbox checked={removeForce} onCheckedChange={(c) => setRemoveForce(c === true)} className="mt-0.5" />
-            <span className="text-xs leading-snug text-(--text-muted)">强制删除</span>
+            <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
           </label>
         }
         onConfirm={async () => {

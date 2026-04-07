@@ -89,7 +89,7 @@ export default function InspectDialog({ serverId, kind, targetId, targetLabel, o
       folding: true,
       lineNumbers: 'on' as const,
     }),
-    [],
+    []
   )
 
   return (
@@ -130,7 +130,7 @@ export default function InspectDialog({ serverId, kind, targetId, targetLabel, o
             value={json}
             options={editorOptions}
             loading={
-              <div className="flex h-full items-center justify-center text-sm text-(--text-muted)">初始化编辑器…</div>
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">初始化编辑器…</div>
             }
           />
         </DialogFullscreenBody>

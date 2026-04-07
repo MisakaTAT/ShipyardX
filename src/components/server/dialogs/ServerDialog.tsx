@@ -242,7 +242,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                             type="button"
                             variant="ghost"
                             icon
-                            className="absolute top-1/2 right-1.5 -translate-y-1/2 text-(--text-muted) hover:bg-(--bg-surface) hover:text-(--text-base)"
+                            className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:bg-muted hover:text-foreground"
                             onClick={() => setShowPassword((v) => !v)}
                             tabIndex={-1}
                           >

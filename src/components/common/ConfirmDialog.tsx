@@ -51,9 +51,9 @@ export function ConfirmDialog({
       <DialogContent variant="confirm">
         <DialogBody variant="scroll">
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold text-(--text-strong)">{title}</DialogTitle>
+            <DialogTitle className="text-base font-semibold text-foreground">{title}</DialogTitle>
             {description ? (
-              <DialogDescription className="pt-2 text-(--text-muted) whitespace-pre-line wrap-break-word">
+              <DialogDescription className="pt-2 wrap-break-word whitespace-pre-line text-muted-foreground">
                 {description}
               </DialogDescription>
             ) : (

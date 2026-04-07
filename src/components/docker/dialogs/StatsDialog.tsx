@@ -40,7 +40,7 @@ function Gauge({ value, color, label, sublabel }: GaugeProps) {
     <div className="flex flex-col items-center gap-2">
       <div className="relative size-24">
         <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" strokeWidth="10" />
+          <circle className="stroke-border" cx="50" cy="50" r="40" fill="none" strokeWidth="10" />
           <circle
             cx="50"
             cy="50"
@@ -54,12 +54,12 @@ function Gauge({ value, color, label, sublabel }: GaugeProps) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-bold text-(--text-strong)">{pct.toFixed(1)}%</span>
+          <span className="text-lg font-bold text-foreground">{pct.toFixed(1)}%</span>
         </div>
       </div>
       <div className="text-center">
-        <div className="text-sm font-medium text-(--text-base)">{label}</div>
-        {sublabel ? <div className="mt-0.5 text-xs text-(--text-muted)">{sublabel}</div> : null}
+        <div className="text-sm font-medium text-foreground">{label}</div>
+        {sublabel ? <div className="mt-0.5 text-xs text-muted-foreground">{sublabel}</div> : null}
       </div>
     </div>
   )
@@ -82,17 +82,14 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
     cyan: '#39c5cf',
   }
   return (
-    <div
-      className="flex items-center gap-3 rounded-lg border border-border px-4 py-3"
-      style={{ background: 'var(--bg-surface)' }}
-    >
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted px-4 py-3">
       <div className="shrink-0" style={{ color: colorMap[color] ?? '#58a6ff' }}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-xs text-(--text-muted)">{label}</div>
-        <div className="truncate text-sm font-semibold text-(--text-strong)">{value}</div>
-        {subvalue ? <div className="text-xs text-(--text-soft)">{subvalue}</div> : null}
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="truncate text-sm font-semibold text-foreground">{value}</div>
+        {subvalue ? <div className="text-xs text-muted-foreground">{subvalue}</div> : null}
       </div>
     </div>
   )
@@ -140,7 +137,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
 
         <DialogBody variant="stack">
           {loading && !stats ? (
-            <div className="flex items-center justify-center gap-3 py-12 text-(--text-muted)">
+            <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
               <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
               <span className="text-sm">获取资源数据中...</span>
             </div>
@@ -181,7 +178,9 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
                 />
               </div>
 
-              {lastUpdated ? <div className="text-center text-xs text-(--text-muted)">更新于 {lastUpdated}</div> : null}
+              {lastUpdated ? (
+                <div className="text-center text-xs text-muted-foreground">更新于 {lastUpdated}</div>
+              ) : null}
             </>
           ) : null}
         </DialogBody>

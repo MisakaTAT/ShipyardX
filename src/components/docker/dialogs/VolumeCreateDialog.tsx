@@ -70,7 +70,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
         serverId,
         values.name.trim(),
         'local',
-        Object.keys(driverOpts).length ? driverOpts : null,
+        Object.keys(driverOpts).length ? driverOpts : null
       )
       onOpenChange(false)
       await onCreated()
@@ -139,7 +139,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 name="enableNfs"
                 render={({ field }) => (
                   <Field orientation="horizontal">
-                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-(--text-base)">
+                    <FieldLabel className="flex cursor-pointer items-center gap-2 font-normal text-foreground">
                       <Checkbox
                         checked={field.value}
                         disabled={submitting}
