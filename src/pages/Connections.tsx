@@ -1,15 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Server, Plus, Pencil, Trash2, Search, KeyRound, Lock, ArrowRight } from 'lucide-react'
+import { Server, Plus, Pencil, Trash2, Search, KeyRound, Lock, ArrowRight, X } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/ui/empty-state'
-import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
-import { PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import ServerDialog from '@/components/server/dialogs/ServerDialog'
-import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface ConnectionsProps {
   onConnect: (server: ServerConfig) => void
@@ -69,8 +76,8 @@ export default function Connections({ onConnect }: ConnectionsProps) {
 
   return (
     <>
-      <PageScrollArea>
-        <PageListColumn gap={servers.length > 0}>
+      <div className="flex-1 overflow-auto p-2 md:p-3">
+        <div className={`flex h-full flex-col ${servers.length > 0 ? 'gap-3' : ''}`}>
           {servers.length > 0 ? (
             <div className="shrink-0">
               <div className="flex items-center justify-between">
@@ -84,32 +91,61 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                 </Button>
               </div>
 
-              <PanelToolbarSearch
-                ref={searchRef}
-                variant="page"
-                value={search}
-                onValueChange={setSearch}
-                placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
-              />
+              <div className="relative mt-4 w-full">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
+                  className="w-full pr-8 pl-9"
+                />
+                {search ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-full text-muted-foreground"
+                    aria-label="清除搜索"
+                    onClick={() => setSearch('')}
+                  >
+                    <X className="size-3" />
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
           <div className="flex-1 overflow-auto">
             {servers.length === 0 ? (
-              <EmptyState
-                variant="hero"
-                icon={<Server />}
-                title="尚未配置远程服务器"
-                description="配置完成后，可在此查看系统概览、管理 Docker 容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。"
-                action={
-                  <Button onClick={handleAdd}>
-                    <Plus />
-                    添加服务器
-                  </Button>
-                }
-              />
+              <div className="flex h-full items-center justify-center px-4">
+                <div className="max-w-xs text-center">
+                  <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
+                    <Server />
+                  </div>
+                  <h2 className="text-sm font-semibold text-foreground">尚未配置远程服务器</h2>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    配置完成后，可在此查看系统概览、管理 Docker
+                    容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
+                  </p>
+                  <div className="mt-5">
+                    <Button onClick={handleAdd}>
+                      <Plus />
+                      添加服务器
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : filtered.length === 0 ? (
-              <EmptyState variant="search" icon={<Search />} title="没有找到匹配的服务器" />
+              <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                <div className="flex justify-center text-border [&_svg]:size-7">
+                  <Search />
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">没有找到匹配的服务器</p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {filtered.map((server) => (
@@ -124,8 +160,8 @@ export default function Connections({ onConnect }: ConnectionsProps) {
               </div>
             )}
           </div>
-        </PageListColumn>
-      </PageScrollArea>
+        </div>
+      </div>
 
       <ServerDialog
         open={showDialog}
@@ -139,16 +175,30 @@ export default function Connections({ onConnect }: ConnectionsProps) {
         onSave={handleSave}
       />
 
-      <ConfirmDialog
+      <AlertDialog
         open={deleteServerId !== null}
         onOpenChange={(open) => {
           if (!open) setDeleteServerId(null)
         }}
-        title="删除服务器"
-        description="确定要删除此服务器配置吗？此操作不可撤销。"
-        confirmText="删除"
-        onConfirm={executeDeleteServer}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除服务器</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除此服务器配置吗？此操作不可撤销。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="ghost">取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                void executeDeleteServer().finally(() => setDeleteServerId(null))
+              }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
@@ -195,10 +245,10 @@ function ServerCard({
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <Button type="button" variant="ghostAccent" icon title="编辑" onClick={onEdit}>
+          <Button type="button" variant="ghost" size="icon-sm" title="编辑" onClick={onEdit}>
             <Pencil />
           </Button>
-          <Button type="button" variant="ghostDanger" icon title="删除" onClick={onDelete}>
+          <Button type="button" variant="destructive" size="icon-sm" title="删除" onClick={onDelete}>
             <Trash2 />
           </Button>
         </div>

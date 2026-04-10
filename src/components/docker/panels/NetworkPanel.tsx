@@ -1,20 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Share2, Trash2, Plus, ScanSearch } from 'lucide-react'
+import { Share2, Trash2, Plus, ScanSearch, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Network } from '@/types/app-bindings'
 import NetworkCreateDialog from '@/components/docker/dialogs/NetworkCreateDialog'
-import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import InspectDialog from '@/components/docker/dialogs/InspectDialog'
 import { Button } from '@/components/ui/button'
-import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
-import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
   serverId: string
   refreshTick?: number
+}
+type DataTableColumn<T extends object> = {
+  key: string
+  title: React.ReactNode
+  render?: (value: unknown, record: T, index: number) => React.ReactNode
+  colWidth?: string
+  truncate?: boolean
 }
 
 export default function NetworkPanel({ serverId, refreshTick }: Props) {
@@ -134,7 +149,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title="Inspect"
               onClick={() => setInspectTarget(n)}
               className="rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -144,7 +159,7 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title="删除"
               onClick={() => setRemoveTarget(n)}
               className="rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
@@ -161,20 +176,31 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <PanelToolbar>
-        <PanelToolbarHeading
-          icon={<Share2 />}
-          title="网络"
-          meta={networks.length > 0 ? `(${networks.length})` : null}
-        />
-
-        <PanelToolbarSearch
-          ref={searchRef}
-          value={search}
-          onValueChange={setSearch}
-          placeholder='搜索… ("/" 快速聚焦)'
-        />
-
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
+        <div className="inline-flex items-center gap-2.5">
+          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
+            <Share2 />
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span>网络</span>
+            {networks.length > 0 ? (
+              <span className="font-normal text-muted-foreground">({networks.length})</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="relative ml-4 w-full max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder='搜索… ("/" 快速聚焦)'
+            className="w-full pl-9"
+          />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowCreate(true)}>
@@ -182,15 +208,43 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
             创建网络
           </Button>
         </div>
-      </PanelToolbar>
+      </div>
 
       <div className="flex-1 overflow-auto bg-card">
         {loading && networks.length === 0 ? (
-          <PanelListLoading />
+          <div className="flex h-full min-h-48 items-center justify-center">
+            <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={<Share2 />} title={search ? `无匹配的网络 \"${search}\"` : '没有网络'} />
+          <div className="flex min-h-48 flex-col items-center justify-center text-center">
+            <div className="flex justify-center text-border [&_svg]:size-7">
+              <Share2 />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{search ? `无匹配的网络 \"${search}\"` : '没有网络'}</p>
+          </div>
         ) : (
-          <DataTable className="w-full text-sm" rowKey="id" columns={networkColumns} rows={filtered} />
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                {networkColumns.map((col) => (
+                  <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
+                    {col.title}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((row, idx) => (
+                <TableRow key={row.id}>
+                  {networkColumns.map((col) => (
+                    <TableCell key={col.key} className={col.truncate === false ? 'whitespace-normal' : undefined}>
+                      {col.render ? col.render(undefined, row, idx) : null}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -211,24 +265,42 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
         />
       )}
 
-      <ConfirmDialog
+      <AlertDialog
         open={removeTarget !== null}
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除网络"
-        description={removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''}
-        confirmText="删除"
-        onConfirm={async () => {
-          if (!removeTarget) return
-          try {
-            await commands.removeNetwork(serverId, removeTarget.id)
-            await fetchNetworks()
-          } catch (e) {
-            toast.error(String(e))
-          }
-        }}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除网络</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line">
+              {removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="ghost">取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!removeTarget) return
+                void (async () => {
+                  try {
+                    await commands.removeNetwork(serverId, removeTarget.id)
+                    await fetchNetworks()
+                  } catch (err) {
+                    toast.error(String(err))
+                  } finally {
+                    setRemoveTarget(null)
+                  }
+                })()
+              }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

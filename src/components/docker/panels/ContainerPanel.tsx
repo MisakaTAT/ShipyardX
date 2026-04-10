@@ -13,6 +13,7 @@ import {
   Square,
   Terminal,
   Trash2,
+  Search,
 } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
 import LogDialog from '@/components/docker/dialogs/LogDialog'
@@ -20,18 +21,32 @@ import StatsDialog from '@/components/docker/dialogs/StatsDialog'
 import ContainerExecDialog from '@/components/docker/dialogs/ContainerExecDialog'
 import InspectDialog from '@/components/docker/dialogs/InspectDialog'
 import RunContainerDialog from '@/components/docker/dialogs/RunContainerDialog'
-import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Button } from '@/components/ui/button'
-import { ContainerStateBadge } from '@/components/ui/badge'
-import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
-import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
   serverId: string
   refreshTick?: number
+}
+type DataTableColumn<T extends object> = {
+  key: string
+  title: React.ReactNode
+  render?: (value: unknown, record: T, index: number) => React.ReactNode
+  colWidth?: string
 }
 
 function parsePorts(ports: string): string[] {
@@ -39,6 +54,38 @@ function parsePorts(ports: string): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function ContainerStateBadge({ state }: { state: string }) {
+  const s = state.toLowerCase().trim()
+  const labelMap: Record<string, string> = {
+    created: '已创建',
+    running: '运行中',
+    paused: '已暂停',
+    restarting: '重启中',
+    removing: '删除中',
+    exited: '已停止',
+    dead: '已停止',
+  }
+  const label = labelMap[s] ?? state
+  const tone =
+    s === 'running'
+      ? 'bg-green-500'
+      : s === 'exited' || s === 'dead'
+        ? 'bg-red-500'
+        : s === 'paused'
+          ? 'bg-yellow-500'
+          : s === 'restarting' || s === 'removing'
+            ? 'bg-amber-500'
+            : s === 'created'
+              ? 'bg-blue-500'
+              : 'bg-muted-foreground'
+  return (
+    <Badge variant="outline" className="h-auto rounded-full px-2 py-0.5 text-xs">
+      <span className={`size-1.5 rounded-full ${tone}`} />
+      {label}
+    </Badge>
+  )
 }
 
 export default function ContainerPanel({ serverId, refreshTick }: ContainerPanelProps) {
@@ -182,8 +229,8 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
           return (
             <div>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="ghost" icon title="更多操作">
+                <DropdownMenuTrigger>
+                  <Button type="button" variant="ghost" size="icon-sm" title="更多操作">
                     <MoreHorizontal />
                   </Button>
                 </DropdownMenuTrigger>
@@ -251,20 +298,33 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <PanelToolbar>
-        <PanelToolbarHeading
-          icon={<Box />}
-          title="容器"
-          meta={containers.length > 0 ? `${runningCount}/${containers.length} 运行中` : null}
-        />
-
-        <PanelToolbarSearch
-          ref={searchRef}
-          value={search}
-          onValueChange={setSearch}
-          placeholder='搜索… ("/" 快速聚焦)'
-        />
-
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
+        <div className="inline-flex items-center gap-2.5">
+          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
+            <Box />
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span>容器</span>
+            {containers.length > 0 ? (
+              <span className="font-normal text-muted-foreground">
+                {runningCount}/{containers.length} 运行中
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="relative ml-4 w-full max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder='搜索… ("/" 快速聚焦)'
+            className="w-full pl-9"
+          />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" variant="default" className="gap-1" onClick={() => setRunDialogOpen(true)}>
@@ -272,16 +332,42 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
             启动新容器
           </Button>
         </div>
-      </PanelToolbar>
+      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-card">
         {loading && containers.length === 0 ? (
-          <PanelListLoading />
+          <div className="flex h-full min-h-48 items-center justify-center">
+            <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={<Box />} title={search ? `无匹配的容器 "${search}"` : '没有容器'} />
+          <div className="flex min-h-48 flex-col items-center justify-center text-center">
+            <div className="flex justify-center text-border [&_svg]:size-7">
+              <Box />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{search ? `无匹配的容器 "${search}"` : '没有容器'}</p>
+          </div>
         ) : (
-          <DataTable className="w-full table-fixed" rowKey="id" columns={containerColumns} rows={filtered} />
+          <Table className="w-full table-fixed">
+            <TableHeader>
+              <TableRow>
+                {containerColumns.map((col) => (
+                  <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
+                    {col.title}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((row, idx) => (
+                <TableRow key={row.id}>
+                  {containerColumns.map((col) => (
+                    <TableCell key={col.key}>{col.render ? col.render(undefined, row, idx) : null}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -330,21 +416,35 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
         onSuccess={() => void fetchContainers()}
       />
 
-      <ConfirmDialog
+      <AlertDialog
         open={removeTarget !== null}
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除容器"
-        description={removeDescription}
-        confirmText={removeConfirmText}
-        onConfirm={async () => {
-          if (!removeTarget) return
-          const c = removeTarget
-          const isRunning = c.state === 'running'
-          await runAction(c.id, 'remove', 'remove_container', { force: isRunning })
-        }}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除容器</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line">{removeDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="ghost">取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!removeTarget) return
+                const c = removeTarget
+                const isRunning = c.state === 'running'
+                void runAction(c.id, 'remove', 'remove_container', { force: isRunning }).finally(() =>
+                  setRemoveTarget(null)
+                )
+              }}
+            >
+              {removeConfirmText}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

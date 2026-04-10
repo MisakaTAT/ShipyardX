@@ -11,8 +11,8 @@ import {
   serverTestConnectionSchema,
   type ServerFormValues,
 } from '@/schema/serverFormSchema'
-import { Server as ServerIcon, Loader2, Eye, EyeOff } from 'lucide-react'
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Server as ServerIcon, Loader2, Eye, EyeOff, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -109,25 +109,28 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent variant="panelMd">
-        <DialogHeaderBar
-          icon={<ServerIcon />}
-          title={isEdit ? '编辑服务器' : '添加服务器'}
-          onClose={() => onOpenChange(false)}
-          closeDisabled={loading}
-        />
+      <DialogContent className="max-w-md p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <ServerIcon />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">
+            {isEdit ? '编辑服务器' : '添加服务器'}
+          </DialogTitle>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)} disabled={loading}>
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${baseId}-server-form`} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogBody variant="split" className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto p-0">
             <FieldGroup className="gap-4 p-4">
               <Controller
                 control={form.control}
                 name="name"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${baseId}-name`} required>
-                      服务器名称
-                    </FieldLabel>
+                    <FieldLabel htmlFor={`${baseId}-name`}>服务器名称</FieldLabel>
                     <FieldContent>
                       <Input id={`${baseId}-name`} {...field} placeholder="生产服务器" disabled={loading} />
                       <FieldError errors={[fieldState.error]} />
@@ -143,9 +146,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                     name="host"
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
-                        <FieldLabel htmlFor={`${baseId}-host`} required>
-                          主机地址
-                        </FieldLabel>
+                        <FieldLabel htmlFor={`${baseId}-host`}>主机地址</FieldLabel>
                         <FieldContent>
                           <Input id={`${baseId}-host`} {...field} placeholder="192.168.1.100" disabled={loading} />
                           <FieldError errors={[fieldState.error]} />
@@ -159,9 +160,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                   name="port"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={`${baseId}-port`} required>
-                        端口
-                      </FieldLabel>
+                      <FieldLabel htmlFor={`${baseId}-port`}>端口</FieldLabel>
                       <FieldContent>
                         <Input
                           id={`${baseId}-port`}
@@ -225,9 +224,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                   name="password"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={`${baseId}-pwd`} required>
-                        密码
-                      </FieldLabel>
+                      <FieldLabel htmlFor={`${baseId}-pwd`}>密码</FieldLabel>
                       <FieldContent>
                         <div className="relative">
                           <Input
@@ -241,7 +238,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                           <Button
                             type="button"
                             variant="ghost"
-                            icon
+                            size="icon-sm"
                             className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:bg-muted hover:text-foreground"
                             onClick={() => setShowPassword((v) => !v)}
                             tabIndex={-1}
@@ -260,9 +257,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                   name="key_path"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={`${baseId}-key`} required>
-                        密钥路径
-                      </FieldLabel>
+                      <FieldLabel htmlFor={`${baseId}-key`}>密钥路径</FieldLabel>
                       <FieldContent>
                         <Input id={`${baseId}-key`} {...field} placeholder="~/.ssh/id_rsa" disabled={loading} />
                         <FieldError errors={[fieldState.error]} />
@@ -272,16 +267,16 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                 />
               )}
             </FieldGroup>
-          </DialogBody>
+          </div>
         </form>
 
-        <DialogFooter variant="panelSplit">
-          <Button type="button" variant="ghostSoft" disabled={loading} onClick={handleTest}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3">
+          <Button type="button" variant="secondary" disabled={loading} onClick={handleTest}>
             {loading ? <Loader2 className="animate-spin" /> : null}
             测试连接
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="ghostSoft" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" form={`${baseId}-server-form`} disabled={loading}>
@@ -289,7 +284,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
               {isEdit ? '保存' : '添加'}
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

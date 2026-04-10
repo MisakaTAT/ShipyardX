@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Cpu, MemoryStick, Network, HardDrive } from 'lucide-react'
+import { Cpu, MemoryStick, Network, HardDrive, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ContainerStats } from '@/types/app-bindings'
-import { Dialog, DialogBody, DialogContent, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { formatBytes } from '@/utils/formatBytes'
 import { formatNowTime } from '@/utils/datetime'
 
@@ -132,10 +133,20 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
         if (!next) onClose()
       }}
     >
-      <DialogContent variant="panelXl">
-        <DialogHeaderBar icon={<Cpu />} title={containerName} titleClassName="truncate font-mono" onClose={onClose} />
+      <DialogContent className="max-w-xl p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <Cpu />
+          </span>
+          <DialogTitle className="flex-1 truncate font-mono text-sm leading-none font-semibold text-foreground">
+            {containerName}
+          </DialogTitle>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
 
-        <DialogBody variant="stack">
+        <div className="space-y-4 p-4">
           {loading && !stats ? (
             <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
               <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
@@ -183,7 +194,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
               ) : null}
             </>
           ) : null}
-        </DialogBody>
+        </div>
       </DialogContent>
     </Dialog>
   )

@@ -6,17 +6,47 @@ import { ArrowLeftRight, Play, Plus, Search, Square, Trash2 } from 'lucide-react
 
 import type { PortForward, ServerConfig } from '@/types/app-bindings'
 import PortForwardCreateDialog from '@/components/server/dialogs/PortForwardCreateDialog'
-import { Badge, PortForwardStatusBadge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
-import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
-import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
-import { PanelToolbarSearch } from '@/components/ui/panel-toolbar'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatBytes, formatSpeed } from '@/utils/formatBytes'
 
 type SpeedSnapshot = Record<string, { tx: number; rx: number; ts: number }>
 type SpeedMap = Record<string, { txSpeed: number; rxSpeed: number }>
+type DataTableColumn<T extends object> = {
+  key: string
+  title: React.ReactNode
+  render?: (value: unknown, record: T, index: number) => React.ReactNode
+  colWidth?: string
+  truncate?: boolean
+}
+
+function PortForwardStatusBadge({ running, enabled }: { running?: boolean; enabled: boolean }) {
+  if (running) {
+    return (
+      <Badge variant="outline" className="h-auto rounded-full px-2 py-0.5 text-xs">
+        <span className="size-1.5 animate-pulse rounded-full bg-green-500" />
+        监听中
+      </Badge>
+    )
+  }
+  if (enabled) {
+    return (
+      <Badge variant="outline" className="h-auto rounded-full px-2 py-0.5 text-xs">
+        <span className="size-1.5 rounded-full bg-amber-500" />
+        待启动
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" className="h-auto rounded-full px-2 py-0.5 text-xs">
+      <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+      已禁用
+    </Badge>
+  )
+}
 
 export default function PortForwardPage() {
   const [rules, setRules] = useState<PortForward[]>([])
@@ -215,7 +245,10 @@ export default function PortForwardPage() {
         title: '协议',
         truncate: false,
         render: (_, f) => (
-          <Badge variant="protocol" size="protocol">
+          <Badge
+            variant="outline"
+            className="h-auto border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-blue-500 uppercase"
+          >
             {f.protocol}
           </Badge>
         ),
@@ -327,7 +360,7 @@ export default function PortForwardPage() {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title={f.enabled ? '禁用' : '启用'}
               onClick={() => void handleSetEnabled(f.id, !f.enabled)}
               className={cn(
@@ -340,7 +373,7 @@ export default function PortForwardPage() {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title="删除"
               onClick={() => void handleDelete(f.id)}
               className={cn('rounded-lg text-muted-foreground', 'hover:bg-red-500/10 hover:text-red-500')}
@@ -357,8 +390,8 @@ export default function PortForwardPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <PageScrollArea>
-        <PageListColumn gap={rules.length > 0}>
+      <div className="flex-1 overflow-auto p-2 md:p-3">
+        <div className={`flex h-full flex-col ${rules.length > 0 ? 'gap-3' : ''}`}>
           {/* Page Header */}
           {rules.length > 0 ? (
             <div className="shrink-0">
@@ -398,43 +431,82 @@ export default function PortForwardPage() {
                 </div>
               </div>
 
-              <PanelToolbarSearch
-                ref={searchRef}
-                variant="page"
-                value={search}
-                onValueChange={setSearch}
-                placeholder='搜索主机、容器、端口或错误信息… ("/" 快速聚焦)'
-              />
+              <div className="relative mt-4 w-full">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder='搜索主机、容器、端口或错误信息… ("/" 快速聚焦)'
+                  className="w-full pr-8 pl-9"
+                />
+              </div>
             </div>
           ) : null}
 
           {/* Content */}
           <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
             {rulesLoading && rules.length === 0 ? (
-              <PanelListLoading fullHeight />
+              <div className="flex h-full min-h-48 items-center justify-center">
+                <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              </div>
             ) : rules.length === 0 ? (
-              <EmptyState
-                variant="hero"
-                icon={<ArrowLeftRight />}
-                title="尚未创建转发规则"
-                description="创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。"
-                action={
-                  <Button onClick={() => setShowCreate(true)}>
-                    <Plus />
-                    创建规则
-                  </Button>
-                }
-              />
+              <div className="flex h-full items-center justify-center px-4">
+                <div className="max-w-xs text-center">
+                  <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
+                    <ArrowLeftRight />
+                  </div>
+                  <h2 className="text-sm font-semibold text-foreground">尚未创建转发规则</h2>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。
+                  </p>
+                  <div className="mt-5">
+                    <Button onClick={() => setShowCreate(true)}>
+                      <Plus />
+                      创建规则
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : filteredRules.length === 0 ? (
-              <EmptyState variant="search" className="h-48" icon={<Search />} title={`没有匹配「${search}」的规则`} />
+              <div className="flex h-48 flex-col items-center justify-center text-center">
+                <div className="flex justify-center text-border [&_svg]:size-7">
+                  <Search />
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{`没有匹配「${search}」的规则`}</p>
+              </div>
             ) : (
               <div className="h-full overflow-auto">
-                <DataTable className="w-full text-sm" rowKey="id" columns={portForwardColumns} rows={filteredRules} />
+                <Table className="w-full text-sm">
+                  <TableHeader>
+                    <TableRow>
+                      {portForwardColumns.map((col) => (
+                        <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
+                          {col.title}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRules.map((row, idx) => (
+                      <TableRow key={row.id}>
+                        {portForwardColumns.map((col) => (
+                          <TableCell key={col.key} className={col.truncate === false ? 'whitespace-normal' : undefined}>
+                            {col.render ? col.render(undefined, row, idx) : null}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>
-        </PageListColumn>
-      </PageScrollArea>
+        </div>
+      </div>
 
       <PortForwardCreateDialog
         open={showCreate}

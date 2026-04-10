@@ -12,11 +12,11 @@ import {
 import type { Image, Network, RunContainer } from '@/types/app-bindings'
 import { imageRefExistsOnHost, listSelectableImageRefs } from '@/utils/dockerImageRef'
 import { buildRunParamsFromForm } from '@/utils/dockerRunCli'
-import { Box, CheckCircle2, Circle, Loader2, Play, Plus, Trash2, XCircle } from 'lucide-react'
+import { Box, CheckCircle2, Circle, Loader2, Play, Plus, Trash2, X, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import {
   Field,
   FieldContent,
@@ -280,29 +280,33 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         }
       }}
     >
-      <DialogContent
-        variant="runContainer"
-        onPointerDownOutside={phase === 'progress' && stepActive ? (e) => e.preventDefault() : undefined}
-        onEscapeKeyDown={phase === 'progress' && stepActive ? (e) => e.preventDefault() : undefined}
-      >
+      <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
         {phase === 'form' ? (
-          <DialogHeaderBar icon={<Box />} title="启动新容器" onClose={() => onOpenChange(false)} />
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+            <span className="flex shrink-0 text-primary [&_svg]:size-4">
+              <Box />
+            </span>
+            <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">启动新容器</DialogTitle>
+            <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
+              <X className="size-4" />
+            </Button>
+          </div>
         ) : (
-          <DialogHeaderBar
-            icon={<Box />}
-            title="启动新容器"
-            headerTrailing={
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-muted-foreground"
-                disabled={runStep === 'active'}
-                onClick={() => void handleBackFromProgress()}
-              >
-                {imageStep === 'active' ? '中断拉取' : '返回编辑'}
-              </Button>
-            }
-          />
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+            <span className="flex shrink-0 text-primary [&_svg]:size-4">
+              <Box />
+            </span>
+            <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">启动新容器</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-muted-foreground"
+              disabled={runStep === 'active'}
+              onClick={() => void handleBackFromProgress()}
+            >
+              {imageStep === 'active' ? '中断拉取' : '返回编辑'}
+            </Button>
+          </div>
         )}
 
         {phase === 'form' ? (
@@ -337,7 +341,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                 />
 
                 <div className="space-y-2">
-                  <FieldTitle required>镜像</FieldTitle>
+                  <FieldTitle>镜像</FieldTitle>
                   <Controller
                     control={form.control}
                     name="imageManualInput"
@@ -408,7 +412,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                                         }
                                       />
                                     </SelectTrigger>
-                                    <SelectContent position="popper" align="start">
+                                    <SelectContent align="start">
                                       {imageOptions.map((ref) => (
                                         <SelectItem key={ref} value={ref}>
                                           {ref}
@@ -553,7 +557,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                                   >
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent position="popper" align="start">
+                                  <SelectContent align="start">
                                     <SelectItem value="tcp">tcp</SelectItem>
                                     <SelectItem value="udp">udp</SelectItem>
                                   </SelectContent>
@@ -564,7 +568,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           <Button
                             type="button"
                             variant="ghost"
-                            icon
+                            size="icon-sm"
                             className="shrink-0 text-muted-foreground hover:text-red-500"
                             onClick={() => removePortRow(i)}
                           >
@@ -591,7 +595,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           <SelectTrigger aria-invalid={fieldState.invalid}>
                             <SelectValue placeholder={networksLoading ? '正在加载网络…' : '选择网络'} />
                           </SelectTrigger>
-                          <SelectContent position="popper" align="start">
+                          <SelectContent align="start">
                             <SelectItem value="bridge">bridge</SelectItem>
                             <SelectItem value="host">host</SelectItem>
                             <SelectItem value="none">none</SelectItem>
@@ -706,7 +710,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                         <Button
                           type="button"
                           variant="ghost"
-                          icon
+                          size="icon-sm"
                           className="text-muted-foreground hover:text-red-500"
                           onClick={() => removeVolumeRow(i)}
                         >
@@ -924,7 +928,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           <SelectTrigger aria-invalid={fieldState.invalid}>
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent position="popper" align="start">
+                          <SelectContent align="start">
                             {RESTART_OPTIONS.map((o) => (
                               <SelectItem key={o.value} value={o.value}>
                                 {o.label}
@@ -958,7 +962,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
               </FieldGroup>
             </form>
 
-            <DialogFooter variant="actionsEnd">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 取消
               </Button>
@@ -966,7 +970,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                 <Play />
                 运行
               </Button>
-            </DialogFooter>
+            </div>
           </>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">

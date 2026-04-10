@@ -26,7 +26,6 @@ import DockerManagePanel from '@/components/docker/panels/DockerManagePanel'
 import EventPanel from '@/components/docker/panels/EventPanel'
 import { useEngineEvents } from '@/lib/useEngineEvents'
 import { Button } from '@/components/ui/button'
-import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { KeepAlive } from '@/components/common/KeepAlive'
 import { cn } from '@/lib/utils'
@@ -145,8 +144,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   }
 
   return (
-    <PageScrollArea>
-      <PageListColumn gap>
+    <div className="flex-1 overflow-auto p-2 md:p-3">
+      <div className="flex h-full flex-col gap-3">
         <Tabs
           value={activeTab}
           onValueChange={(v) => onActiveTabChange(v as WorkspaceTab)}
@@ -173,7 +172,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
                 <Button
                   type="button"
                   variant="ghost"
-                  icon
+                  size="icon-sm"
                   className="rounded-full hover:bg-amber-500/15 hover:text-amber-500"
                   title="重新检测 Docker"
                   onClick={() => checkDocker(true)}
@@ -184,7 +183,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
               <Button
                 type="button"
                 variant="ghost"
-                icon
+                size="icon-sm"
                 className="rounded-full text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
                 title="断开连接"
                 onClick={handleDisconnect}
@@ -215,8 +214,8 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
             <TerminalPanel serverId={selectedServer.id} />
           </KeepAlive>
         </div>
-      </PageListColumn>
-    </PageScrollArea>
+      </div>
+    </div>
   )
 }
 

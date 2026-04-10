@@ -9,10 +9,10 @@ import {
 } from '@/schema/portForwardCreateFormSchema'
 import { parseContainerTcpPortOptions } from '@/utils/parseContainerTcpPorts'
 import type { Container, LocalAddress, ServerConfig } from '@/types/app-bindings'
-import { ArrowLeftRight, Loader2 } from 'lucide-react'
+import { ArrowLeftRight, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -185,23 +185,32 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
         if (!next && !submitting) onOpenChange(false)
       }}
     >
-      <DialogContent variant="panel">
-        <DialogHeaderBar
-          icon={<ArrowLeftRight />}
-          title="创建转发规则"
-          onClose={() => onOpenChange(false)}
-          closeDisabled={submitting}
-        />
+      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <ArrowLeftRight />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">创建转发规则</DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${formId}-pf-create`} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogBody className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <FieldGroup className="gap-4">
               <Controller
                 control={form.control}
                 name="serverId"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel required>主机</FieldLabel>
+                    <FieldLabel>主机</FieldLabel>
                     <FieldContent>
                       <Select
                         value={field.value}
@@ -211,7 +220,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                         <SelectTrigger className="font-mono">
                           <SelectValue placeholder="选择主机" />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start">
+                        <SelectContent align="start">
                           {servers.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
                               {s.name}
@@ -230,7 +239,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                 name="containerId"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel required>容器</FieldLabel>
+                    <FieldLabel>容器</FieldLabel>
                     <FieldContent>
                       {containersLoading ? (
                         <div className="flex h-9 items-center justify-center">
@@ -245,7 +254,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           <SelectTrigger className="font-mono">
                             <SelectValue placeholder="选择容器" />
                           </SelectTrigger>
-                          <SelectContent position="popper" align="start">
+                          <SelectContent align="start">
                             {containers.map((c) => (
                               <SelectItem key={c.id} value={c.id}>
                                 {c.name}
@@ -265,7 +274,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                 name="containerPort"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel required>容器端口</FieldLabel>
+                    <FieldLabel>容器端口</FieldLabel>
                     <FieldContent>
                       {portOptions.length === 0 ? (
                         <FieldDescription>该容器没有可用 TCP 端口</FieldDescription>
@@ -282,7 +291,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           <SelectTrigger className="font-mono">
                             <SelectValue placeholder="选择容器端口" />
                           </SelectTrigger>
-                          <SelectContent position="popper" align="start">
+                          <SelectContent align="start">
                             {portOptions.map((p) => (
                               <SelectItem key={p.container_port} value={String(p.container_port)}>
                                 {p.label}
@@ -302,13 +311,13 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                 name="bindAddress"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel required>绑定地址</FieldLabel>
+                    <FieldLabel>绑定地址</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                         <SelectTrigger className="font-mono">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start">
+                        <SelectContent align="start">
                           {localAddresses.map((o) => (
                             <SelectItem key={o.ip} value={o.ip}>
                               {o.name}
@@ -327,9 +336,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                 name="localPort"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${formId}-local-port`} required>
-                      本地端口
-                    </FieldLabel>
+                    <FieldLabel htmlFor={`${formId}-local-port`}>本地端口</FieldLabel>
                     <FieldContent>
                       <Input
                         id={`${formId}-local-port`}
@@ -354,10 +361,10 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                 )}
               />
             </FieldGroup>
-          </DialogBody>
+          </div>
         </form>
 
-        <DialogFooter variant="actionsEnd">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
             取消
           </Button>
@@ -365,7 +372,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             {submitting ? <Loader2 className="animate-spin" /> : null}
             创建
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

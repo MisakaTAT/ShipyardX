@@ -11,13 +11,13 @@ import {
   Unplug,
   Loader2,
   Filter,
+  Search,
 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState } from '@/components/ui/empty-state'
-import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatUnixSecondsTime } from '@/utils/datetime'
 
@@ -28,6 +28,12 @@ interface EventPanelProps {
 }
 
 type TypeFilter = 'all' | 'container' | 'image' | 'network' | 'volume'
+type DataTableColumn<T extends object> = {
+  key: string
+  title: React.ReactNode
+  render?: (value: unknown, record: T, index: number) => React.ReactNode
+  colWidth?: string
+}
 
 const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] = [
   { key: 'all', label: '全部', icon: <Activity className="size-3.5" /> },
@@ -187,7 +193,10 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         title: '动作',
         colWidth: '8rem',
         render: (_, ev) => (
-          <Badge variant="outline" size="pill" className={cn('max-w-full min-w-0', actionColor(ev.action))}>
+          <Badge
+            variant="outline"
+            className={cn('h-auto rounded-full px-2 py-0.5', 'max-w-full min-w-0', actionColor(ev.action))}
+          >
             {ev.action}
           </Badge>
         ),
@@ -211,20 +220,35 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Toolbar */}
-      <PanelToolbar>
-        <PanelToolbarHeading icon={<Activity />} title="事件" meta={events.length > 0 ? `(${events.length})` : null} />
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
+        <div className="inline-flex items-center gap-2.5">
+          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
+            <Activity />
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span>事件</span>
+            {events.length > 0 ? <span className="font-normal text-muted-foreground">({events.length})</span> : null}
+          </div>
+        </div>
 
-        <PanelToolbarSearch
-          ref={searchRef}
-          value={search}
-          onValueChange={setSearch}
-          placeholder='搜索… ("/" 快速聚焦)'
-        />
+        <div className="relative ml-4 w-full max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder='搜索… ("/" 快速聚焦)'
+            className="w-full pl-9"
+          />
+        </div>
 
         <Button
           type="button"
-          variant="ghostAccent"
-          icon
+          variant="ghost"
+          size="icon-sm"
           className={showFilters ? 'bg-muted text-foreground' : undefined}
           title="类型过滤"
           onClick={() => setShowFilters(!showFilters)}
@@ -236,8 +260,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
           {statusIndicator(status)}
           <Button
             type="button"
-            variant="ghostDanger"
-            icon
+            variant="destructive"
+            size="icon-sm"
             title="清空事件"
             onClick={onClear}
             disabled={events.length === 0}
@@ -245,7 +269,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
             <Trash2 />
           </Button>
         </div>
-      </PanelToolbar>
+      </div>
 
       {/* Filter chips */}
       {showFilters && (
@@ -280,14 +304,35 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         }}
       >
         {filtered.length === 0 ? (
-          <EmptyState icon={<Activity />} title={events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'} />
+          <div className="flex min-h-48 flex-col items-center justify-center text-center">
+            <div className="flex justify-center text-border [&_svg]:size-7">
+              <Activity />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'}
+            </p>
+          </div>
         ) : (
-          <DataTable
-            className="w-full table-fixed"
-            rowKey={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
-            columns={eventColumns}
-            rows={filtered}
-          />
+          <Table className="w-full table-fixed">
+            <TableHeader>
+              <TableRow>
+                {eventColumns.map((col) => (
+                  <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
+                    {col.title}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((ev, i) => (
+                <TableRow key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}>
+                  {eventColumns.map((col) => (
+                    <TableCell key={col.key}>{col.render ? col.render(undefined, ev, i) : null}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

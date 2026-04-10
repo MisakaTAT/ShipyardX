@@ -4,7 +4,13 @@ import Layout from './layouts/Layout'
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey={STORAGE_KEY}>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      storageKey={STORAGE_KEY}
+    >
       <Layout />
     </ThemeProvider>
   )

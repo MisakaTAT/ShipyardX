@@ -1,23 +1,36 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
 import ImagePullDialog from '@/components/docker/dialogs/ImagePullDialog'
-import { Trash2, Download, Image as ImageIcon, ScanSearch } from 'lucide-react'
+import { Trash2, Download, Image as ImageIcon, ScanSearch, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Image } from '@/types/app-bindings'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
 import { Checkbox } from '@/components/ui/checkbox'
-import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import InspectDialog from '@/components/docker/dialogs/InspectDialog'
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ImagePanelProps {
   serverId: string
   refreshTick?: number
+}
+type DataTableColumn<T extends object> = {
+  key: string
+  title: React.ReactNode
+  render?: (value: unknown, record: T, index: number) => React.ReactNode
 }
 
 export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
@@ -99,11 +112,11 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         title: '标签',
         render: (_, img) =>
           img.tag === '<none>' ? (
-            <Badge variant="outline" size="tag" className="font-normal text-muted-foreground">
+            <Badge variant="outline" className="h-auto rounded px-2 py-0.5 font-normal text-muted-foreground">
               无标签
             </Badge>
           ) : (
-            <Badge variant="tag" size="tag">
+            <Badge variant="outline" className="h-auto rounded px-2 py-0.5">
               {img.tag}
             </Badge>
           ),
@@ -127,7 +140,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title="Inspect"
               onClick={() => setInspectTarget(img)}
               className="rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -137,7 +150,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             <Button
               type="button"
               variant="ghost"
-              icon
+              size="icon-sm"
               title="删除"
               onClick={() => setRemoveTarget(img)}
               className={cn('rounded-lg text-muted-foreground', 'hover:bg-red-500/10 hover:text-red-500')}
@@ -154,16 +167,29 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <PanelToolbar>
-        <PanelToolbarHeading icon={<ImageIcon />} title="镜像" meta={images.length > 0 ? `(${images.length})` : null} />
-
-        <PanelToolbarSearch
-          ref={searchRef}
-          value={search}
-          onValueChange={setSearch}
-          placeholder='搜索… ("/" 快速聚焦)'
-        />
-
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
+        <div className="inline-flex items-center gap-2.5">
+          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
+            <ImageIcon />
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span>镜像</span>
+            {images.length > 0 ? <span className="font-normal text-muted-foreground">({images.length})</span> : null}
+          </div>
+        </div>
+        <div className="relative ml-4 w-full max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            ref={searchRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder='搜索… ("/" 快速聚焦)'
+            className="w-full pl-9"
+          />
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowPull(true)}>
@@ -171,16 +197,40 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
             拉取镜像
           </Button>
         </div>
-      </PanelToolbar>
+      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-card">
         {loading && images.length === 0 ? (
-          <PanelListLoading />
+          <div className="flex h-full min-h-48 items-center justify-center">
+            <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={<ImageIcon />} title={search ? `无匹配的镜像 "${search}"` : '没有镜像'} />
+          <div className="flex min-h-48 flex-col items-center justify-center text-center">
+            <div className="flex justify-center text-border [&_svg]:size-7">
+              <ImageIcon />
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{search ? `无匹配的镜像 "${search}"` : '没有镜像'}</p>
+          </div>
         ) : (
-          <DataTable className="w-full" rowKey="id" columns={imageColumns} rows={filtered} />
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow>
+                {imageColumns.map((col) => (
+                  <TableHead key={col.key}>{col.title}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((row, idx) => (
+                <TableRow key={row.id}>
+                  {imageColumns.map((col) => (
+                    <TableCell key={col.key}>{col.render ? col.render(undefined, row, idx) : null}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -201,30 +251,50 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
         />
       )}
 
-      <ConfirmDialog
+      <AlertDialog
         open={removeTarget !== null}
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除镜像"
-        description={removeImageDescription}
-        confirmText="删除"
-        extra={
-          <label className="flex cursor-pointer items-start gap-2.5 text-left">
-            <Checkbox checked={removeForce} onCheckedChange={(c) => setRemoveForce(c === true)} className="mt-0.5" />
-            <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
-          </label>
-        }
-        onConfirm={async () => {
-          if (!removeTarget) return
-          try {
-            await commands.removeImage(serverId, removeTarget.id, removeForce)
-            await fetchImages()
-          } catch (e) {
-            toast.error(String(e))
-          }
-        }}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除镜像</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line">{removeImageDescription}</AlertDialogDescription>
+            <div className="pt-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-left">
+                <Checkbox
+                  checked={removeForce}
+                  onCheckedChange={(c) => setRemoveForce(c === true)}
+                  className="mt-0.5"
+                />
+                <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
+              </label>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel variant="ghost">取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (!removeTarget) return
+                void (async () => {
+                  try {
+                    await commands.removeImage(serverId, removeTarget.id, removeForce)
+                    await fetchImages()
+                  } catch (err) {
+                    toast.error(String(err))
+                  } finally {
+                    setRemoveTarget(null)
+                  }
+                })()
+              }}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

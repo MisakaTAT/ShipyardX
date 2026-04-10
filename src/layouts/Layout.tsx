@@ -8,7 +8,6 @@ import Workspace, { type WorkspaceTab } from '@/pages/Workspace'
 import AppStore from '@/pages/AppStore'
 import PortForward from '@/pages/PortForward'
 import { KeepAlive } from '@/components/common/KeepAlive'
-import { PageScrollArea } from '@/components/ui/page-frame'
 import { APP_PATHS, appMemoryLocation } from '@/lib/appRouter'
 
 export default function Layout() {
@@ -37,9 +36,9 @@ function LayoutContent() {
 
       <main className="flex flex-1 flex-col overflow-hidden bg-background">
         {isStore ? (
-          <PageScrollArea>
+          <div className="flex-1 overflow-auto p-2 md:p-3">
             <AppStore />
-          </PageScrollArea>
+          </div>
         ) : null}
 
         {selectedServer ? (

@@ -557,7 +557,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
               <Button
                 type="button"
                 variant="ghost"
-                icon
+                size="icon-sm"
                 className="text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={onRequestClose}
                 title="关闭"

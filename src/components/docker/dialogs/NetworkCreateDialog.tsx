@@ -8,11 +8,11 @@ import {
   type NetworkCreateFormValues,
 } from '@/schema/networkCreateFormSchema'
 import type { NetworkCreate } from '@/types/app-bindings'
-import { Share2, Loader2, Plus } from 'lucide-react'
+import { Share2, Loader2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -67,25 +67,32 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
         if (!next && !submitting) onOpenChange(false)
       }}
     >
-      <DialogContent variant="panel">
-        <DialogHeaderBar
-          icon={<Share2 />}
-          title="创建网络"
-          onClose={() => onOpenChange(false)}
-          closeDisabled={submitting}
-        />
+      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <Share2 />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">创建网络</DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${formId}-net-create`} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogBody className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <FieldGroup className="gap-4">
               <Controller
                 control={form.control}
                 name="name"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${formId}-name`} required>
-                      名称
-                    </FieldLabel>
+                    <FieldLabel htmlFor={`${formId}-name`}>名称</FieldLabel>
                     <FieldContent>
                       <Input id={`${formId}-name`} {...field} placeholder="my-net" disabled={submitting} />
                       <FieldError errors={[fieldState.error]} />
@@ -98,13 +105,13 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                 name="driver"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel required>Driver</FieldLabel>
+                    <FieldLabel>Driver</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                         <SelectTrigger className="font-mono">
                           <SelectValue placeholder="选择 Driver" />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start">
+                        <SelectContent align="start">
                           <SelectItem value="bridge">bridge</SelectItem>
                           <SelectItem value="host">host</SelectItem>
                           <SelectItem value="overlay">overlay</SelectItem>
@@ -192,10 +199,10 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                 )}
               />
             </FieldGroup>
-          </DialogBody>
+          </div>
         </form>
 
-        <DialogFooter variant="actionsEnd">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
             取消
           </Button>
@@ -212,7 +219,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               </>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

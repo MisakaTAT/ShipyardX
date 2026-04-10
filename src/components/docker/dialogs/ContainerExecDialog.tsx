@@ -12,7 +12,10 @@ interface Props {
 export default function ContainerExecDialog({ open, serverId, containerId, containerName, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : null)}>
-      <DialogContent variant="fullscreen">
+      <DialogContent
+        className="inset-0 h-dvh max-w-full translate-x-0 translate-y-0 rounded-none p-0"
+        showCloseButton={false}
+      >
         <div className="h-full w-full">
           <TerminalPanel
             serverId={serverId}

@@ -3,19 +3,9 @@ import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
-import { RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
+import { RefreshCw, Play, Square, Clock, Copy, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  Dialog,
-  DialogCloseIconButton,
-  DialogContent,
-  DialogFullscreenBody,
-  DialogLoadingOverlay,
-  DialogPanelMeta,
-  DialogPanelTitle,
-  DialogPanelToolbar,
-  DialogPanelToolbarEnd,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatNowTime } from '@/utils/datetime'
@@ -187,10 +177,13 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
         if (!next) void handleClose()
       }}
     >
-      <DialogContent variant="fullscreen">
-        <DialogPanelToolbar>
-          <DialogPanelTitle>{containerName}</DialogPanelTitle>
-          <DialogPanelMeta>日志</DialogPanelMeta>
+      <DialogContent
+        className="inset-0 h-dvh max-w-full translate-x-0 translate-y-0 rounded-none p-0"
+        showCloseButton={false}
+      >
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3">
+          <span className="mr-1 font-mono text-sm font-semibold text-foreground">{containerName}</span>
+          <span className="mr-2 text-xs text-muted-foreground">日志</span>
 
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
             <SelectTrigger className="w-fit shrink-0">
@@ -253,14 +246,23 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
             复制
           </Button>
 
-          <DialogPanelToolbarEnd>
+          <div className="ml-auto flex items-center gap-2">
             {lineCount > 0 ? <span className="text-xs text-muted-foreground">{lineCount} 行</span> : null}
-            <DialogCloseIconButton onClick={() => void handleClose()} />
-          </DialogPanelToolbarEnd>
-        </DialogPanelToolbar>
+            <Button type="button" variant="ghost" size="icon-sm" onClick={() => void handleClose()}>
+              <X className="size-4" />
+            </Button>
+          </div>
+        </div>
 
-        <DialogFullscreenBody tone="log">
-          {loading ? <DialogLoadingOverlay>加载中...</DialogLoadingOverlay> : null}
+        <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
+          {loading ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                加载中...
+              </div>
+            </div>
+          ) : null}
           <div className="absolute inset-0 min-h-0 p-2">
             <Virtuoso
               className="rounded-sm"
@@ -271,7 +273,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
               itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
             />
           </div>
-        </DialogFullscreenBody>
+        </div>
       </DialogContent>
     </Dialog>
   )

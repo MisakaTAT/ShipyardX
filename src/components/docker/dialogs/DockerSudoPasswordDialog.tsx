@@ -6,9 +6,9 @@ import {
   dockerSudoPasswordFormSchema,
   type DockerSudoPasswordFormValues,
 } from '@/schema/dockerDaemonFormSchema'
-import { KeyRound, Loader2 } from 'lucide-react'
+import { KeyRound, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 
@@ -58,11 +58,21 @@ export default function DockerSudoPasswordDialog({
         onOpenChange(false)
       }}
     >
-      <DialogContent variant="panelMd">
-        <DialogHeaderBar icon={<KeyRound />} title="请输入提权密码" onClose={requestClose} closeDisabled={busy} />
+      <DialogContent className="max-w-md p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <KeyRound />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">
+            请输入提权密码
+          </DialogTitle>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={requestClose} disabled={busy}>
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${formId}-sudo`} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogBody className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <FieldGroup className="gap-3">
               <FieldDescription>当前操作需要 sudo 权限 请输入服务器用户的提权密码</FieldDescription>
               <Controller
@@ -85,10 +95,10 @@ export default function DockerSudoPasswordDialog({
                 )}
               />
             </FieldGroup>
-          </DialogBody>
+          </div>
         </form>
 
-        <DialogFooter variant="actionsEnd">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="ghost" onClick={requestClose} disabled={busy}>
             取消
           </Button>
@@ -96,7 +106,7 @@ export default function DockerSudoPasswordDialog({
             {busy ? <Loader2 className="animate-spin" /> : null}
             确认
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

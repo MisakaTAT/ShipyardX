@@ -7,11 +7,11 @@ import {
   volumeCreateFormSchema,
   type VolumeCreateFormValues,
 } from '@/schema/volumeCreateFormSchema'
-import { Database, Loader2, Plus } from 'lucide-react'
+import { Database, Loader2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -88,25 +88,32 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
         if (!next && !submitting) onOpenChange(false)
       }}
     >
-      <DialogContent variant="panel">
-        <DialogHeaderBar
-          icon={<Database />}
-          title="创建存储卷"
-          onClose={() => onOpenChange(false)}
-          closeDisabled={submitting}
-        />
+      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <Database />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">创建存储卷</DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${formId}-vol-create`} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogBody className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             <FieldGroup className="gap-4">
               <Controller
                 control={form.control}
                 name="name"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${formId}-name`} required>
-                      名称
-                    </FieldLabel>
+                    <FieldLabel htmlFor={`${formId}-name`}>名称</FieldLabel>
                     <FieldContent>
                       <Input id={`${formId}-name`} {...field} placeholder="my-volume" disabled={submitting} />
                       <FieldError errors={[fieldState.error]} />
@@ -119,13 +126,13 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 name="driver"
                 render={({ field }) => (
                   <Field>
-                    <FieldLabel required>模式</FieldLabel>
+                    <FieldLabel>模式</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                         <SelectTrigger className="font-mono">
                           <SelectValue placeholder="选择 Driver" />
                         </SelectTrigger>
-                        <SelectContent position="popper" align="start">
+                        <SelectContent align="start">
                           <SelectItem value="local">local</SelectItem>
                         </SelectContent>
                       </Select>
@@ -158,9 +165,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                     name="nfsAddr"
                     render={({ field, fieldState }) => (
                       <Field data-invalid={fieldState.invalid}>
-                        <FieldLabel htmlFor={`${formId}-nfs-addr`} required>
-                          地址
-                        </FieldLabel>
+                        <FieldLabel htmlFor={`${formId}-nfs-addr`}>地址</FieldLabel>
                         <FieldContent>
                           <Input
                             id={`${formId}-nfs-addr`}
@@ -199,9 +204,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                       name="nfsMount"
                       render={({ field, fieldState }) => (
                         <Field data-invalid={fieldState.invalid}>
-                          <FieldLabel htmlFor={`${formId}-nfs-mount`} required>
-                            挂载点
-                          </FieldLabel>
+                          <FieldLabel htmlFor={`${formId}-nfs-mount`}>挂载点</FieldLabel>
                           <FieldContent>
                             <Input
                               id={`${formId}-nfs-mount`}
@@ -238,10 +241,10 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 </>
               ) : null}
             </FieldGroup>
-          </DialogBody>
+          </div>
         </form>
 
-        <DialogFooter variant="actionsEnd">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
             取消
           </Button>
@@ -258,7 +261,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
               </>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

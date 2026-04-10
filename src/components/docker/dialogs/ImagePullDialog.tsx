@@ -4,9 +4,9 @@ import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/lib/pullImageStream'
 import { imagePullDefaultValues, imagePullFormSchema, type ImagePullFormValues } from '@/schema/imagePullFormSchema'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogBody, DialogContent, DialogHeaderBar } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldContent, FieldError, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 
@@ -93,16 +93,19 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
         if (!next && !pulling) void handleClose()
       }}
     >
-      <DialogContent variant="panel">
-        <DialogHeaderBar
-          icon={<Download />}
-          title="拉取镜像"
-          onClose={() => void handleClose()}
-          closeDisabled={pulling}
-        />
+      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex shrink-0 text-primary [&_svg]:size-4">
+            <Download />
+          </span>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">拉取镜像</DialogTitle>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => void handleClose()} disabled={pulling}>
+            <X className="size-4" />
+          </Button>
+        </div>
 
         <form id={`${formId}-pull`} onSubmit={handlePull} className="contents">
-          <DialogBody variant="stackSm">
+          <div className="space-y-3 p-4">
             <FieldGroup className="gap-2">
               <Controller
                 control={form.control}
@@ -152,7 +155,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                 </pre>
               </div>
             ) : null}
-          </DialogBody>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
