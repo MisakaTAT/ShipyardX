@@ -10,8 +10,8 @@ export default function AppStore() {
         </div>
 
         <Badge
-          variant="secondary"
-          className="mb-3 gap-1 border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-400/95"
+          variant="caution"
+          className="mb-3 gap-1 border-amber-500/25 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-400/95"
         >
           <Construction className="size-3" />
           开发中

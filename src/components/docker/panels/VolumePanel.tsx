@@ -1,23 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Database, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
+import { Database, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Volume } from '@/types/app-bindings'
 import VolumeCreateDialog from '@/components/docker/dialogs/VolumeCreateDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import InspectDialog from '@/components/docker/dialogs/InspectDialog'
 import { Button } from '@/components/ui/button'
+import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
 import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import {
-  Table,
-  TableBody,
-  TableBodyRow,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  dataTableHead,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -74,6 +66,74 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
     )
   })
 
+  const volumeColumns = useMemo<DataTableColumn<Volume>[]>(
+    () => [
+      {
+        key: 'name',
+        title: '名称',
+        colWidth: '16rem',
+        render: (_, v) => (
+          <span className="font-medium text-foreground" title={v.name}>
+            {v.name}
+          </span>
+        ),
+      },
+      {
+        key: 'driver',
+        title: 'Driver',
+        colWidth: '6rem',
+        render: (_, v) => v.driver || '—',
+      },
+      {
+        key: 'scope',
+        title: 'Scope',
+        colWidth: '6rem',
+        render: (_, v) => v.scope || '—',
+      },
+      {
+        key: 'created',
+        title: '创建时间',
+        colWidth: '10rem',
+        render: (_, v) => <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>,
+      },
+      {
+        key: 'mountpoint',
+        title: 'Mountpoint',
+        render: (_, v) => <span title={v.mountpoint}>{v.mountpoint || '—'}</span>,
+      },
+      {
+        key: 'actions',
+        title: '操作',
+        colWidth: '5rem',
+        render: (_, v) => (
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              icon
+              title="Inspect"
+              onClick={() => setInspectTarget(v)}
+              className="rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <ScanSearch />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              icon
+              title="删除"
+              onClick={() => setRemoveTarget(v)}
+              className="rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  )
+
   return (
     <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
@@ -101,72 +161,11 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
 
       <div className="flex-1 overflow-auto bg-card">
         {loading && volumes.length === 0 ? (
-          <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <PanelListLoading />
         ) : filtered.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
-            <Database className="mb-3 h-10 w-10 text-border" />
-            <p className="text-sm">{search ? `无匹配的存储卷 \"${search}\"` : '没有存储卷'}</p>
-          </div>
+          <EmptyState icon={<Database />} title={search ? `无匹配的存储卷 \"${search}\"` : '没有存储卷'} />
         ) : (
-          <Table className="w-full table-fixed text-sm">
-            <colgroup>
-              <col style={{ width: '20%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '40%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '10%' }} />
-            </colgroup>
-            <TableHeader>
-              <TableRow>
-                <TableHead className={dataTableHead.first}>名称</TableHead>
-                <TableHead className={dataTableHead.mid}>Driver</TableHead>
-                <TableHead className={dataTableHead.mid}>Scope</TableHead>
-                <TableHead className={dataTableHead.mid}>Mountpoint</TableHead>
-                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
-                <TableHead className={dataTableHead.last}>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((v) => (
-                <TableBodyRow key={v.name}>
-                  <TableCell className="min-w-0 px-5 py-3">
-                    <span className="block truncate font-medium text-foreground" title={v.name}>
-                      {v.name}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{v.driver || '—'}</TableCell>
-                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{v.scope || '—'}</TableCell>
-                  <TableCell className="min-w-0 px-4 py-3">
-                    <span className="block truncate font-mono text-xs text-muted-foreground" title={v.mountpoint}>
-                      {v.mountpoint || '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">
-                    <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>
-                  </TableCell>
-                  <TableCell className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button"
-                        variant="ghostAccent"
-                        icon
-                        title="Inspect"
-                        onClick={() => setInspectTarget(v)}
-                      >
-                        <ScanSearch />
-                      </Button>
-                      <Button type="button" variant="ghostDanger" icon title="删除" onClick={() => setRemoveTarget(v)}>
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableBodyRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable className="w-full table-fixed" rowKey="name" columns={volumeColumns} rows={filtered} />
         )}
       </div>
 

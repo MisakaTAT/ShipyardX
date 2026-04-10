@@ -1,23 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Share2, Loader2, Trash2, Plus, ScanSearch } from 'lucide-react'
+import { Share2, Trash2, Plus, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Network } from '@/types/app-bindings'
 import NetworkCreateDialog from '@/components/docker/dialogs/NetworkCreateDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import InspectDialog from '@/components/docker/dialogs/InspectDialog'
 import { Button } from '@/components/ui/button'
+import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
 import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import {
-  Table,
-  TableBody,
-  TableBodyRow,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  dataTableHead,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { formatDateTimeString, formatNowTime } from '@/utils/datetime'
 
 interface Props {
@@ -78,6 +70,95 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
     )
   })
 
+  const networkColumns = useMemo<DataTableColumn<Network>[]>(
+    () => [
+      {
+        key: 'name',
+        title: '名称',
+        render: (_, n) => (
+          <>
+            <div className="font-medium text-foreground">{n.name}</div>
+            <div className="text-muted-foreground">{n.id.slice(0, 12)}</div>
+          </>
+        ),
+      },
+      {
+        key: 'driver',
+        title: 'Driver',
+        render: (_, n) => n.driver || '—',
+      },
+      {
+        key: 'scope',
+        title: 'Scope',
+        render: (_, n) => n.scope || '—',
+      },
+      {
+        key: 'subnets',
+        title: '子网',
+        render: (_, n) => <ChipCell items={n.subnets} />,
+      },
+      {
+        key: 'gateways',
+        title: '网关',
+        render: (_, n) => <ChipCell items={n.gateways} />,
+      },
+      {
+        key: 'labels',
+        title: '标签',
+        colWidth: '16rem',
+        truncate: false,
+        render: (_, n) => <ChipCell items={n.labels} />,
+      },
+      {
+        key: 'attrs',
+        title: '属性',
+        render: (_, n) => (
+          <>
+            {n.internal ? 'internal' : ''}
+            {n.internal && n.attachable ? ' · ' : ''}
+            {n.attachable ? 'attachable' : '—'}
+          </>
+        ),
+      },
+      {
+        key: 'created',
+        title: '创建时间',
+        render: (_, n) => <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>,
+      },
+      {
+        key: 'actions',
+        title: '操作',
+        colWidth: '5rem',
+        render: (_, n) => (
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              icon
+              title="Inspect"
+              onClick={() => setInspectTarget(n)}
+              className="rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <ScanSearch />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              icon
+              title="删除"
+              onClick={() => setRemoveTarget(n)}
+              className="rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+
+    []
+  )
+
   return (
     <div className="flex h-full flex-col bg-background">
       <PanelToolbar>
@@ -105,75 +186,11 @@ export default function NetworkPanel({ serverId, refreshTick }: Props) {
 
       <div className="flex-1 overflow-auto bg-card">
         {loading && networks.length === 0 ? (
-          <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <PanelListLoading />
         ) : filtered.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
-            <Share2 className="mb-3 h-10 w-10 text-border" />
-            <p className="text-sm">{search ? `无匹配的网络 \"${search}\"` : '没有网络'}</p>
-          </div>
+          <EmptyState icon={<Share2 />} title={search ? `无匹配的网络 \"${search}\"` : '没有网络'} />
         ) : (
-          <Table className="w-full text-sm">
-            <TableHeader>
-              <TableRow>
-                <TableHead className={dataTableHead.first}>名称</TableHead>
-                <TableHead className={dataTableHead.mid}>Driver</TableHead>
-                <TableHead className={dataTableHead.mid}>Scope</TableHead>
-                <TableHead className={dataTableHead.mid}>子网</TableHead>
-                <TableHead className={dataTableHead.mid}>网关</TableHead>
-                <TableHead className={dataTableHead.mid}>标签</TableHead>
-                <TableHead className={dataTableHead.mid}>属性</TableHead>
-                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
-                <TableHead className={dataTableHead.last}>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((n) => (
-                <TableBodyRow key={n.id}>
-                  <TableCell className="px-5 py-3">
-                    <div className="font-medium text-foreground">{n.name}</div>
-                    <div className="mt-0.5 font-mono text-xs text-muted-foreground">{n.id.slice(0, 12)}</div>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{n.driver || '—'}</TableCell>
-                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">{n.scope || '—'}</TableCell>
-                  <TableCell className="max-w-[220px] px-4 py-3">
-                    <ChipCell items={n.subnets} />
-                  </TableCell>
-                  <TableCell className="max-w-[220px] px-4 py-3">
-                    <ChipCell items={n.gateways} />
-                  </TableCell>
-                  <TableCell className="max-w-[320px] px-4 py-3">
-                    <ChipCell items={n.labels} />
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs text-muted-foreground">
-                    {n.internal ? 'internal' : ''}
-                    {n.internal && n.attachable ? ' · ' : ''}
-                    {n.attachable ? 'attachable' : '—'}
-                  </TableCell>
-                  <TableCell className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">
-                    <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>
-                  </TableCell>
-                  <TableCell className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button"
-                        variant="ghostAccent"
-                        icon
-                        title="Inspect"
-                        onClick={() => setInspectTarget(n)}
-                      >
-                        <ScanSearch />
-                      </Button>
-                      <Button type="button" variant="ghostDanger" icon title="删除" onClick={() => setRemoveTarget(n)}>
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableBodyRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable className="w-full text-sm" rowKey="id" columns={networkColumns} rows={filtered} />
         )}
       </div>
 

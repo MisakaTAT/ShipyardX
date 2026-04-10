@@ -13,18 +13,11 @@ import {
   Filter,
 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
-import {
-  Table,
-  TableBody,
-  TableBodyRow,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  eventTableHead,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { cn } from '@/lib/utils'
 import { formatUnixSecondsTime } from '@/utils/datetime'
 
@@ -154,6 +147,67 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
     return counts
   }, [events])
 
+  const eventColumns = useMemo<DataTableColumn<DockerEvent>[]>(
+    () => [
+      {
+        key: 'name',
+        title: '名称',
+        colWidth: '12rem',
+        render: (_, ev) => (
+          <span className="font-medium text-foreground" title={ev.actor_name || undefined}>
+            {ev.actor_name || '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'id',
+        title: 'ID',
+        colWidth: '8rem',
+        render: (_, ev) => <span title={ev.actor_id || undefined}>{ev.actor_id || '—'}</span>,
+      },
+      {
+        key: 'time',
+        title: '时间',
+        colWidth: '8rem',
+        render: (_, ev) => formatUnixSecondsTime(ev.time),
+      },
+      {
+        key: 'type',
+        title: '类型',
+        colWidth: '8rem',
+        render: (_, ev) => (
+          <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
+            {typeIcon(ev.event_type)}
+            <span className="min-w-0 truncate">{ev.event_type}</span>
+          </span>
+        ),
+      },
+      {
+        key: 'action',
+        title: '动作',
+        colWidth: '8rem',
+        render: (_, ev) => (
+          <Badge variant="outline" size="pill" className={cn('max-w-full min-w-0', actionColor(ev.action))}>
+            {ev.action}
+          </Badge>
+        ),
+      },
+      {
+        key: 'image',
+        title: '镜像',
+        colWidth: '8rem',
+        render: (_, ev) => <span title={ev.actor_image || undefined}>{ev.actor_image || '—'}</span>,
+      },
+      {
+        key: 'detail',
+        title: '详情',
+        render: (_, ev) => <span title={ev.detail || undefined}>{ev.detail || '—'}</span>,
+      },
+    ],
+
+    []
+  )
+
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Toolbar */}
@@ -226,81 +280,14 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         }}
       >
         {filtered.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
-            <Activity className="mb-3 h-10 w-10 text-border" />
-            <p className="text-sm">{events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'}</p>
-          </div>
+          <EmptyState icon={<Activity />} title={events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'} />
         ) : (
-          <Table className="w-full text-xs">
-            <TableHeader>
-              <TableRow>
-                <TableHead className={eventTableHead.first}>ID</TableHead>
-                <TableHead className={eventTableHead.mid}>时间</TableHead>
-                <TableHead className={eventTableHead.mid}>类型</TableHead>
-                <TableHead className={eventTableHead.mid}>动作</TableHead>
-                <TableHead className={eventTableHead.wide}>名称</TableHead>
-                <TableHead className={eventTableHead.wide}>镜像</TableHead>
-                <TableHead className={eventTableHead.last}>详情</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((ev, i) => {
-                return (
-                  <TableBodyRow key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}>
-                    <TableCell
-                      className="py-2 pr-3 pl-5 align-middle font-mono text-muted-foreground"
-                      title={ev.actor_id || undefined}
-                    >
-                      {ev.actor_id || '—'}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 align-middle font-mono whitespace-nowrap text-muted-foreground tabular-nums">
-                      {formatUnixSecondsTime(ev.time)}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 align-middle">
-                      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                        {typeIcon(ev.event_type)}
-                        <span className="text-[11px]">{ev.event_type}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-3 py-2 align-middle">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
-                          actionColor(ev.action)
-                        )}
-                      >
-                        {ev.action}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-[160px] px-3 py-2 align-middle">
-                      <span
-                        className={cn(
-                          'block truncate font-medium',
-                          ev.actor_name ? 'text-foreground' : 'text-muted-foreground'
-                        )}
-                        title={ev.actor_name || undefined}
-                      >
-                        {ev.actor_name || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-0 px-3 py-2 align-middle">
-                      <span
-                        className="block truncate font-mono text-muted-foreground"
-                        title={ev.actor_image || undefined}
-                      >
-                        {ev.actor_image || '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-0 px-3 py-2 pr-5 align-middle">
-                      <span className="block truncate font-mono text-muted-foreground" title={ev.detail || undefined}>
-                        {ev.detail || '—'}
-                      </span>
-                    </TableCell>
-                  </TableBodyRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            className="w-full table-fixed"
+            rowKey={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
+            columns={eventColumns}
+            rows={filtered}
+          />
         )}
       </div>
     </div>

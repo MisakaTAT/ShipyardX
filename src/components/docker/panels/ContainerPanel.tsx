@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
 import { toast } from 'sonner'
 import {
   BarChart2,
   Box,
   FileText,
-  Loader2,
   MoreHorizontal,
   Play,
   Plus,
@@ -23,18 +22,11 @@ import InspectDialog from '@/components/docker/dialogs/InspectDialog'
 import RunContainerDialog from '@/components/docker/dialogs/RunContainerDialog'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Button } from '@/components/ui/button'
+import { ContainerStateBadge } from '@/components/ui/badge'
+import { EmptyState, PanelListLoading } from '@/components/ui/empty-state'
 import { PanelToolbar, PanelToolbarHeading, PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import {
-  Table,
-  TableBody,
-  TableBodyRow,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  dataTableHead,
-} from '@/components/ui/table'
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { formatNowTime, formatUnixSeconds } from '@/utils/datetime'
 
 interface ContainerPanelProps {
@@ -47,79 +39,6 @@ function parsePorts(ports: string): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-}
-
-const CONTAINER_STATE_LABEL: Record<string, string> = {
-  created: '已创建',
-  running: '运行中',
-  paused: '已暂停',
-  restarting: '重启中',
-  removing: '删除中',
-  exited: '已停止',
-  dead: '已停止',
-}
-
-type StateTone = 'green' | 'red' | 'yellow' | 'amber' | 'blue' | 'muted'
-
-function stateTone(s: string): StateTone {
-  if (s === 'running') return 'green'
-  if (s === 'exited' || s === 'dead') return 'red'
-  if (s === 'paused') return 'yellow'
-  if (s === 'restarting' || s === 'removing') return 'amber'
-  if (s === 'created') return 'blue'
-  return 'muted'
-}
-
-const TONE_CLASSES: Record<StateTone, { wrap: string; dot: string; pulse?: boolean }> = {
-  green: {
-    wrap: 'bg-green-500/10 text-green-500 border-green-500/30',
-    dot: 'bg-green-500',
-    pulse: true,
-  },
-  red: {
-    wrap: 'bg-red-500/10 text-red-500 border-red-500/30',
-    dot: 'bg-red-500',
-  },
-  yellow: {
-    wrap: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
-    dot: 'bg-yellow-500',
-  },
-  amber: {
-    wrap: 'bg-amber-500/10 text-amber-600 border-amber-500/35 dark:text-amber-400',
-    dot: 'bg-amber-500',
-    pulse: true,
-  },
-  blue: {
-    wrap: 'bg-blue-500/10 text-blue-500 border-blue-500/30',
-    dot: 'bg-blue-500',
-  },
-  muted: {
-    wrap: '',
-    dot: '',
-  },
-}
-
-function StateBadge({ state }: { state: string }) {
-  const s = state.toLowerCase().trim()
-  const label = CONTAINER_STATE_LABEL[s] ?? state
-  const tone = stateTone(s)
-  const t = TONE_CLASSES[tone]
-
-  if (tone === 'muted') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-        {label}
-      </span>
-    )
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${t.wrap}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${t.dot} ${t.pulse ? 'animate-pulse' : ''}`} />
-      {label}
-    </span>
-  )
 }
 
 export default function ContainerPanel({ serverId, refreshTick }: ContainerPanelProps) {
@@ -164,41 +83,39 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const runAction = async (
-    containerId: string,
-    action: string,
-    command: string,
-    args: Record<string, unknown> = {}
-  ) => {
-    setActionLoading((prev) => ({ ...prev, [containerId]: action }))
-    try {
-      switch (command) {
-        case 'start_container':
-          await commands.startContainer(serverId, containerId)
-          break
-        case 'stop_container':
-          await commands.stopContainer(serverId, containerId)
-          break
-        case 'restart_container':
-          await commands.restartContainer(serverId, containerId)
-          break
-        case 'remove_container':
-          await commands.removeContainer(serverId, containerId, Boolean(args.force))
-          break
-        default:
-          throw new Error(`Unknown container command: ${command}`)
+  const runAction = useCallback(
+    async (containerId: string, action: string, command: string, args: Record<string, unknown> = {}) => {
+      setActionLoading((prev) => ({ ...prev, [containerId]: action }))
+      try {
+        switch (command) {
+          case 'start_container':
+            await commands.startContainer(serverId, containerId)
+            break
+          case 'stop_container':
+            await commands.stopContainer(serverId, containerId)
+            break
+          case 'restart_container':
+            await commands.restartContainer(serverId, containerId)
+            break
+          case 'remove_container':
+            await commands.removeContainer(serverId, containerId, Boolean(args.force))
+            break
+          default:
+            throw new Error(`Unknown container command: ${command}`)
+        }
+        await fetchContainers()
+      } catch (e) {
+        toast.error(String(e))
+      } finally {
+        setActionLoading((prev) => {
+          const next = { ...prev }
+          delete next[containerId]
+          return next
+        })
       }
-      await fetchContainers()
-    } catch (e) {
-      toast.error(String(e))
-    } finally {
-      setActionLoading((prev) => {
-        const next = { ...prev }
-        delete next[containerId]
-        return next
-      })
-    }
-  }
+    },
+    [serverId, fetchContainers]
+  )
 
   const filtered = containers.filter((c) => {
     if (!search.trim()) return true
@@ -210,6 +127,117 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       c.state.toLowerCase().includes(q)
     )
   })
+
+  const containerColumns = useMemo<DataTableColumn<Container>[]>(
+    () => [
+      {
+        key: 'name',
+        title: '名称',
+        render: (_, c) => (
+          <>
+            <div className="font-medium text-foreground">{c.name}</div>
+            <div className="text-muted-foreground">{c.id}</div>
+          </>
+        ),
+      },
+      {
+        key: 'image',
+        title: '镜像',
+        render: (_, c) => <span title={c.image}>{c.image}</span>,
+      },
+      {
+        key: 'state',
+        title: '状态',
+        colWidth: '12rem',
+        render: (_, c) => (
+          <>
+            <ContainerStateBadge state={c.state} />
+            <br />
+            <span title={c.status}>{c.status}</span>
+          </>
+        ),
+      },
+      {
+        key: 'ip',
+        title: 'IP',
+        render: (_, c) => <span>{c.ip || '-'}</span>,
+      },
+      {
+        key: 'ports',
+        title: '端口',
+        render: (_, c) => (c.ports ? <PortCell ports={c.ports} /> : <span>—</span>),
+      },
+      {
+        key: 'created',
+        title: '创建时间',
+        render: (_, c) => <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>,
+      },
+      {
+        key: 'actions',
+        title: '操作',
+        colWidth: '3rem',
+        render: (_, c) => {
+          const busy = actionLoading[c.id]
+          const isRunning = c.state === 'running'
+          return (
+            <div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" icon title="更多操作">
+                    <MoreHorizontal />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => runAction(c.id, 'start', 'start_container')}
+                    disabled={isRunning || Boolean(busy)}
+                  >
+                    <Play className="size-3.5" />
+                    启动
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => runAction(c.id, 'stop', 'stop_container')}
+                    disabled={!isRunning || Boolean(busy)}
+                  >
+                    <Square className="size-3.5" />
+                    停止
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => runAction(c.id, 'restart', 'restart_container')}
+                    disabled={Boolean(busy)}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    重启
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExecTarget(c)} disabled={!isRunning}>
+                    <Terminal className="size-3.5" />
+                    容器终端
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatsTarget(c)} disabled={!isRunning}>
+                    <BarChart2 className="size-3.5" />
+                    资源监控
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLogTarget(c)}>
+                    <FileText className="size-3.5" />
+                    日志
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setInspectTarget(c)}>
+                    <ScanSearch className="size-3.5" />
+                    Inspect
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onClick={() => setRemoveTarget(c)} disabled={Boolean(busy)}>
+                    <Trash2 className="size-3.5" />
+                    删除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
+    ],
+    [actionLoading, runAction]
+  )
 
   const runningCount = containers.filter((c) => c.state === 'running').length
 
@@ -249,126 +277,11 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       {/* Content */}
       <div className="flex-1 overflow-auto bg-card">
         {loading && containers.length === 0 ? (
-          <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <PanelListLoading />
         ) : filtered.length === 0 ? (
-          <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
-            <Box className="mb-3 h-10 w-10 text-border" />
-            <p className="text-sm">{search ? `无匹配的容器 "${search}"` : '没有容器'}</p>
-          </div>
+          <EmptyState icon={<Box />} title={search ? `无匹配的容器 "${search}"` : '没有容器'} />
         ) : (
-          <Table className="w-full text-sm">
-            <TableHeader>
-              <TableRow>
-                <TableHead className={dataTableHead.first}>名称</TableHead>
-                <TableHead className={dataTableHead.mid}>镜像</TableHead>
-                <TableHead className={dataTableHead.mid} style={{ minWidth: '160px' }}>
-                  状态
-                </TableHead>
-                <TableHead className={dataTableHead.mid}>IP</TableHead>
-                <TableHead className={dataTableHead.mid}>端口</TableHead>
-                <TableHead className={dataTableHead.mid}>创建时间</TableHead>
-                <TableHead className={dataTableHead.last}>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((c) => {
-                const busy = actionLoading[c.id]
-                const isRunning = c.state === 'running'
-                return (
-                  <TableBodyRow key={c.id}>
-                    <TableCell className="px-5 py-3">
-                      <div className="font-medium text-foreground">{c.name}</div>
-                      <div className="mt-0.5 font-mono text-xs text-muted-foreground">{c.id}</div>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] px-4 py-3">
-                      <span className="block truncate font-mono text-xs text-muted-foreground" title={c.image}>
-                        {c.image}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-40 px-4 py-3">
-                      <StateBadge state={c.state} />
-                      <div className="mt-1 truncate text-xs text-muted-foreground" title={c.status}>
-                        {c.status}
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3">
-                      <span className="font-mono text-xs text-muted-foreground">{c.ip || '-'}</span>
-                    </TableCell>
-                    <TableCell className="max-w-[220px] px-4 py-3">
-                      {c.ports ? (
-                        <PortCell ports={c.ports} />
-                      ) : (
-                        <span className="font-mono text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-xs text-muted-foreground">
-                      <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>
-                    </TableCell>
-                    <TableCell className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button type="button" variant="ghostAccent" icon title="更多操作">
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem
-                              onClick={() => runAction(c.id, 'start', 'start_container')}
-                              disabled={isRunning || Boolean(busy)}
-                            >
-                              <Play />
-                              启动
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => runAction(c.id, 'stop', 'stop_container')}
-                              disabled={!isRunning || Boolean(busy)}
-                            >
-                              <Square />
-                              停止
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => runAction(c.id, 'restart', 'restart_container')}
-                              disabled={Boolean(busy)}
-                            >
-                              <RotateCcw />
-                              重启
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setExecTarget(c)} disabled={!isRunning}>
-                              <Terminal />
-                              容器终端
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatsTarget(c)} disabled={!isRunning}>
-                              <BarChart2 />
-                              资源监控
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setLogTarget(c)}>
-                              <FileText />
-                              日志
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setInspectTarget(c)}>
-                              <ScanSearch />
-                              Inspect
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setRemoveTarget(c)}
-                              disabled={Boolean(busy)}
-                            >
-                              <Trash2 />
-                              删除
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableBodyRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+          <DataTable className="w-full table-fixed" rowKey="id" columns={containerColumns} rows={filtered} />
         )}
       </div>
 

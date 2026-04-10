@@ -3,6 +3,7 @@ import { commands } from '@/types/app-bindings'
 import { Server, Plus, Pencil, Trash2, Search, KeyRound, Lock, ArrowRight } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { PageListColumn, PageScrollArea } from '@/components/ui/page-frame'
 import { PanelToolbarSearch } from '@/components/ui/panel-toolbar'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -95,12 +96,20 @@ export default function Connections({ onConnect }: ConnectionsProps) {
 
           <div className="flex-1 overflow-auto">
             {servers.length === 0 ? (
-              <EmptyState onAdd={handleAdd} />
+              <EmptyState
+                variant="hero"
+                icon={<Server />}
+                title="尚未配置远程服务器"
+                description="配置完成后，可在此查看系统概览、管理 Docker 容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。"
+                action={
+                  <Button onClick={handleAdd}>
+                    <Plus />
+                    添加服务器
+                  </Button>
+                }
+              />
             ) : filtered.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <Search className="size-7 text-border" />
-                <p className="mt-2 text-sm text-muted-foreground">没有找到匹配的服务器</p>
-              </div>
+              <EmptyState variant="search" icon={<Search />} title="没有找到匹配的服务器" />
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {filtered.map((server) => (
@@ -200,26 +209,5 @@ function ServerCard({
         </div>
       </CardFooter>
     </Card>
-  )
-}
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <div className="max-w-xs text-center">
-        <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10">
-          <Server className="size-7 text-primary" />
-        </div>
-        <h2 className="text-sm font-semibold text-foreground">尚未配置远程服务器</h2>
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          配置完成后，可在此查看系统概览、管理 Docker
-          容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
-        </p>
-        <Button className="mt-5" onClick={onAdd}>
-          <Plus />
-          添加服务器
-        </Button>
-      </div>
-    </div>
   )
 }
