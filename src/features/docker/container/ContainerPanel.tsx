@@ -16,11 +16,11 @@ import {
   Search,
 } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
-import LogDialog from '@/components/docker/dialogs/LogDialog'
-import StatsDialog from '@/components/docker/dialogs/StatsDialog'
-import ContainerExecDialog from '@/components/docker/dialogs/ContainerExecDialog'
-import InspectDialog from '@/components/docker/dialogs/InspectDialog'
-import RunContainerDialog from '@/components/docker/dialogs/RunContainerDialog'
+import LogDialog from '@/features/docker/container/LogDialog'
+import StatsDialog from '@/features/docker/container/StatsDialog'
+import ContainerExecDialog from '@/features/docker/container/ContainerExecDialog'
+import ResourceInspectDialog from '@/features/docker/shared/ResourceInspectDialog'
+import RunContainerDialog from '@/features/docker/container/RunContainerDialog'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -390,7 +390,7 @@ export default function ContainerPanel({ serverId, refreshTick }: ContainerPanel
       )}
 
       {inspectTarget && (
-        <InspectDialog
+        <ResourceInspectDialog
           serverId={serverId}
           kind="container"
           targetId={inspectTarget.id}

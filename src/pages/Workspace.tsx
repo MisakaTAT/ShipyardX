@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { motion } from 'motion/react'
 import { commands } from '@/types/app-bindings'
 import {
   Activity,
@@ -16,17 +17,17 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ServerConfig } from '@/types/app-bindings'
-import ContainerPanel from '@/components/docker/panels/ContainerPanel'
-import ImagePanel from '@/components/docker/panels/ImagePanel'
-import NetworkPanel from '@/components/docker/panels/NetworkPanel'
-import TerminalPanel from '@/components/docker/panels/TerminalPanel'
-import ServerOverview from '@/components/server/ServerOverview'
-import VolumePanel from '@/components/docker/panels/VolumePanel'
-import DockerManagePanel from '@/components/docker/panels/DockerManagePanel'
-import EventPanel from '@/components/docker/panels/EventPanel'
+import ContainerPanel from '@/features/docker/container/ContainerPanel'
+import ImagePanel from '@/features/docker/image/ImagePanel'
+import NetworkPanel from '@/features/docker/network/NetworkPanel'
+import TerminalPanel from '@/features/terminal/TerminalPanel'
+import ServerOverview from '@/features/docker/engine/ServerOverview'
+import VolumePanel from '@/features/docker/volume/VolumePanel'
+import DockerManagePanel from '@/features/docker/engine/DockerManagePanel'
+import EventPanel from '@/features/docker/event/EventPanel'
 import { useEngineEvents } from '@/lib/useEngineEvents'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList } from '@/components/ui/tabs'
 import { KeepAlive } from '@/components/common/KeepAlive'
 import { cn } from '@/lib/utils'
 
@@ -149,49 +150,69 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
         <Tabs
           value={activeTab}
           onValueChange={(v) => onActiveTabChange(v as WorkspaceTab)}
-          className="flex flex-col gap-3"
+          className="relative flex flex-col gap-3 perspective-[1000px]"
         >
-          <TabsList
-            variant="line"
-            className="h-auto w-full flex-wrap justify-start gap-1 overflow-hidden rounded-xl border border-border bg-card p-1.5"
-          >
-            {NAV_ITEMS.map((item) => (
-              <TabsTrigger
-                key={item.key}
-                value={item.key}
-                disabled={!dockerOk && item.key !== 'terminal'}
-                className="flex flex-1 sm:flex-none"
-              >
-                {item.icon}
-                {item.label}
-              </TabsTrigger>
-            ))}
+          <div className="rounded-xl border border-border bg-card p-1.5">
+            <TabsList
+              variant="line"
+              className="no-visible-scrollbar relative h-auto w-full max-w-full justify-start gap-2 overflow-auto bg-transparent p-0 sm:overflow-visible"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                {NAV_ITEMS.map((item) => {
+                  const isActive = activeTab === item.key
+                  const disabled = !dockerOk && item.key !== 'terminal'
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onActiveTabChange(item.key)}
+                      className={cn(
+                        'relative flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm transition-colors',
+                        isActive ? 'text-background' : 'text-foreground hover:text-foreground',
+                        disabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer'
+                      )}
+                    >
+                      {isActive ? (
+                        <motion.span
+                          layoutId="workspace-active-tab-pill"
+                          transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
+                          className="absolute inset-0 rounded-full bg-primary"
+                        />
+                      ) : null}
+                      <span className="relative z-10">{item.icon}</span>
+                      <span className="relative z-10">{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
 
-            <div className="ml-auto flex items-center gap-1">
-              {!dockerOk ? (
+              <div className="ml-auto flex items-center gap-1">
+                {!dockerOk ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full hover:bg-amber-500/15 hover:text-amber-500"
+                    title="重新检测 Docker"
+                    onClick={() => checkDocker(true)}
+                  >
+                    <RefreshCw className="size-[18px]" />
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-full hover:bg-amber-500/15 hover:text-amber-500"
-                  title="重新检测 Docker"
-                  onClick={() => checkDocker(true)}
+                  className="rounded-full text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
+                  title="断开连接"
+                  onClick={handleDisconnect}
                 >
-                  <RefreshCw className="size-[18px]" />
+                  <Unplug className="size-[18px]" />
                 </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-full text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
-                title="断开连接"
-                onClick={handleDisconnect}
-              >
-                <Unplug className="size-[18px]" />
-              </Button>
-            </div>
-          </TabsList>
+              </div>
+            </TabsList>
+          </div>
         </Tabs>
 
         <div

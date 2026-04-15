@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import TerminalPanel from '@/components/docker/panels/TerminalPanel'
+import TerminalPanel from '@/features/terminal/TerminalPanel'
 
 interface Props {
   open: boolean

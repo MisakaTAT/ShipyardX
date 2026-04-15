@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { ArrowLeftRight, Play, Plus, Search, Square, Trash2 } from 'lucide-react'
 
 import type { PortForward, ServerConfig } from '@/types/app-bindings'
-import PortForwardCreateDialog from '@/components/server/dialogs/PortForwardCreateDialog'
+import PortForwardCreateDialog from '@/features/port-forward/PortForwardCreateDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

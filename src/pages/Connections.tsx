@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import ServerDialog from '@/components/server/dialogs/ServerDialog'
+import ServerDialog from '@/features/server/ServerDialog'
 import {
   AlertDialog,
   AlertDialogAction,

@@ -10,7 +10,7 @@ import {
   formValuesToDaemonUpdate,
   type DockerDaemonFormValues,
 } from '@/schema/dockerDaemonFormSchema'
-import DockerSudoPasswordDialog from '@/components/docker/dialogs/DockerSudoPasswordDialog'
+import DockerSudoPasswordDialog from '@/features/docker/engine/DockerSudoPasswordDialog'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'

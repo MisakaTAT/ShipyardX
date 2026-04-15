@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { commands } from '@/types/app-bindings'
-import ImagePullDialog from '@/components/docker/dialogs/ImagePullDialog'
+import ImagePullDialog from '@/features/docker/image/ImagePullDialog'
 import { Trash2, Download, Image as ImageIcon, ScanSearch, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Image } from '@/types/app-bindings'
@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import InspectDialog from '@/components/docker/dialogs/InspectDialog'
+import ResourceInspectDialog from '@/features/docker/shared/ResourceInspectDialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
@@ -242,7 +242,7 @@ export default function ImagePanel({ serverId, refreshTick }: ImagePanelProps) {
       />
 
       {inspectTarget && (
-        <InspectDialog
+        <ResourceInspectDialog
           serverId={serverId}
           kind="image"
           targetId={inspectTarget.id}

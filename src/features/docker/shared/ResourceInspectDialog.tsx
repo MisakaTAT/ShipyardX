@@ -16,7 +16,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function InspectDialog({ serverId, kind, targetId, targetLabel, onClose }: Props) {
+export default function ResourceInspectDialog({ serverId, kind, targetId, targetLabel, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [json, setJson] = useState('')
   const [copied, setCopied] = useState(false)

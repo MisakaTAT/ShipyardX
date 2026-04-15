@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Database, Trash2, Plus, ScanSearch, Search } from 'lucide-react'
+import { Share2, Trash2, Plus, ScanSearch, Search } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Volume } from '@/types/app-bindings'
-import VolumeCreateDialog from '@/components/docker/dialogs/VolumeCreateDialog'
+import type { Network } from '@/types/app-bindings'
+import NetworkCreateDialog from '@/features/docker/network/NetworkCreateDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import InspectDialog from '@/components/docker/dialogs/InspectDialog'
+import ResourceInspectDialog from '@/features/docker/shared/ResourceInspectDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -29,23 +29,24 @@ type DataTableColumn<T extends object> = {
   title: React.ReactNode
   render?: (value: unknown, record: T, index: number) => React.ReactNode
   colWidth?: string
+  truncate?: boolean
 }
 
-export default function VolumePanel({ serverId, refreshTick }: Props) {
-  const [volumes, setVolumes] = useState<Volume[]>([])
+export default function NetworkPanel({ serverId, refreshTick }: Props) {
+  const [networks, setNetworks] = useState<Network[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
-  const [removeTarget, setRemoveTarget] = useState<Volume | null>(null)
-  const [inspectTarget, setInspectTarget] = useState<Volume | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Network | null>(null)
+  const [inspectTarget, setInspectTarget] = useState<Network | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const fetchVolumes = useCallback(async () => {
+  const fetchNetworks = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await commands.listVolumes(serverId)
-      setVolumes(data)
+      const data = await commands.listNetworks(serverId)
+      setNetworks(data)
       setLastUpdated(formatNowTime())
     } catch (e) {
       toast.error(String(e))
@@ -55,8 +56,8 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
   }, [serverId])
 
   useEffect(() => {
-    fetchVolumes()
-  }, [fetchVolumes, refreshTick])
+    fetchNetworks()
+  }, [fetchNetworks, refreshTick])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -69,64 +70,88 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const filtered = volumes.filter((v) => {
+  const filtered = networks.filter((n) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
     return (
-      v.name.toLowerCase().includes(q) ||
-      v.driver.toLowerCase().includes(q) ||
-      v.scope.toLowerCase().includes(q) ||
-      v.mountpoint.toLowerCase().includes(q)
+      n.name.toLowerCase().includes(q) ||
+      n.id.toLowerCase().includes(q) ||
+      n.driver.toLowerCase().includes(q) ||
+      n.scope.toLowerCase().includes(q) ||
+      n.created_at.toLowerCase().includes(q) ||
+      n.subnets.join(' ').toLowerCase().includes(q) ||
+      n.gateways.join(' ').toLowerCase().includes(q) ||
+      n.labels.join(' ').toLowerCase().includes(q)
     )
   })
 
-  const volumeColumns = useMemo<DataTableColumn<Volume>[]>(
+  const networkColumns = useMemo<DataTableColumn<Network>[]>(
     () => [
       {
         key: 'name',
         title: '名称',
-        colWidth: '16rem',
-        render: (_, v) => (
-          <span className="font-medium text-foreground" title={v.name}>
-            {v.name}
-          </span>
+        render: (_, n) => (
+          <>
+            <div className="font-medium text-foreground">{n.name}</div>
+            <div className="text-muted-foreground">{n.id.slice(0, 12)}</div>
+          </>
         ),
       },
       {
         key: 'driver',
         title: 'Driver',
-        colWidth: '6rem',
-        render: (_, v) => v.driver || '—',
+        render: (_, n) => n.driver || '—',
       },
       {
         key: 'scope',
         title: 'Scope',
-        colWidth: '6rem',
-        render: (_, v) => v.scope || '—',
+        render: (_, n) => n.scope || '—',
+      },
+      {
+        key: 'subnets',
+        title: '子网',
+        render: (_, n) => <ChipCell items={n.subnets} />,
+      },
+      {
+        key: 'gateways',
+        title: '网关',
+        render: (_, n) => <ChipCell items={n.gateways} />,
+      },
+      {
+        key: 'labels',
+        title: '标签',
+        colWidth: '16rem',
+        truncate: false,
+        render: (_, n) => <ChipCell items={n.labels} />,
+      },
+      {
+        key: 'attrs',
+        title: '属性',
+        render: (_, n) => (
+          <>
+            {n.internal ? 'internal' : ''}
+            {n.internal && n.attachable ? ' · ' : ''}
+            {n.attachable ? 'attachable' : '—'}
+          </>
+        ),
       },
       {
         key: 'created',
         title: '创建时间',
-        colWidth: '10rem',
-        render: (_, v) => <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>,
-      },
-      {
-        key: 'mountpoint',
-        title: 'Mountpoint',
-        render: (_, v) => <span title={v.mountpoint}>{v.mountpoint || '—'}</span>,
+        render: (_, n) => <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>,
       },
       {
         key: 'actions',
         title: '操作',
         colWidth: '5rem',
-        render: (_, v) => (
+        render: (_, n) => (
           <div>
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               title="Inspect"
-              onClick={() => setInspectTarget(v)}
+              onClick={() => setInspectTarget(n)}
               className="rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <ScanSearch />
@@ -136,7 +161,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
               variant="ghost"
               size="icon-sm"
               title="删除"
-              onClick={() => setRemoveTarget(v)}
+              onClick={() => setRemoveTarget(n)}
               className="rounded-lg text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
             >
               <Trash2 />
@@ -145,6 +170,7 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         ),
       },
     ],
+
     []
   )
 
@@ -153,11 +179,13 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
       <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
         <div className="inline-flex items-center gap-2.5">
           <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
-            <Database />
+            <Share2 />
           </div>
           <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <span>存储卷</span>
-            {volumes.length > 0 ? <span className="font-normal text-muted-foreground">({volumes.length})</span> : null}
+            <span>网络</span>
+            {networks.length > 0 ? (
+              <span className="font-normal text-muted-foreground">({networks.length})</span>
+            ) : null}
           </div>
         </div>
         <div className="relative ml-4 w-full max-w-xs">
@@ -177,30 +205,28 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
           {lastUpdated ? <span className="mr-1 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           <Button type="button" onClick={() => setShowCreate(true)}>
             <Plus />
-            创建存储卷
+            创建网络
           </Button>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto bg-card">
-        {loading && volumes.length === 0 ? (
+        {loading && networks.length === 0 ? (
           <div className="flex h-full min-h-48 items-center justify-center">
             <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex min-h-48 flex-col items-center justify-center text-center">
             <div className="flex justify-center text-border [&_svg]:size-7">
-              <Database />
+              <Share2 />
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {search ? `无匹配的存储卷 \"${search}\"` : '没有存储卷'}
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{search ? `无匹配的网络 \"${search}\"` : '没有网络'}</p>
           </div>
         ) : (
-          <Table className="w-full table-fixed">
+          <Table className="w-full text-sm">
             <TableHeader>
               <TableRow>
-                {volumeColumns.map((col) => (
+                {networkColumns.map((col) => (
                   <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
                     {col.title}
                   </TableHead>
@@ -209,9 +235,11 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
             </TableHeader>
             <TableBody>
               {filtered.map((row, idx) => (
-                <TableRow key={row.name}>
-                  {volumeColumns.map((col) => (
-                    <TableCell key={col.key}>{col.render ? col.render(undefined, row, idx) : null}</TableCell>
+                <TableRow key={row.id}>
+                  {networkColumns.map((col) => (
+                    <TableCell key={col.key} className={col.truncate === false ? 'whitespace-normal' : undefined}>
+                      {col.render ? col.render(undefined, row, idx) : null}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))}
@@ -220,18 +248,18 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
         )}
       </div>
 
-      <VolumeCreateDialog
+      <NetworkCreateDialog
         serverId={serverId}
         open={showCreate}
         onOpenChange={setShowCreate}
-        onCreated={() => void fetchVolumes()}
+        onCreated={() => void fetchNetworks()}
       />
 
       {inspectTarget && (
-        <InspectDialog
+        <ResourceInspectDialog
           serverId={serverId}
-          kind="volume"
-          targetId={inspectTarget.name}
+          kind="network"
+          targetId={inspectTarget.id}
           targetLabel={inspectTarget.name}
           onClose={() => setInspectTarget(null)}
         />
@@ -245,9 +273,9 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除存储卷</AlertDialogTitle>
+            <AlertDialogTitle>删除网络</AlertDialogTitle>
             <AlertDialogDescription className="whitespace-pre-line">
-              {removeTarget ? `确认删除存储卷「${removeTarget.name}」？\n\n若仍有容器正在使用该卷，删除会失败。` : ''}
+              {removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -258,8 +286,8 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
                 if (!removeTarget) return
                 void (async () => {
                   try {
-                    await commands.removeVolume(serverId, removeTarget.name)
-                    await fetchVolumes()
+                    await commands.removeNetwork(serverId, removeTarget.id)
+                    await fetchNetworks()
                   } catch (err) {
                     toast.error(String(err))
                   } finally {
@@ -273,6 +301,36 @@ export default function VolumePanel({ serverId, refreshTick }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+function ChipCell({ items }: { items: string[] }) {
+  const list = items.map((s) => s.trim()).filter(Boolean)
+  const visible = list.slice(0, 2)
+  const hiddenCount = list.length - visible.length
+
+  if (list.length === 0) {
+    return <span className="font-mono text-xs text-muted-foreground">—</span>
+  }
+
+  const full = list.join(', ')
+
+  return (
+    <div className="flex flex-wrap gap-1" title={full}>
+      {visible.map((item, i) => (
+        <span
+          key={`${i}-${item}`}
+          className="inline-block max-w-[200px] truncate rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+        >
+          {item}
+        </span>
+      ))}
+      {hiddenCount > 0 ? (
+        <span className="inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          +{hiddenCount}
+        </span>
+      ) : null}
     </div>
   )
 }

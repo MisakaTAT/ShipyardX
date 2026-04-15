@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import debounce from 'lodash-es/debounce'
 import { commands } from '@/types/app-bindings'
-import { Terminal } from '@xterm/xterm'
+import { Terminal as XtermTerminal } from '@xterm/xterm'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { IDisposable } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon, X } from 'lucide-react'
+import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,7 +21,6 @@ const OVERLAY_FADE_OUT_MS = 220
 const TERMINAL_VIEW_PADDING_PX = 8
 const XTERM_SCROLLBAR_GUTTER_PX = 14
 const FIT_HEIGHT_SLACK_PX = 2
-
 const TERMINAL_SURFACE_BG = '#0d1117'
 
 const XTERM_THEME = {
@@ -122,8 +121,6 @@ function xtermBinaryPayloadToBytes(data: string): number[] {
   return Array.from(Uint8Array.from(data, (c) => c.charCodeAt(0)))
 }
 
-// 用 client 尺寸避免 FitAddon 在 flex 下多算一行
-
 type XtermInternalCore = {
   _renderService: {
     dimensions: { css: { cell: { width: number; height: number } } }
@@ -131,11 +128,11 @@ type XtermInternalCore = {
   }
 }
 
-function getXtermCore(term: Terminal): XtermInternalCore | null {
+function getXtermCore(term: XtermTerminal): XtermInternalCore | null {
   return (term as unknown as { _core?: XtermInternalCore })._core ?? null
 }
 
-function fitTerminalToContainer(term: Terminal, fitAddon: FitAddon) {
+function fitTerminalToContainer(term: XtermTerminal, fitAddon: FitAddon) {
   if (!term.element?.parentElement) {
     fitAddon.fit()
     return
@@ -170,8 +167,7 @@ function isWebGL2Usable(): boolean {
   }
 }
 
-/** WebGL2 → Canvas 2D → xterm 内置渲染 */
-function mountXtermRenderAddons(term: Terminal): () => void {
+function mountXtermRenderAddons(term: XtermTerminal): () => void {
   let webgl: WebglAddon | undefined
   let canvas: CanvasAddon | undefined
   let onContextLoss: IDisposable | undefined
@@ -202,7 +198,7 @@ function mountXtermRenderAddons(term: Terminal): () => void {
       canvas = new CanvasAddon()
       term.loadAddon(canvas)
     } catch (e) {
-      console.warn('[TerminalPanel] Canvas 渲染不可用，使用内置渲染', e)
+      console.warn('[Terminal] Canvas 渲染不可用，使用内置渲染', e)
     }
   }
 
@@ -215,7 +211,7 @@ function mountXtermRenderAddons(term: Terminal): () => void {
         ensureCanvas()
       })
     } catch (e) {
-      console.warn('[TerminalPanel] WebGL 初始化失败，使用 Canvas', e)
+      console.warn('[Terminal] WebGL 初始化失败，使用 Canvas', e)
       unloadWebGL()
       ensureCanvas()
     }
@@ -229,11 +225,9 @@ function mountXtermRenderAddons(term: Terminal): () => void {
   }
 }
 
-interface TerminalPanelProps {
+interface TerminalProps {
   serverId: string
   containerId?: string
-  title?: string
-  onRequestClose?: () => void
 }
 
 type ConnectionPhase = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -244,9 +238,9 @@ type EndSessionOptions = {
   errorMessage?: string
 }
 
-export default function TerminalPanel({ serverId, containerId, title, onRequestClose }: TerminalPanelProps) {
+export default function Terminal({ serverId, containerId }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const xtermRef = useRef<Terminal | null>(null)
+  const xtermRef = useRef<XtermTerminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const backendSessionIdRef = useRef<string | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
@@ -477,7 +471,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
 
     mountAliveRef.current = true
 
-    const term = new Terminal({
+    const term = new XtermTerminal({
       fontFamily: '"Cascadia Code", "JetBrains Mono", Menlo, "Courier New", monospace',
       fontSize: 13,
       lineHeight: 1.3,
@@ -545,186 +539,162 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
   const isContainerExec = Boolean(containerId)
 
   return (
-    <div className="flex h-full flex-col bg-card">
-      {title ? (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2">
-          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-            <TerminalIcon className="shrink-0" />
-            <span className="truncate">{title}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {onRequestClose ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                onClick={onRequestClose}
-                title="关闭"
-              >
-                <X />
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      <div className="relative flex-1 overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden">
+      <div
+        ref={containerRef}
+        className="box-border h-full w-full"
+        style={{
+          padding: TERMINAL_VIEW_PADDING_PX,
+          background: TERMINAL_SURFACE_BG,
+          visibility: xtermVisible ? 'visible' : 'hidden',
+        }}
+      />
+
+      {overlayMounted && (
         <div
-          ref={containerRef}
-          className="box-border h-full w-full"
-          style={{
-            padding: TERMINAL_VIEW_PADDING_PX,
-            background: TERMINAL_SURFACE_BG,
-            visibility: xtermVisible ? 'visible' : 'hidden',
-          }}
-        />
-
-        {overlayMounted && (
-          <div
-            className={cn(
-              'absolute inset-0 z-10 flex flex-1 items-center justify-center bg-card p-6 transition-all duration-200',
-              overlayVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
-            )}
-          >
-            <div className="mx-auto w-full max-w-lg space-y-6 text-center">
-              {phase === 'disconnected' && (
-                <>
-                  <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-                      <TerminalIcon className="size-7 text-primary" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-foreground">
-                      {wasEverConnected ? '连接已断开' : '远程终端未连接'}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      {wasEverConnected
-                        ? '与远程主机的会话已结束，可重新建立连接。'
-                        : isContainerExec
-                          ? '将通过 SSH 在远程主机上执行 docker exec 并接入容器交互终端。'
-                          : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
-                    </p>
-                  </div>
-                  {isContainerExec && (
-                    <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-muted-foreground">用户（可选）</p>
-                          <Input
-                            value={execUser}
-                            onChange={(e) => setExecUser(e.target.value)}
-                            placeholder="root 或 1000:1000"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <p className="text-xs text-muted-foreground">Shell</p>
-                          <Select
-                            value={execShellPreset}
-                            onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="/bin/ash">/bin/ash</SelectItem>
-                              <SelectItem value="/bin/bash">/bin/bash</SelectItem>
-                              <SelectItem value="/bin/sh">/bin/sh</SelectItem>
-                              <SelectItem value="custom">自定义</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      {execShellPreset === 'custom' ? (
-                        <div className="mt-3 space-y-1.5">
-                          <p className="text-xs text-muted-foreground">自定义 shell 命令</p>
-                          <Input
-                            value={execCustomShell}
-                            onChange={(e) => setExecCustomShell(e.target.value)}
-                            placeholder="示例 /busybox/sh"
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center gap-3">
-                    <Button
-                      type="button"
-                      onClick={connect}
-                      disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
-                    >
-                      <TerminalIcon />
-                      {wasEverConnected ? '重新连接' : '开始连接'}
-                    </Button>
-                  </div>
-                </>
-              )}
-
-              {phase === 'connecting' && (
+          className={cn(
+            'absolute inset-0 z-10 flex flex-1 items-center justify-center bg-card p-6 transition-all duration-200',
+            overlayVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0'
+          )}
+        >
+          <div className="mx-auto w-full max-w-lg space-y-6 text-center">
+            {phase === 'disconnected' && (
+              <>
                 <div className="flex flex-col items-center gap-3 text-center">
                   <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <Loader2 className="size-7 animate-spin text-primary" />
+                    <TerminalIcon className="size-7 text-primary" />
                   </div>
-                  <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {wasEverConnected ? '连接已断开' : '远程终端未连接'}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    {isContainerExec
-                      ? '正在通过 SSH 启动 docker exec 并连接容器终端，请稍候。'
-                      : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
+                    {wasEverConnected
+                      ? '与远程主机的会话已结束，可重新建立连接。'
+                      : isContainerExec
+                        ? '将通过 SSH 在远程主机上执行 docker exec 并接入容器交互终端。'
+                        : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
                   </p>
                 </div>
-              )}
-
-              {phase === 'error' && (
-                <>
-                  <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
-                      <ShieldAlert className="size-7 text-amber-500" />
+                {isContainerExec && (
+                  <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">用户（可选）</p>
+                        <Input
+                          value={execUser}
+                          onChange={(e) => setExecUser(e.target.value)}
+                          placeholder="root 或 1000:1000"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs text-muted-foreground">Shell</p>
+                        <Select
+                          value={execShellPreset}
+                          onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="/bin/ash">/bin/ash</SelectItem>
+                            <SelectItem value="/bin/bash">/bin/bash</SelectItem>
+                            <SelectItem value="/bin/sh">/bin/sh</SelectItem>
+                            <SelectItem value="custom">自定义</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <h2 className="text-lg font-semibold text-foreground">无法建立 SSH 连接</h2>
-                    <p className="text-sm text-muted-foreground">
-                      请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。
-                    </p>
-                  </div>
-
-                  <div className="flex w-full flex-col items-center">
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setErrorDetailsExpanded((v) => !v)}
-                      aria-expanded={errorDetailsExpanded}
-                    >
-                      查看详情
-                      <ChevronDown
-                        className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
-                      />
-                    </button>
-                    {errorDetailsExpanded ? (
-                      <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center font-mono text-[11px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
-                        {errorText}
-                      </pre>
+                    {execShellPreset === 'custom' ? (
+                      <div className="mt-3 space-y-1.5">
+                        <p className="text-xs text-muted-foreground">自定义 shell 命令</p>
+                        <Input
+                          value={execCustomShell}
+                          onChange={(e) => setExecCustomShell(e.target.value)}
+                          placeholder="示例 /busybox/sh"
+                        />
+                      </div>
                     ) : null}
                   </div>
+                )}
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={connect}
+                    disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
+                  >
+                    <TerminalIcon />
+                    {wasEverConnected ? '重新连接' : '开始连接'}
+                  </Button>
+                </div>
+              </>
+            )}
 
-                  <div className="flex items-center justify-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setPhase('disconnected')
-                        setErrorText('')
-                      }}
-                    >
-                      返回
-                    </Button>
-                    <Button type="button" onClick={connect}>
-                      <RefreshCw />
-                      重试
-                    </Button>
+            {phase === 'connecting' && (
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <Loader2 className="size-7 animate-spin text-primary" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
+                <p className="text-sm text-muted-foreground">
+                  {isContainerExec
+                    ? '正在通过 SSH 启动 docker exec 并连接容器终端，请稍候。'
+                    : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
+                </p>
+              </div>
+            )}
+
+            {phase === 'error' && (
+              <>
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
+                    <ShieldAlert className="size-7 text-amber-500" />
                   </div>
-                </>
-              )}
-            </div>
+                  <h2 className="text-lg font-semibold text-foreground">无法建立 SSH 连接</h2>
+                  <p className="text-sm text-muted-foreground">
+                    请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。
+                  </p>
+                </div>
+
+                <div className="flex w-full flex-col items-center">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => setErrorDetailsExpanded((v) => !v)}
+                    aria-expanded={errorDetailsExpanded}
+                  >
+                    查看详情
+                    <ChevronDown
+                      className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
+                    />
+                  </button>
+                  {errorDetailsExpanded ? (
+                    <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center font-mono text-[11px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
+                      {errorText}
+                    </pre>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center justify-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setPhase('disconnected')
+                      setErrorText('')
+                    }}
+                  >
+                    返回
+                  </Button>
+                  <Button type="button" onClick={connect}>
+                    <RefreshCw />
+                    重试
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
