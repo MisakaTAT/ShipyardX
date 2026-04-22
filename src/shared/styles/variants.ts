@@ -48,7 +48,7 @@ export const panelCard = cva('flex min-h-0 flex-1 flex-col overflow-hidden round
 export const siderNavButton = cva('h-10 w-full rounded-lg p-2.5 [&_svg]:size-5', {
   variants: {
     active: {
-      true: 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+      true: 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground dark:hover:bg-primary dark:hover:text-primary-foreground',
       false: 'text-muted-foreground hover:bg-muted hover:text-foreground',
     },
     disabled: {

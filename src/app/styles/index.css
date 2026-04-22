@@ -131,6 +131,19 @@
   }
 }
 
+/**
+ * 关掉表单控件的 focus/invalid 3px 柔光环（Tailwind ring 本质是 box-shadow），
+ * 聚焦与报错改由 border 颜色提示。
+ */
+[data-slot='input']:focus-visible,
+[data-slot='textarea']:focus-visible,
+[data-slot='select-trigger']:focus-visible,
+[data-slot='input'][aria-invalid='true'],
+[data-slot='textarea'][aria-invalid='true'],
+[data-slot='select-trigger'][aria-invalid='true'] {
+  box-shadow: none !important;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
