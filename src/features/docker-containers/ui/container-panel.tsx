@@ -149,7 +149,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         actions={
           <Button type="button" className="gap-1" onClick={() => setRunDialogOpen(true)}>
             <Plus />
-            启动新容器
+            运行容器
           </Button>
         }
       />

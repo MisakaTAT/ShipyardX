@@ -444,7 +444,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                           value={execShellPreset}
                           onValueChange={(v) => setExecShellPreset(v as typeof execShellPreset)}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -520,7 +520,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     />
                   </button>
                   {errorDetailsExpanded ? (
-                    <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center font-mono text-[11px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
+                    <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center text-[12px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
                       {errorText}
                     </pre>
                   ) : null}

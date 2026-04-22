@@ -49,7 +49,7 @@ export function buildPortForwardColumns({
       header: '协议',
       meta: { className: 'whitespace-normal' },
       cell: ({ row }) => (
-        <ToneBadge tone="info" className="font-mono uppercase">
+        <ToneBadge tone="info" className="uppercase">
           {row.original.protocol}
         </ToneBadge>
       ),

@@ -140,7 +140,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Cpu />
           </span>
-          <DialogTitle className="flex-1 truncate font-mono text-sm leading-none font-semibold text-foreground">
+          <DialogTitle className="flex-1 truncate text-sm leading-none font-semibold text-foreground">
             {containerName}
           </DialogTitle>
           <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>

@@ -95,7 +95,7 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <ScanSearch />
           </span>
-          <span className="mr-1 font-mono text-sm font-semibold text-foreground">{targetLabel}</span>
+          <span className="mr-1 text-sm font-semibold text-foreground">{targetLabel}</span>
 
           <Button type="button" variant="default" disabled={loading} title="重新加载" onClick={() => void load()}>
             <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />

@@ -17,13 +17,7 @@ export function EnvLabelsSection({ control }: EnvLabelsSectionProps) {
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="run-ctr-labels">容器标签（Labels）</FieldLabel>
             <FieldContent>
-              <Textarea
-                id="run-ctr-labels"
-                {...field}
-                placeholder={'app=ShipyardX'}
-                rows={3}
-                className="min-h-[72px] font-mono"
-              />
+              <Textarea id="run-ctr-labels" {...field} placeholder={'app=ShipyardX'} />
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
           </Field>
@@ -37,13 +31,7 @@ export function EnvLabelsSection({ control }: EnvLabelsSectionProps) {
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="run-ctr-env">环境变量</FieldLabel>
             <FieldContent>
-              <Textarea
-                id="run-ctr-env"
-                {...field}
-                placeholder={'TZ=Asia/Shanghai'}
-                rows={4}
-                className="min-h-[72px] font-mono disabled:cursor-not-allowed disabled:opacity-50"
-              />
+              <Textarea id="run-ctr-env" {...field} placeholder={'TZ=Asia/Shanghai'} />
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
           </Field>

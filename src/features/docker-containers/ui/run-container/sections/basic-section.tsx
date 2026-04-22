@@ -67,7 +67,6 @@ export function BasicSection({ control, imageOptions, imagesLoading, onToggleMan
                           }
                           disabled={imagesLoading}
                           autoComplete="off"
-                          className="font-mono"
                         />
                         <datalist id={datalistId}>
                           {imageOptions.map((ref) => (

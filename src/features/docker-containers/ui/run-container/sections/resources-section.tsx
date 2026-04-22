@@ -23,7 +23,6 @@ export function ResourcesSection({ control }: ResourcesSectionProps) {
               {...field}
               placeholder="默认 1024；0 表示不设置"
               aria-invalid={fieldState.invalid}
-              className="font-mono"
             />
           </div>
         )}
@@ -42,7 +41,6 @@ export function ResourcesSection({ control }: ResourcesSectionProps) {
               {...field}
               placeholder="0 或留空表示不限制"
               aria-invalid={fieldState.invalid}
-              className="font-mono"
             />
           </div>
         )}
@@ -60,7 +58,6 @@ export function ResourcesSection({ control }: ResourcesSectionProps) {
               {...field}
               placeholder="0 或留空表示不限制"
               aria-invalid={fieldState.invalid}
-              className="font-mono"
             />
           </div>
         )}

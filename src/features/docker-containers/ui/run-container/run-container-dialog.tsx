@@ -137,7 +137,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Box />
           </span>
-          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">启动新容器</DialogTitle>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">运行容器</DialogTitle>
           {flow.phase === 'form' ? (
             <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
               <X className="size-4" />

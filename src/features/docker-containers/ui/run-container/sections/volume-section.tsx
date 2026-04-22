@@ -33,24 +33,14 @@ export function VolumeSection({ control }: VolumeSectionProps) {
               control={control}
               name={`volumes.${i}.hostPath`}
               render={({ field, fieldState }) => (
-                <Input
-                  placeholder="主机目录 /data/app"
-                  {...field}
-                  aria-invalid={fieldState.invalid}
-                  className="font-mono"
-                />
+                <Input placeholder="主机目录 /data/app" {...field} aria-invalid={fieldState.invalid} />
               )}
             />
             <Controller
               control={control}
               name={`volumes.${i}.containerPath`}
               render={({ field, fieldState }) => (
-                <Input
-                  placeholder="容器内路径 var/www"
-                  {...field}
-                  aria-invalid={fieldState.invalid}
-                  className="font-mono"
-                />
+                <Input placeholder="容器内路径 var/www" {...field} aria-invalid={fieldState.invalid} />
               )}
             />
           </div>

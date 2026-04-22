@@ -18,13 +18,7 @@ export function CommandSection({ control }: CommandSectionProps) {
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="run-ctr-cmd">启动命令（CMD）</FieldLabel>
             <FieldContent>
-              <Textarea
-                id="run-ctr-cmd"
-                {...field}
-                placeholder={'nginx\n-g\ndaemon off;'}
-                rows={3}
-                className="min-h-[72px] font-mono"
-              />
+              <Textarea id="run-ctr-cmd" {...field} placeholder={'nginx\n-g\ndaemon off;'} rows={3} />
               <FieldDescription>留空则沿用镜像默认 CMD</FieldDescription>
               <FieldError errors={[fieldState.error]} />
             </FieldContent>
@@ -38,7 +32,7 @@ export function CommandSection({ control }: CommandSectionProps) {
         render={({ field }) => (
           <div className="space-y-2">
             <FieldLabel htmlFor="run-ctr-ep">入口命令（ENTRYPOINT）</FieldLabel>
-            <Input id="run-ctr-ep" {...field} placeholder="/docker-entrypoint.sh" className="font-mono" />
+            <Input id="run-ctr-ep" {...field} placeholder="/docker-entrypoint.sh" />
             <FieldDescription>留空则沿用镜像默认 ENTRYPOINT</FieldDescription>
           </div>
         )}

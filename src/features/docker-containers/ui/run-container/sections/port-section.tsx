@@ -76,7 +76,6 @@ export function PortSection({ control }: PortSectionProps) {
                         field.onChange(Number.isFinite(n) ? n : null)
                       }}
                       aria-invalid={fieldState.invalid}
-                      className="min-w-0 font-mono"
                     />
                   )}
                 />
@@ -95,7 +94,6 @@ export function PortSection({ control }: PortSectionProps) {
                         field.onChange(Number.isFinite(v) ? v : 0)
                       }}
                       aria-invalid={fieldState.invalid}
-                      className="min-w-0 font-mono"
                     />
                   )}
                 />

@@ -56,7 +56,7 @@ export function WorkspaceTabs<K extends string>({
                   onClick={() => onChange(item.key)}
                   className={cn(
                     'relative flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                    isActive ? 'text-background' : 'text-muted-foreground hover:text-foreground',
+                    isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                     !isActive && !disabled && 'hover:bg-muted',
                     disabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer'
                   )}

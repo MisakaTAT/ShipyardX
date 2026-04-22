@@ -135,13 +135,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor={`${formId}-subnet`}>子网（可选）</FieldLabel>
                       <FieldContent>
-                        <Input
-                          id={`${formId}-subnet`}
-                          {...field}
-                          placeholder="172.28.0.0/16"
-                          disabled={submitting}
-                          className="font-mono"
-                        />
+                        <Input id={`${formId}-subnet`} {...field} placeholder="172.28.0.0/16" disabled={submitting} />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
@@ -154,13 +148,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor={`${formId}-gw`}>网关（可选）</FieldLabel>
                       <FieldContent>
-                        <Input
-                          id={`${formId}-gw`}
-                          {...field}
-                          placeholder="172.28.0.1"
-                          disabled={submitting}
-                          className="font-mono"
-                        />
+                        <Input id={`${formId}-gw`} {...field} placeholder="172.28.0.1" disabled={submitting} />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>

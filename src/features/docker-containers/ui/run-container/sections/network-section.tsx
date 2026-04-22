@@ -50,13 +50,7 @@ export function NetworkSection({ control, networks, networksLoading }: NetworkSe
           render={({ field, fieldState }) => (
             <div className="space-y-2">
               <FieldLabel htmlFor="run-ctr-ipv4">IPv4</FieldLabel>
-              <Input
-                id="run-ctr-ipv4"
-                {...field}
-                placeholder="留空则自动分配"
-                aria-invalid={fieldState.invalid}
-                className="font-mono"
-              />
+              <Input id="run-ctr-ipv4" {...field} placeholder="留空则自动分配" aria-invalid={fieldState.invalid} />
             </div>
           )}
         />
@@ -66,13 +60,7 @@ export function NetworkSection({ control, networks, networksLoading }: NetworkSe
           render={({ field, fieldState }) => (
             <div className="space-y-2">
               <FieldLabel htmlFor="run-ctr-ipv6">IPv6</FieldLabel>
-              <Input
-                id="run-ctr-ipv6"
-                {...field}
-                placeholder="留空则自动分配"
-                aria-invalid={fieldState.invalid}
-                className="font-mono"
-              />
+              <Input id="run-ctr-ipv6" {...field} placeholder="留空则自动分配" aria-invalid={fieldState.invalid} />
             </div>
           )}
         />

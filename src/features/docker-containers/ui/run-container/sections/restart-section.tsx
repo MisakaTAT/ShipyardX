@@ -47,14 +47,7 @@ export function RestartSection({ control, restartPolicy }: RestartSectionProps) 
           render={({ field, fieldState }) => (
             <div className="space-y-2">
               <FieldLabel htmlFor="run-restart-max">最大重试次数（on-failure）</FieldLabel>
-              <Input
-                id="run-restart-max"
-                type="number"
-                min={0}
-                {...field}
-                aria-invalid={fieldState.invalid}
-                className="font-mono"
-              />
+              <Input id="run-restart-max" type="number" min={0} {...field} aria-invalid={fieldState.invalid} />
             </div>
           )}
         />

@@ -131,7 +131,6 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                           }}
                           placeholder="nginx:latest"
                           disabled={pulling}
-                          className="min-w-0 flex-1 font-mono disabled:opacity-50"
                         />
                         <Button type="submit" form={`${formId}-pull`} className="shrink-0" disabled={pulling}>
                           {pulling ? (

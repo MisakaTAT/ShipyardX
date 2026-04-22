@@ -174,7 +174,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                             {...field}
                             placeholder="10.0.0.10 或 nfs.example.com"
                             disabled={submitting}
-                            className="font-mono"
                           />
                           <FieldError errors={[fieldState.error]} />
                         </FieldContent>
@@ -189,13 +188,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor={`${formId}-nfs-ver`}>版本</FieldLabel>
                           <FieldContent>
-                            <Input
-                              id={`${formId}-nfs-ver`}
-                              {...field}
-                              placeholder="4.1"
-                              disabled={submitting}
-                              className="font-mono"
-                            />
+                            <Input id={`${formId}-nfs-ver`} {...field} placeholder="4.1" disabled={submitting} />
                             <FieldError errors={[fieldState.error]} />
                           </FieldContent>
                         </Field>
@@ -213,7 +206,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                               {...field}
                               placeholder="/nfs-share"
                               disabled={submitting}
-                              className="font-mono"
                             />
                             <FieldError errors={[fieldState.error]} />
                           </FieldContent>
@@ -233,7 +225,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                             {...field}
                             placeholder="rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14"
                             disabled={submitting}
-                            className="font-mono"
                           />
                           <FieldError errors={[fieldState.error]} />
                         </FieldContent>

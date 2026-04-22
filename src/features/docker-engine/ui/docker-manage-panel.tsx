@@ -167,7 +167,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                           <Textarea
                             {...field}
                             placeholder={'https://docker.1panel.live\nhttps://mirror.example.com'}
-                            className="h-24 resize-none font-mono"
+                            className="h-24 resize-none"
                             disabled={saving || restarting}
                           />
                           <FieldError errors={[fieldState.error]} />
@@ -246,12 +246,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                       <FieldLabel className="text-sm font-medium text-foreground">Socket 路径</FieldLabel>
                       <FieldDescription>Docker 守护进程（Docker Daemon）与客户端之间的通信通道</FieldDescription>
                       <FieldContent className="mt-3">
-                        <Input
-                          {...field}
-                          placeholder="unix:///var/run/docker.sock"
-                          disabled={saving || restarting}
-                          className="font-mono"
-                        />
+                        <Input {...field} placeholder="unix:///var/run/docker.sock" disabled={saving || restarting} />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
@@ -283,12 +278,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                               render={({ field: f, fieldState }) => (
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
-                                    <Input
-                                      {...f}
-                                      placeholder="10m"
-                                      disabled={saving || restarting}
-                                      className="font-mono"
-                                    />
+                                    <Input {...f} placeholder="10m" disabled={saving || restarting} />
                                     <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>
@@ -300,12 +290,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                               render={({ field: f, fieldState }) => (
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
-                                    <Input
-                                      {...f}
-                                      placeholder="3"
-                                      disabled={saving || restarting}
-                                      className="font-mono"
-                                    />
+                                    <Input {...f} placeholder="3" disabled={saving || restarting} />
                                     <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>
