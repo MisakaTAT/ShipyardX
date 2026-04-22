@@ -1,7 +1,8 @@
+import type { MouseEvent } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useLocation } from 'wouter'
 import { Moon, Settings, Sun } from 'lucide-react'
-import { useTheme, useIsLightMode } from '@/app/theme'
+import { useTheme, useIsLightMode, runThemeTransition } from '@/app/theme'
 import { PRIMARY_NAV } from '@/layouts/sider/nav-config'
 import { NavButton } from '@/layouts/sider/nav-button'
 
@@ -9,7 +10,14 @@ export default function Sider() {
   const [location, navigate] = useLocation()
   const { setTheme } = useTheme()
   const light = useIsLightMode()
-  const toggleTheme = () => setTheme(light ? 'dark' : 'light')
+  const toggleTheme = (e: MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const origin = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+    runThemeTransition(origin, () => setTheme(light ? 'dark' : 'light'))
+  }
 
   return (
     <nav className="flex w-14 shrink-0 flex-col items-center border-r border-border bg-sidebar py-3">

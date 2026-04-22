@@ -58,19 +58,19 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         cell: ({ row }) => row.original.scope || '—',
       },
       {
+        id: 'mountpoint',
+        header: 'Mountpoint',
+        cell: ({ row }) => <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>,
+      },
+      {
         id: 'created',
         header: '创建时间',
-        meta: { width: '10rem' },
+        meta: { width: '12rem' },
         cell: ({ row }) => (
           <span className="font-mono" title={row.original.created_at || undefined}>
             {formatDateTimeString(row.original.created_at)}
           </span>
         ),
-      },
-      {
-        id: 'mountpoint',
-        header: 'Mountpoint',
-        cell: ({ row }) => <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>,
       },
       {
         id: 'actions',
