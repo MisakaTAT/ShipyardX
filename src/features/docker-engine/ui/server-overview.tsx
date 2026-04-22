@@ -37,14 +37,14 @@ export default function ServerOverview({ serverId }: Props) {
   return (
     <div className="h-full overflow-auto bg-background">
       <div className="space-y-3">
-        <div className="rounded-xl border border-border bg-card px-4 py-3 md:px-5 md:py-4">
+        <div className="rounded-xl border border-border bg-card px-5 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
                 <span className="text-xs tracking-wider text-muted-foreground uppercase">Host Overview</span>
               </div>
-              <h2 className="mt-1 truncate text-base font-semibold text-foreground md:text-lg">
+              <h2 className="mt-1 truncate text-lg font-semibold text-foreground">
                 {info?.name || '未知主机'}
               </h2>
               <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -54,7 +54,7 @@ export default function ServerOverview({ serverId }: Props) {
             {lastUpdated ? <span className="shrink-0 text-xs text-muted-foreground">更新于 {lastUpdated}</span> : null}
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="mt-3 grid grid-cols-4 gap-2">
             <MetricCard icon={<Box size={14} />} label="容器总数" value={String(totalContainers)} />
             <MetricCard icon={<Layers size={14} />} label="镜像数" value={String(info?.images ?? 0)} />
             <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '—')} />
@@ -72,7 +72,7 @@ export default function ServerOverview({ serverId }: Props) {
             加载主机信息...
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <div className="grid grid-cols-3 gap-3">
             <InfoSection title="容器状态">
               <StatusBar label="运行中" value={running} total={totalContainers} color="bg-green-500" />
               <StatusBar label="已暂停" value={paused} total={totalContainers} color="bg-yellow-500" />

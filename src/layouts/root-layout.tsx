@@ -35,7 +35,7 @@ function LayoutContent() {
 
       <main className="flex flex-1 flex-col overflow-hidden bg-background">
         {isStore ? (
-          <div className="flex-1 overflow-auto p-2 md:p-3">
+          <div className="flex-1 overflow-auto p-3">
             <AppStore />
           </div>
         ) : null}

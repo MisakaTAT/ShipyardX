@@ -37,7 +37,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
   useEffect(() => {
     if (!open) return
     form.reset(networkCreateDefaultValues())
-  }, [open])
+  }, [open, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitting(true)

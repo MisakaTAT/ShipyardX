@@ -3,7 +3,7 @@ import { Badge } from '@/shared/ui/badge'
 
 export default function AppStore() {
   return (
-    <div className="flex min-h-[min(560px,calc(100vh-5rem))] flex-col items-center justify-center px-4 py-12">
+    <div className="flex min-h-[560px] flex-col items-center justify-center px-4 py-12">
       <div className="max-w-md text-center">
         <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10">
           <Stone className="size-7 text-primary" />

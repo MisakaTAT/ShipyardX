@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { CheckCircle2, Circle, Loader2, XCircle } from 'lucide-react'
-import type { StepState } from './use-run-container'
+import type { StepState } from '@/features/docker-containers/ui/run-container/use-run-container'
 
 export interface ProgressStep {
   status: StepState
@@ -44,7 +44,7 @@ export function PullProgress({ steps, pullLines, showPullLog, error }: PullProgr
       </div>
 
       {showPullLog ? (
-        <div className="flex max-h-[min(40vh,320px)] min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted">
+        <div className="flex max-h-[320px] min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted">
           <div className="min-h-[120px] flex-1 overflow-auto bg-background p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
             {pullLines.join('\n')}
             <div ref={logEndRef} />

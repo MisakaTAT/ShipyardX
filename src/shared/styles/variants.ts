@@ -1,6 +1,14 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 
 /**
+ * 将 shadcn DialogContent 改成覆盖整屏的样式。
+ * 用 `!` 强制覆盖其默认的 grid + top/left-1/2 + translate-1/2 + max-w-sm。
+ */
+export const fullScreenDialogContent =
+  'flex! fixed! inset-0! top-0! left-0! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:max-w-full'
+
+
+/**
  * 通用状态圆点。配合 StatusBadge 组件使用。
  */
 export const statusDot = cva('inline-block size-1.5 shrink-0 rounded-full', {

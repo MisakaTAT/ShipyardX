@@ -577,7 +577,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 </div>
                 {isContainerExec && (
                   <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <p className="text-xs text-muted-foreground">用户（可选）</p>
                         <Input

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEngineEvents } from '@/shared/api/events/use-engine-events'
-import { qk } from './query-keys'
+import { qk } from '@/shared/api/query-keys'
 
 /**
  * 将 Docker 引擎事件流映射为 TanStack Query 的 invalidateQueries。

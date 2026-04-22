@@ -5,6 +5,7 @@ import { Check, Copy, RefreshCw, ScanSearch, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Button } from '@/shared/ui/button'
+import { fullScreenDialogContent } from '@/shared/styles/variants'
 
 type InspectKind = 'container' | 'image' | 'network' | 'volume'
 
@@ -89,10 +90,7 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
         if (!next) onClose()
       }}
     >
-      <DialogContent
-        className="inset-0 h-dvh max-w-full translate-x-0 translate-y-0 rounded-none p-0"
-        showCloseButton={false}
-      >
+      <DialogContent className={fullScreenDialogContent} showCloseButton={false}>
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <ScanSearch />

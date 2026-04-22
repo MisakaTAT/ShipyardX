@@ -1,7 +1,7 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { useLocation } from 'wouter'
 import { Moon, Settings, Sun } from 'lucide-react'
-import { useTheme, useIsLightMode } from '@/app/theme-provider'
+import { useTheme, useIsLightMode } from '@/app/theme'
 import { PRIMARY_NAV } from '@/layouts/sider/nav-config'
 import { NavButton } from '@/layouts/sider/nav-button'
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Checkbox } from '@/shared/ui/checkbox'
 
-export const CHECK_ROW_CLASS = 'flex cursor-pointer items-start gap-2.5 text-left text-xs leading-snug text-foreground'
+const CHECK_ROW_CLASS = 'flex cursor-pointer items-start gap-2.5 text-left text-xs leading-snug text-foreground'
 
 interface CheckRowProps {
   checked: boolean

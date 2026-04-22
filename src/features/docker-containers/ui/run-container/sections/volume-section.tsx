@@ -4,7 +4,7 @@ import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { FieldTitle } from '@/shared/ui/field'
 import type { RunContainerFormValues } from '@/features/docker-containers/model/run-container-schema'
-import { CheckRow } from '../shared'
+import { CheckRow } from '@/features/docker-containers/ui/run-container/shared'
 
 interface VolumeSectionProps {
   control: Control<RunContainerFormValues>
@@ -33,9 +33,9 @@ export function VolumeSection({ control }: VolumeSectionProps) {
       {fields.map((row, i) => (
         <div
           key={row.id}
-          className="flex flex-col gap-2 rounded-lg border border-border bg-muted p-2 sm:flex-row sm:items-center"
+          className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2"
         >
-          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <Controller
               control={control}
               name={`volumes.${i}.hostPath`}

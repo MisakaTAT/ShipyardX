@@ -3,8 +3,6 @@
 import * as React from 'react'
 import { ThemeProvider as NextThemesProvider, useTheme as useNextTheme } from 'next-themes'
 
-export const STORAGE_KEY = 'shipyardx-theme'
-
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
   const [mounted, setMounted] = React.useState(false)
 
@@ -18,16 +16,6 @@ export function ThemeProvider({ children, ...props }: React.ComponentProps<typeo
       {mounted ? children : null}
     </NextThemesProvider>
   )
-}
-
-export function useTheme() {
-  return useNextTheme()
-}
-
-export function useIsLightMode() {
-  const { theme, resolvedTheme } = useNextTheme()
-  const current = theme === 'system' ? resolvedTheme : theme
-  return current !== 'dark'
 }
 
 function ThemeClassSync() {

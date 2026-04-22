@@ -132,7 +132,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
   useEffect(() => {
     if (!open) return
     form.setValue('containerPort', 0)
-  }, [open, watchContainerId])
+  }, [open, watchContainerId, form])
 
   useEffect(() => {
     if (!open || localAddresses.length === 0) return

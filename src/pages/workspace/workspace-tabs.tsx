@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { RefreshCw, Unplug } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Tabs, TabsList } from '@/shared/ui/tabs'
 import { cn } from '@/shared/lib/utils'
@@ -44,7 +44,7 @@ export function WorkspaceTabs<K extends string>({
       <div className="overflow-hidden rounded-xl border border-border bg-card p-1.5">
         <TabsList
           variant="line"
-          className="no-visible-scrollbar relative h-auto w-full max-w-full justify-start gap-2 overflow-auto bg-transparent p-0 sm:overflow-visible"
+          className="no-visible-scrollbar relative h-auto w-full max-w-full justify-start gap-2 overflow-visible bg-transparent p-0"
         >
           <div className="flex min-w-0 flex-1 items-center gap-1">
             {items.map((item) => {
@@ -58,7 +58,10 @@ export function WorkspaceTabs<K extends string>({
                   onClick={() => onChange(item.key)}
                   className={cn(
                     'relative flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
-                    isActive ? 'text-background' : 'text-foreground hover:text-foreground',
+                    isActive
+                      ? 'text-background'
+                      : 'text-muted-foreground hover:text-foreground',
+                    !isActive && !disabled && 'hover:bg-muted',
                     disabled ? 'cursor-not-allowed opacity-45' : 'cursor-pointer'
                   )}
                 >
@@ -97,7 +100,7 @@ export function WorkspaceTabs<K extends string>({
               title="断开连接"
               onClick={onDisconnect}
             >
-              <Unplug className="size-[18px]" />
+              <X className="size-[18px]" />
             </Button>
           </div>
         </TabsList>

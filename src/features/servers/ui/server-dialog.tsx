@@ -40,7 +40,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
     if (!open) return
     form.reset(server ? serverConfigToFormValues(server) : defaultServerFormValues())
     setShowPassword(false)
-  }, [open, server?.id])
+  }, [open, server, form])
 
   const handleOpenChange = (next: boolean) => {
     onOpenChange(next)

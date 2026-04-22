@@ -66,7 +66,7 @@ export function PortSection({ control }: PortSectionProps) {
           {portFields.map((row, i) => (
             <div
               key={row.id}
-              className="flex flex-col gap-2 rounded-lg border border-border bg-muted p-2 sm:flex-row sm:items-center"
+              className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2"
             >
               <div className="grid min-w-0 flex-1 grid-cols-3 gap-2">
                 <Controller

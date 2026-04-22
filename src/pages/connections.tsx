@@ -32,7 +32,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
 
   return (
     <>
-      <div className="flex-1 overflow-auto p-2 md:p-3">
+      <div className="flex-1 overflow-auto p-3">
         <div className={`flex h-full flex-col ${servers.length > 0 ? 'gap-3' : ''}`}>
           {servers.length > 0 ? (
             <div className="shrink-0">
@@ -81,7 +81,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
             ) : filtered.length === 0 ? (
               <EmptyState icon={Search} title="没有找到匹配的服务器" />
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-3 gap-3">
                 {filtered.map((server) => (
                   <ServerCard
                     key={server.id}

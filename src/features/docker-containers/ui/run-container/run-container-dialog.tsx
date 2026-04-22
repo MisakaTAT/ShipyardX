@@ -15,17 +15,17 @@ import { listSelectableImageRefs } from '@/shared/lib/docker-image-ref'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { FieldError, FieldGroup } from '@/shared/ui/field'
-import { BasicSection } from './sections/basic-section'
-import { PortSection } from './sections/port-section'
-import { NetworkSection } from './sections/network-section'
-import { VolumeSection } from './sections/volume-section'
-import { CommandSection } from './sections/command-section'
-import { EnvLabelsSection } from './sections/env-labels-section'
-import { ResourcesSection } from './sections/resources-section'
-import { OptionsSection } from './sections/options-section'
-import { RestartSection } from './sections/restart-section'
-import { PullProgress } from './pull-progress'
-import { useRunContainerFlow } from './use-run-container'
+import { BasicSection } from '@/features/docker-containers/ui/run-container/sections/basic-section'
+import { PortSection } from '@/features/docker-containers/ui/run-container/sections/port-section'
+import { NetworkSection } from '@/features/docker-containers/ui/run-container/sections/network-section'
+import { VolumeSection } from '@/features/docker-containers/ui/run-container/sections/volume-section'
+import { CommandSection } from '@/features/docker-containers/ui/run-container/sections/command-section'
+import { EnvLabelsSection } from '@/features/docker-containers/ui/run-container/sections/env-labels-section'
+import { ResourcesSection } from '@/features/docker-containers/ui/run-container/sections/resources-section'
+import { OptionsSection } from '@/features/docker-containers/ui/run-container/sections/options-section'
+import { RestartSection } from '@/features/docker-containers/ui/run-container/sections/restart-section'
+import { PullProgress } from '@/features/docker-containers/ui/run-container/pull-progress'
+import { useRunContainerFlow } from '@/features/docker-containers/ui/run-container/use-run-container'
 
 interface RunContainerDialogProps {
   open: boolean
@@ -130,7 +130,10 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         }
       }}
     >
-      <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+      <DialogContent
+        className="flex! h-[720px] w-[680px] max-w-none! flex-col gap-0 overflow-hidden p-0"
+        showCloseButton={false}
+      >
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Box />

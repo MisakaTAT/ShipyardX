@@ -74,7 +74,7 @@ export default function PortForwardPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="flex-1 overflow-auto p-2 md:p-3">
+      <div className="flex-1 overflow-auto p-3">
         <div className={`flex h-full flex-col ${rules.length > 0 ? 'gap-3' : ''}`}>
           {rules.length > 0 ? (
             <div className="shrink-0">

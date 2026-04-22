@@ -1,7 +1,7 @@
 import { Controller, type Control } from 'react-hook-form'
 import { FieldDescription, FieldTitle } from '@/shared/ui/field'
 import type { RunContainerFormValues } from '@/features/docker-containers/model/run-container-schema'
-import { CheckRow } from '../shared'
+import { CheckRow } from '@/features/docker-containers/ui/run-container/shared'
 
 interface OptionsSectionProps {
   control: Control<RunContainerFormValues>

@@ -47,7 +47,7 @@ export function NetworkSection({ control, networks, networksLoading }: NetworkSe
         )}
       />
       <FieldDescription>固定 IP 仅适用于用户自定义网络 填写 IP 后请在网络下拉选择对应名称</FieldDescription>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         <Controller
           control={control}
           name="ipv4Address"

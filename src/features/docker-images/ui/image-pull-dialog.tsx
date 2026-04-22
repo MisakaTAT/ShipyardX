@@ -39,7 +39,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
     setStatus('idle')
     setPullId(null)
     queueMicrotask(() => inputRef.current?.focus())
-  }, [open])
+  }, [open, form])
 
   useEffect(() => {
     if (outputRef.current) {

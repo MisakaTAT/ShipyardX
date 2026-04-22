@@ -14,10 +14,10 @@ import {
   PanelShell,
   type ColumnDef,
 } from '@/shared/components'
-import { ContainerStateBadge } from './container-state-badge'
-import { PortCell } from './port-cell'
-import { ContainerActionsMenu } from './container-actions-menu'
-import RunContainerDialog from './run-container/run-container-dialog'
+import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
+import { PortCell } from '@/features/docker-containers/ui/port-cell'
+import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
+import RunContainerDialog from '@/features/docker-containers/ui/run-container/run-container-dialog'
 import {
   useContainerAction,
   useContainers,

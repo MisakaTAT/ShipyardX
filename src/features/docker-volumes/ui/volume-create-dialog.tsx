@@ -38,7 +38,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
   useEffect(() => {
     if (!open) return
     form.reset(volumeCreateDefaultValues())
-  }, [open])
+  }, [open, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitting(true)

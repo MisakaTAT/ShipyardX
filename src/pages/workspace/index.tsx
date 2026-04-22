@@ -93,7 +93,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   }
 
   return (
-    <div className="flex-1 overflow-auto p-2 md:p-3">
+    <div className="flex-1 overflow-auto p-3">
       <div className="flex h-full flex-col gap-3">
         <WorkspaceTabs
           items={NAV_ITEMS}

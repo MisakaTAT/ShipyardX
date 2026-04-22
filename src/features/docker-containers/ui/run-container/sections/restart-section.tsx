@@ -18,7 +18,7 @@ const RESTART_OPTIONS = [
 
 export function RestartSection({ control, restartPolicy }: RestartSectionProps) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-3">
       <Controller
         control={control}
         name="restartPolicy"

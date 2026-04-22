@@ -35,7 +35,7 @@ export default function DockerSudoPasswordDialog({
   useEffect(() => {
     if (!open) return
     form.reset(dockerSudoPasswordDefaultValues())
-  }, [open])
+  }, [open, form])
 
   const onSubmit = form.handleSubmit(async ({ password }) => {
     await onSubmitPassword(password)
