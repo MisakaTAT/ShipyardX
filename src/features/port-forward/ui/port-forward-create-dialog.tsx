@@ -18,16 +18,18 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { modalDialogContent } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
+import { useCreatePortForwardRule } from '@/features/port-forward/api/use-port-forwards'
 
 interface PortForwardCreateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: () => void | Promise<void>
+  onCreated?: () => void | Promise<void>
 }
 
 export default function PortForwardCreateDialog({ open, onOpenChange, onCreated }: PortForwardCreateDialogProps) {
   const formId = useId()
   const [submitting, setSubmitting] = useState(false)
+  const createRule = useCreatePortForwardRule()
 
   const [servers, setServers] = useState<ServerConfig[]>([])
   const [serversLoading, setServersLoading] = useState(false)
@@ -158,26 +160,31 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
     }
 
     setSubmitting(true)
-    try {
-      const created = await commands.createPortForwardRule(values.serverId, {
-        container_id: container.id,
-        container_name: container.name || null,
-        remote_host: container.ip,
-        remote_port: values.containerPort,
-        container_port: values.containerPort,
-        protocol: 'tcp',
-        local_port: values.localPort,
-        bind_address: values.bindAddress.trim() || null,
-        enabled: true,
-      })
-      toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
-      onOpenChange(false)
-      await onCreated()
-    } catch (e) {
-      toast.error(String(e))
-    } finally {
-      setSubmitting(false)
-    }
+    createRule.mutate(
+      [
+        values.serverId,
+        {
+          container_id: container.id,
+          container_name: container.name || null,
+          remote_host: container.ip,
+          remote_port: values.containerPort,
+          container_port: values.containerPort,
+          protocol: 'tcp',
+          local_port: values.localPort,
+          bind_address: values.bindAddress.trim() || null,
+          enabled: true,
+        },
+      ],
+      {
+        onSuccess: () => {
+          onOpenChange(false)
+          void onCreated?.()
+        },
+        onSettled: () => {
+          setSubmitting(false)
+        },
+      }
+    )
   })
 
   return (

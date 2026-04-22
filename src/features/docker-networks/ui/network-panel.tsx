@@ -139,14 +139,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         tableClassName="text-sm"
       />
 
-      <NetworkCreateDialog
-        serverId={serverId}
-        open={showCreate}
-        onOpenChange={setShowCreate}
-        onCreated={() => {
-          /* 事件流 invalidate */
-        }}
-      />
+      <NetworkCreateDialog serverId={serverId} open={showCreate} onOpenChange={setShowCreate} />
 
       {inspectTarget ? (
         <ResourceInspectDialog

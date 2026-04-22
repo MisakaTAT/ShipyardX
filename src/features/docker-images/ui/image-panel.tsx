@@ -141,14 +141,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         }}
       />
 
-      <ImagePullDialog
-        serverId={serverId}
-        open={showPull}
-        onOpenChange={setShowPull}
-        onSuccess={() => {
-          /* 拉取完成由事件流 invalidate */
-        }}
-      />
+      <ImagePullDialog serverId={serverId} open={showPull} onOpenChange={setShowPull} />
 
       {inspectTarget ? (
         <ResourceInspectDialog

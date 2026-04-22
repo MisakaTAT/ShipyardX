@@ -153,13 +153,7 @@ export default function PortForwardPage() {
         </div>
       </div>
 
-      <PortForwardCreateDialog
-        open={showCreate}
-        onOpenChange={setShowCreate}
-        onCreated={async () => {
-          /* 由 mutation / query 内部自动 invalidate */
-        }}
-      />
+      <PortForwardCreateDialog open={showCreate} onOpenChange={setShowCreate} />
     </div>
   )
 }

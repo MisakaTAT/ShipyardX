@@ -123,14 +123,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         empty={{ icon: Database, title: search ? `无匹配的存储卷 "${search}"` : '没有存储卷' }}
       />
 
-      <VolumeCreateDialog
-        serverId={serverId}
-        open={showCreate}
-        onOpenChange={setShowCreate}
-        onCreated={() => {
-          /* 事件流 invalidate */
-        }}
-      />
+      <VolumeCreateDialog serverId={serverId} open={showCreate} onOpenChange={setShowCreate} />
 
       {inspectTarget ? (
         <ResourceInspectDialog

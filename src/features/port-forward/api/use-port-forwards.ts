@@ -12,6 +12,18 @@ export function usePortForwards() {
   })
 }
 
+export function useCreatePortForwardRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (args: Parameters<typeof commands.createPortForwardRule>) => commands.createPortForwardRule(...args),
+    onSuccess: (created) => {
+      toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
+      qc.invalidateQueries({ queryKey: qk.portForwards() })
+    },
+    onError: (err) => toast.error(String(err)),
+  })
+}
+
 /** 启用时每 3 秒轮询一次端口转发列表，页面不可见时暂停 */
 export function usePortForwardPolling(enabled: boolean) {
   const qc = useQueryClient()

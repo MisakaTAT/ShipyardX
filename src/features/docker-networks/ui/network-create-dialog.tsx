@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { commands } from '@/types/app-bindings'
 import {
   networkCreateDefaultValues,
   networkCreateFormSchema,
@@ -18,17 +17,19 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { modalDialogContent } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
+import { useCreateNetwork } from '@/features/docker-networks/api/use-networks'
 
 export interface NetworkCreateDialogProps {
   serverId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: () => void | Promise<void>
+  onCreated?: () => void | Promise<void>
 }
 
 export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCreated }: NetworkCreateDialogProps) {
   const formId = useId()
   const [submitting, setSubmitting] = useState(false)
+  const createNetwork = useCreateNetwork(serverId)
 
   const form = useForm<NetworkCreateFormValues>({
     resolver: zodResolver(networkCreateFormSchema),
@@ -43,23 +44,24 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitting(true)
-    try {
-      const req: NetworkCreate = {
-        name: values.name.trim(),
-        driver: values.driver.trim() || null,
-        subnet: values.subnet.trim() || null,
-        gateway: values.gateway.trim() || null,
-        internal: values.internal,
-        attachable: values.attachable,
-      }
-      await commands.createNetwork(serverId, req)
-      onOpenChange(false)
-      await onCreated()
-    } catch (e) {
-      toast.error(String(e))
-    } finally {
-      setSubmitting(false)
+    const req: NetworkCreate = {
+      name: values.name.trim(),
+      driver: values.driver.trim() || null,
+      subnet: values.subnet.trim() || null,
+      gateway: values.gateway.trim() || null,
+      internal: values.internal,
+      attachable: values.attachable,
     }
+    createNetwork.mutate(req, {
+      onSuccess: () => {
+        toast.success('网络已创建')
+        onOpenChange(false)
+        void onCreated?.()
+      },
+      onSettled: () => {
+        setSubmitting(false)
+      },
+    })
   })
 
   return (

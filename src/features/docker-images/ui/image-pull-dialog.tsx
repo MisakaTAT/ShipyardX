@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
@@ -15,16 +16,18 @@ import { Field, FieldContent, FieldError, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { modalDialogContent } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
+import { qk } from '@/shared/api/query-keys'
 
 export interface ImagePullDialogProps {
   serverId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSuccess: () => void | Promise<void>
+  onSuccess?: () => void | Promise<void>
 }
 
 export default function ImagePullDialog({ serverId, open, onOpenChange, onSuccess }: ImagePullDialogProps) {
   const formId = useId()
+  const qc = useQueryClient()
   const form = useForm<ImagePullFormValues>({
     resolver: zodResolver(imagePullFormSchema),
     defaultValues: imagePullDefaultValues(),
@@ -76,7 +79,8 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
       await pullImage(serverId, img, setLines, { onStreamId: (id) => setPullId(id) })
       setPullId(null)
       setStatus('success')
-      await onSuccess()
+      qc.invalidateQueries({ queryKey: qk.images(serverId) })
+      await onSuccess?.()
     } catch {
       setStatus('error')
       setPullId(null)

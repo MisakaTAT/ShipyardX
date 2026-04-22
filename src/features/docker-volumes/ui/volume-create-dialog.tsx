@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { commands } from '@/types/app-bindings'
 import {
   volumeCreateDefaultValues,
   volumeCreateFormSchema,
@@ -17,17 +16,19 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { modalDialogContent } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
+import { useCreateVolume } from '@/features/docker-volumes/api/use-volumes'
 
 export interface VolumeCreateDialogProps {
   serverId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: () => void | Promise<void>
+  onCreated?: () => void | Promise<void>
 }
 
 export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCreated }: VolumeCreateDialogProps) {
   const formId = useId()
   const [submitting, setSubmitting] = useState(false)
+  const createVolume = useCreateVolume(serverId)
 
   const form = useForm<VolumeCreateFormValues>({
     resolver: zodResolver(volumeCreateFormSchema),
@@ -44,43 +45,46 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
 
   const onSubmit = form.handleSubmit(async (values) => {
     setSubmitting(true)
-    try {
-      const driverOpts: Record<string, string> = {}
+    const driverOpts: Record<string, string> = {}
 
-      if (values.enableNfs) {
-        const addr = values.nfsAddr.trim()
-        const mount = values.nfsMount.trim()
-        const oParts: string[] = []
-        oParts.push(`addr=${addr}`)
-        const ver = values.nfsVersion.trim()
-        if (ver) oParts.push(`nfsvers=${ver}`)
-        const opt = values.nfsOptions.trim()
-        if (opt) {
-          for (const p of opt
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean))
-            oParts.push(p)
-        }
-
-        driverOpts.type = 'nfs'
-        driverOpts.o = oParts.join(',')
-        driverOpts.device = `:${mount}`
+    if (values.enableNfs) {
+      const addr = values.nfsAddr.trim()
+      const mount = values.nfsMount.trim()
+      const oParts: string[] = []
+      oParts.push(`addr=${addr}`)
+      const ver = values.nfsVersion.trim()
+      if (ver) oParts.push(`nfsvers=${ver}`)
+      const opt = values.nfsOptions.trim()
+      if (opt) {
+        for (const p of opt
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean))
+          oParts.push(p)
       }
 
-      await commands.createVolume(
-        serverId,
-        values.name.trim(),
-        'local',
-        Object.keys(driverOpts).length ? driverOpts : null
-      )
-      onOpenChange(false)
-      await onCreated()
-    } catch (e) {
-      toast.error(String(e))
-    } finally {
-      setSubmitting(false)
+      driverOpts.type = 'nfs'
+      driverOpts.o = oParts.join(',')
+      driverOpts.device = `:${mount}`
     }
+
+    createVolume.mutate(
+      {
+        name: values.name.trim(),
+        driver: 'local',
+        driverOpts: Object.keys(driverOpts).length ? driverOpts : null,
+      },
+      {
+        onSuccess: () => {
+          toast.success('存储卷已创建')
+          onOpenChange(false)
+          void onCreated?.()
+        },
+        onSettled: () => {
+          setSubmitting(false)
+        },
+      }
+    )
   })
 
   return (
