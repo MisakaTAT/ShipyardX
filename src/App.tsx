@@ -1,17 +1,10 @@
-import { ThemeProvider } from '@/components/theme-provider'
-import { STORAGE_KEY } from '@/components/theme-provider'
-import Layout from './layouts/Layout'
+import { AppProviders } from '@/app/providers'
+import Layout from '@/layouts/root-layout'
 
 export default function App() {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-      storageKey={STORAGE_KEY}
-    >
+    <AppProviders>
       <Layout />
-    </ThemeProvider>
+    </AppProviders>
   )
 }

@@ -1,0 +1,42 @@
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { commands } from '@/types/app-bindings'
+
+export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
+
+/**
+ * 探测 Docker 可用性：成功 -> ok；失败根据错误文本分流到 no_permission / no_docker / error。
+ */
+export function useDockerAccess(serverId: string) {
+  const [status, setStatus] = useState<DockerStatus>('checking')
+
+  const check = useCallback(
+    async (notify = false) => {
+      setStatus('checking')
+      try {
+        await commands.checkDockerAccess(serverId)
+        setStatus('ok')
+        if (notify) toast.success('Docker 连接正常')
+      } catch (e) {
+        const msg = String(e)
+        if (msg.includes('no_permission')) {
+          setStatus('no_permission')
+          if (notify) toast.error('权限不足，请将用户加入 docker 组')
+        } else if (msg.includes('no_docker')) {
+          setStatus('no_docker')
+          if (notify) toast.error('Docker 未安装或未运行')
+        } else {
+          setStatus('error')
+          if (notify) toast.error('无法连接 Docker')
+        }
+      }
+    },
+    [serverId]
+  )
+
+  useEffect(() => {
+    void check()
+  }, [check])
+
+  return { status, recheck: check, ok: status === 'ok' }
+}

@@ -1383,6 +1383,43 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/query-core@npm:5.99.2":
+  version: 5.99.2
+  resolution: "@tanstack/query-core@npm:5.99.2"
+  checksum: 10c0/099532b312c8c939bc9a98824e4cded67d567c10bc686f4e0d407bf3f868250cf3cd23be8d4a81b8d7c3e99f6245a08278ddcceed7cd8f290058a6f503163d98
+  languageName: node
+  linkType: hard
+
+"@tanstack/query-devtools@npm:5.99.2":
+  version: 5.99.2
+  resolution: "@tanstack/query-devtools@npm:5.99.2"
+  checksum: 10c0/ce94f285c8a6ee19b6ed6722f6e0de13021e5660ee15bf827930c0f7f68d7e46607a22cc173f2ff0a6400b9bb5d2604715a53b7b47304fe144260a15d6184129
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query-devtools@npm:^5.99.2":
+  version: 5.99.2
+  resolution: "@tanstack/react-query-devtools@npm:5.99.2"
+  dependencies:
+    "@tanstack/query-devtools": "npm:5.99.2"
+  peerDependencies:
+    "@tanstack/react-query": ^5.99.2
+    react: ^18 || ^19
+  checksum: 10c0/99b70cfd1aff9231a78648b0a022cef73b9b951195da88d832681f9ce50b2ba51d6cfc9f32be934a50d901d66f2a80431b9d2daf7c17062123bb6f3df081f0aa
+  languageName: node
+  linkType: hard
+
+"@tanstack/react-query@npm:^5.99.2":
+  version: 5.99.2
+  resolution: "@tanstack/react-query@npm:5.99.2"
+  dependencies:
+    "@tanstack/query-core": "npm:5.99.2"
+  peerDependencies:
+    react: ^18 || ^19
+  checksum: 10c0/b9fb565e61c864b05227a026e38ef6bc1582f357c1f224c2f45c8cf6522d2ff37404cd85b6c35df178e752a68c8ed38b80692291294aafbae341d1281b2cf635
+  languageName: node
+  linkType: hard
+
 "@taplo/core@npm:^0.2.0":
   version: 0.2.0
   resolution: "@taplo/core@npm:0.2.0"
@@ -4634,6 +4671,8 @@ __metadata:
     "@hookform/resolvers": "npm:^5.2.2"
     "@monaco-editor/react": "npm:^4.7.0"
     "@tailwindcss/vite": "npm:^4.2.2"
+    "@tanstack/react-query": "npm:^5.99.2"
+    "@tanstack/react-query-devtools": "npm:^5.99.2"
     "@tauri-apps/api": "npm:^2"
     "@tauri-apps/cli": "npm:^2"
     "@tauri-apps/plugin-opener": "npm:^2"
