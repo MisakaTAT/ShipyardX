@@ -12,15 +12,7 @@ export function WarnIcon() {
   )
 }
 
-export function TrafficRow({
-  label,
-  value,
-  tone,
-}: {
-  label: 'TX' | 'RX'
-  value: string
-  tone: 'tx' | 'rx'
-}) {
+export function TrafficRow({ label, value, tone }: { label: 'TX' | 'RX'; value: string; tone: 'tx' | 'rx' }) {
   return (
     <div className="flex items-center gap-2">
       <span

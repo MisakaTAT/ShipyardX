@@ -45,8 +45,7 @@ export function usePortForwardPolling(enabled: boolean) {
 export function useSetPortForwardEnabled() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      commands.setPortForwardEnabled(id, enabled),
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => commands.setPortForwardEnabled(id, enabled),
     onSuccess: (_r, { enabled }) => {
       toast.success(enabled ? '规则已启用' : '规则已禁用')
       qc.invalidateQueries({ queryKey: qk.portForwards() })

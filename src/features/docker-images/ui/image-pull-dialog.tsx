@@ -3,12 +3,18 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
-import { imagePullDefaultValues, imagePullFormSchema, type ImagePullFormValues } from '@/features/docker-images/model/image-pull-schema'
+import {
+  imagePullDefaultValues,
+  imagePullFormSchema,
+  type ImagePullFormValues,
+} from '@/features/docker-images/model/image-pull-schema'
 import { Download, Loader2, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Field, FieldContent, FieldError, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 export interface ImagePullDialogProps {
   serverId: string
@@ -93,7 +99,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
         if (!next && !pulling) void handleClose()
       }}
     >
-      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Download />

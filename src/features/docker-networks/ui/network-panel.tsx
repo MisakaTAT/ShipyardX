@@ -5,13 +5,7 @@ import NetworkCreateDialog from '@/features/docker-networks/ui/network-create-di
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { formatDateTimeString } from '@/shared/lib/datetime'
-import {
-  ConfirmDialog,
-  DataTable,
-  PanelHeader,
-  PanelShell,
-  type ColumnDef,
-} from '@/shared/components'
+import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ChipCell } from '@/features/docker-networks/ui/chip-cell'
 import { useNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
 
@@ -87,7 +81,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span title={row.original.created_at || undefined}>
+          <span className="font-mono" title={row.original.created_at || undefined}>
             {formatDateTimeString(row.original.created_at)}
           </span>
         ),
@@ -171,9 +165,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
           if (!open) setRemoveTarget(null)
         }}
         title="删除网络"
-        description={
-          removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''
-        }
+        description={removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''}
         destructive
         confirmText="删除"
         onConfirm={() => {

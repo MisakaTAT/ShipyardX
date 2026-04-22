@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 export interface VolumeCreateDialogProps {
   serverId: string
@@ -88,7 +90,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
         if (!next && !submitting) onOpenChange(false)
       }}
     >
-      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Database />
@@ -129,7 +131,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                     <FieldLabel>模式</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                        <SelectTrigger className="font-mono">
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="选择 Driver" />
                         </SelectTrigger>
                         <SelectContent align="start">

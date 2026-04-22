@@ -6,16 +6,14 @@ export const qk = {
     ['docker', serverId, 'containers', containerId, 'inspect'] as const,
 
   images: (serverId: string) => ['docker', serverId, 'images'] as const,
-  imageInspect: (serverId: string, imageId: string) =>
-    ['docker', serverId, 'images', imageId, 'inspect'] as const,
+  imageInspect: (serverId: string, imageId: string) => ['docker', serverId, 'images', imageId, 'inspect'] as const,
 
   networks: (serverId: string) => ['docker', serverId, 'networks'] as const,
   networkInspect: (serverId: string, networkId: string) =>
     ['docker', serverId, 'networks', networkId, 'inspect'] as const,
 
   volumes: (serverId: string) => ['docker', serverId, 'volumes'] as const,
-  volumeInspect: (serverId: string, name: string) =>
-    ['docker', serverId, 'volumes', name, 'inspect'] as const,
+  volumeInspect: (serverId: string, name: string) => ['docker', serverId, 'volumes', name, 'inspect'] as const,
 
   dockerInfo: (serverId: string) => ['docker', serverId, 'info'] as const,
   dockerAccess: (serverId: string) => ['docker', serverId, 'access'] as const,

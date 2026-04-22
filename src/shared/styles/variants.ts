@@ -3,6 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 export const fullScreenDialogContent =
   'flex! fixed! inset-0! top-0! left-0! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:max-w-full'
 
+export const modalDialogContent = 'flex! min-w-md flex-col gap-0 overflow-hidden p-0'
 
 export const toneBadge = cva('', {
   variants: {
@@ -34,23 +35,20 @@ export const toneDotColor = cva('', {
   defaultVariants: { tone: 'muted' },
 })
 
-export const panelCard = cva(
-  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card',
-  {
-    variants: {
-      bare: {
-        true: 'border-0 bg-transparent',
-        false: '',
-      },
+export const panelCard = cva('flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card', {
+  variants: {
+    bare: {
+      true: 'border-0 bg-transparent',
+      false: '',
     },
-    defaultVariants: { bare: false },
-  }
-)
+  },
+  defaultVariants: { bare: false },
+})
 
 export const siderNavButton = cva('h-10 w-full rounded-lg p-2.5 [&_svg]:size-5', {
   variants: {
     active: {
-      true: 'bg-sidebar-nav-active-bg text-primary hover:bg-sidebar-nav-active-bg-hover hover:text-primary',
+      true: 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
       false: 'text-muted-foreground hover:bg-muted hover:text-foreground',
     },
     disabled: {

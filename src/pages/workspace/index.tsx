@@ -59,11 +59,7 @@ interface WorkspaceProps {
 export default function Workspace({ selectedServer, onDisconnect, activeTab, onActiveTabChange }: WorkspaceProps) {
   const { status: dockerStatus, ok: dockerOk, recheck } = useDockerAccess(selectedServer.id)
 
-  const {
-    events,
-    status: eventStatus,
-    clearEvents,
-  } = useDockerEventInvalidation(selectedServer.id, dockerOk)
+  const { events, status: eventStatus, clearEvents } = useDockerEventInvalidation(selectedServer.id, dockerOk)
 
   const handleDisconnect = () => {
     const label = selectedServer.name

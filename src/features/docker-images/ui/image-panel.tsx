@@ -6,14 +6,7 @@ import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
-import {
-  ConfirmDialog,
-  DataTable,
-  PanelHeader,
-  PanelShell,
-  ToneBadge,
-  type ColumnDef,
-} from '@/shared/components'
+import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import { useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
 
 interface ImagePanelProps {
@@ -66,7 +59,9 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           row.original.tag === '<none>' ? (
             <ToneBadge tone="muted">无标签</ToneBadge>
           ) : (
-            <ToneBadge tone="info">{row.original.tag}</ToneBadge>
+            <ToneBadge tone="info" maxWidth="8rem">
+              {row.original.tag}
+            </ToneBadge>
           ),
       },
       { id: 'size', header: '大小', cell: ({ row }) => row.original.size },
@@ -74,7 +69,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>
+          <span className="font-mono" title={formatUnixSeconds(row.original.created_ts)}>
             {formatUnixSeconds(row.original.created_ts)}
           </span>
         ),
@@ -87,7 +82,13 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           const img = row.original
           return (
             <div>
-              <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(img)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Inspect"
+                onClick={() => setInspectTarget(img)}
+              >
                 <ScanSearch />
               </Button>
               <Button
@@ -172,11 +173,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         confirmText="删除"
         extra={
           <label className="flex cursor-pointer items-start gap-2.5 text-left">
-            <Checkbox
-              checked={removeForce}
-              onCheckedChange={(c) => setRemoveForce(c === true)}
-              className="mt-0.5"
-            />
+            <Checkbox checked={removeForce} onCheckedChange={(c) => setRemoveForce(c === true)} className="mt-0.5" />
             <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
           </label>
         }

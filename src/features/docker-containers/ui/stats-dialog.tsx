@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Button } from '@/shared/ui/button'
 import { formatBytes } from '@/shared/lib/format'
 import { formatNowTime } from '@/shared/lib/datetime'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 interface Props {
   serverId: string
@@ -133,7 +135,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
         if (!next) onClose()
       }}
     >
-      <DialogContent className="max-w-xl p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Cpu />

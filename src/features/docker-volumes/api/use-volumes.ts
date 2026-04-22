@@ -28,8 +28,7 @@ interface CreateVolumeVars {
 export function useCreateVolume(serverId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: CreateVolumeVars) =>
-      commands.createVolume(serverId, vars.name, vars.driver, vars.driverOpts),
+    mutationFn: (vars: CreateVolumeVars) => commands.createVolume(serverId, vars.name, vars.driver, vars.driverOpts),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.volumes(serverId) }),
     onError: (err) => toast.error(String(err)),
   })

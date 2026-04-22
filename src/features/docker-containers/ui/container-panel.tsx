@@ -7,13 +7,7 @@ import ContainerExecDialog from '@/features/docker-containers/ui/container-exec-
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
-import {
-  ConfirmDialog,
-  DataTable,
-  PanelHeader,
-  PanelShell,
-  type ColumnDef,
-} from '@/shared/components'
+import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
 import { PortCell } from '@/features/docker-containers/ui/port-cell'
 import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
@@ -107,7 +101,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>
+          <span className="font-mono" title={formatUnixSeconds(row.original.created_ts)}>
             {formatUnixSeconds(row.original.created_ts)}
           </span>
         ),

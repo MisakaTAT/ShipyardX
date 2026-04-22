@@ -1,7 +1,7 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Play, Square, Trash2 } from 'lucide-react'
 import type { PortForward, ServerConfig } from '@/types/app-bindings'
-import { Badge } from '@/shared/ui/badge'
+import { ToneBadge } from '@/shared/components/tone-badge'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { formatBytes, formatSpeed } from '@/shared/lib/format'
@@ -31,9 +31,7 @@ export function buildPortForwardColumns({
         const f = row.original
         return (
           <>
-            <div className="font-medium text-foreground">
-              {f.container_name ?? f.container_id.slice(0, 12)}
-            </div>
+            <div className="font-medium text-foreground">{f.container_name ?? f.container_id.slice(0, 12)}</div>
             <div>{f.container_id.slice(0, 12)}</div>
           </>
         )
@@ -43,9 +41,7 @@ export function buildPortForwardColumns({
       id: 'host',
       header: '主机',
       cell: ({ row }) => (
-        <div className="text-foreground">
-          {serverById.get(row.original.server_id)?.name ?? row.original.server_id}
-        </div>
+        <div className="text-foreground">{serverById.get(row.original.server_id)?.name ?? row.original.server_id}</div>
       ),
     },
     {
@@ -53,12 +49,9 @@ export function buildPortForwardColumns({
       header: '协议',
       meta: { className: 'whitespace-normal' },
       cell: ({ row }) => (
-        <Badge
-          variant="outline"
-          className="h-auto border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-blue-500 uppercase"
-        >
+        <ToneBadge tone="info" className="font-mono uppercase">
           {row.original.protocol}
-        </Badge>
+        </ToneBadge>
       ),
     },
     {
@@ -153,9 +146,7 @@ export function buildPortForwardColumns({
               onClick={() => onToggleEnabled(f.id, !f.enabled)}
               className={cn(
                 'text-muted-foreground',
-                f.enabled
-                  ? 'hover:bg-amber-500/10 hover:text-amber-500'
-                  : 'hover:bg-green-500/10 hover:text-green-500'
+                f.enabled ? 'hover:bg-amber-500/10 hover:text-amber-500' : 'hover:bg-green-500/10 hover:text-green-500'
               )}
             >
               {f.enabled ? <Square /> : <Play />}

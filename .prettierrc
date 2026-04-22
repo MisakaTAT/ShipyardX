@@ -9,7 +9,7 @@
     "prettier-plugin-tailwindcss",
     "prettier-plugin-toml"
   ],
-  "tailwindStylesheet": "src/App.css",
+  "tailwindStylesheet": "src/app/styles/index.css",
   "tailwindFunctions": [
     "cn",
     "cva"

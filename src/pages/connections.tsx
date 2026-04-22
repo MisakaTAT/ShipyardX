@@ -39,9 +39,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">服务器</h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    管理远程服务器连接，选择一个服务器进入工作区。
-                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">管理远程服务器连接，选择一个服务器进入工作区。</p>
                 </div>
                 <Button onClick={openAdd}>
                   <Plus />

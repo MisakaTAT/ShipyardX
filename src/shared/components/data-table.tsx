@@ -1,12 +1,6 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import type { LucideProps } from 'lucide-react'
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  type ColumnDef,
-  type RowData,
-} from '@tanstack/react-table'
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type RowData } from '@tanstack/react-table'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 import { EmptyState } from '@/shared/components/empty-state'
 import { cn } from '@/shared/lib/utils'
@@ -65,7 +59,13 @@ export function DataTable<TData, TValue = unknown>({
       ) : rows.length === 0 ? (
         <EmptyState icon={empty?.icon} title={empty?.title} description={empty?.description} />
       ) : (
-        <table className={cn('w-full caption-bottom text-sm table-fixed', tableClassName)}>
+        <table
+          className={cn(
+            'w-full table-fixed caption-bottom border-separate border-spacing-0 text-sm',
+            '[&_tbody_tr_td]:border-b [&_tbody_tr_td]:border-border [&_tbody_tr:last-child_td]:border-b-0',
+            tableClassName
+          )}
+        >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -78,16 +78,14 @@ export function DataTable<TData, TValue = unknown>({
                     <TableHead
                       key={header.id}
                       className={cn(
-                        'sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_0_var(--border)]',
+                        'sticky top-0 z-10 border-b border-border bg-card',
                         'truncate',
                         meta?.headerClassName,
                         meta?.className
                       )}
                       style={style}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   )
                 })}
@@ -109,11 +107,7 @@ export function DataTable<TData, TValue = unknown>({
                   return (
                     <TableCell
                       key={cell.id}
-                      className={cn(
-                        'text-muted-foreground',
-                        'truncate *:truncate *:max-w-full',
-                        meta?.className
-                      )}
+                      className={cn('text-muted-foreground', 'truncate *:max-w-full *:truncate', meta?.className)}
                       style={style}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

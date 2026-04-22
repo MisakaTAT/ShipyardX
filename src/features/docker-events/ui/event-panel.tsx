@@ -1,23 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Activity,
-  Box,
-  CircleDot,
-  Database,
-  Filter,
-  Layers,
-  Loader2,
-  Radio,
-  Search,
-  Share2,
-  Trash2,
-  Unplug,
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Activity, Box, CircleDot, Database, Filter, Layers, Search, Share2, Trash2 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
 import { formatUnixSecondsTime } from '@/shared/lib/datetime'
-import { DataTable, SearchInput, ToneBadge, type ColumnDef } from '@/shared/components'
+import { DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import type { BadgeTone } from '@/shared/styles/variants'
 
 interface EventPanelProps {
@@ -62,31 +49,27 @@ function statusIndicator(status: EventStreamStatus) {
   switch (status) {
     case 'connected':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-green-500">
-          <Radio className="size-3" />
+        <ToneBadge tone="success" dot pulse>
           已连接
-        </span>
+        </ToneBadge>
       )
     case 'connecting':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" />
+        <ToneBadge tone="info" dot pulse>
           连接中
-        </span>
+        </ToneBadge>
       )
     case 'disconnected':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-yellow-500">
-          <Unplug className="size-3" />
+        <ToneBadge tone="warning" dot pulse>
           已断开，重连中…
-        </span>
+        </ToneBadge>
       )
     case 'stopped':
       return (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Unplug className="size-3" />
+        <ToneBadge tone="muted" dot>
           已停止
-        </span>
+        </ToneBadge>
       )
   }
 }
@@ -95,14 +78,6 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [showFilters, setShowFilters] = useState(false)
-  const listRef = useRef<HTMLDivElement>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-
-  useEffect(() => {
-    if (autoScroll && listRef.current) {
-      listRef.current.scrollTop = 0
-    }
-  }, [events.length, autoScroll])
 
   const filtered = useMemo(() => {
     return events.filter((ev) => {
@@ -147,9 +122,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'id',
         header: 'ID',
         meta: { width: '8rem' },
-        cell: ({ row }) => (
-          <span title={row.original.actor_id || undefined}>{row.original.actor_id || '—'}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.actor_id || undefined}>{row.original.actor_id || '—'}</span>,
       },
       {
         id: 'time',
@@ -172,78 +145,59 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'action',
         header: '动作',
         meta: { width: '8rem' },
-        cell: ({ row }) => (
-          <ToneBadge tone={actionTone(row.original.action)}>{row.original.action}</ToneBadge>
-        ),
+        cell: ({ row }) => <ToneBadge tone={actionTone(row.original.action)}>{row.original.action}</ToneBadge>,
       },
       {
         id: 'image',
         header: '镜像',
         meta: { width: '8rem' },
-        cell: ({ row }) => (
-          <span title={row.original.actor_image || undefined}>{row.original.actor_image || '—'}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.actor_image || undefined}>{row.original.actor_image || '—'}</span>,
       },
       {
         id: 'detail',
         header: '详情',
-        cell: ({ row }) => (
-          <span title={row.original.detail || undefined}>{row.original.detail || '—'}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.detail || undefined}>{row.original.detail || '—'}</span>,
       },
     ],
     []
   )
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-5 py-4">
-        <div className="inline-flex items-center gap-2.5">
-          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
-            <Activity />
-          </div>
-          <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <span>事件</span>
-            {events.length > 0 ? <span className="font-normal text-muted-foreground">({events.length})</span> : null}
-          </div>
-        </div>
-
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder='搜索… ("/" 快速聚焦)'
-          className="ml-4 w-full max-w-xs"
-          clearable={false}
-        />
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className={showFilters ? 'bg-muted text-foreground' : undefined}
-          title="类型过滤"
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          <Filter />
-        </Button>
-
-        <div className="ml-auto flex items-center gap-2">
-          {statusIndicator(status)}
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon-sm"
-            title="清空事件"
-            onClick={onClear}
-            disabled={events.length === 0}
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      </div>
+    <PanelShell>
+      <PanelHeader
+        icon={Activity}
+        title="事件"
+        stats={events.length > 0 ? `(${events.length})` : undefined}
+        search={{ value: search, onChange: setSearch }}
+        actions={
+          <>
+            {statusIndicator(status)}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={showFilters ? 'bg-muted text-foreground' : undefined}
+              title="类型过滤"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter />
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon-sm"
+              title="清空事件"
+              onClick={onClear}
+              disabled={events.length === 0}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        }
+      />
 
       {showFilters && (
-        <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-5 py-3">
+        <div className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-3 py-1.5">
           {TYPE_FILTERS.map((f) => (
             <button
               key={f.key}
@@ -252,7 +206,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
                 typeFilter === f.key
-                  ? 'bg-sidebar-nav-active-bg text-primary'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
@@ -264,24 +218,15 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         </div>
       )}
 
-      <div
-        ref={listRef}
-        className="flex-1 overflow-auto bg-card"
-        onScroll={(e) => {
-          const el = e.currentTarget
-          setAutoScroll(el.scrollTop <= 10)
+      <DataTable<DockerEvent>
+        columns={eventColumns}
+        data={filtered}
+        getRowId={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
+        empty={{
+          icon: events.length === 0 ? Activity : Search,
+          title: events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件',
         }}
-      >
-        <DataTable<DockerEvent>
-          columns={eventColumns}
-          data={filtered}
-          getRowId={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
-          empty={{
-            icon: events.length === 0 ? Activity : Search,
-            title: events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件',
-          }}
-        />
-      </div>
-    </div>
+      />
+    </PanelShell>
   )
 }

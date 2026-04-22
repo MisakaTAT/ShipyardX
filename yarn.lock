@@ -305,7 +305,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@babel/runtime@npm:^7.28.6":
+"@babel/runtime@npm:^7.29.2":
   version: 7.29.2
   resolution: "@babel/runtime@npm:7.29.2"
   checksum: 10c0/30b80a0140d16467792e1bbeb06f655b0dab70407da38dfac7fedae9c859f9ae9d846ef14ad77bd3814c064295fe9b1bc551f1541ea14646ae9f22b71a8bc17a
@@ -348,32 +348,37 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@base-ui/react@npm:^1.3.0":
-  version: 1.3.0
-  resolution: "@base-ui/react@npm:1.3.0"
+"@base-ui/react@npm:^1.4.1":
+  version: 1.4.1
+  resolution: "@base-ui/react@npm:1.4.1"
   dependencies:
-    "@babel/runtime": "npm:^7.28.6"
-    "@base-ui/utils": "npm:0.2.6"
+    "@babel/runtime": "npm:^7.29.2"
+    "@base-ui/utils": "npm:0.2.8"
     "@floating-ui/react-dom": "npm:^2.1.8"
     "@floating-ui/utils": "npm:^0.2.11"
-    tabbable: "npm:^6.4.0"
     use-sync-external-store: "npm:^1.6.0"
   peerDependencies:
+    "@date-fns/tz": ^1.2.0
     "@types/react": ^17 || ^18 || ^19
+    date-fns: ^4.0.0
     react: ^17 || ^18 || ^19
     react-dom: ^17 || ^18 || ^19
   peerDependenciesMeta:
+    "@date-fns/tz":
+      optional: true
     "@types/react":
       optional: true
-  checksum: 10c0/36c9d2d77a82b41cb3783be39340aa0713bbe102fb18213f8f3e2c4f1295beb8359dd97067248bea34925f4a40eab281ddc42f05009179db1d5a7a99e4bfecdc
+    date-fns:
+      optional: true
+  checksum: 10c0/913361cd1e09f256d95bbd905287a10c34b2dab23482bf4ad5e595e4d72f5ea22e0b0b23657df6b548a938b248be3129c0bf1242c90753b59618a615c9e90ad5
   languageName: node
   linkType: hard
 
-"@base-ui/utils@npm:0.2.6":
-  version: 0.2.6
-  resolution: "@base-ui/utils@npm:0.2.6"
+"@base-ui/utils@npm:0.2.8":
+  version: 0.2.8
+  resolution: "@base-ui/utils@npm:0.2.8"
   dependencies:
-    "@babel/runtime": "npm:^7.28.6"
+    "@babel/runtime": "npm:^7.29.2"
     "@floating-ui/utils": "npm:^0.2.11"
     reselect: "npm:^5.1.1"
     use-sync-external-store: "npm:^1.6.0"
@@ -384,7 +389,7 @@ __metadata:
   peerDependenciesMeta:
     "@types/react":
       optional: true
-  checksum: 10c0/5611442ac37066774277cd3360d16ebc3f599dc7b8efdfdfbf5b66b6d2eb6e87a18c0f9922b061818850e781d9bbc70aa5fc4ffb1dfd7fb234eefc401e070090
+  checksum: 10c0/762ff2251875c08b9e506824d7b45299baef895944d28f633a34c088cd5d6f121ee29267d2afb79527180044d232e56591c4109b2fcab7ac926d7e490c5b2b29
   languageName: node
   linkType: hard
 
@@ -740,17 +745,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fontsource-variable/geist-mono@npm:^5.2.7":
+  version: 5.2.7
+  resolution: "@fontsource-variable/geist-mono@npm:5.2.7"
+  checksum: 10c0/f401fe26e9edeadbef79ab32afb03393d03908d16efa355b94cc7f0a68f5ea96adacd4a2b0724f11eff4cc0b7484693d10f3098cda769692e6497c05af274ad6
+  languageName: node
+  linkType: hard
+
 "@fontsource-variable/geist@npm:^5.2.8":
   version: 5.2.8
   resolution: "@fontsource-variable/geist@npm:5.2.8"
   checksum: 10c0/be455d4498ab0323b45d8bb37698dca810ae761643e85583605e18fc4175dec9b5ca518193673544b32a096cb3073fec0df0ef5cec92ce6ab0f58b29cd7ba596
-  languageName: node
-  linkType: hard
-
-"@fontsource-variable/inter@npm:^5.2.8":
-  version: 5.2.8
-  resolution: "@fontsource-variable/inter@npm:5.2.8"
-  checksum: 10c0/35b46df31c8c18f55f87228acf6297e4dac6cc9f38d0faaafdaf5a40e40c386cf1bfb115fb0fe0dcdb9b7e14f582843693ccf070d9c903072a5b2fc0f8dfde56
   languageName: node
   linkType: hard
 
@@ -5273,9 +5278,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"shadcn@npm:^4.2.0":
-  version: 4.2.0
-  resolution: "shadcn@npm:4.2.0"
+"shadcn@npm:^4.4.0":
+  version: 4.4.0
+  resolution: "shadcn@npm:4.4.0"
   dependencies:
     "@babel/core": "npm:^7.28.0"
     "@babel/parser": "npm:^7.28.0"
@@ -5313,7 +5318,7 @@ __metadata:
     zod-to-json-schema: "npm:^3.24.6"
   bin:
     shadcn: dist/index.js
-  checksum: 10c0/e9ebb277e90e1bb010ab2cf81f7ec6ba1c54896bebf5518f127f639bc7b4bfbc86dd052a190de4fbcdcbab25c75be243e5ae84731d0008f3be97b5ad1a807ca4
+  checksum: 10c0/cff222fbfe69510595a64029ec4c7dddea096d492516f204bfbbc6d5081ac5397c558fa9db9da89acab2d4674f557476563c1e9079cb929935df0f12d4bca789
   languageName: node
   linkType: hard
 
@@ -5337,10 +5342,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "shipyardx@workspace:."
   dependencies:
-    "@base-ui/react": "npm:^1.3.0"
+    "@base-ui/react": "npm:^1.4.1"
     "@eslint/js": "npm:^10.0.1"
     "@fontsource-variable/geist": "npm:^5.2.8"
-    "@fontsource-variable/inter": "npm:^5.2.8"
+    "@fontsource-variable/geist-mono": "npm:^5.2.7"
     "@hookform/resolvers": "npm:^5.2.2"
     "@monaco-editor/react": "npm:^4.7.0"
     "@tailwindcss/vite": "npm:^4.2.2"
@@ -5382,7 +5387,7 @@ __metadata:
     react-dom: "npm:^19.1.0"
     react-hook-form: "npm:^7.72.1"
     react-virtuoso: "npm:^4.18.3"
-    shadcn: "npm:^4.2.0"
+    shadcn: "npm:^4.4.0"
     sonner: "npm:^2.0.7"
     tailwind-merge: "npm:^3.5.0"
     tailwindcss: "npm:^4.2.2"
@@ -5622,13 +5627,6 @@ __metadata:
   version: 4.0.0
   resolution: "strip-final-newline@npm:4.0.0"
   checksum: 10c0/b0cf2b62d597a1b0e3ebc42b88767f0a0d45601f89fd379a928a1812c8779440c81abba708082c946445af1d6b62d5f16e2a7cf4f30d9d6587b89425fae801ff
-  languageName: node
-  linkType: hard
-
-"tabbable@npm:^6.4.0":
-  version: 6.4.0
-  resolution: "tabbable@npm:6.4.0"
-  checksum: 10c0/d931427f4a96b801fd8801ba296a702119e06f70ad262fed8abc5271225c9f1ca51b89fdec4fb2f22e1d35acb3d2881db0a17cedc758272e9ecb540d00299d76
   languageName: node
   linkType: hard
 

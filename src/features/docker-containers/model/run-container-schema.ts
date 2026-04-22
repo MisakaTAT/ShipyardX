@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { buildRunParamsFromForm, getRunContainerValidationIssues } from '@/features/docker-containers/lib/docker-run-cli'
+import {
+  buildRunParamsFromForm,
+  getRunContainerValidationIssues,
+} from '@/features/docker-containers/lib/docker-run-cli'
 
 export const portRowSchema = z.object({
   containerPort: z.number().int().min(1).max(65535),

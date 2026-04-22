@@ -44,9 +44,7 @@ export default function ServerOverview({ serverId }: Props) {
                 <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
                 <span className="text-xs tracking-wider text-muted-foreground uppercase">Host Overview</span>
               </div>
-              <h2 className="mt-1 truncate text-lg font-semibold text-foreground">
-                {info?.name || '未知主机'}
-              </h2>
+              <h2 className="mt-1 truncate text-lg font-semibold text-foreground">{info?.name || '未知主机'}</h2>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {info?.os || 'Unknown OS'} {info?.os_version ? `· ${info.os_version}` : ''}
               </p>

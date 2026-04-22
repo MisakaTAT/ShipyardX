@@ -1,11 +1,16 @@
-import { BarChart2, FileText, MoreHorizontal, Play, RotateCcw, ScanSearch, Square, Terminal, Trash2 } from 'lucide-react'
-import { Button } from '@/shared/ui/button'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/dropdown-menu'
+  BarChart2,
+  FileText,
+  MoreHorizontal,
+  Play,
+  RotateCcw,
+  ScanSearch,
+  Square,
+  Terminal,
+  Trash2,
+} from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import type { Container } from '@/types/app-bindings'
 
 interface ContainerActionsMenuProps {

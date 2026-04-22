@@ -29,9 +29,7 @@ export function OptionsSection({ control }: OptionsSectionProps) {
           </CheckRow>
         )}
       />
-      <FieldDescription className="pl-6">
-        特权模式会显著扩大容器可访问的主机能力（谨慎启用！）
-      </FieldDescription>
+      <FieldDescription className="pl-6">特权模式会显著扩大容器可访问的主机能力（谨慎启用！）</FieldDescription>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         <Controller
           control={control}

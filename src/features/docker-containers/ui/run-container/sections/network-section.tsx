@@ -22,11 +22,7 @@ export function NetworkSection({ control, networks, networksLoading }: NetworkSe
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid} className="gap-2">
             <FieldTitle>网络</FieldTitle>
-            <Select
-              value={field.value.trim() || 'bridge'}
-              onValueChange={field.onChange}
-              disabled={networksLoading}
-            >
+            <Select value={field.value.trim() || 'bridge'} onValueChange={field.onChange} disabled={networksLoading}>
               <SelectTrigger aria-invalid={fieldState.invalid}>
                 <SelectValue placeholder={networksLoading ? '正在加载网络…' : '选择网络'} />
               </SelectTrigger>

@@ -11,6 +11,8 @@ import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 export interface DockerSudoPasswordDialogProps {
   open: boolean
@@ -58,7 +60,7 @@ export default function DockerSudoPasswordDialog({
         onOpenChange(false)
       }}
     >
-      <DialogContent className="max-w-md p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <KeyRound />

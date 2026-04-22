@@ -1,13 +1,7 @@
 import { Controller, type Control } from 'react-hook-form'
 import { Input } from '@/shared/ui/input'
 import { Textarea } from '@/shared/ui/textarea'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel } from '@/shared/ui/field'
 import type { RunContainerFormValues } from '@/features/docker-containers/model/run-container-schema'
 
 interface CommandSectionProps {

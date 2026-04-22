@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 interface ServerDialogProps {
   open: boolean
@@ -109,7 +111,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <ServerIcon />

@@ -15,11 +15,7 @@ function emptyVolume(): RunContainerFormValues['volumes'][number] {
 }
 
 export function VolumeSection({ control }: VolumeSectionProps) {
-  const {
-    fields,
-    append,
-    remove,
-  } = useFieldArray({ control, name: 'volumes' })
+  const { fields, append, remove } = useFieldArray({ control, name: 'volumes' })
 
   return (
     <div className="space-y-2">
@@ -31,10 +27,7 @@ export function VolumeSection({ control }: VolumeSectionProps) {
         </Button>
       </div>
       {fields.map((row, i) => (
-        <div
-          key={row.id}
-          className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2"
-        >
+        <div key={row.id} className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2">
           <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <Controller
               control={control}

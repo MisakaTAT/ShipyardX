@@ -15,6 +15,8 @@ import { listSelectableImageRefs } from '@/shared/lib/docker-image-ref'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { FieldError, FieldGroup } from '@/shared/ui/field'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 import { BasicSection } from '@/features/docker-containers/ui/run-container/sections/basic-section'
 import { PortSection } from '@/features/docker-containers/ui/run-container/sections/port-section'
 import { NetworkSection } from '@/features/docker-containers/ui/run-container/sections/network-section'
@@ -130,17 +132,12 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         }
       }}
     >
-      <DialogContent
-        className="flex! h-[720px] w-[680px] max-w-none! flex-col gap-0 overflow-hidden p-0"
-        showCloseButton={false}
-      >
+      <DialogContent className={cn(modalDialogContent, 'h-[720px] w-[680px] max-w-none!')} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Box />
           </span>
-          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">
-            启动新容器
-          </DialogTitle>
+          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">启动新容器</DialogTitle>
           {flow.phase === 'form' ? (
             <Button type="button" variant="ghost" size="icon-sm" onClick={() => onOpenChange(false)}>
               <X className="size-4" />

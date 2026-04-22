@@ -1,9 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import {
-  Controller,
-  useFieldArray,
-  type Control,
-} from 'react-hook-form'
+import { Controller, useFieldArray, type Control } from 'react-hook-form'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { FieldDescription, FieldTitle } from '@/shared/ui/field'
@@ -20,11 +16,7 @@ function emptyPort(): RunContainerFormValues['ports'][number] {
 }
 
 export function PortSection({ control }: PortSectionProps) {
-  const {
-    fields: portFields,
-    append,
-    remove,
-  } = useFieldArray({ control, name: 'ports' })
+  const { fields: portFields, append, remove } = useFieldArray({ control, name: 'ports' })
 
   return (
     <div className="space-y-2">
@@ -56,18 +48,13 @@ export function PortSection({ control }: PortSectionProps) {
           </RadioGroup>
         )}
       />
-      <FieldDescription>
-        可与下方映射同时使用 启用 -P 时为 Dockerfile 中 EXPOSE 端口在主机分配临时端口
-      </FieldDescription>
+      <FieldDescription>可与下方映射同时使用 启用 -P 时为 Dockerfile 中 EXPOSE 端口在主机分配临时端口</FieldDescription>
       {portFields.length === 0 ? (
         <FieldDescription>未添加映射且未启用 -P 时容器内端口不会暴露到主机</FieldDescription>
       ) : (
         <div className="space-y-2">
           {portFields.map((row, i) => (
-            <div
-              key={row.id}
-              className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2"
-            >
+            <div key={row.id} className="flex flex-row items-center gap-2 rounded-lg border border-border bg-muted p-2">
               <div className="grid min-w-0 flex-1 grid-cols-3 gap-2">
                 <Controller
                   control={control}

@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react'
 import type { LucideProps } from 'lucide-react'
 import { SearchInput } from '@/shared/components/search-input'
 import { formatNowTime } from '@/shared/lib/datetime'
+import { cn } from '@/shared/lib/utils'
 
 export interface PanelHeaderSearchProps {
   value: string
@@ -16,22 +17,12 @@ interface PanelHeaderProps {
   title: ReactNode
   stats?: ReactNode
   search?: PanelHeaderSearchProps
-  /** 最近更新时间；number 会自动格式化为相对时间 */
   lastUpdated?: string | number | null
   actions?: ReactNode
   className?: string
 }
 
-/** 列表面板统一顶部栏：icon + 标题 + 统计 + 搜索 + actions */
-export function PanelHeader({
-  icon: Icon,
-  title,
-  stats,
-  search,
-  lastUpdated,
-  actions,
-  className,
-}: PanelHeaderProps) {
+export function PanelHeader({ icon: Icon, title, stats, search, lastUpdated, actions, className }: PanelHeaderProps) {
   const updatedText =
     lastUpdated == null
       ? null
@@ -42,22 +33,11 @@ export function PanelHeader({
         : lastUpdated
 
   return (
-    <div
-      className={
-        'flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-4' +
-        (className ? ' ' + className : '')
-      }
-    >
-      <div className="inline-flex items-center gap-2.5">
-        {Icon ? (
-          <div className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-muted/30 text-muted-foreground [&_svg]:size-4">
-            <Icon />
-          </div>
-        ) : null}
-        <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <span>{title}</span>
-          {stats ? <span className="font-normal text-muted-foreground">{stats}</span> : null}
-        </div>
+    <div className={cn('flex h-11 shrink-0 items-center gap-3 border-b border-border bg-card px-3', className)}>
+      <div className="inline-flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+        {Icon ? <Icon className="size-4 shrink-0 text-muted-foreground" /> : null}
+        <span className="truncate">{title}</span>
+        {stats ? <span className="text-xs font-normal text-muted-foreground">{stats}</span> : null}
       </div>
 
       {search ? (
@@ -66,12 +46,12 @@ export function PanelHeader({
           onChange={search.onChange}
           placeholder={search.placeholder ?? '搜索… ("/" 快速聚焦)'}
           hotkey={search.hotkey}
-          className={search.className ?? 'ml-4 w-full max-w-xs'}
+          className={search.className ?? 'w-56'}
         />
       ) : null}
 
       <div className="ml-auto flex items-center gap-2">
-        {updatedText ? <span className="mr-1 text-xs text-muted-foreground">更新于 {updatedText}</span> : null}
+        {updatedText ? <span className="text-[11px] text-muted-foreground">更新于 {updatedText}</span> : null}
         {actions}
       </div>
     </div>

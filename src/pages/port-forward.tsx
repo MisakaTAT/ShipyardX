@@ -30,7 +30,7 @@ export default function PortForwardPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   const serverById = useMemo(() => {
-    const m = new Map<string, typeof servers[number]>()
+    const m = new Map<string, (typeof servers)[number]>()
     for (const s of servers) m.set(s.id, s)
     return m
   }, [servers])
@@ -97,12 +97,7 @@ export default function PortForwardPage() {
                       停止
                     </Button>
                   ) : enabledCount > 0 ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => startAll.mutate()}
-                      disabled={rulesLoading}
-                    >
+                    <Button type="button" variant="outline" onClick={() => startAll.mutate()} disabled={rulesLoading}>
                       <Play />
                       启动
                     </Button>

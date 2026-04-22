@@ -190,7 +190,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
           <span className="mr-2 text-xs text-muted-foreground">日志</span>
 
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
-            <SelectTrigger className="w-fit shrink-0">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

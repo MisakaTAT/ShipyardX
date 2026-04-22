@@ -5,13 +5,7 @@ import VolumeCreateDialog from '@/features/docker-volumes/ui/volume-create-dialo
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { formatDateTimeString } from '@/shared/lib/datetime'
-import {
-  ConfirmDialog,
-  DataTable,
-  PanelHeader,
-  PanelShell,
-  type ColumnDef,
-} from '@/shared/components'
+import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
 
 interface VolumePanelProps {
@@ -68,7 +62,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         header: '创建时间',
         meta: { width: '10rem' },
         cell: ({ row }) => (
-          <span title={row.original.created_at || undefined}>
+          <span className="font-mono" title={row.original.created_at || undefined}>
             {formatDateTimeString(row.original.created_at)}
           </span>
         ),
@@ -76,9 +70,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
       {
         id: 'mountpoint',
         header: 'Mountpoint',
-        cell: ({ row }) => (
-          <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>,
       },
       {
         id: 'actions',

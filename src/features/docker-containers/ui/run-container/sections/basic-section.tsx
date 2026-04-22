@@ -2,14 +2,7 @@ import { useId } from 'react'
 import { Controller, type Control } from 'react-hook-form'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-  FieldTitle,
-} from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldTitle } from '@/shared/ui/field'
 import type { RunContainerFormValues } from '@/features/docker-containers/model/run-container-schema'
 import { CheckRow } from '@/features/docker-containers/ui/run-container/shared'
 
@@ -114,9 +107,7 @@ export function BasicSection({ control, imageOptions, imagesLoading, onToggleMan
                           </SelectContent>
                         </Select>
                         {!imagesLoading && imageOptions.length === 0 ? (
-                          <FieldDescription>
-                            可勾选自定镜像自行输入引用 或先到镜像页拉取后再选
-                          </FieldDescription>
+                          <FieldDescription>可勾选自定镜像自行输入引用 或先到镜像页拉取后再选</FieldDescription>
                         ) : null}
                       </>
                     )}

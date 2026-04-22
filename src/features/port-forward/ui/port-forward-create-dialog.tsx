@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { modalDialogContent } from '@/shared/styles/variants'
+import { cn } from '@/shared/lib/utils'
 
 interface PortForwardCreateDialogProps {
   open: boolean
@@ -185,7 +187,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
         if (!next && !submitting) onOpenChange(false)
       }}
     >
-      <DialogContent className="max-w-lg p-0" showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <ArrowLeftRight />
@@ -217,8 +219,10 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                         onValueChange={field.onChange}
                         disabled={submitting || serversLoading || servers.length === 0}
                       >
-                        <SelectTrigger className="font-mono">
-                          <SelectValue placeholder="选择主机" />
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="选择主机">
+                            {(value) => (value ? (servers.find((s) => s.id === value)?.name ?? value) : '选择主机')}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent align="start">
                           {servers.map((s) => (
@@ -251,8 +255,12 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           onValueChange={field.onChange}
                           disabled={submitting || containers.length === 0}
                         >
-                          <SelectTrigger className="font-mono">
-                            <SelectValue placeholder="选择容器" />
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="选择容器">
+                              {(value) =>
+                                value ? (containers.find((c) => c.id === value)?.name ?? value) : '选择容器'
+                              }
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent align="start">
                             {containers.map((c) => (
@@ -288,7 +296,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           onValueChange={(v) => field.onChange(Number(v))}
                           disabled={submitting}
                         >
-                          <SelectTrigger className="font-mono">
+                          <SelectTrigger className="w-full">
                             <SelectValue placeholder="选择容器端口" />
                           </SelectTrigger>
                           <SelectContent align="start">
@@ -314,7 +322,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     <FieldLabel>绑定地址</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                        <SelectTrigger className="font-mono">
+                        <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent align="start">
@@ -352,7 +360,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           const n = Number(e.target.value)
                           field.onChange(Number.isFinite(n) ? n : 0)
                         }}
-                        className="font-mono"
+                        className="w-full"
                       />
                       <FieldDescription>填 0 时由系统随机分配本地端口</FieldDescription>
                       <FieldError errors={[fieldState.error]} />
