@@ -12,9 +12,7 @@ export function usePortForwards() {
   })
 }
 
-/**
- * 当有转发运行中时，每 3 秒轮询一次；页面不可见时暂停。
- */
+/** 启用时每 3 秒轮询一次端口转发列表，页面不可见时暂停 */
 export function usePortForwardPolling(enabled: boolean) {
   const qc = useQueryClient()
   useEffect(() => {

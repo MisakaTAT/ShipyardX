@@ -1,16 +1,23 @@
-import type { ComponentType, ReactNode } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import type { LucideProps } from 'lucide-react'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type RowData,
+} from '@tanstack/react-table'
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 import { EmptyState } from '@/shared/components/empty-state'
 import { cn } from '@/shared/lib/utils'
 
-export interface ColumnDef<T> {
-  key: string
-  title: ReactNode
-  /** 列宽，例如 "12rem" / "80px"；不指定则自动。 */
-  width?: string
-  className?: string
-  render: (row: T, index: number) => ReactNode
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    width?: string
+    className?: string
+    headerClassName?: string
+  }
 }
 
 interface EmptyOption {
@@ -19,71 +26,107 @@ interface EmptyOption {
   description?: ReactNode
 }
 
-interface DataTableProps<T> {
-  columns: ColumnDef<T>[]
-  data: T[]
-  rowKey: (row: T) => string
+interface DataTableProps<TData, TValue = unknown> {
+  columns: ColumnDef<TData, TValue>[]
+  data: TData[]
+  getRowId?: (row: TData, index: number) => string
   loading?: boolean
   empty?: EmptyOption
   className?: string
   tableClassName?: string
-  /** 行点击：常用于打开详情，不与列内按钮冲突 */
-  onRowClick?: (row: T) => void
+  onRowClick?: (row: TData) => void
 }
 
-/**
- * 统一数据表：根据 columns 配置渲染 Table，内置 loading 圈、空态；替代各面板里重复的 <Table>+手写 header/rows 代码。
- */
-export function DataTable<T>({
+export function DataTable<TData, TValue = unknown>({
   columns,
   data,
-  rowKey,
+  getRowId,
   loading,
   empty,
   className,
   tableClassName,
   onRowClick,
-}: DataTableProps<T>) {
+}: DataTableProps<TData, TValue>) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId,
+  })
+
+  const rows = table.getRowModel().rows
+
   return (
     <div className={cn('flex-1 overflow-auto bg-card', className)}>
       {loading && data.length === 0 ? (
         <div className="flex h-full min-h-48 items-center justify-center">
           <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
         </div>
-      ) : data.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState icon={empty?.icon} title={empty?.title} description={empty?.description} />
       ) : (
-        <Table className={cn('w-full table-fixed', tableClassName)}>
+        <table className={cn('w-full caption-bottom text-sm table-fixed', tableClassName)}>
           <TableHeader>
-            <TableRow>
-              {columns.map((col) => (
-                <TableHead
-                  key={col.key}
-                  className={col.className}
-                  style={col.width ? { width: col.width } : undefined}
-                >
-                  {col.title}
-                </TableHead>
-              ))}
-            </TableRow>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta
+                  const style: CSSProperties | undefined = meta?.width
+                    ? { width: meta.width, maxWidth: meta.width }
+                    : undefined
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={cn(
+                        'sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_0_var(--border)]',
+                        'truncate',
+                        meta?.headerClassName,
+                        meta?.className
+                      )}
+                      style={style}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-            {data.map((row, idx) => (
+            {rows.map((row) => (
               <TableRow
-                key={rowKey(row)}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                key={row.id}
+                onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 className={onRowClick ? 'cursor-pointer' : undefined}
               >
-                {columns.map((col) => (
-                  <TableCell key={col.key} className={col.className}>
-                    {col.render(row, idx)}
-                  </TableCell>
-                ))}
+                {row.getVisibleCells().map((cell) => {
+                  const meta = cell.column.columnDef.meta
+                  const style: CSSProperties | undefined = meta?.width
+                    ? { width: meta.width, maxWidth: meta.width }
+                    : undefined
+                  return (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        'text-muted-foreground',
+                        'truncate *:truncate *:max-w-full',
+                        meta?.className
+                      )}
+                      style={style}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  )
+                })}
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </table>
       )}
     </div>
   )
 }
+
+export type { ColumnDef } from '@tanstack/react-table'

@@ -3,7 +3,6 @@ import { Trash2, Download, Image as ImageIcon, ScanSearch } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
-import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
@@ -12,6 +11,7 @@ import {
   DataTable,
   PanelHeader,
   PanelShell,
+  ToneBadge,
   type ColumnDef,
 } from '@/shared/components'
 import { useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
@@ -46,58 +46,66 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const columns: ColumnDef<Image>[] = useMemo(
     () => [
       {
-        key: 'repository',
-        title: '仓库',
-        render: (img) => (
-          <span className="font-medium text-foreground" title={img.repository}>
-            {img.repository}
+        id: 'repository',
+        header: '仓库',
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground" title={row.original.repository}>
+            {row.original.repository}
           </span>
         ),
       },
-      { key: 'id', title: 'ID', render: (img) => img.id.replace('sha256:', '').slice(0, 12) },
       {
-        key: 'tag',
-        title: '标签',
-        render: (img) =>
-          img.tag === '<none>' ? (
-            <Badge variant="outline" className="h-auto rounded px-2 py-0.5 font-normal text-muted-foreground">
-              无标签
-            </Badge>
+        id: 'id',
+        header: 'ID',
+        cell: ({ row }) => row.original.id.replace('sha256:', '').slice(0, 12),
+      },
+      {
+        id: 'tag',
+        header: '标签',
+        cell: ({ row }) =>
+          row.original.tag === '<none>' ? (
+            <ToneBadge tone="muted">无标签</ToneBadge>
           ) : (
-            <Badge variant="outline" className="h-auto rounded px-2 py-0.5">
-              {img.tag}
-            </Badge>
+            <ToneBadge tone="info">{row.original.tag}</ToneBadge>
           ),
       },
-      { key: 'size', title: '大小', render: (img) => img.size },
+      { id: 'size', header: '大小', cell: ({ row }) => row.original.size },
       {
-        key: 'created',
-        title: '创建时间',
-        render: (img) => <span title={formatUnixSeconds(img.created_ts)}>{formatUnixSeconds(img.created_ts)}</span>,
+        id: 'created',
+        header: '创建时间',
+        cell: ({ row }) => (
+          <span title={formatUnixSeconds(row.original.created_ts)}>
+            {formatUnixSeconds(row.original.created_ts)}
+          </span>
+        ),
       },
       {
-        key: 'actions',
-        title: '操作',
-        render: (img) => (
-          <div>
-            <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(img)}>
-              <ScanSearch />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              title="删除"
-              onClick={() => {
-                setRemoveForce(false)
-                setRemoveTarget(img)
-              }}
-              className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        ),
+        id: 'actions',
+        header: '操作',
+        meta: { width: '5rem' },
+        cell: ({ row }) => {
+          const img = row.original
+          return (
+            <div>
+              <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(img)}>
+                <ScanSearch />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="删除"
+                onClick={() => {
+                  setRemoveForce(false)
+                  setRemoveTarget(img)
+                }}
+                className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )
+        },
       },
     ],
     []
@@ -126,7 +134,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       <DataTable<Image>
         columns={columns}
         data={filtered}
-        rowKey={(img) => img.id}
+        getRowId={(img) => img.id}
         loading={isFetching && images.length === 0}
         empty={{
           icon: ImageIcon,

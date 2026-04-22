@@ -16,15 +16,13 @@ interface PanelHeaderProps {
   title: ReactNode
   stats?: ReactNode
   search?: PanelHeaderSearchProps
-  /** TanStack Query 返回的 dataUpdatedAt 或 "刚刚" 字符串；传 number 自动格式化 */
+  /** 最近更新时间；number 会自动格式化为相对时间 */
   lastUpdated?: string | number | null
   actions?: ReactNode
   className?: string
 }
 
-/**
- * 列表面板的统一顶部栏。替代各 Panel 里重复的 "icon + title + stats + search + actions" 结构。
- */
+/** 列表面板统一顶部栏：icon + 标题 + 统计 + 搜索 + actions */
 export function PanelHeader({
   icon: Icon,
   title,

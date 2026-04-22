@@ -9,9 +9,7 @@ interface AppProvidersProps {
   children: ReactNode
 }
 
-/**
- * 顶层 Provider 聚合：主题 + TanStack Query + Toast。
- */
+/** 顶层 Provider 聚合：主题 + TanStack Query + Toast */
 export function AppProviders({ children }: AppProvidersProps) {
   const [queryClient] = useState(() => createQueryClient())
 

@@ -1,56 +1,39 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 
-/**
- * 将 shadcn DialogContent 改成覆盖整屏的样式。
- * 用 `!` 强制覆盖其默认的 grid + top/left-1/2 + translate-1/2 + max-w-sm。
- */
 export const fullScreenDialogContent =
   'flex! fixed! inset-0! top-0! left-0! h-dvh max-h-dvh w-full max-w-full translate-x-0! translate-y-0! flex-col gap-0 overflow-hidden rounded-none border-0 p-0 shadow-none sm:max-w-full'
 
 
-/**
- * 通用状态圆点。配合 StatusBadge 组件使用。
- */
-export const statusDot = cva('inline-block size-1.5 shrink-0 rounded-full', {
+export const toneBadge = cva('', {
   variants: {
     tone: {
-      success: 'bg-green-500',
-      danger: 'bg-red-500',
-      warning: 'bg-yellow-500',
-      info: 'bg-blue-500',
-      pending: 'bg-amber-500',
-      muted: 'bg-muted-foreground/40',
+      success: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+      danger: 'border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-400',
+      warning: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-800 dark:text-yellow-400',
+      info: 'border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+      pending: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+      muted: 'border-border bg-muted/60 text-muted-foreground',
     },
-    pulse: { true: 'animate-pulse', false: '' },
   },
-  defaultVariants: { tone: 'muted', pulse: false },
+  defaultVariants: { tone: 'muted' },
 })
 
-export type StatusTone = NonNullable<VariantProps<typeof statusDot>['tone']>
+export type BadgeTone = NonNullable<VariantProps<typeof toneBadge>['tone']>
 
-/**
- * 状态徽章外壳。
- */
-export const statusBadge = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs leading-none whitespace-nowrap',
-  {
-    variants: {
-      tone: {
-        success: 'border-border',
-        danger: 'border-border',
-        warning: 'border-border',
-        info: 'border-border',
-        pending: 'border-border',
-        muted: 'border-border',
-      },
+export const toneDotColor = cva('', {
+  variants: {
+    tone: {
+      success: 'bg-emerald-500',
+      danger: 'bg-red-500',
+      warning: 'bg-yellow-500',
+      info: 'bg-sky-500',
+      pending: 'bg-amber-500',
+      muted: 'bg-muted-foreground/50',
     },
-    defaultVariants: { tone: 'muted' },
-  }
-)
+  },
+  defaultVariants: { tone: 'muted' },
+})
 
-/**
- * 面板卡片容器（表格类面板的外层）。
- */
 export const panelCard = cva(
   'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card',
   {
@@ -64,9 +47,6 @@ export const panelCard = cva(
   }
 )
 
-/**
- * Sider 导航按钮激活态。取代 bg-[color-mix(...)] 内联写法。
- */
 export const siderNavButton = cva('h-10 w-full rounded-lg p-2.5 [&_svg]:size-5', {
   variants: {
     active: {

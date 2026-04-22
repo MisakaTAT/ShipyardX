@@ -20,9 +20,7 @@ interface BasicSectionProps {
   onToggleManual: (on: boolean) => void
 }
 
-/**
- * 名称 + 镜像选择 + 强制拉取。
- */
+/** 启动容器对话框的基础区块：名称 + 镜像 + 强制拉取 */
 export function BasicSection({ control, imageOptions, imagesLoading, onToggleManual }: BasicSectionProps) {
   const datalistId = useId()
 

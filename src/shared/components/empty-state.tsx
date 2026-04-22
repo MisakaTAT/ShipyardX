@@ -11,9 +11,7 @@ interface EmptyStateProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-/**
- * 统一空态。用于列表/面板/页面的 "没有数据 / 无匹配 / 首次使用"。
- */
+/** 列表/面板/页面的统一空态 */
 export function EmptyState({ icon: Icon, title, description, action, className, size = 'md' }: EmptyStateProps) {
   const minH = size === 'sm' ? 'min-h-32' : size === 'lg' ? 'min-h-80' : 'min-h-48'
   const iconSize = size === 'lg' ? 'size-7' : size === 'sm' ? 'size-5' : 'size-7'

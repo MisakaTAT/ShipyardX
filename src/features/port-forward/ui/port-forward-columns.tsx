@@ -25,39 +25,49 @@ export function buildPortForwardColumns({
 }: BuildColumnsParams): ColumnDef<PortForward>[] {
   return [
     {
-      key: 'container',
-      title: '容器',
-      render: (f) => (
-        <>
-          <div className="font-medium text-foreground">{f.container_name ?? f.container_id.slice(0, 12)}</div>
-          <div className="text-muted-foreground">{f.container_id.slice(0, 12)}</div>
-        </>
+      id: 'container',
+      header: '容器',
+      cell: ({ row }) => {
+        const f = row.original
+        return (
+          <>
+            <div className="font-medium text-foreground">
+              {f.container_name ?? f.container_id.slice(0, 12)}
+            </div>
+            <div>{f.container_id.slice(0, 12)}</div>
+          </>
+        )
+      },
+    },
+    {
+      id: 'host',
+      header: '主机',
+      cell: ({ row }) => (
+        <div className="text-foreground">
+          {serverById.get(row.original.server_id)?.name ?? row.original.server_id}
+        </div>
       ),
     },
     {
-      key: 'host',
-      title: '主机',
-      render: (f) => <div className="text-foreground">{serverById.get(f.server_id)?.name ?? f.server_id}</div>,
-    },
-    {
-      key: 'protocol',
-      title: '协议',
-      className: 'whitespace-normal',
-      render: (f) => (
+      id: 'protocol',
+      header: '协议',
+      meta: { className: 'whitespace-normal' },
+      cell: ({ row }) => (
         <Badge
           variant="outline"
           className="h-auto border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-blue-500 uppercase"
         >
-          {f.protocol}
+          {row.original.protocol}
         </Badge>
       ),
     },
     {
-      key: 'local',
-      title: '本地端口',
-      width: '12rem',
-      render: (f) =>
-        f.running ? (
+      id: 'local',
+      header: '本地端口',
+      meta: { width: '12rem' },
+      cell: ({ row }) => {
+        const f = row.original
+        return f.running ? (
           <button
             type="button"
             className="inline-flex cursor-pointer items-center gap-1 text-foreground hover:underline"
@@ -72,47 +82,52 @@ export function buildPortForwardColumns({
           </>
         ) : (
           <span className="tracking-wide text-muted-foreground uppercase">random</span>
-        ),
+        )
+      },
     },
     {
-      key: 'target',
-      title: '目标',
-      render: (f) => (
+      id: 'target',
+      header: '目标',
+      cell: ({ row }) => (
         <>
-          {f.remote_host}:{f.remote_port}
+          {row.original.remote_host}:{row.original.remote_port}
         </>
       ),
     },
     {
-      key: 'status',
-      title: '状态',
-      render: (f) => (
-        <div className="flex items-center gap-1.5">
-          <PortForwardStatusBadge running={f.running} enabled={f.enabled} />
-          {f.last_error ? (
-            <span className="cursor-help text-red-500" title={f.last_error}>
-              <WarnIcon />
-            </span>
-          ) : null}
-        </div>
-      ),
+      id: 'status',
+      header: '状态',
+      cell: ({ row }) => {
+        const f = row.original
+        return (
+          <div className="flex items-center gap-1.5">
+            <PortForwardStatusBadge running={f.running} enabled={f.enabled} />
+            {f.last_error ? (
+              <span className="cursor-help text-red-500" title={f.last_error}>
+                <WarnIcon />
+              </span>
+            ) : null}
+          </div>
+        )
+      },
     },
     {
-      key: 'traffic',
-      title: '流量',
-      width: '12rem',
-      render: (f) => (
+      id: 'traffic',
+      header: '流量',
+      meta: { width: '12rem' },
+      cell: ({ row }) => (
         <div className="space-y-0.5">
-          <TrafficRow label="TX" tone="tx" value={formatBytes(f.tx_bytes)} />
-          <TrafficRow label="RX" tone="rx" value={formatBytes(f.rx_bytes)} />
+          <TrafficRow label="TX" tone="tx" value={formatBytes(row.original.tx_bytes)} />
+          <TrafficRow label="RX" tone="rx" value={formatBytes(row.original.rx_bytes)} />
         </div>
       ),
     },
     {
-      key: 'speed',
-      title: '速度',
-      width: '12rem',
-      render: (f) => {
+      id: 'speed',
+      header: '速度',
+      meta: { width: '12rem' },
+      cell: ({ row }) => {
+        const f = row.original
         const sp = f.running ? speeds[f.id] : undefined
         return (
           <div className="space-y-0.5">
@@ -123,36 +138,41 @@ export function buildPortForwardColumns({
       },
     },
     {
-      key: 'actions',
-      title: '操作',
-      width: '5rem',
-      render: (f) => (
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            title={f.enabled ? '禁用' : '启用'}
-            onClick={() => onToggleEnabled(f.id, !f.enabled)}
-            className={cn(
-              'text-muted-foreground',
-              f.enabled ? 'hover:bg-amber-500/10 hover:text-amber-500' : 'hover:bg-green-500/10 hover:text-green-500'
-            )}
-          >
-            {f.enabled ? <Square /> : <Play />}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            title="删除"
-            onClick={() => onDelete(f.id)}
-            className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      ),
+      id: 'actions',
+      header: '操作',
+      meta: { width: '5rem' },
+      cell: ({ row }) => {
+        const f = row.original
+        return (
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              title={f.enabled ? '禁用' : '启用'}
+              onClick={() => onToggleEnabled(f.id, !f.enabled)}
+              className={cn(
+                'text-muted-foreground',
+                f.enabled
+                  ? 'hover:bg-amber-500/10 hover:text-amber-500'
+                  : 'hover:bg-green-500/10 hover:text-green-500'
+              )}
+            >
+              {f.enabled ? <Square /> : <Play />}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              title="删除"
+              onClick={() => onDelete(f.id)}
+              className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 }

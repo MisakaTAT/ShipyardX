@@ -47,63 +47,75 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
   const columns: ColumnDef<Network>[] = useMemo(
     () => [
       {
-        key: 'name',
-        title: '名称',
-        render: (n) => (
-          <>
-            <div className="font-medium text-foreground">{n.name}</div>
-            <div className="text-muted-foreground">{n.id.slice(0, 12)}</div>
-          </>
+        id: 'name',
+        header: '名称',
+        cell: ({ row }) => {
+          const n = row.original
+          return (
+            <>
+              <div className="font-medium text-foreground">{n.name}</div>
+              <div>{n.id.slice(0, 12)}</div>
+            </>
+          )
+        },
+      },
+      { id: 'driver', header: 'Driver', cell: ({ row }) => row.original.driver || '—' },
+      { id: 'scope', header: 'Scope', cell: ({ row }) => row.original.scope || '—' },
+      { id: 'subnets', header: '子网', cell: ({ row }) => <ChipCell items={row.original.subnets} /> },
+      { id: 'gateways', header: '网关', cell: ({ row }) => <ChipCell items={row.original.gateways} /> },
+      {
+        id: 'labels',
+        header: '标签',
+        meta: { width: '16rem', className: 'whitespace-normal' },
+        cell: ({ row }) => <ChipCell items={row.original.labels} />,
+      },
+      {
+        id: 'attrs',
+        header: '属性',
+        cell: ({ row }) => {
+          const n = row.original
+          return (
+            <>
+              {n.internal ? 'internal' : ''}
+              {n.internal && n.attachable ? ' · ' : ''}
+              {n.attachable ? 'attachable' : '—'}
+            </>
+          )
+        },
+      },
+      {
+        id: 'created',
+        header: '创建时间',
+        cell: ({ row }) => (
+          <span title={row.original.created_at || undefined}>
+            {formatDateTimeString(row.original.created_at)}
+          </span>
         ),
       },
-      { key: 'driver', title: 'Driver', render: (n) => n.driver || '—' },
-      { key: 'scope', title: 'Scope', render: (n) => n.scope || '—' },
-      { key: 'subnets', title: '子网', render: (n) => <ChipCell items={n.subnets} /> },
-      { key: 'gateways', title: '网关', render: (n) => <ChipCell items={n.gateways} /> },
       {
-        key: 'labels',
-        title: '标签',
-        width: '16rem',
-        className: 'whitespace-normal',
-        render: (n) => <ChipCell items={n.labels} />,
-      },
-      {
-        key: 'attrs',
-        title: '属性',
-        render: (n) => (
-          <>
-            {n.internal ? 'internal' : ''}
-            {n.internal && n.attachable ? ' · ' : ''}
-            {n.attachable ? 'attachable' : '—'}
-          </>
-        ),
-      },
-      {
-        key: 'created',
-        title: '创建时间',
-        render: (n) => <span title={n.created_at || undefined}>{formatDateTimeString(n.created_at)}</span>,
-      },
-      {
-        key: 'actions',
-        title: '操作',
-        width: '5rem',
-        render: (n) => (
-          <div>
-            <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(n)}>
-              <ScanSearch />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              title="删除"
-              onClick={() => setRemoveTarget(n)}
-              className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        ),
+        id: 'actions',
+        header: '操作',
+        meta: { width: '5rem' },
+        cell: ({ row }) => {
+          const n = row.original
+          return (
+            <div>
+              <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(n)}>
+                <ScanSearch />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="删除"
+                onClick={() => setRemoveTarget(n)}
+                className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )
+        },
       },
     ],
     []
@@ -128,7 +140,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
       <DataTable<Network>
         columns={columns}
         data={filtered}
-        rowKey={(n) => n.id}
+        getRowId={(n) => n.id}
         loading={isFetching && networks.length === 0}
         empty={{ icon: Share2, title: search ? `无匹配的网络 "${search}"` : '没有网络' }}
         tableClassName="text-sm"

@@ -16,9 +16,7 @@ interface SearchInputProps {
   name?: string
 }
 
-/**
- * 统一搜索输入：左侧 search 图标、自带 "/" 聚焦热键、右侧可选清除。
- */
+/** 统一搜索输入：左侧图标 + "/" 聚焦热键 + 可选清除按钮 */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(function SearchInput(
   { value, onChange, placeholder, className, hotkey = '/', clearable = true, autoFocus, name },
   forwardedRef

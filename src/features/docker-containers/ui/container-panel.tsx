@@ -61,51 +61,76 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const columns: ColumnDef<Container>[] = useMemo(
     () => [
       {
-        key: 'name',
-        title: '名称',
-        render: (c) => (
-          <>
-            <div className="font-medium text-foreground">{c.name}</div>
-            <div className="text-muted-foreground">{c.id}</div>
-          </>
-        ),
-      },
-      { key: 'image', title: '镜像', render: (c) => <span title={c.image}>{c.image}</span> },
-      {
-        key: 'state',
-        title: '状态',
-        width: '12rem',
-        render: (c) => (
-          <>
-            <ContainerStateBadge state={c.state} />
-            <br />
-            <span title={c.status}>{c.status}</span>
-          </>
-        ),
-      },
-      { key: 'ip', title: 'IP', render: (c) => <span>{c.ip || '-'}</span> },
-      { key: 'ports', title: '端口', render: (c) => (c.ports ? <PortCell ports={c.ports} /> : <span>—</span>) },
-      {
-        key: 'created',
-        title: '创建时间',
-        render: (c) => <span title={formatUnixSeconds(c.created_ts)}>{formatUnixSeconds(c.created_ts)}</span>,
+        id: 'name',
+        header: '名称',
+        cell: ({ row }) => {
+          const c = row.original
+          return (
+            <>
+              <div className="font-medium text-foreground">{c.name}</div>
+              <div>{c.id}</div>
+            </>
+          )
+        },
       },
       {
-        key: 'actions',
-        title: '操作',
-        width: '3rem',
-        render: (c) => (
-          <ContainerActionsMenu
-            container={c}
-            busy={action.isPending}
-            onAction={(a) => runAction(c.id, a)}
-            onRemove={() => setRemoveTarget(c)}
-            onExec={() => setExecTarget(c)}
-            onStats={() => setStatsTarget(c)}
-            onLog={() => setLogTarget(c)}
-            onInspect={() => setInspectTarget(c)}
-          />
+        id: 'image',
+        header: '镜像',
+        cell: ({ row }) => <span title={row.original.image}>{row.original.image}</span>,
+      },
+      {
+        id: 'state',
+        header: '状态',
+        meta: { width: '12rem' },
+        cell: ({ row }) => {
+          const c = row.original
+          return (
+            <>
+              <ContainerStateBadge state={c.state} />
+              <br />
+              <span title={c.status}>{c.status}</span>
+            </>
+          )
+        },
+      },
+      {
+        id: 'ip',
+        header: 'IP',
+        cell: ({ row }) => <span>{row.original.ip || '-'}</span>,
+      },
+      {
+        id: 'ports',
+        header: '端口',
+        cell: ({ row }) => (row.original.ports ? <PortCell ports={row.original.ports} /> : <span>—</span>),
+      },
+      {
+        id: 'created',
+        header: '创建时间',
+        cell: ({ row }) => (
+          <span title={formatUnixSeconds(row.original.created_ts)}>
+            {formatUnixSeconds(row.original.created_ts)}
+          </span>
         ),
+      },
+      {
+        id: 'actions',
+        header: '操作',
+        meta: { width: '3rem' },
+        cell: ({ row }) => {
+          const c = row.original
+          return (
+            <ContainerActionsMenu
+              container={c}
+              busy={action.isPending}
+              onAction={(a) => runAction(c.id, a)}
+              onRemove={() => setRemoveTarget(c)}
+              onExec={() => setExecTarget(c)}
+              onStats={() => setStatsTarget(c)}
+              onLog={() => setLogTarget(c)}
+              onInspect={() => setInspectTarget(c)}
+            />
+          )
+        },
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +163,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       <DataTable<Container>
         columns={columns}
         data={filtered}
-        rowKey={(c) => c.id}
+        getRowId={(c) => c.id}
         loading={isFetching && containers.length === 0}
         empty={{ icon: Box, title: search ? `无匹配的容器 "${search}"` : '没有容器' }}
       />

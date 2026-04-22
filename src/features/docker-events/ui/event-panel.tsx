@@ -14,12 +14,11 @@ import {
   Unplug,
 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
-import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 import { cn } from '@/shared/lib/utils'
 import { formatUnixSecondsTime } from '@/shared/lib/datetime'
-import { EmptyState, SearchInput } from '@/shared/components'
+import { DataTable, SearchInput, ToneBadge, type ColumnDef } from '@/shared/components'
+import type { BadgeTone } from '@/shared/styles/variants'
 
 interface EventPanelProps {
   events: DockerEvent[]
@@ -28,12 +27,6 @@ interface EventPanelProps {
 }
 
 type TypeFilter = 'all' | 'container' | 'image' | 'network' | 'volume'
-type DataTableColumn<T extends object> = {
-  key: string
-  title: React.ReactNode
-  render?: (value: unknown, record: T, index: number) => React.ReactNode
-  colWidth?: string
-}
 
 const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] = [
   { key: 'all', label: '全部', icon: <Activity className="size-3.5" /> },
@@ -58,14 +51,11 @@ function typeIcon(t: string) {
   }
 }
 
-function actionColor(action: string): string {
-  if (['start', 'create', 'pull', 'connect', 'mount'].includes(action))
-    return 'text-green-500 bg-green-500/10 border-green-500/30'
-  if (['stop', 'die', 'kill', 'destroy', 'delete', 'remove', 'disconnect', 'unmount'].includes(action))
-    return 'text-red-500 bg-red-500/10 border-red-500/30'
-  if (['restart', 'pause', 'unpause', 'rename', 'update', 'tag', 'untag'].includes(action))
-    return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/30'
-  return 'text-muted-foreground bg-muted border-border'
+function actionTone(action: string): BadgeTone {
+  if (['start', 'create', 'pull', 'connect', 'mount'].includes(action)) return 'success'
+  if (['stop', 'die', 'kill', 'destroy', 'delete', 'remove', 'disconnect', 'unmount'].includes(action)) return 'danger'
+  if (['restart', 'pause', 'unpause', 'rename', 'update', 'tag', 'untag'].includes(action)) return 'warning'
+  return 'muted'
 }
 
 function statusIndicator(status: EventStreamStatus) {
@@ -141,64 +131,65 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
     return counts
   }, [events])
 
-  const eventColumns = useMemo<DataTableColumn<DockerEvent>[]>(
+  const eventColumns = useMemo<ColumnDef<DockerEvent>[]>(
     () => [
       {
-        key: 'name',
-        title: '名称',
-        colWidth: '12rem',
-        render: (_, ev) => (
-          <span className="font-medium text-foreground" title={ev.actor_name || undefined}>
-            {ev.actor_name || '—'}
+        id: 'name',
+        header: '名称',
+        meta: { width: '12rem' },
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground" title={row.original.actor_name || undefined}>
+            {row.original.actor_name || '—'}
           </span>
         ),
       },
       {
-        key: 'id',
-        title: 'ID',
-        colWidth: '8rem',
-        render: (_, ev) => <span title={ev.actor_id || undefined}>{ev.actor_id || '—'}</span>,
+        id: 'id',
+        header: 'ID',
+        meta: { width: '8rem' },
+        cell: ({ row }) => (
+          <span title={row.original.actor_id || undefined}>{row.original.actor_id || '—'}</span>
+        ),
       },
       {
-        key: 'time',
-        title: '时间',
-        colWidth: '8rem',
-        render: (_, ev) => formatUnixSecondsTime(ev.time),
+        id: 'time',
+        header: '时间',
+        meta: { width: '8rem' },
+        cell: ({ row }) => formatUnixSecondsTime(row.original.time),
       },
       {
-        key: 'type',
-        title: '类型',
-        colWidth: '8rem',
-        render: (_, ev) => (
+        id: 'type',
+        header: '类型',
+        meta: { width: '8rem' },
+        cell: ({ row }) => (
           <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
-            {typeIcon(ev.event_type)}
-            <span className="min-w-0 truncate">{ev.event_type}</span>
+            {typeIcon(row.original.event_type)}
+            <span className="min-w-0 truncate">{row.original.event_type}</span>
           </span>
         ),
       },
       {
-        key: 'action',
-        title: '动作',
-        colWidth: '8rem',
-        render: (_, ev) => (
-          <Badge
-            variant="outline"
-            className={cn('h-auto rounded-full px-2 py-0.5', 'max-w-full min-w-0', actionColor(ev.action))}
-          >
-            {ev.action}
-          </Badge>
+        id: 'action',
+        header: '动作',
+        meta: { width: '8rem' },
+        cell: ({ row }) => (
+          <ToneBadge tone={actionTone(row.original.action)}>{row.original.action}</ToneBadge>
         ),
       },
       {
-        key: 'image',
-        title: '镜像',
-        colWidth: '8rem',
-        render: (_, ev) => <span title={ev.actor_image || undefined}>{ev.actor_image || '—'}</span>,
+        id: 'image',
+        header: '镜像',
+        meta: { width: '8rem' },
+        cell: ({ row }) => (
+          <span title={row.original.actor_image || undefined}>{row.original.actor_image || '—'}</span>
+        ),
       },
       {
-        key: 'detail',
-        title: '详情',
-        render: (_, ev) => <span title={ev.detail || undefined}>{ev.detail || '—'}</span>,
+        id: 'detail',
+        header: '详情',
+        cell: ({ row }) => (
+          <span title={row.original.detail || undefined}>{row.original.detail || '—'}</span>
+        ),
       },
     ],
     []
@@ -281,33 +272,15 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
           setAutoScroll(el.scrollTop <= 10)
         }}
       >
-        {filtered.length === 0 ? (
-          <EmptyState
-            icon={events.length === 0 ? Activity : Search}
-            title={events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件'}
-          />
-        ) : (
-          <Table className="w-full table-fixed">
-            <TableHeader>
-              <TableRow>
-                {eventColumns.map((col) => (
-                  <TableHead key={col.key} style={col.colWidth ? { width: col.colWidth } : undefined}>
-                    {col.title}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((ev, i) => (
-                <TableRow key={`${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}>
-                  {eventColumns.map((col) => (
-                    <TableCell key={col.key}>{col.render ? col.render(undefined, ev, i) : null}</TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable<DockerEvent>
+          columns={eventColumns}
+          data={filtered}
+          getRowId={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
+          empty={{
+            icon: events.length === 0 ? Activity : Search,
+            title: events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件',
+          }}
+        />
       </div>
     </div>
   )

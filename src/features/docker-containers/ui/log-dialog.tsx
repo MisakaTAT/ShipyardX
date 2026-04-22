@@ -145,8 +145,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
     return () => {
       void stopStream()
     }
-    // Intentionally only react to `follow` toggling to avoid double-starting
-    // a stream when startFollow/loadStaticLogs change on the same render.
+    // 仅在 follow 切换时重启流；依赖变化不应触发重启
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [follow])
 
@@ -154,14 +153,13 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
     if (!follow) {
       void loadStaticLogs()
     }
-    // Tail/timestamps drive re-loading; loadStaticLogs itself already depends
-    // on them so including it here would cause redundant runs.
+    // tail/timestamps 变化触发重载；loadStaticLogs 已依赖它们，避免重复执行
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tail, timestamps])
 
   useEffect(() => {
     void loadStaticLogs()
-    // Mount-only initial fetch.
+    // 仅挂载时拉取一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

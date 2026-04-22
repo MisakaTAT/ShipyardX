@@ -1,4 +1,4 @@
-export { StatusBadge } from '@/shared/components/status-badge'
+export { ToneBadge } from '@/shared/components/tone-badge'
 export { EmptyState } from '@/shared/components/empty-state'
 export { InlineCode } from '@/shared/components/inline-code'
 export { SearchInput } from '@/shared/components/search-input'

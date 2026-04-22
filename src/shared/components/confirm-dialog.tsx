@@ -17,16 +17,14 @@ interface ConfirmDialogProps {
   description?: ReactNode
   confirmText?: ReactNode
   cancelText?: ReactNode
-  /** 是否为危险操作（红色按钮） */
+  /** 危险操作：按钮使用 destructive 样式 */
   destructive?: boolean
   onConfirm: () => void | Promise<void>
-  /** 额外嵌入内容，位于 description 与 footer 之间（例如 Checkbox 选项） */
+  /** 介于描述与 footer 之间的自定义内容，如 Checkbox */
   extra?: ReactNode
 }
 
-/**
- * 统一确认/删除对话框。替代各 Panel 里重复的 AlertDialog 拼装。
- */
+/** 通用确认/删除对话框 */
 export function ConfirmDialog({
   open,
   onOpenChange,

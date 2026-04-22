@@ -9,10 +9,7 @@ import { qk } from '@/shared/api/query-keys'
 export type Phase = 'form' | 'progress'
 export type StepState = 'pending' | 'active' | 'done' | 'error'
 
-/**
- * "拉取镜像 -> 创建容器" 的两步流程状态机。
- * 把原 RunContainerDialog 里散落的 imageStep/runStep/pullLines 全部收敛。
- */
+/** "拉取镜像 → 创建容器" 两步流程的状态机 */
 export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
   const qc = useQueryClient()
   const mountedRef = useRef(true)

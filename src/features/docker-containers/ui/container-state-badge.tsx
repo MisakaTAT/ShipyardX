@@ -1,7 +1,7 @@
-import { StatusBadge } from '@/shared/components'
-import type { StatusTone } from '@/shared/styles/variants'
+import { ToneBadge } from '@/shared/components'
+import type { BadgeTone } from '@/shared/styles/variants'
 
-const TONE_BY_STATE: Record<string, StatusTone> = {
+const TONE_BY_STATE: Record<string, BadgeTone> = {
   running: 'success',
   exited: 'danger',
   dead: 'danger',
@@ -25,5 +25,9 @@ export function ContainerStateBadge({ state }: { state: string }) {
   const s = state.toLowerCase().trim()
   const tone = TONE_BY_STATE[s] ?? 'muted'
   const label = LABEL_BY_STATE[s] ?? state
-  return <StatusBadge tone={tone}>{label}</StatusBadge>
+  return (
+    <ToneBadge tone={tone} dot>
+      {label}
+    </ToneBadge>
+  )
 }

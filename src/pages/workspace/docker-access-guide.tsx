@@ -11,9 +11,7 @@ interface DockerAccessGuideProps {
   onOpenTerminal: () => void
 }
 
-/**
- * Docker 不可用时的引导页。原在 Workspace.tsx 内联，现独立到 layouts/workspace/。
- */
+/** Docker 不可用时的引导页（权限/未安装/错误三种分支） */
 export function DockerAccessGuide({
   status,
   username,

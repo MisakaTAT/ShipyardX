@@ -42,49 +42,68 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
   const columns: ColumnDef<Volume>[] = useMemo(
     () => [
       {
-        key: 'name',
-        title: '名称',
-        width: '16rem',
-        render: (v) => (
-          <span className="font-medium text-foreground" title={v.name}>
-            {v.name}
+        id: 'name',
+        header: '名称',
+        meta: { width: '16rem' },
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground" title={row.original.name}>
+            {row.original.name}
           </span>
         ),
       },
-      { key: 'driver', title: 'Driver', width: '6rem', render: (v) => v.driver || '—' },
-      { key: 'scope', title: 'Scope', width: '6rem', render: (v) => v.scope || '—' },
       {
-        key: 'created',
-        title: '创建时间',
-        width: '10rem',
-        render: (v) => <span title={v.created_at || undefined}>{formatDateTimeString(v.created_at)}</span>,
+        id: 'driver',
+        header: 'Driver',
+        meta: { width: '6rem' },
+        cell: ({ row }) => row.original.driver || '—',
       },
       {
-        key: 'mountpoint',
-        title: 'Mountpoint',
-        render: (v) => <span title={v.mountpoint}>{v.mountpoint || '—'}</span>,
+        id: 'scope',
+        header: 'Scope',
+        meta: { width: '6rem' },
+        cell: ({ row }) => row.original.scope || '—',
       },
       {
-        key: 'actions',
-        title: '操作',
-        width: '5rem',
-        render: (v) => (
-          <div>
-            <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(v)}>
-              <ScanSearch />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              title="删除"
-              onClick={() => setRemoveTarget(v)}
-              className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-            >
-              <Trash2 />
-            </Button>
-          </div>
+        id: 'created',
+        header: '创建时间',
+        meta: { width: '10rem' },
+        cell: ({ row }) => (
+          <span title={row.original.created_at || undefined}>
+            {formatDateTimeString(row.original.created_at)}
+          </span>
         ),
+      },
+      {
+        id: 'mountpoint',
+        header: 'Mountpoint',
+        cell: ({ row }) => (
+          <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '操作',
+        meta: { width: '5rem' },
+        cell: ({ row }) => {
+          const v = row.original
+          return (
+            <div>
+              <Button type="button" variant="ghost" size="icon-sm" title="Inspect" onClick={() => setInspectTarget(v)}>
+                <ScanSearch />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="删除"
+                onClick={() => setRemoveTarget(v)}
+                className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )
+        },
       },
     ],
     []
@@ -109,7 +128,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
       <DataTable<Volume>
         columns={columns}
         data={filtered}
-        rowKey={(v) => v.name}
+        getRowId={(v) => v.name}
         loading={isFetching && volumes.length === 0}
         empty={{ icon: Database, title: search ? `无匹配的存储卷 "${search}"` : '没有存储卷' }}
       />

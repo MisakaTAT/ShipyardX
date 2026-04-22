@@ -1,4 +1,4 @@
-import { StatusBadge } from '@/shared/components'
+import { ToneBadge } from '@/shared/components'
 
 interface PortForwardStatusBadgeProps {
   running?: boolean
@@ -8,11 +8,21 @@ interface PortForwardStatusBadgeProps {
 export function PortForwardStatusBadge({ running, enabled }: PortForwardStatusBadgeProps) {
   if (running) {
     return (
-      <StatusBadge tone="success" pulse>
+      <ToneBadge tone="success" dot pulse>
         监听中
-      </StatusBadge>
+      </ToneBadge>
     )
   }
-  if (enabled) return <StatusBadge tone="pending">待启动</StatusBadge>
-  return <StatusBadge tone="muted">已禁用</StatusBadge>
+  if (enabled) {
+    return (
+      <ToneBadge tone="pending" dot>
+        待启动
+      </ToneBadge>
+    )
+  }
+  return (
+    <ToneBadge tone="muted" dot>
+      已禁用
+    </ToneBadge>
+  )
 }

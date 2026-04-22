@@ -14,10 +14,7 @@ interface Snapshot {
   ts: number
 }
 
-/**
- * 计算端口转发规则的即时速率：比较本次与上次的累计字节差分，再除以时间。
- * 只在 `running` 的规则上生效。
- */
+/** 根据前后两次累计字节差分计算端口转发的即时速率（仅运行中的规则） */
 export function useSpeedTracker(rules: PortForward[]): SpeedMap {
   const prevRef = useRef<Record<string, Snapshot>>({})
   return useMemo(() => {

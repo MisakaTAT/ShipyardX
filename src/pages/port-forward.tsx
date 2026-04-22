@@ -148,7 +148,7 @@ export default function PortForwardPage() {
               <DataTable<PortForward>
                 columns={columns}
                 data={filteredRules}
-                rowKey={(r) => r.id}
+                getRowId={(r) => r.id}
                 loading={rulesLoading && rules.length === 0}
                 tableClassName="text-sm"
                 empty={{ icon: Search, title: '没有记录' }}

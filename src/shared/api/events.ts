@@ -3,10 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEngineEvents } from '@/shared/api/events/use-engine-events'
 import { qk } from '@/shared/api/query-keys'
 
-/**
- * 将 Docker 引擎事件流映射为 TanStack Query 的 invalidateQueries。
- * 替代原 Workspace.tsx 中的 refreshTick / refreshTypesRef prop drilling。
- */
+/** 订阅 Docker 引擎事件流，按资源类型批量失效相关 query */
 export function useDockerEventInvalidation(serverId: string, enabled: boolean) {
   const qc = useQueryClient()
 
@@ -14,7 +11,7 @@ export function useDockerEventInvalidation(serverId: string, enabled: boolean) {
     serverId,
     enabled,
     onRefresh: (resource) => {
-      // 所有资源变化都顺带刷新引擎概览（计数变化）
+      // 任何资源变化都刷一下引擎概览（计数会跟着变）
       qc.invalidateQueries({ queryKey: qk.dockerInfo(serverId) })
       switch (resource) {
         case 'container':
@@ -35,7 +32,7 @@ export function useDockerEventInvalidation(serverId: string, enabled: boolean) {
     },
   })
 
-  // 当服务器切换或禁用时，清掉该服务器下所有缓存，避免短暂展示旧数据
+  // 切换或禁用服务器时，清掉对应缓存，避免闪现旧数据
   useEffect(() => {
     if (!enabled) return
     return () => {
