@@ -101,9 +101,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span className="font-mono" title={formatUnixSeconds(row.original.created_ts)}>
-            {formatUnixSeconds(row.original.created_ts)}
-          </span>
+          <span title={formatUnixSeconds(row.original.created_ts)}>{formatUnixSeconds(row.original.created_ts)}</span>
         ),
       },
       {

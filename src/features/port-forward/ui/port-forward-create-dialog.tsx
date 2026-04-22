@@ -219,7 +219,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                         onValueChange={field.onChange}
                         disabled={submitting || serversLoading || servers.length === 0}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                           <SelectValue placeholder="选择主机">
                             {(value) => (value ? (servers.find((s) => s.id === value)?.name ?? value) : '选择主机')}
                           </SelectValue>
@@ -255,7 +255,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           onValueChange={field.onChange}
                           disabled={submitting || containers.length === 0}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                             <SelectValue placeholder="选择容器">
                               {(value) =>
                                 value ? (containers.find((c) => c.id === value)?.name ?? value) : '选择容器'
@@ -296,7 +296,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           onValueChange={(v) => field.onChange(Number(v))}
                           disabled={submitting}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                             <SelectValue placeholder="选择容器端口" />
                           </SelectTrigger>
                           <SelectContent align="start">
@@ -322,7 +322,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     <FieldLabel>绑定地址</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent align="start">
@@ -361,6 +361,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                           field.onChange(Number.isFinite(n) ? n : 0)
                         }}
                         className="w-full"
+                        aria-invalid={fieldState.invalid}
                       />
                       <FieldDescription>填 0 时由系统随机分配本地端口</FieldDescription>
                       <FieldError errors={[fieldState.error]} />

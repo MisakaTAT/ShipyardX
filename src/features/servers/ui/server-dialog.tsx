@@ -134,7 +134,13 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={`${baseId}-name`}>服务器名称</FieldLabel>
                     <FieldContent>
-                      <Input id={`${baseId}-name`} {...field} placeholder="生产服务器" disabled={loading} />
+                      <Input
+                        id={`${baseId}-name`}
+                        {...field}
+                        placeholder="生产服务器"
+                        disabled={loading}
+                        aria-invalid={fieldState.invalid}
+                      />
                       <FieldError errors={[fieldState.error]} />
                     </FieldContent>
                   </Field>
@@ -150,7 +156,13 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                       <Field data-invalid={fieldState.invalid}>
                         <FieldLabel htmlFor={`${baseId}-host`}>主机地址</FieldLabel>
                         <FieldContent>
-                          <Input id={`${baseId}-host`} {...field} placeholder="192.168.1.100" disabled={loading} />
+                          <Input
+                            id={`${baseId}-host`}
+                            {...field}
+                            placeholder="192.168.1.100"
+                            disabled={loading}
+                            aria-invalid={fieldState.invalid}
+                          />
                           <FieldError errors={[fieldState.error]} />
                         </FieldContent>
                       </Field>
@@ -178,6 +190,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                             const n = parseInt(e.target.value, 10)
                             field.onChange(Number.isFinite(n) ? n : 22)
                           }}
+                          aria-invalid={fieldState.invalid}
                         />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
@@ -193,7 +206,13 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={`${baseId}-user`}>用户名</FieldLabel>
                     <FieldContent>
-                      <Input id={`${baseId}-user`} {...field} placeholder="root" disabled={loading} />
+                      <Input
+                        id={`${baseId}-user`}
+                        {...field}
+                        placeholder="root"
+                        disabled={loading}
+                        aria-invalid={fieldState.invalid}
+                      />
                       <FieldError errors={[fieldState.error]} />
                     </FieldContent>
                   </Field>
@@ -236,6 +255,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                             placeholder="SSH 登录密码"
                             disabled={loading}
                             className="pr-10"
+                            aria-invalid={fieldState.invalid}
                           />
                           <Button
                             type="button"
@@ -261,7 +281,13 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor={`${baseId}-key`}>密钥路径</FieldLabel>
                       <FieldContent>
-                        <Input id={`${baseId}-key`} {...field} placeholder="~/.ssh/id_rsa" disabled={loading} />
+                        <Input
+                          id={`${baseId}-key`}
+                          {...field}
+                          placeholder="~/.ssh/id_rsa"
+                          disabled={loading}
+                          aria-invalid={fieldState.invalid}
+                        />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>

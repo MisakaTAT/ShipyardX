@@ -90,6 +90,7 @@ export default function DockerSudoPasswordDialog({
                         placeholder="sudo 密码"
                         disabled={busy}
                         autoComplete="off"
+                        aria-invalid={fieldState.invalid}
                       />
                       <FieldError errors={[fieldState.error]} />
                     </FieldContent>

@@ -9,7 +9,6 @@ import { qk } from '@/shared/api/query-keys'
 export type Phase = 'form' | 'progress'
 export type StepState = 'pending' | 'active' | 'done' | 'error'
 
-/** "拉取镜像 → 创建容器" 两步流程的状态机 */
 export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
   const qc = useQueryClient()
   const mountedRef = useRef(true)

@@ -82,9 +82,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         header: '创建时间',
         meta: { width: '12rem' },
         cell: ({ row }) => (
-          <span className="font-mono" title={row.original.created_at || undefined}>
-            {formatDateTimeString(row.original.created_at)}
-          </span>
+          <span title={row.original.created_at || undefined}>{formatDateTimeString(row.original.created_at)}</span>
         ),
       },
       {

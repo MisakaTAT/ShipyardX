@@ -96,7 +96,13 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={`${formId}-name`}>名称</FieldLabel>
                     <FieldContent>
-                      <Input id={`${formId}-name`} {...field} placeholder="my-net" disabled={submitting} />
+                      <Input
+                        id={`${formId}-name`}
+                        {...field}
+                        placeholder="my-net"
+                        disabled={submitting}
+                        aria-invalid={fieldState.invalid}
+                      />
                       <FieldError errors={[fieldState.error]} />
                     </FieldContent>
                   </Field>
@@ -110,7 +116,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     <FieldLabel>Driver</FieldLabel>
                     <FieldContent>
                       <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                           <SelectValue placeholder="选择 Driver" />
                         </SelectTrigger>
                         <SelectContent align="start">
@@ -135,7 +141,13 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor={`${formId}-subnet`}>子网（可选）</FieldLabel>
                       <FieldContent>
-                        <Input id={`${formId}-subnet`} {...field} placeholder="172.28.0.0/16" disabled={submitting} />
+                        <Input
+                          id={`${formId}-subnet`}
+                          {...field}
+                          placeholder="172.28.0.0/16"
+                          disabled={submitting}
+                          aria-invalid={fieldState.invalid}
+                        />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
@@ -148,7 +160,13 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     <Field data-invalid={fieldState.invalid}>
                       <FieldLabel htmlFor={`${formId}-gw`}>网关（可选）</FieldLabel>
                       <FieldContent>
-                        <Input id={`${formId}-gw`} {...field} placeholder="172.28.0.1" disabled={submitting} />
+                        <Input
+                          id={`${formId}-gw`}
+                          {...field}
+                          placeholder="172.28.0.1"
+                          disabled={submitting}
+                          aria-invalid={fieldState.invalid}
+                        />
                         <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
