@@ -19,6 +19,24 @@ use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
 use crate::utils::id::generate_id;
 
+/// 终端 WS 走单路二进制，首字节是 channel tag：0x00 = PTY 字节流，0x01 = 控制 JSON（UTF-8）。
+const TAG_DATA: u8 = 0x00;
+const TAG_CTRL: u8 = 0x01;
+
+fn pty_frame(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(1 + bytes.len());
+    out.push(TAG_DATA);
+    out.extend_from_slice(bytes);
+    out
+}
+
+fn ctrl_frame(json: &str) -> Vec<u8> {
+    let mut out = Vec::with_capacity(1 + json.len());
+    out.push(TAG_CTRL);
+    out.extend_from_slice(json.as_bytes());
+    out
+}
+
 static WS_PORT: OnceLock<u16> = OnceLock::new();
 
 fn is_safe_docker_ident(v: &str) -> bool {
@@ -33,7 +51,7 @@ fn shell_single_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
-fn terminal_ws_send(app: &AppHandle, session_id: &str, message: String) {
+fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
     let tx = app
         .state::<AppState>()
         .terminal_ws_clients
@@ -42,15 +60,26 @@ fn terminal_ws_send(app: &AppHandle, session_id: &str, message: String) {
         .get(session_id)
         .cloned();
     if let Some(tx) = tx {
-        let _ = tx.send(message);
+        let _ = tx.send(frame);
     }
 }
 
+fn send_control(app: &AppHandle, session_id: &str, msg: WsServerMsg) {
+    terminal_ws_send(app, session_id, ctrl_frame(&msg.to_json()));
+}
+
+fn send_pty_bytes(app: &AppHandle, session_id: &str, bytes: &[u8]) {
+    terminal_ws_send(app, session_id, pty_frame(bytes));
+}
+
 fn fail_terminal(app: &AppHandle, session_id: &str, message: impl AsRef<str>) {
-    let msg = WsServerMsg::Error {
-        message: message.as_ref().to_string(),
-    };
-    terminal_ws_send(app, session_id, msg.to_json());
+    send_control(
+        app,
+        session_id,
+        WsServerMsg::Error {
+            message: message.as_ref().to_string(),
+        },
+    );
 }
 
 fn run_terminal_thread(
@@ -198,7 +227,7 @@ fn run_terminal_io_loop(
                 }
                 Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
                     let _ = channel.close();
-                    terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
+                    send_control(&ah, &session_id, WsServerMsg::Closed);
                     return;
                 }
                 Err(mpsc::TryRecvError::Empty) => break,
@@ -214,7 +243,7 @@ fn run_terminal_io_loop(
         sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
         match channel.read(&mut buf) {
             Ok(0) => {
-                terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
+                send_control(&ah, &session_id, WsServerMsg::Closed);
                 return;
             }
             Ok(n) => {
@@ -223,19 +252,19 @@ fn run_terminal_io_loop(
                 loop {
                     match channel.read(&mut buf) {
                         Ok(0) => {
-                            terminal_ws_send(&ah, &session_id, WsServerMsg::Output { data: output }.to_json());
-                            terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
+                            send_pty_bytes(&ah, &session_id, &output);
+                            send_control(&ah, &session_id, WsServerMsg::Closed);
                             return;
                         }
                         Ok(extra) => output.extend_from_slice(&buf[..extra]),
                         Err(_) => break,
                     }
                 }
-                terminal_ws_send(&ah, &session_id, WsServerMsg::Output { data: output }.to_json());
+                send_pty_bytes(&ah, &session_id, &output);
             }
             Err(ref e) if e.kind() == ErrorKind::TimedOut => {}
             Err(_) => {
-                terminal_ws_send(&ah, &session_id, WsServerMsg::Closed.to_json());
+                send_control(&ah, &session_id, WsServerMsg::Closed);
                 return;
             }
         }
@@ -244,28 +273,44 @@ fn run_terminal_io_loop(
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-enum WsClientMsg {
-    #[serde(rename = "input")]
-    Input { data: Vec<u8> },
+enum WsClientCtrl {
     #[serde(rename = "resize")]
     Resize { cols: u32, rows: u32 },
     #[serde(rename = "close")]
     Close,
 }
 
-fn forward_ws_to_terminal(ah: &AppHandle, session_id: &str, msg: WsClientMsg) {
+fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
     let app_state = ah.state::<AppState>();
     let terminals = app_state.terminals.lock().unwrap();
-    let Some(handle) = terminals.get(session_id) else {
+    if let Some(handle) = terminals.get(session_id) {
+        let _ = handle.tx.send(msg);
+    }
+}
+
+fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
+    let Some((&tag, body)) = frame.split_first() else {
         return;
     };
-    let send = |m: TerminalMsg| {
-        let _ = handle.tx.send(m);
-    };
-    match msg {
-        WsClientMsg::Input { data } => send(TerminalMsg::Data(data)),
-        WsClientMsg::Resize { cols, rows } => send(TerminalMsg::Resize { cols, rows }),
-        WsClientMsg::Close => send(TerminalMsg::Close),
+    match tag {
+        TAG_DATA => {
+            if !body.is_empty() {
+                dispatch_terminal_msg(ah, session_id, TerminalMsg::Data(body.to_vec()));
+            }
+        }
+        TAG_CTRL => {
+            if let Ok(ctrl) = serde_json::from_slice::<WsClientCtrl>(body) {
+                match ctrl {
+                    WsClientCtrl::Resize { cols, rows } => {
+                        dispatch_terminal_msg(ah, session_id, TerminalMsg::Resize { cols, rows });
+                    }
+                    WsClientCtrl::Close => {
+                        dispatch_terminal_msg(ah, session_id, TerminalMsg::Close);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -286,7 +331,7 @@ fn run_ws_client(stream: std::net::TcpStream, ah: AppHandle) {
         return;
     }
 
-    let (tx, rx) = mpsc::channel::<String>();
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
     ah.state::<AppState>()
         .terminal_ws_clients
         .lock()
@@ -296,18 +341,16 @@ fn run_ws_client(stream: std::net::TcpStream, ah: AppHandle) {
     let _ = ws.get_mut().set_nonblocking(true);
 
     'ws: loop {
-        while let Ok(msg) = rx.try_recv() {
-            let _ = ws.send(Message::Text(msg));
+        while let Ok(frame) = rx.try_recv() {
+            let _ = ws.send(Message::Binary(frame));
         }
 
         let mut did_work = false;
         loop {
             match ws.read() {
-                Ok(Message::Text(text)) => {
+                Ok(Message::Binary(bytes)) => {
                     did_work = true;
-                    if let Ok(msg) = serde_json::from_str::<WsClientMsg>(&text) {
-                        forward_ws_to_terminal(&ah, &session_id, msg);
-                    }
+                    handle_client_frame(&ah, &session_id, &bytes);
                 }
                 Ok(Message::Close(_)) => break 'ws,
                 Ok(_) => did_work = true,
@@ -410,22 +453,6 @@ pub fn open_container_exec_terminal(
         .unwrap()
         .insert(session_id.clone(), TerminalHandle { tx });
     Ok(TerminalSession { session_id, ws_port })
-}
-
-fn send_terminal_msg(state: &State<AppState>, session_id: &str, msg: TerminalMsg) -> Result<(), String> {
-    let terminals = state.terminals.lock().unwrap();
-    let Some(handle) = terminals.get(session_id) else {
-        return Ok(());
-    };
-    handle.tx.send(msg).map_err(|e| e.to_string())
-}
-
-pub fn write_terminal(session_id: String, data: Vec<u8>, state: State<AppState>) -> Result<(), String> {
-    send_terminal_msg(&state, &session_id, TerminalMsg::Data(data))
-}
-
-pub fn resize_terminal(session_id: String, cols: u32, rows: u32, state: State<AppState>) -> Result<(), String> {
-    send_terminal_msg(&state, &session_id, TerminalMsg::Resize { cols, rows })
 }
 
 pub fn close_terminal(session_id: String, state: State<AppState>) -> Result<(), String> {

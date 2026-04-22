@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import debounce from 'lodash-es/debounce'
-import { commands } from '@/types/app-bindings'
-import { Terminal as XtermTerminal } from '@xterm/xterm'
-import { CanvasAddon } from '@xterm/addon-canvas'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebglAddon } from '@xterm/addon-webgl'
-import { WebLinksAddon } from '@xterm/addon-web-links'
-import type { IDisposable } from '@xterm/xterm'
-import '@xterm/xterm/css/xterm.css'
+import { Terminal as WTerminal, WebSocketTransport, useTerminal } from '@wterm/react'
+import '@wterm/react/css'
 import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
+import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -16,49 +10,60 @@ import { cn } from '@/shared/lib/utils'
 
 const WS_OPEN_RETRIES = 20
 const WS_OPEN_RETRY_DELAY_MS = 100
-const TERMINAL_RESIZE_DEBOUNCE_MS = 30
 const OVERLAY_FADE_OUT_MS = 220
 const TERMINAL_VIEW_PADDING_PX = 8
-const XTERM_SCROLLBAR_GUTTER_PX = 14
-const FIT_HEIGHT_SLACK_PX = 2
-const TERMINAL_SURFACE_BG = '#0d1117'
+const TERMINAL_SURFACE_BG = '#1e1e1e'
+const DEFAULT_ROW_HEIGHT_PX = 17
 
-const XTERM_THEME = {
-  background: TERMINAL_SURFACE_BG,
-  foreground: '#e2e8f0',
-  cursor: '#60a5fa',
-  cursorAccent: TERMINAL_SURFACE_BG,
-  selectionBackground: '#3b82f680',
-  black: '#161b22',
-  red: '#f87171',
-  green: '#4ade80',
-  yellow: '#fbbf24',
-  blue: '#60a5fa',
-  magenta: '#c084fc',
-  cyan: '#34d399',
-  white: '#e2e8f0',
-  brightBlack: '#475569',
-  brightRed: '#fca5a5',
-  brightGreen: '#86efac',
-  brightYellow: '#fde68a',
-  brightBlue: '#93c5fd',
-  brightMagenta: '#d8b4fe',
-  brightCyan: '#6ee7b7',
-  brightWhite: '#f8fafc',
+/**
+ * 覆盖 @wterm/dom 默认 .wterm 样式里的 padding / border-radius / box-shadow，
+ * 并强制 border-box + 100% 宽度。高度由 JS 按 row-height 整数倍对齐（见下方 ResizeObserver）
+ * 以规避 wterm `_scrollToBottom` 里 `floor(maxScroll / rh) * rh` 的 snap 截掉最后一行的问题。
+ */
+const TERMINAL_STYLE = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: 0,
+  borderRadius: 0,
+  boxShadow: 'none',
 } as const
 
-type TerminalWireInbound = { type: 'output'; data: number[] } | { type: 'closed' } | { type: 'error'; message: string }
+/**
+ * 终端 WebSocket 协议（单路二进制 + 首字节 channel tag）：
+ *   tag 0x00 + payload = PTY 字节流（双向）
+ *   tag 0x01 + payload = 控制 JSON（UTF-8，双向）
+ *     下行：{ type: 'closed' } | { type: 'error', message }
+ *     上行：{ type: 'resize', cols, rows } | { type: 'close' }
+ */
+const TAG_DATA = 0x00
+const TAG_CTRL = 0x01
 
-function isU8Payload(v: unknown): v is number[] {
-  return Array.isArray(v) && v.every((x) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 255)
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
+
+function ptyFrame(data: string): Uint8Array {
+  const payload = textEncoder.encode(data)
+  const out = new Uint8Array(1 + payload.length)
+  out[0] = TAG_DATA
+  out.set(payload, 1)
+  return out
 }
 
-function parseTerminalWireInbound(raw: string): TerminalWireInbound | null {
+function ctrlFrame(payload: Record<string, unknown>): Uint8Array {
+  const json = textEncoder.encode(JSON.stringify(payload))
+  const out = new Uint8Array(1 + json.length)
+  out[0] = TAG_CTRL
+  out.set(json, 1)
+  return out
+}
+
+type ControlInbound = { type: 'closed' } | { type: 'error'; message: string }
+
+function parseControlInbound(bytes: Uint8Array): ControlInbound | null {
   try {
-    const o = JSON.parse(raw) as { type?: string; data?: unknown; message?: unknown }
+    const o = JSON.parse(textDecoder.decode(bytes)) as { type?: string; message?: unknown }
     if (o.type === 'closed') return { type: 'closed' }
     if (o.type === 'error' && typeof o.message === 'string') return { type: 'error', message: o.message }
-    if (o.type === 'output' && isU8Payload(o.data)) return { type: 'output', data: o.data }
   } catch {
     return null
   }
@@ -69,28 +74,52 @@ function terminalSocketUrl(sessionId: string, wsPort: number) {
   return `ws://127.0.0.1:${wsPort}/terminal/${sessionId}`
 }
 
-function createWebSocketWhenOpen(url: string): Promise<WebSocket> {
+type TransportCallbacks = {
+  onPty: (bytes: Uint8Array) => void
+  onControl: (msg: ControlInbound) => void
+  onClose: () => void
+}
+
+function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<WebSocketTransport> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(url)
-    const onFail = () => {
-      socket.close()
-      reject(new Error('WebSocket 连接失败'))
-    }
-    socket.onopen = () => {
-      socket.onopen = null
-      socket.onerror = null
-      resolve(socket)
-    }
-    socket.onerror = onFail
+    let settled = false
+    const transport = new WebSocketTransport({
+      reconnect: false,
+      onData: (data) => {
+        if (!(data instanceof Uint8Array) || data.length === 0) return
+        const tag = data[0]
+        const body = data.subarray(1)
+        if (tag === TAG_DATA) cb.onPty(body)
+        else if (tag === TAG_CTRL) {
+          const msg = parseControlInbound(body)
+          if (msg) cb.onControl(msg)
+        }
+      },
+      onOpen: () => {
+        settled = true
+        resolve(transport)
+      },
+      onClose: () => {
+        if (settled) cb.onClose()
+      },
+      onError: () => {
+        if (!settled) reject(new Error('WebSocket 连接失败'))
+      },
+    })
+    transport.connect(url)
   })
 }
 
-async function openTerminalSocket(sessionId: string, wsPort: number): Promise<WebSocket> {
+async function openTerminalTransport(
+  sessionId: string,
+  wsPort: number,
+  cb: TransportCallbacks
+): Promise<WebSocketTransport> {
   const url = terminalSocketUrl(sessionId, wsPort)
   let lastError: unknown
   for (let i = 0; i < WS_OPEN_RETRIES; i += 1) {
     try {
-      return await createWebSocketWhenOpen(url)
+      return await connectTerminalTransport(url, cb)
     } catch (e) {
       lastError = e
       await new Promise((r) => setTimeout(r, WS_OPEN_RETRY_DELAY_MS))
@@ -99,130 +128,9 @@ async function openTerminalSocket(sessionId: string, wsPort: number): Promise<We
   throw lastError ?? new Error('WebSocket 多次重试仍无法连接')
 }
 
-function sendTerminalWireJson(socket: WebSocket, payload: Record<string, unknown>) {
-  if (socket.readyState !== WebSocket.OPEN) return
-  try {
-    socket.send(JSON.stringify(payload))
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-function closeTerminalSocket(socket: WebSocket) {
-  sendTerminalWireJson(socket, { type: 'close' })
-  socket.close()
-}
-
-function textToUtf8Bytes(text: string): number[] {
-  return Array.from(new TextEncoder().encode(text))
-}
-
-function xtermBinaryPayloadToBytes(data: string): number[] {
-  return Array.from(Uint8Array.from(data, (c) => c.charCodeAt(0)))
-}
-
-type XtermInternalCore = {
-  _renderService: {
-    dimensions: { css: { cell: { width: number; height: number } } }
-    clear: () => void
-  }
-}
-
-function getXtermCore(term: XtermTerminal): XtermInternalCore | null {
-  return (term as unknown as { _core?: XtermInternalCore })._core ?? null
-}
-
-function fitTerminalToContainer(term: XtermTerminal, fitAddon: FitAddon) {
-  if (!term.element?.parentElement) {
-    fitAddon.fit()
-    return
-  }
-  const core = getXtermCore(term)
-  const cell = core?._renderService.dimensions.css.cell
-  if (!cell || cell.width === 0 || cell.height === 0) {
-    fitAddon.fit()
-    return
-  }
-  const parent = term.element.parentElement
-  const cs = window.getComputedStyle(term.element)
-  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)
-  const scrollbar = term.options.scrollback === 0 ? 0 : (term.options.overviewRuler?.width ?? XTERM_SCROLLBAR_GUTTER_PX)
-  const innerH = Math.max(0, parent.clientHeight - padY - FIT_HEIGHT_SLACK_PX)
-  const innerW = Math.max(0, parent.clientWidth - padX - scrollbar)
-  const cols = Math.max(2, Math.floor(innerW / cell.width))
-  const rows = Math.max(1, Math.floor(innerH / cell.height))
-  if (term.cols !== cols || term.rows !== rows) {
-    core._renderService.clear()
-    term.resize(cols, rows)
-  }
-}
-
-function isWebGL2Usable(): boolean {
-  try {
-    const c = document.createElement('canvas')
-    return c.getContext('webgl2') != null
-  } catch {
-    return false
-  }
-}
-
-function mountXtermRenderAddons(term: XtermTerminal): () => void {
-  let webgl: WebglAddon | undefined
-  let canvas: CanvasAddon | undefined
-  let onContextLoss: IDisposable | undefined
-
-  const unloadWebGL = () => {
-    onContextLoss?.dispose()
-    onContextLoss = undefined
-    try {
-      webgl?.dispose()
-    } catch {
-      /* noop */
-    }
-    webgl = undefined
-  }
-
-  const unloadCanvas = () => {
-    try {
-      canvas?.dispose()
-    } catch {
-      /* noop */
-    }
-    canvas = undefined
-  }
-
-  const ensureCanvas = () => {
-    if (canvas) return
-    try {
-      canvas = new CanvasAddon()
-      term.loadAddon(canvas)
-    } catch (e) {
-      console.warn('[Terminal] Canvas 渲染不可用，使用内置渲染', e)
-    }
-  }
-
-  if (isWebGL2Usable()) {
-    try {
-      webgl = new WebglAddon()
-      term.loadAddon(webgl)
-      onContextLoss = webgl.onContextLoss(() => {
-        unloadWebGL()
-        ensureCanvas()
-      })
-    } catch (e) {
-      console.warn('[Terminal] WebGL 初始化失败，使用 Canvas', e)
-      unloadWebGL()
-      ensureCanvas()
-    }
-  } else {
-    ensureCanvas()
-  }
-
-  return () => {
-    unloadWebGL()
-    unloadCanvas()
-  }
+function closeTerminalTransport(transport: WebSocketTransport) {
+  if (transport.connected) transport.send(ctrlFrame({ type: 'close' }))
+  transport.close()
 }
 
 interface TerminalProps {
@@ -239,20 +147,18 @@ type EndSessionOptions = {
 }
 
 export default function Terminal({ serverId, containerId }: TerminalProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const xtermRef = useRef<XtermTerminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
+  const { ref: termRef, write: termWrite, focus: termFocus } = useTerminal()
+  const sizeRef = useRef({ cols: 80, rows: 24 })
   const backendSessionIdRef = useRef<string | null>(null)
-  const socketRef = useRef<WebSocket | null>(null)
-  const detachSocketMessageRef = useRef<(() => void) | null>(null)
-  const xtermInputDisposablesRef = useRef<IDisposable[]>([])
+  const transportRef = useRef<WebSocketTransport | null>(null)
   const overlayFadeTimerRef = useRef<number | null>(null)
+  const terminalHostRef = useRef<HTMLDivElement | null>(null)
   const serverIdLiveRef = useRef(serverId)
+  const containerIdLiveRef = useRef<string | undefined>(containerId)
   const connectInFlightRef = useRef(false)
   const mountAliveRef = useRef(true)
   const serverEpochRef = useRef(0)
   const shellReadyPendingRef = useRef(false)
-  const containerIdLiveRef = useRef<string | undefined>(containerId)
   const [phase, setPhase] = useState<ConnectionPhase>('disconnected')
   const [errorText, setErrorText] = useState('')
   const [wasEverConnected, setWasEverConnected] = useState(false)
@@ -268,6 +174,33 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   useEffect(() => {
     if (phase === 'error') setErrorDetailsExpanded(false)
   }, [phase, errorText])
+
+  /**
+   * 把 .wterm 的可视高度对齐到 rowHeight 的整数倍。wterm 内部 _scrollToBottom 会把
+   * scrollTop snap 到 floor(maxScroll / rh) * rh，若 maxScroll 不是 rh 倍数，最后一行会被切掉。
+   */
+  const alignTerminalHeight = useCallback(() => {
+    const host = terminalHostRef.current
+    const wt = host?.querySelector<HTMLElement>('.wterm')
+    if (!host || !wt) return
+    const rh = Number.parseFloat(getComputedStyle(wt).getPropertyValue('--term-row-height')) || DEFAULT_ROW_HEIGHT_PX
+    if (rh <= 0) return
+    const cs = getComputedStyle(host)
+    const availH = host.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0)
+    wt.style.height = `${Math.max(rh, Math.floor(availH / rh) * rh)}px`
+  }, [])
+
+  useEffect(() => {
+    const host = terminalHostRef.current
+    if (!host) return
+    const ro = new ResizeObserver(() => alignTerminalHeight())
+    ro.observe(host)
+    const rafId = requestAnimationFrame(alignTerminalHeight)
+    return () => {
+      cancelAnimationFrame(rafId)
+      ro.disconnect()
+    }
+  }, [alignTerminalHeight])
 
   useEffect(() => {
     serverEpochRef.current += 1
@@ -292,55 +225,53 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     setOverlayMounted(true)
   }, [phase])
 
-  const disposeXtermWireListeners = useCallback(() => {
-    detachSocketMessageRef.current?.()
-    detachSocketMessageRef.current = null
-    for (const d of xtermInputDisposablesRef.current) d.dispose()
-    xtermInputDisposablesRef.current = []
+  const endSession = useCallback((opts: EndSessionOptions) => {
+    shellReadyPendingRef.current = false
+    const transport = transportRef.current
+    transportRef.current = null
+
+    const sid = backendSessionIdRef.current
+    backendSessionIdRef.current = null
+
+    if (transport) closeTerminalTransport(transport)
+    if (sid) void commands.closeTerminal(sid).catch(console.error)
+
+    if (opts.updateUi && mountAliveRef.current) {
+      if (opts.reason === 'error' && opts.errorMessage !== undefined) {
+        setPhase('error')
+        setErrorText(opts.errorMessage)
+        setWasEverConnected(true)
+      } else {
+        setPhase('disconnected')
+        if (opts.reason === 'remote') setWasEverConnected(true)
+      }
+    }
   }, [])
 
-  const endSession = useCallback(
-    (opts: EndSessionOptions) => {
+  useEffect(() => {
+    mountAliveRef.current = true
+    return () => {
+      mountAliveRef.current = false
       shellReadyPendingRef.current = false
-      const socket = socketRef.current
-      socketRef.current = null
-      disposeXtermWireListeners()
+      if (overlayFadeTimerRef.current !== null) {
+        window.clearTimeout(overlayFadeTimerRef.current)
+        overlayFadeTimerRef.current = null
+      }
+
+      const transport = transportRef.current
+      transportRef.current = null
 
       const sid = backendSessionIdRef.current
       backendSessionIdRef.current = null
-
-      if (socket) closeTerminalSocket(socket)
-      if (sid) void commands.closeTerminal(sid).catch(console.error)
-
-      const term = xtermRef.current
-      if (term) term.options.disableStdin = true
-
-      if (opts.updateUi && mountAliveRef.current) {
-        if (opts.reason === 'error' && opts.errorMessage !== undefined) {
-          setPhase('error')
-          setErrorText(opts.errorMessage)
-          setWasEverConnected(true)
-        } else {
-          setPhase('disconnected')
-          if (opts.reason === 'remote') setWasEverConnected(true)
-        }
+      if (sid) {
+        if (transport) closeTerminalTransport(transport)
+        void commands.closeTerminal(sid).catch(console.error)
       }
-    },
-    [disposeXtermWireListeners]
-  )
-
-  const scheduleFitAndFocus = useCallback(() => {
-    requestAnimationFrame(() => {
-      const term = xtermRef.current
-      const fit = fitAddonRef.current
-      if (term && fit) fitTerminalToContainer(term, fit)
-      xtermRef.current?.focus()
-    })
+    }
   }, [])
 
   const connect = useCallback(async () => {
-    const term = xtermRef.current
-    if (!term || connectInFlightRef.current || socketRef.current) return
+    if (connectInFlightRef.current || transportRef.current) return
 
     connectInFlightRef.current = true
     setPhase('connecting')
@@ -351,14 +282,10 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     let openedBackendSessionId: string | null = null
 
     try {
-      term.options.disableStdin = false
-      term.clear()
-      requestAnimationFrame(() => {
-        const t = xtermRef.current
-        const f = fitAddonRef.current
-        if (t && f) fitTerminalToContainer(t, f)
-      })
+      // 重置残留内容：RIS + 清除回滚缓冲
+      termWrite('\x1bc\x1b[3J')
 
+      const { cols, rows } = sizeRef.current
       const targetContainerId = containerIdLiveRef.current
       const targetShell = execShellPreset === 'custom' ? execCustomShell.trim() : execShellPreset
       const session = targetContainerId
@@ -366,73 +293,52 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
             container_id: targetContainerId,
             user: execUser.trim() || null,
             shell: targetShell || '/bin/sh',
-            cols: term.cols,
-            rows: term.rows,
+            cols,
+            rows,
           })
-        : await commands.openTerminal(serverIdLiveRef.current, term.cols, term.rows)
+        : await commands.openTerminal(serverIdLiveRef.current, cols, rows)
       if (isStale()) {
         void commands.closeTerminal(session.session_id).catch(console.error)
-        term.options.disableStdin = true
         return
       }
       openedBackendSessionId = session.session_id
       backendSessionIdRef.current = session.session_id
 
-      const socket = await openTerminalSocket(session.session_id, session.ws_port)
-      if (isStale()) {
-        void commands.closeTerminal(session.session_id).catch(console.error)
-        socket.close()
-        backendSessionIdRef.current = null
-        openedBackendSessionId = null
-        term.options.disableStdin = true
-        return
-      }
-
-      socketRef.current = socket
-      sendTerminalWireJson(socket, { type: 'resize', cols: term.cols, rows: term.rows })
-
-      const onSocketMessage = (ev: MessageEvent) => {
-        if (typeof ev.data !== 'string') return
-        const inbound = parseTerminalWireInbound(ev.data)
-        if (!inbound) return
-
-        if (inbound.type === 'output') {
+      const transport = await openTerminalTransport(session.session_id, session.ws_port, {
+        onPty: (bytes) => {
           if (shellReadyPendingRef.current) {
             shellReadyPendingRef.current = false
             if (mountAliveRef.current) {
               setPhase('connected')
               setWasEverConnected(true)
             }
-            scheduleFitAndFocus()
+            requestAnimationFrame(() => termFocus())
           }
-          term.write(new Uint8Array(inbound.data))
-          return
-        }
-        if (inbound.type === 'error') {
+          termWrite(bytes)
+        },
+        onControl: (msg) => {
           shellReadyPendingRef.current = false
-          endSession({ updateUi: true, reason: 'error', errorMessage: inbound.message })
-          return
-        }
-        shellReadyPendingRef.current = false
-        endSession({ updateUi: true, reason: 'remote' })
+          if (msg.type === 'error') {
+            endSession({ updateUi: true, reason: 'error', errorMessage: msg.message })
+          } else {
+            endSession({ updateUi: true, reason: 'remote' })
+          }
+        },
+        onClose: () => {
+          // 服务端或网络层断开；若我们已自行清理，transportRef 会先被置空并直接忽略
+          if (transportRef.current) endSession({ updateUi: true, reason: 'remote' })
+        },
+      })
+      if (isStale()) {
+        transport.close()
+        void commands.closeTerminal(session.session_id).catch(console.error)
+        backendSessionIdRef.current = null
+        openedBackendSessionId = null
+        return
       }
 
-      socket.addEventListener('message', onSocketMessage)
-      detachSocketMessageRef.current = () => socket.removeEventListener('message', onSocketMessage)
-
-      const forwardStdin = (bytes: number[]) => {
-        const s = socketRef.current
-        if (s) sendTerminalWireJson(s, { type: 'input', data: bytes })
-      }
-
-      xtermInputDisposablesRef.current.push(
-        term.onData((data) => forwardStdin(textToUtf8Bytes(data))),
-        term.onBinary((data) => forwardStdin(xtermBinaryPayloadToBytes(data))),
-        term.onResize(({ cols, rows }) => {
-          const s = socketRef.current
-          if (s) sendTerminalWireJson(s, { type: 'resize', cols, rows })
-        })
-      )
+      transportRef.current = transport
+      transport.send(ctrlFrame({ type: 'resize', cols, rows }))
 
       if (!mountAliveRef.current || isStale()) {
         endSession({ updateUi: false })
@@ -441,21 +347,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
       shellReadyPendingRef.current = true
     } catch (e) {
-      disposeXtermWireListeners()
-      const orphan = socketRef.current
+      const orphan = transportRef.current
       backendSessionIdRef.current = null
-      socketRef.current = null
-      if (orphan) {
-        try {
-          orphan.close()
-        } catch {
-          /* noop */
-        }
-      }
+      transportRef.current = null
+      if (orphan) orphan.close()
       if (openedBackendSessionId) {
         void commands.closeTerminal(openedBackendSessionId).catch(console.error)
       }
-      term.options.disableStdin = true
       if (mountAliveRef.current && epochAtStart === serverEpochRef.current) {
         setPhase('error')
         setErrorText(String(e))
@@ -463,92 +361,46 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     } finally {
       connectInFlightRef.current = false
     }
-  }, [disposeXtermWireListeners, endSession, scheduleFitAndFocus, execCustomShell, execShellPreset, execUser])
+  }, [endSession, termFocus, termWrite, execCustomShell, execShellPreset, execUser])
 
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+  const handleTerminalData = useCallback((data: string) => {
+    const transport = transportRef.current
+    if (transport?.connected) transport.send(ptyFrame(data))
+  }, [])
 
-    mountAliveRef.current = true
-
-    const term = new XtermTerminal({
-      fontFamily: '"Cascadia Code", "JetBrains Mono", Menlo, "Courier New", monospace',
-      fontSize: 13,
-      lineHeight: 1.3,
-      theme: XTERM_THEME,
-      cursorBlink: true,
-      cursorStyle: 'bar',
-      allowProposedApi: true,
-      scrollback: 5000,
-      disableStdin: true,
-    })
-
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    term.loadAddon(new WebLinksAddon())
-    term.open(el)
-
-    const unmountRenderAddons = mountXtermRenderAddons(term)
-
-    requestAnimationFrame(() => fitTerminalToContainer(term, fitAddon))
-    fitAddonRef.current = fitAddon
-    xtermRef.current = term
-
-    const debouncedResize = debounce(() => {
-      const t = xtermRef.current
-      const f = fitAddonRef.current
-      if (t && f) fitTerminalToContainer(t, f)
-    }, TERMINAL_RESIZE_DEBOUNCE_MS)
-
-    const ro = new ResizeObserver(() => debouncedResize())
-    ro.observe(el)
-
-    return () => {
-      mountAliveRef.current = false
-      shellReadyPendingRef.current = false
-      ro.disconnect()
-      debouncedResize.cancel()
-      if (overlayFadeTimerRef.current !== null) {
-        window.clearTimeout(overlayFadeTimerRef.current)
-        overlayFadeTimerRef.current = null
-      }
-
-      const socket = socketRef.current
-      socketRef.current = null
-      detachSocketMessageRef.current?.()
-      detachSocketMessageRef.current = null
-      for (const d of xtermInputDisposablesRef.current) d.dispose()
-      xtermInputDisposablesRef.current = []
-
-      const sid = backendSessionIdRef.current
-      backendSessionIdRef.current = null
-      if (sid) {
-        if (socket) closeTerminalSocket(socket)
-        void commands.closeTerminal(sid).catch(console.error)
-      }
-
-      xtermRef.current = null
-      fitAddonRef.current = null
-      unmountRenderAddons()
-      term.dispose()
-    }
-  }, [serverId, containerId])
+  const handleTerminalResize = useCallback((cols: number, rows: number) => {
+    sizeRef.current = { cols, rows }
+    const transport = transportRef.current
+    if (transport?.connected) transport.send(ctrlFrame({ type: 'resize', cols, rows }))
+  }, [])
 
   const overlayVisible = phase !== 'connected'
-  const xtermVisible = phase === 'connected'
+  const terminalVisible = phase === 'connected'
   const isContainerExec = Boolean(containerId)
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden select-text" style={{ background: TERMINAL_SURFACE_BG }}>
       <div
-        ref={containerRef}
-        className="box-border h-full w-full"
+        ref={terminalHostRef}
+        className="absolute inset-0 box-border"
         style={{
           padding: TERMINAL_VIEW_PADDING_PX,
-          background: TERMINAL_SURFACE_BG,
-          visibility: xtermVisible ? 'visible' : 'hidden',
+          visibility: terminalVisible ? 'visible' : 'hidden',
         }}
-      />
+      >
+        <WTerminal
+          ref={termRef}
+          autoResize
+          cursorBlink
+          theme="default"
+          onData={handleTerminalData}
+          onResize={handleTerminalResize}
+          onReady={() => {
+            requestAnimationFrame(alignTerminalHeight)
+          }}
+          style={TERMINAL_STYLE}
+        />
+      </div>
 
       {overlayMounted && (
         <div

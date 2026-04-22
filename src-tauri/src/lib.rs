@@ -74,8 +74,6 @@ pub fn run() {
             commands::port_forward::stop_port_forward,
             commands::terminal::open_terminal,
             commands::terminal::open_container_exec_terminal,
-            commands::terminal::write_terminal,
-            commands::terminal::resize_terminal,
             commands::terminal::close_terminal,
         ])
         .events(collect_events![

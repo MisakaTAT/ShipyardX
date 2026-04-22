@@ -31,7 +31,7 @@ pub struct AppState {
     pub data_file: Mutex<std::path::PathBuf>,
     pub terminals: Mutex<HashMap<String, TerminalHandle>>,
     pub streams: Mutex<HashMap<String, StreamHandle>>,
-    pub terminal_ws_clients: Mutex<HashMap<String, mpsc::Sender<String>>>,
+    pub terminal_ws_clients: Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>,
     pub event_streams: Mutex<HashMap<String, EventStreamHandle>>,
     pub port_forwards: Mutex<HashMap<String, PortForwardHandle>>,
     pub port_forward_last_errors: Mutex<HashMap<String, String>>,

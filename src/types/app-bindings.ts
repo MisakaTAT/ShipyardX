@@ -54,8 +54,6 @@ export const commands = {
 	stopPortForward: (id: string) => __TAURI_INVOKE<null>("stop_port_forward", { id }),
 	openTerminal: (serverId: string, cols: number, rows: number) => __TAURI_INVOKE<TerminalSession>("open_terminal", { serverId, cols, rows }),
 	openContainerExecTerminal: (serverId: string, params: ContainerExecTerminalParams) => __TAURI_INVOKE<TerminalSession>("open_container_exec_terminal", { serverId, params }),
-	writeTerminal: (sessionId: string, data: number[]) => __TAURI_INVOKE<null>("write_terminal", { sessionId, data }),
-	resizeTerminal: (sessionId: string, cols: number, rows: number) => __TAURI_INVOKE<null>("resize_terminal", { sessionId, cols, rows }),
 	closeTerminal: (sessionId: string) => __TAURI_INVOKE<null>("close_terminal", { sessionId }),
 };
 

@@ -15,8 +15,6 @@ pub struct ContainerExecTerminalParams {
 pub enum WsServerMsg {
     #[serde(rename = "closed")]
     Closed,
-    #[serde(rename = "output")]
-    Output { data: Vec<u8> },
     #[serde(rename = "error")]
     Error { message: String },
 }
