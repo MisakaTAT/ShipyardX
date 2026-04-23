@@ -118,38 +118,40 @@ export default function PortForwardPage() {
             </div>
           ) : null}
 
-          <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
-            {rules.length === 0 && !rulesLoading ? (
-              <div className="flex h-full items-center justify-center px-4">
-                <div className="max-w-xs text-center">
-                  <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
-                    <ArrowLeftRight />
-                  </div>
-                  <h2 className="text-sm font-semibold text-foreground">尚未创建转发规则</h2>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。
-                  </p>
-                  <div className="mt-5">
-                    <Button onClick={() => setShowCreate(true)}>
-                      <Plus />
-                      创建规则
-                    </Button>
-                  </div>
+          {rules.length === 0 ? (
+            <div className="flex h-full flex-1 items-center justify-center px-4">
+              <div className="max-w-xs text-center">
+                <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
+                  <ArrowLeftRight />
+                </div>
+                <h2 className="text-sm font-semibold text-foreground">尚未创建转发规则</h2>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                  创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。
+                </p>
+                <div className="mt-5">
+                  <Button onClick={() => setShowCreate(true)}>
+                    <Plus />
+                    创建规则
+                  </Button>
                 </div>
               </div>
-            ) : filteredRules.length === 0 && rules.length > 0 ? (
-              <EmptyState icon={Search} title={`没有匹配「${search}」的规则`} />
-            ) : (
-              <DataTable<PortForward>
-                columns={columns}
-                data={filteredRules}
-                getRowId={(r) => r.id}
-                loading={rulesLoading && rules.length === 0}
-                tableClassName="text-sm"
-                empty={{ icon: Search, title: '没有记录' }}
-              />
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
+              {filteredRules.length === 0 && rules.length > 0 ? (
+                <EmptyState icon={Search} title={`没有匹配「${search}」的规则`} />
+              ) : (
+                <DataTable<PortForward>
+                  columns={columns}
+                  data={filteredRules}
+                  getRowId={(r) => r.id}
+                  loading={rulesLoading && rules.length === 0}
+                  tableClassName="text-sm"
+                  empty={{ icon: Search, title: '没有记录' }}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 

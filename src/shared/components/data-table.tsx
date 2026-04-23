@@ -1,5 +1,6 @@
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import type { LucideProps } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type RowData } from '@tanstack/react-table'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table'
 import { EmptyState } from '@/shared/components/empty-state'
@@ -54,7 +55,7 @@ export function DataTable<TData, TValue = unknown>({
     <div className={cn('flex-1 overflow-auto bg-card', className)}>
       {loading && data.length === 0 ? (
         <div className="flex h-full min-h-48 items-center justify-center">
-          <div className="size-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : rows.length === 0 ? (
         <EmptyState icon={empty?.icon} title={empty?.title} description={empty?.description} />

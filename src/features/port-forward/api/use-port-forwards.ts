@@ -9,6 +9,7 @@ export function usePortForwards() {
     queryKey: qk.portForwards(),
     queryFn: () => commands.listPortForwardsAll(),
     refetchOnMount: true,
+    placeholderData: [],
   })
 }
 
