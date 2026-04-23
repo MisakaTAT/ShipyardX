@@ -47,7 +47,6 @@ export function serverConfigToFormValues(s: ServerConfig): ServerFormValues {
   }
 }
 
-/** 测试连接仅需主机与认证字段，与完整保存校验分离 */
 export const serverTestConnectionSchema = z
   .object({
     host: z.string().min(1, '请先填写主机地址'),

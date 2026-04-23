@@ -9,7 +9,7 @@ import { Button } from '@/shared/ui/button'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
-import { PortCell } from '@/features/docker-containers/ui/port-cell'
+import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
 import RunContainerDialog from '@/features/docker-containers/ui/run-container/run-container-dialog'
 import {
@@ -95,7 +95,13 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       {
         id: 'ports',
         header: '端口',
-        cell: ({ row }) => (row.original.ports ? <PortCell ports={row.original.ports} /> : <span>—</span>),
+        cell: ({ row }) => (
+          <TruncatedChips
+            items={row.original.ports ? row.original.ports.split(',') : []}
+            maxVisible={2}
+            title={row.original.ports || undefined}
+          />
+        ),
       },
       {
         id: 'created',

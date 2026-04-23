@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEngineEvents } from '@/shared/api/events/use-engine-events'
 import { qk } from '@/shared/api/query-keys'
 
-/** 订阅 Docker 引擎事件流，按资源类型批量失效相关 query */
 export function useDockerEventInvalidation(serverId: string, enabled: boolean) {
   const qc = useQueryClient()
 
@@ -11,7 +10,7 @@ export function useDockerEventInvalidation(serverId: string, enabled: boolean) {
     serverId,
     enabled,
     onRefresh: (resource) => {
-      // 任何资源变化都刷一下引擎概览（计数会跟着变）
+      // 任何资源变化都刷一下引擎概览
       qc.invalidateQueries({ queryKey: qk.dockerInfo(serverId) })
       switch (resource) {
         case 'container':

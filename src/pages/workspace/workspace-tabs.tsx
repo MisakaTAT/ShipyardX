@@ -16,13 +16,11 @@ interface WorkspaceTabsProps<K extends string> {
   activeKey: K
   onChange: (key: K) => void
   dockerOk: boolean
-  /** 即使 Docker 不可用也始终可点的 tab（例如终端） */
   alwaysEnabledKeys?: K[]
   onDockerRetry: () => void
   onDisconnect: () => void
 }
 
-/** Workspace 顶部 Tab 栏：motion pill + 禁用态 + 断开/重试按钮 */
 export function WorkspaceTabs<K extends string>({
   items,
   activeKey,

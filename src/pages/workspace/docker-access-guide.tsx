@@ -11,7 +11,6 @@ interface DockerAccessGuideProps {
   onOpenTerminal: () => void
 }
 
-/** Docker 不可用时的引导页（权限/未安装/错误三种分支） */
 export function DockerAccessGuide({ status, username, onRetry, onDisconnect, onOpenTerminal }: DockerAccessGuideProps) {
   const isPermission = status === 'no_permission'
   const isNoDocker = status === 'no_docker'

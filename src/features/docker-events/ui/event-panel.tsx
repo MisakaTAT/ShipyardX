@@ -114,7 +114,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         meta: { width: '12rem' },
         cell: ({ row }) => (
           <span className="font-medium text-foreground" title={row.original.actor_name || undefined}>
-            {row.original.actor_name || '—'}
+            {row.original.actor_name || '-'}
           </span>
         ),
       },
@@ -151,12 +151,12 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'image',
         header: '镜像',
         meta: { width: '8rem' },
-        cell: ({ row }) => <span title={row.original.actor_image || undefined}>{row.original.actor_image || '—'}</span>,
+        cell: ({ row }) => <span title={row.original.actor_image || undefined}>{row.original.actor_image || '-'}</span>,
       },
       {
         id: 'detail',
         header: '详情',
-        cell: ({ row }) => <span title={row.original.detail || undefined}>{row.original.detail || '—'}</span>,
+        cell: ({ row }) => <span title={row.original.detail || undefined}>{row.original.detail || '-'}</span>,
       },
     ],
     []

@@ -58,3 +58,23 @@ export const siderNavButton = cva('h-10 w-full rounded-lg p-2.5 [&_svg]:size-5',
   },
   defaultVariants: { active: false, disabled: false },
 })
+
+export const chipVariants = cva(
+  'inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground',
+  {
+    variants: {
+      mono: {
+        true: 'font-mono',
+        false: '',
+      },
+      truncate: {
+        true: 'truncate',
+        false: '',
+      },
+    },
+    defaultVariants: {
+      mono: true,
+      truncate: false,
+    },
+  }
+)

@@ -6,7 +6,7 @@ import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-
 import { Button } from '@/shared/ui/button'
 import { formatDateTimeString } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
-import { ChipCell } from '@/features/docker-networks/ui/chip-cell'
+import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { useNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
 
 interface NetworkPanelProps {
@@ -55,13 +55,13 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
       },
       { id: 'driver', header: 'Driver', cell: ({ row }) => row.original.driver || '—' },
       { id: 'scope', header: 'Scope', cell: ({ row }) => row.original.scope || '—' },
-      { id: 'subnets', header: '子网', cell: ({ row }) => <ChipCell items={row.original.subnets} /> },
-      { id: 'gateways', header: '网关', cell: ({ row }) => <ChipCell items={row.original.gateways} /> },
+      { id: 'subnets', header: '子网', cell: ({ row }) => <TruncatedChips items={row.original.subnets} /> },
+      { id: 'gateways', header: '网关', cell: ({ row }) => <TruncatedChips items={row.original.gateways} /> },
       {
         id: 'labels',
         header: '标签',
         meta: { width: '16rem', className: 'whitespace-normal' },
-        cell: ({ row }) => <ChipCell items={row.original.labels} />,
+        cell: ({ row }) => <TruncatedChips items={row.original.labels} />,
       },
       {
         id: 'attrs',
@@ -72,7 +72,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
             <>
               {n.internal ? 'internal' : ''}
               {n.internal && n.attachable ? ' · ' : ''}
-              {n.attachable ? 'attachable' : '—'}
+              {n.attachable ? 'attachable' : '-'}
             </>
           )
         },

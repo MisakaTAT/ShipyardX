@@ -24,7 +24,6 @@ export function useDeleteServer() {
   })
 }
 
-/** 将保存服务器对话框返回的最新列表写回 query 缓存 */
 export function useSetServers() {
   const qc = useQueryClient()
   return (servers: ServerConfig[]) => {

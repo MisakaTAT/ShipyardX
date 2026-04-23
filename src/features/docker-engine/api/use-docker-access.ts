@@ -4,7 +4,6 @@ import { commands } from '@/types/app-bindings'
 
 export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
-/** 探测 Docker 可用性；失败时根据错误分类为 no_permission / no_docker / error */
 export function useDockerAccess(serverId: string) {
   const [status, setStatus] = useState<DockerStatus>('checking')
 

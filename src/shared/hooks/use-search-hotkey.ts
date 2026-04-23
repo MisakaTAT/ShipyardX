@@ -1,6 +1,5 @@
 import { useEffect, type RefObject } from 'react'
 
-/** 绑定 "/" 到搜索 input；在输入框聚焦或对话框打开时不抢焦点 */
 export function useSearchHotkey(
   ref: RefObject<HTMLInputElement | null>,
   options: { enabled?: boolean; key?: string } = {}
