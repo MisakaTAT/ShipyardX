@@ -3,13 +3,12 @@ import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
-import { RefreshCw, Play, Square, Clock, Copy, Check, X } from 'lucide-react'
+import { RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import { fullScreenDialogContent } from '@/shared/styles/variants'
 import { formatNowTime } from '@/shared/lib/datetime'
+import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
 
 interface Props {
   serverId: string
@@ -178,17 +177,14 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
   const lineCount = lines.length
 
   return (
-    <Dialog
+    <StandardFullScreenDialog
       open
-      onOpenChange={(next) => {
-        if (!next) void handleClose()
-      }}
-    >
-      <DialogContent className={fullScreenDialogContent} showCloseButton={false}>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3">
-          <span className="mr-1 font-mono text-sm font-semibold text-foreground">{containerName}</span>
-          <span className="mr-2 text-xs text-muted-foreground">日志</span>
-
+      onOpenChange={(v) => (!v ? void handleClose() : null)}
+      title={containerName}
+      subtitle="日志"
+      showCloseButton
+      headerActions={
+        <>
           <Select value={String(tail)} disabled={follow} onValueChange={(v) => setTail(Number(v))}>
             <SelectTrigger>
               <SelectValue />
@@ -250,35 +246,30 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
             复制
           </Button>
 
-          <div className="ml-auto flex items-center gap-2">
-            {lineCount > 0 ? <span className="text-xs text-muted-foreground">{lineCount} 行</span> : null}
-            <Button type="button" variant="ghost" size="icon-sm" onClick={() => void handleClose()}>
-              <X className="size-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
-          {loading ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                加载中...
-              </div>
+          {lineCount > 0 ? <span className="text-xs text-muted-foreground">{lineCount} 行</span> : null}
+        </>
+      }
+    >
+      <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#0d1117' }}>
+        {loading ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              加载中...
             </div>
-          ) : null}
-          <div className="absolute inset-0 min-h-0 p-2">
-            <Virtuoso
-              className="rounded-sm"
-              style={{ height: '100%' }}
-              data={lines}
-              defaultItemHeight={22}
-              followOutput={follow ? 'smooth' : false}
-              itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
-            />
           </div>
+        ) : null}
+        <div className="absolute inset-0 min-h-0 p-2">
+          <Virtuoso
+            className="rounded-sm"
+            style={{ height: '100%' }}
+            data={lines}
+            defaultItemHeight={22}
+            followOutput={follow ? 'smooth' : false}
+            itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
+          />
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </StandardFullScreenDialog>
   )
 }

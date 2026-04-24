@@ -9,14 +9,12 @@ import {
   imagePullFormSchema,
   type ImagePullFormValues,
 } from '@/features/docker-images/model/image-pull-schema'
-import { Download, Loader2, X } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { Field, FieldContent, FieldError, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
-import { modalDialogContent } from '@/shared/styles/variants'
-import { cn } from '@/shared/lib/utils'
 import { qk } from '@/shared/api/query-keys'
+import { StandardDialog } from '@/shared/components/standard-dialog'
 
 export interface ImagePullDialogProps {
   serverId: string
@@ -97,76 +95,71 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
   }
 
   return (
-    <Dialog
+    <StandardDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && !pulling) void handleClose()
+        if (!next && pulling) return
+        if (!next) void handleClose()
+        else onOpenChange(true)
       }}
+      title="拉取镜像"
+      icon={Download}
+      disableClose={pulling}
+      showCloseButton
+      footer={null}
     >
-      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-          <span className="flex shrink-0 text-primary [&_svg]:size-4">
-            <Download />
-          </span>
-          <DialogTitle className="flex-1 text-sm leading-none font-semibold text-foreground">拉取镜像</DialogTitle>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={() => void handleClose()} disabled={pulling}>
-            <X className="size-4" />
-          </Button>
+      <form id={`${formId}-pull`} onSubmit={handlePull} className="contents">
+        <div className="space-y-3">
+          <FieldGroup className="gap-2">
+            <Controller
+              control={form.control}
+              name="image"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid} className="w-full">
+                  <FieldContent className="gap-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id={`${formId}-image`}
+                        aria-invalid={fieldState.invalid}
+                        aria-describedby={fieldState.error ? `${formId}-image-err` : undefined}
+                        {...field}
+                        ref={(el) => {
+                          field.ref(el)
+                          inputRef.current = el
+                        }}
+                        placeholder="nginx:latest"
+                        disabled={pulling}
+                      />
+                      <Button type="submit" form={`${formId}-pull`} className="shrink-0" disabled={pulling}>
+                        {pulling ? (
+                          <>
+                            <Loader2 className="animate-spin" />
+                            拉取中
+                          </>
+                        ) : (
+                          <>
+                            <Download />
+                            拉取
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <FieldError id={`${formId}-image-err`} className="mt-0" errors={[fieldState.error]} />
+                  </FieldContent>
+                </Field>
+              )}
+            />
+          </FieldGroup>
+
+          {lines.length > 0 ? (
+            <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-background p-3">
+              <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground">
+                {lines.join('\n')}
+              </pre>
+            </div>
+          ) : null}
         </div>
-
-        <form id={`${formId}-pull`} onSubmit={handlePull} className="contents">
-          <div className="space-y-3 p-4">
-            <FieldGroup className="gap-2">
-              <Controller
-                control={form.control}
-                name="image"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid} className="w-full">
-                    <FieldContent className="gap-2">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id={`${formId}-image`}
-                          aria-invalid={fieldState.invalid}
-                          aria-describedby={fieldState.error ? `${formId}-image-err` : undefined}
-                          {...field}
-                          ref={(el) => {
-                            field.ref(el)
-                            inputRef.current = el
-                          }}
-                          placeholder="nginx:latest"
-                          disabled={pulling}
-                        />
-                        <Button type="submit" form={`${formId}-pull`} className="shrink-0" disabled={pulling}>
-                          {pulling ? (
-                            <>
-                              <Loader2 className="animate-spin" />
-                              拉取中
-                            </>
-                          ) : (
-                            <>
-                              <Download />
-                              拉取
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <FieldError id={`${formId}-image-err`} className="mt-0" errors={[fieldState.error]} />
-                    </FieldContent>
-                  </Field>
-                )}
-              />
-            </FieldGroup>
-
-            {lines.length > 0 ? (
-              <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-background p-3">
-                <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground">
-                  {lines.join('\n')}
-                </pre>
-              </div>
-            ) : null}
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      </form>
+    </StandardDialog>
   )
 }

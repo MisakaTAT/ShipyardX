@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
-import { Cpu, HardDrive, MemoryStick, Network, X } from 'lucide-react'
+import { Cpu, HardDrive, MemoryStick, Network } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ContainerStats } from '@/types/app-bindings'
-import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
-import { Button } from '@/shared/ui/button'
 import { formatBytes } from '@/shared/lib/format'
 import { formatNowTime } from '@/shared/lib/datetime'
-import { modalDialogContent } from '@/shared/styles/variants'
-import { cn } from '@/shared/lib/utils'
+import { StandardDialog } from '@/shared/components/standard-dialog'
 
 interface Props {
   serverId: string
@@ -129,75 +126,54 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
   }, [fetchStats])
 
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
-    >
-      <DialogContent className={cn(modalDialogContent)} showCloseButton={false}>
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-          <span className="flex shrink-0 text-primary [&_svg]:size-4">
-            <Cpu />
-          </span>
-          <DialogTitle className="flex-1 truncate text-sm leading-none font-semibold text-foreground">
-            {containerName}
-          </DialogTitle>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
-            <X className="size-4" />
-          </Button>
-        </div>
+    <StandardDialog open onOpenChange={(v) => (!v ? onClose() : null)} title={containerName} icon={Cpu}>
+      <div className="space-y-4">
+        {loading && !stats ? (
+          <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
+            <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+            <span className="text-sm">获取资源数据中...</span>
+          </div>
+        ) : null}
 
-        <div className="space-y-4 p-4">
-          {loading && !stats ? (
-            <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
-              <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              <span className="text-sm">获取资源数据中...</span>
+        {stats ? (
+          <>
+            <div className="flex justify-around py-2">
+              <Gauge value={stats.cpu_percent} color="blue" label="CPU 使用率" sublabel={`${stats.cpu_percent}%`} />
+              <Gauge
+                value={stats.mem_percent}
+                color="green"
+                label="内存使用率"
+                sublabel={`${formatBytes(stats.mem_usage)} / ${formatBytes(stats.mem_limit)}`}
+              />
             </div>
-          ) : null}
 
-          {stats ? (
-            <>
-              <div className="flex justify-around py-2">
-                <Gauge value={stats.cpu_percent} color="blue" label="CPU 使用率" sublabel={`${stats.cpu_percent}%`} />
-                <Gauge
-                  value={stats.mem_percent}
-                  color="green"
-                  label="内存使用率"
-                  sublabel={`${formatBytes(stats.mem_usage)} / ${formatBytes(stats.mem_limit)}`}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <StatRow
+                icon={<MemoryStick size={16} />}
+                label="内存使用"
+                value={formatBytes(stats.mem_usage)}
+                subvalue={`限制: ${formatBytes(stats.mem_limit)}`}
+                color="green"
+              />
+              <StatRow icon={<Cpu size={16} />} label="CPU" value={`${stats.cpu_percent}%`} color="blue" />
+              <StatRow
+                icon={<Network size={16} />}
+                label="网络 接收 / 发送"
+                value={`${formatBytes(stats.net_rx)} / ${formatBytes(stats.net_tx)}`}
+                color="cyan"
+              />
+              <StatRow
+                icon={<HardDrive size={16} />}
+                label="磁盘 读 / 写"
+                value={`${formatBytes(stats.blk_read)} / ${formatBytes(stats.blk_write)}`}
+                color="purple"
+              />
+            </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <StatRow
-                  icon={<MemoryStick size={16} />}
-                  label="内存使用"
-                  value={formatBytes(stats.mem_usage)}
-                  subvalue={`限制: ${formatBytes(stats.mem_limit)}`}
-                  color="green"
-                />
-                <StatRow icon={<Cpu size={16} />} label="CPU" value={`${stats.cpu_percent}%`} color="blue" />
-                <StatRow
-                  icon={<Network size={16} />}
-                  label="网络 接收 / 发送"
-                  value={`${formatBytes(stats.net_rx)} / ${formatBytes(stats.net_tx)}`}
-                  color="cyan"
-                />
-                <StatRow
-                  icon={<HardDrive size={16} />}
-                  label="磁盘 读 / 写"
-                  value={`${formatBytes(stats.blk_read)} / ${formatBytes(stats.blk_write)}`}
-                  color="purple"
-                />
-              </div>
-
-              {lastUpdated ? (
-                <div className="text-center text-xs text-muted-foreground">更新于 {lastUpdated}</div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
-      </DialogContent>
-    </Dialog>
+            {lastUpdated ? <div className="text-center text-xs text-muted-foreground">更新于 {lastUpdated}</div> : null}
+          </>
+        ) : null}
+      </div>
+    </StandardDialog>
   )
 }

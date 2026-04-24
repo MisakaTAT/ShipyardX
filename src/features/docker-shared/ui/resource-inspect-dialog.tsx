@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { commands } from '@/types/app-bindings'
 import Editor from '@monaco-editor/react'
-import { Check, Copy, RefreshCw, ScanSearch, X } from 'lucide-react'
+import { Check, Copy, RefreshCw, ScanSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import { Dialog, DialogContent } from '@/shared/ui/dialog'
 import { Button } from '@/shared/ui/button'
-import { fullScreenDialogContent } from '@/shared/styles/variants'
+import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
 
 type InspectKind = 'container' | 'image' | 'network' | 'volume'
 
@@ -84,19 +83,13 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
   )
 
   return (
-    <Dialog
+    <StandardFullScreenDialog
       open
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
-    >
-      <DialogContent className={fullScreenDialogContent} showCloseButton={false}>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-5 py-3">
-          <span className="flex shrink-0 text-primary [&_svg]:size-4">
-            <ScanSearch />
-          </span>
-          <span className="mr-1 text-sm font-semibold text-foreground">{targetLabel}</span>
-
+      onOpenChange={(v) => (!v ? onClose() : null)}
+      title={targetLabel}
+      icon={ScanSearch}
+      headerActions={
+        <>
           <Button type="button" variant="default" disabled={loading} title="重新加载" onClick={() => void load()}>
             <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />
             刷新
@@ -106,35 +99,29 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
             {copied ? <Check className="text-green-500" /> : <Copy />}
             复制
           </Button>
-
-          <div className="ml-auto flex items-center gap-0">
-            <Button type="button" variant="ghost" size="icon-sm" onClick={onClose}>
-              <X className="size-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#1e1e1e' }}>
-          {loading ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                加载中…
-              </div>
+        </>
+      }
+    >
+      <div className="relative min-h-0 flex-1 overflow-hidden" style={{ background: '#1e1e1e' }}>
+        {loading ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+              加载中…
             </div>
-          ) : null}
-          <Editor
-            height="100%"
-            language="json"
-            theme="vs-dark"
-            value={json}
-            options={editorOptions}
-            loading={
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">初始化编辑器…</div>
-            }
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        ) : null}
+        <Editor
+          height="100%"
+          language="json"
+          theme="vs-dark"
+          value={json}
+          options={editorOptions}
+          loading={
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">初始化编辑器…</div>
+          }
+        />
+      </div>
+    </StandardFullScreenDialog>
   )
 }
