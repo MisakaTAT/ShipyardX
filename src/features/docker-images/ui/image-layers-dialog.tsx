@@ -68,7 +68,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
                 <div className="space-y-2">
                   {layers.map((l, idx) => {
                     const n = layers.length - idx
-                    const shortId = l.id?.replace('sha256:', '').slice(0, 12) || '—'
+                    const shortId = l.id?.replace('sha256:', '').slice(0, 12) || '-'
                     return (
                       <details key={`${l.id}-${idx}`} className="rounded-lg border bg-background/50 px-3 py-2">
                         <summary className="cursor-pointer list-none">
@@ -79,7 +79,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
                             </div>
                             <span className="text-xs text-muted-foreground">{formatBytes(l.size)}</span>
                           </div>
-                          <div className="mt-1 line-clamp-1 font-mono text-xs text-muted-foreground">{l.command || '—'}</div>
+                          <div className="mt-1 line-clamp-1 font-mono text-xs text-muted-foreground">{l.command || '-'}</div>
                         </summary>
                         <div className="mt-2 grid gap-2 text-xs">
                           <div className="grid grid-cols-[6rem_1fr] gap-2">
@@ -92,7 +92,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
                           </div>
                           <div className="grid grid-cols-[6rem_1fr] gap-2">
                             <div className="text-muted-foreground">Command</div>
-                            <div className="font-mono break-all">{l.command || '—'}</div>
+                            <div className="font-mono break-all">{l.command || '-'}</div>
                           </div>
                           {l.comment ? (
                             <div className="grid grid-cols-[6rem_1fr] gap-2">

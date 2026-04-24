@@ -55,11 +55,11 @@ export default function ServerOverview({ serverId }: Props) {
           <div className="mt-3 grid grid-cols-4 gap-2">
             <MetricCard icon={<Box size={14} />} label="容器总数" value={String(totalContainers)} />
             <MetricCard icon={<Layers size={14} />} label="镜像数" value={String(info?.images ?? 0)} />
-            <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '—')} />
+            <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '-')} />
             <MetricCard
               icon={<HardDrive size={14} />}
               label="总内存"
-              value={info ? formatBytes(info.mem_total) : '—'}
+              value={info ? formatBytes(info.mem_total) : '-'}
             />
           </div>
         </div>
@@ -78,17 +78,17 @@ export default function ServerOverview({ serverId }: Props) {
             </InfoSection>
 
             <InfoSection title="Docker 引擎">
-              <InfoRow label="引擎版本" value={info?.server_version || '—'} />
-              <InfoRow label="API 版本" value={info?.api_version || '—'} />
-              <InfoRow label="存储驱动" value={info?.storage_driver || '—'} />
+              <InfoRow label="引擎版本" value={info?.server_version || '-'} />
+              <InfoRow label="API 版本" value={info?.api_version || '-'} />
+              <InfoRow label="存储驱动" value={info?.storage_driver || '-'} />
               <InfoRow label="警告数量" value={String(warnings)} highlight={warnings > 0} />
             </InfoSection>
 
             <InfoSection title="主机系统">
-              <InfoRow label="主机名" value={info?.name || '—'} />
-              <InfoRow label="操作系统" value={info?.os || '—'} />
-              <InfoRow label="内核版本" value={info?.kernel_version || '—'} />
-              <InfoRow label="架构" value={info?.architecture || '—'} />
+              <InfoRow label="主机名" value={info?.name || '-'} />
+              <InfoRow label="操作系统" value={info?.os || '-'} />
+              <InfoRow label="内核版本" value={info?.kernel_version || '-'} />
+              <InfoRow label="架构" value={info?.architecture || '-'} />
             </InfoSection>
           </div>
         )}

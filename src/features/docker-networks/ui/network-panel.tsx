@@ -53,8 +53,8 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
           )
         },
       },
-      { id: 'driver', header: 'Driver', cell: ({ row }) => row.original.driver || '—' },
-      { id: 'scope', header: 'Scope', cell: ({ row }) => row.original.scope || '—' },
+      { id: 'driver', header: 'Driver', cell: ({ row }) => row.original.driver || '-' },
+      { id: 'scope', header: 'Scope', cell: ({ row }) => row.original.scope || '-' },
       { id: 'subnets', header: '子网', cell: ({ row }) => <TruncatedChips items={row.original.subnets} /> },
       { id: 'gateways', header: '网关', cell: ({ row }) => <TruncatedChips items={row.original.gateways} /> },
       {

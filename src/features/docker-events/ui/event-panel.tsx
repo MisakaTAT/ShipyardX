@@ -122,7 +122,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'id',
         header: 'ID',
         meta: { width: '8rem' },
-        cell: ({ row }) => <span title={row.original.actor_id || undefined}>{row.original.actor_id || '—'}</span>,
+        cell: ({ row }) => <span title={row.original.actor_id || undefined}>{row.original.actor_id || '-'}</span>,
       },
       {
         id: 'time',
