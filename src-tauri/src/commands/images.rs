@@ -1,6 +1,7 @@
 use tauri::{AppHandle, State};
 
 use crate::models::app::image::Image;
+use crate::models::app::image::ImageLayer;
 use crate::services;
 use crate::state::AppState;
 
@@ -14,6 +15,16 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Resul
 #[specta::specta]
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> Result<String, String> {
     services::images::inspect_image(server_id, image_id, state).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_image_history(
+    server_id: String,
+    image_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ImageLayer>, String> {
+    services::images::get_image_history(server_id, image_id, state).await
 }
 
 #[tauri::command]

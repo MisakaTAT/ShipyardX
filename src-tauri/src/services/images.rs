@@ -9,7 +9,8 @@ use crate::docker::mapping::api_image_to_dto;
 use crate::models::app::events::{DockerSshStreamChunk, DockerSshStreamDone};
 use crate::models::app::image::Image;
 use crate::models::app::server::ServerConfig;
-use crate::models::docker::image::ImageSummary;
+use crate::models::docker::container::ContainerSummary;
+use crate::models::docker::image::{ImageHistoryItem, ImageSummary};
 use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
@@ -18,10 +19,29 @@ use crate::utils::sort::sort_by_created_desc_then_id;
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<Image>, String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
+        let containers_resp = docker_get(&server, "/containers/json?all=1")?;
+        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
+            .map_err(|e| format!("解析容器列表失败: {}", e))?;
+
+        let mut used_by: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        for c in containers {
+            let id = c.image_id.trim();
+            if id.is_empty() {
+                continue;
+            }
+            *used_by.entry(id.to_string()).or_insert(0) += 1;
+        }
+
         let resp = docker_get(&server, "/images/json")?;
         let mut api: Vec<ImageSummary> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像列表失败: {}", e))?;
         sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
-        Ok(api.into_iter().map(api_image_to_dto).collect())
+        Ok(api
+            .into_iter()
+            .map(|img| {
+                let cnt = used_by.get(img.id.as_str()).copied().unwrap_or(0);
+                api_image_to_dto(img, cnt)
+            })
+            .collect())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -32,6 +52,31 @@ pub async fn inspect_image(server_id: String, image_id: String, state: State<'_,
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, &format!("/images/{}/json", image_id))?;
         pretty_json_response(&resp)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub async fn get_image_history(
+    server_id: String,
+    image_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::models::app::image::ImageLayer>, String> {
+    let server = get_server_config(&state, &server_id)?;
+    tokio::task::spawn_blocking(move || {
+        let resp = docker_get(&server, &format!("/images/{}/history", image_id))?;
+        let api: Vec<ImageHistoryItem> =
+            serde_json::from_str(&resp).map_err(|e| format!("解析镜像历史失败: {}", e))?;
+        Ok(api
+            .into_iter()
+            .map(|l| crate::models::app::image::ImageLayer {
+                id: l.id,
+                created_ts: l.created,
+                size: l.size,
+                command: l.created_by,
+                comment: l.comment,
+            })
+            .collect())
     })
     .await
     .map_err(|e| e.to_string())?

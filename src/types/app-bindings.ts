@@ -21,6 +21,7 @@ export const commands = {
 	runContainer: (serverId: string, params: RunContainer) => __TAURI_INVOKE<string>("run_container", { serverId, params }),
 	listImages: (serverId: string) => __TAURI_INVOKE<Image[]>("list_images", { serverId }),
 	inspectImage: (serverId: string, imageId: string) => __TAURI_INVOKE<string>("inspect_image", { serverId, imageId }),
+	getImageHistory: (serverId: string, imageId: string) => __TAURI_INVOKE<ImageLayer[]>("get_image_history", { serverId, imageId }),
 	removeImage: (serverId: string, imageId: string, force: boolean) => __TAURI_INVOKE<null>("remove_image", { serverId, imageId, force }),
 	startImagePull: (serverId: string, image: string) => __TAURI_INVOKE<string>("start_image_pull", { serverId, image }),
 	cancelStream: (streamId: string) => __TAURI_INVOKE<void>("cancel_stream", { streamId }),
@@ -188,6 +189,15 @@ export type Image = {
 	tag: string,
 	size: string,
 	created_ts: number,
+	used_by_count: number,
+};
+
+export type ImageLayer = {
+	id: string,
+	created_ts: number,
+	size: number,
+	command: string,
+	comment: string,
 };
 
 export type LocalAddress = {
@@ -305,6 +315,8 @@ export type Volume = {
 	mountpoint: string,
 	scope: string,
 	created_at: string,
+	stack: string,
+	used_by: string,
 };
 
 /* Tauri Specta runtime */

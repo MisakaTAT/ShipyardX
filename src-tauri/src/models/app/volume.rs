@@ -8,4 +8,6 @@ pub struct Volume {
     pub mountpoint: String,
     pub scope: String,
     pub created_at: String,
+    pub stack: String,
+    pub used_by: String,
 }

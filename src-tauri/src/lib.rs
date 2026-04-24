@@ -41,6 +41,7 @@ pub fn run() {
             commands::containers::run_container,
             commands::images::list_images,
             commands::images::inspect_image,
+            commands::images::get_image_history,
             commands::images::remove_image,
             commands::images::start_image_pull,
             commands::images::cancel_stream,

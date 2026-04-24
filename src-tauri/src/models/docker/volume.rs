@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -9,6 +10,8 @@ pub struct VolumeSummary {
     pub driver: Option<String>,
     #[serde(rename = "Mountpoint")]
     pub mountpoint: Option<String>,
+    #[serde(rename = "Labels")]
+    pub labels: Option<HashMap<String, String>>,
     #[serde(rename = "Scope")]
     pub scope: Option<String>,
     #[serde(rename = "CreatedAt")]

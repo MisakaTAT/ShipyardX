@@ -38,9 +38,11 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         id,
         names,
         image,
+        image_id: _,
         state,
         status,
         ports,
+        mounts: _,
         created,
         network_settings,
     } = c;
@@ -68,7 +70,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
     }
 }
 
-pub fn api_image_to_dto(img: ImageSummary) -> Image {
+pub fn api_image_to_dto(img: ImageSummary, used_by_count: u32) -> Image {
     let ImageSummary {
         id,
         repo_tags,
@@ -91,5 +93,6 @@ pub fn api_image_to_dto(img: ImageSummary) -> Image {
         tag,
         size: format_bytes(size),
         created_ts: created,
+        used_by_count,
     }
 }

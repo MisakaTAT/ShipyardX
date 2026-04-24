@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Trash2, Download, Image as ImageIcon, ScanSearch } from 'lucide-react'
+import { Trash2, Download, Image as ImageIcon, Layers, ScanSearch } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
+import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
@@ -23,6 +24,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const [showPull, setShowPull] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Image | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Image | null>(null)
+  const [layersTarget, setLayersTarget] = useState<Image | null>(null)
   const [removeForce, setRemoveForce] = useState(false)
 
   const filtered = useMemo(() => {
@@ -64,6 +66,15 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
             </ToneBadge>
           ),
       },
+      {
+        id: 'used_by',
+        header: 'Used by',
+        cell: ({ row }) => {
+          const n = row.original.used_by_count
+          if (n <= 0) return 'Unused'
+          return `${n} Container${n === 1 ? '' : 's'}`
+        },
+      },
       { id: 'size', header: '大小', cell: ({ row }) => row.original.size },
       {
         id: 'created',
@@ -80,6 +91,9 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           const img = row.original
           return (
             <div>
+              <Button type="button" variant="ghost" size="icon-sm" title="Layers" onClick={() => setLayersTarget(img)}>
+                <Layers />
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -152,6 +166,17 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           onClose={() => setInspectTarget(null)}
         />
       ) : null}
+
+      <ImageLayersDialog
+        serverId={serverId}
+        open={layersTarget !== null}
+        image={layersTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLayersTarget(null)
+          }
+        }}
+      />
 
       <ConfirmDialog
         open={removeTarget !== null}

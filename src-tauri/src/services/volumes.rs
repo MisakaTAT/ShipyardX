@@ -1,7 +1,10 @@
 use tauri::State;
 
+use std::collections::HashMap;
+
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
 use crate::models::app::volume::Volume;
+use crate::models::docker::container::ContainerSummary;
 use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -17,14 +20,56 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
             |x| x.created_at.clone().unwrap_or_default(),
             |x| x.name.clone().unwrap_or_default(),
         );
+
+        let containers_resp = docker_get(&server, "/containers/json?all=1")?;
+        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
+            .map_err(|e| format!("解析容器列表失败: {}", e))?;
+
+        let mut used_by: HashMap<String, Vec<String>> = HashMap::new();
+        for c in containers {
+            let name = c
+                .names
+                .first()
+                .map(|n| n.trim_start_matches('/').to_string())
+                .unwrap_or_default();
+            if name.is_empty() {
+                continue;
+            }
+            for m in c.mounts {
+                if m.mount_type != "volume" {
+                    continue;
+                }
+                if m.name.is_empty() {
+                    continue;
+                }
+                used_by.entry(m.name).or_default().push(name.clone());
+            }
+        }
+
         Ok(list
             .into_iter()
-            .map(|v| Volume {
-                name: v.name.unwrap_or_default(),
-                driver: v.driver.unwrap_or_default(),
-                mountpoint: v.mountpoint.unwrap_or_default(),
-                scope: v.scope.unwrap_or_default(),
-                created_at: v.created_at.unwrap_or_default(),
+            .map(|v| {
+                let name = v.name.clone().unwrap_or_default();
+                let mut used = used_by.get(&name).cloned().unwrap_or_default();
+                used.sort();
+                used.dedup();
+                Volume {
+                    name: name.clone(),
+                    driver: v.driver.unwrap_or_default(),
+                    mountpoint: v.mountpoint.unwrap_or_default(),
+                    scope: v.scope.unwrap_or_default(),
+                    created_at: v.created_at.unwrap_or_default(),
+                    stack: v
+                        .labels
+                        .as_ref()
+                        .and_then(|m| {
+                            m.get("com.docker.compose.project")
+                                .or_else(|| m.get("com.docker.stack.namespace"))
+                        })
+                        .cloned()
+                        .unwrap_or_default(),
+                    used_by: used.join(", "),
+                }
             })
             .collect())
     })

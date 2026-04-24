@@ -9,16 +9,28 @@ pub struct ContainerSummary {
     pub names: Vec<String>,
     #[serde(rename = "Image")]
     pub image: String,
+    #[serde(rename = "ImageID", default)]
+    pub image_id: String,
     #[serde(rename = "State")]
     pub state: String,
     #[serde(rename = "Status")]
     pub status: String,
     #[serde(rename = "Ports")]
     pub ports: Vec<PortBinding>,
+    #[serde(rename = "Mounts", default)]
+    pub mounts: Vec<ContainerMountSummary>,
     #[serde(rename = "Created")]
     pub created: i64,
     #[serde(rename = "NetworkSettings", default)]
     pub network_settings: ContainerNetworkSettings,
+}
+
+#[derive(Deserialize, Default)]
+pub struct ContainerMountSummary {
+    #[serde(rename = "Type", default)]
+    pub mount_type: String,
+    #[serde(rename = "Name", default)]
+    pub name: String,
 }
 
 #[derive(Deserialize, Default)]

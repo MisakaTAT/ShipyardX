@@ -27,6 +27,8 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
     return volumes.filter(
       (v) =>
         v.name.toLowerCase().includes(q) ||
+        v.stack.toLowerCase().includes(q) ||
+        v.used_by.toLowerCase().includes(q) ||
         v.driver.toLowerCase().includes(q) ||
         v.scope.toLowerCase().includes(q) ||
         v.mountpoint.toLowerCase().includes(q)
@@ -49,18 +51,30 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         id: 'driver',
         header: 'Driver',
         meta: { width: '6rem' },
-        cell: ({ row }) => row.original.driver || '—',
+        cell: ({ row }) => row.original.driver || '_',
       },
       {
         id: 'scope',
         header: 'Scope',
         meta: { width: '6rem' },
-        cell: ({ row }) => row.original.scope || '—',
+        cell: ({ row }) => row.original.scope || '_',
+      },
+      {
+        id: 'stack',
+        header: 'Stack',
+        meta: { width: '10rem' },
+        cell: ({ row }) => row.original.stack || '_',
+      },
+      {
+        id: 'used_by',
+        header: 'Used by',
+        meta: { width: '10rem' },
+        cell: ({ row }) => <span title={row.original.used_by}>{row.original.used_by || '_'}</span>,
       },
       {
         id: 'mountpoint',
         header: 'Mountpoint',
-        cell: ({ row }) => <span title={row.original.mountpoint}>{row.original.mountpoint || '—'}</span>,
+        cell: ({ row }) => <span title={row.original.mountpoint}>{row.original.mountpoint || '_'}</span>,
       },
       {
         id: 'created',
