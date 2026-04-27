@@ -8,6 +8,7 @@ pub struct Container {
     pub image: String,
     pub status: String,
     pub state: String,
+    pub stack: String,
     pub ip: String,
     pub ports: String,
     pub created_ts: i64,

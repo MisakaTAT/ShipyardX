@@ -4,7 +4,7 @@ import type { Volume } from '@/types/app-bindings'
 import VolumeCreateDialog from '@/features/docker-volumes/ui/volume-create-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
-import { formatDateTimeString } from '@/shared/lib/datetime'
+import { formatDateTimeString, formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
 import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
@@ -97,7 +97,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         header: '创建时间',
         meta: { width: '12rem' },
         cell: ({ row }) => (
-          <span title={row.original.created_at || undefined}>{formatDateTimeString(row.original.created_at)}</span>
+          <span title={formatDateTimeString(row.original.created_at)}>{formatTimeAgo(row.original.created_at)}</span>
         ),
       },
       {

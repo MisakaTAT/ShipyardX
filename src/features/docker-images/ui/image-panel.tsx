@@ -6,7 +6,7 @@ import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { formatUnixSeconds } from '@/shared/lib/datetime'
+import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import { useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
 import { ImageActionsMenu } from '@/features/docker-images/ui/image-actions-menu'
@@ -96,7 +96,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>{formatUnixSeconds(row.original.created_ts)}</span>
+          <span title={formatUnixSeconds(row.original.created_ts)}>{formatTimeAgo(row.original.created_ts)}</span>
         ),
       },
       {

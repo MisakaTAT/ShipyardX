@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Plus } from 'lucide-react'
+import { Box, HeartCrack, HeartPulse, Plus } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
 import LogDialog from '@/features/docker-containers/ui/log-dialog'
 import StatsDialog from '@/features/docker-containers/ui/stats-dialog'
 import ContainerExecDialog from '@/features/docker-containers/ui/container-exec-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
-import { formatUnixSeconds } from '@/shared/lib/datetime'
+import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
 import { TruncatedChips } from '@/shared/components/truncated-chips'
@@ -21,6 +21,13 @@ import {
 
 interface ContainerPanelProps {
   serverId: string
+}
+
+function getContainerHealth(status: string): 'healthy' | 'unhealthy' | 'unknown' {
+  const s = status.toLowerCase()
+  if (s.includes('(healthy)')) return 'healthy'
+  if (s.includes('(unhealthy)')) return 'unhealthy'
+  return 'unknown'
 }
 
 export default function ContainerPanel({ serverId }: ContainerPanelProps) {
@@ -47,6 +54,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.image.toLowerCase().includes(q) ||
+        c.stack.toLowerCase().includes(q) ||
         c.volumes.some((v) => v.toLowerCase().includes(q)) ||
         c.id.toLowerCase().includes(q) ||
         c.state.toLowerCase().includes(q)
@@ -79,20 +87,62 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         header: '镜像',
         cell: ({ row }) => <span title={row.original.image}>{row.original.image}</span>,
       },
+
       {
         id: 'state',
         header: '状态',
+        cell: ({ row }) => {
+          const c = row.original
+          return <ContainerStateBadge state={c.state} />
+        },
+      },
+      {
+        id: 'health',
+        header: 'Health',
         meta: { width: '12rem' },
         cell: ({ row }) => {
           const c = row.original
+          const health = getContainerHealth(c.status)
+          if (health === 'healthy') {
+            return (
+              <div className="min-w-0">
+                <span className="inline-flex items-center text-emerald-700 dark:text-emerald-400" title={c.status}>
+                  <HeartPulse className="size-4" />
+                </span>
+                <div className="mt-1 truncate text-xs text-muted-foreground" title={c.status}>
+                  {c.status}
+                </div>
+              </div>
+            )
+          }
+          if (health === 'unhealthy') {
+            return (
+              <div className="min-w-0">
+                <span className="inline-flex items-center text-red-700 dark:text-red-400" title={c.status}>
+                  <HeartCrack className="size-4" />
+                </span>
+                <div className="mt-1 truncate text-xs text-muted-foreground" title={c.status}>
+                  {c.status}
+                </div>
+              </div>
+            )
+          }
           return (
-            <>
-              <ContainerStateBadge state={c.state} />
-              <br />
-              <span title={c.status}>{c.status}</span>
-            </>
+            <div className="min-w-0">
+              <span className="text-xs text-muted-foreground">-</span>
+              {c.status ? (
+                <div className="mt-1 truncate text-xs text-muted-foreground" title={c.status}>
+                  {c.status}
+                </div>
+              ) : null}
+            </div>
           )
         },
+      },
+      {
+        id: 'stack',
+        header: 'Stack',
+        cell: ({ row }) => <span title={row.original.stack}>{row.original.stack || '-'}</span>,
       },
       {
         id: 'ip',
@@ -102,6 +152,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       {
         id: 'ports',
         header: '端口',
+        meta: { width: '12rem' },
         cell: ({ row }) => (
           <TruncatedChips
             items={row.original.ports ? row.original.ports.split(',') : []}
@@ -114,7 +165,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         id: 'created',
         header: '创建时间',
         cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>{formatUnixSeconds(row.original.created_ts)}</span>
+          <span title={formatUnixSeconds(row.original.created_ts)}>{formatTimeAgo(row.original.created_ts)}</span>
         ),
       },
       {
@@ -171,6 +222,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         getRowId={(c) => c.id}
         loading={isFetching && containers.length === 0}
         empty={{ icon: Box, title: search ? `无匹配的容器 "${search}"` : '没有容器' }}
+        tableClassName="[&_tbody_tr]:h-16 [&_tbody_tr_td]:h-16"
       />
 
       {logTarget ? (

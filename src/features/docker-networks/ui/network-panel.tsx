@@ -4,7 +4,7 @@ import type { Network } from '@/types/app-bindings'
 import NetworkCreateDialog from '@/features/docker-networks/ui/network-create-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
-import { formatDateTimeString } from '@/shared/lib/datetime'
+import { formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { useNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
@@ -82,7 +82,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         header: '创建时间',
         meta: { width: '12rem' },
         cell: ({ row }) => (
-          <span title={row.original.created_at || undefined}>{formatDateTimeString(row.original.created_at)}</span>
+          <span title={row.original.created_at || undefined}>{formatTimeAgo(row.original.created_at)}</span>
         ),
       },
       {

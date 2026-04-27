@@ -75,6 +75,7 @@ export type Container = {
 	image: string,
 	status: string,
 	state: string,
+	stack: string,
 	ip: string,
 	ports: string,
 	created_ts: number,

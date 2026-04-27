@@ -23,6 +23,8 @@ pub struct ContainerSummary {
     pub created: i64,
     #[serde(rename = "NetworkSettings", default)]
     pub network_settings: ContainerNetworkSettings,
+    #[serde(rename = "Labels", default)]
+    pub labels: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize, Default)]

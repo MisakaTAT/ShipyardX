@@ -45,6 +45,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         mounts,
         created,
         network_settings,
+        labels,
     } = c;
     let name = names
         .first()
@@ -67,12 +68,22 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
     volumes.sort();
     volumes.dedup();
 
+    let stack = labels
+        .as_ref()
+        .and_then(|m| {
+            m.get("com.docker.compose.project")
+                .or_else(|| m.get("com.docker.stack.namespace"))
+        })
+        .cloned()
+        .unwrap_or_default();
+
     Container {
         id: short_container_id(&id),
         name,
         image,
         state,
         status,
+        stack,
         ip,
         ports: format_ports(&ports),
         created_ts: created,
