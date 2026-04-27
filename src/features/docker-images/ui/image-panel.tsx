@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Trash2, Download, Image as ImageIcon, Layers, ScanSearch } from 'lucide-react'
+import { Download, Image as ImageIcon } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
 import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
@@ -9,6 +9,8 @@ import { Checkbox } from '@/shared/ui/checkbox'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import { useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
+import { ImageActionsMenu } from '@/features/docker-images/ui/image-actions-menu'
+import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
 
 interface ImagePanelProps {
   serverId: string
@@ -72,7 +74,21 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         cell: ({ row }) => {
           const n = row.original.used_by_count
           if (n <= 0) return 'Unused'
-          return `${n} Container${n === 1 ? '' : 's'}`
+          const img = row.original
+          const label = `${n} Container${n === 1 ? '' : 's'}`
+          const query = img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.repository
+          return (
+            <button
+              type="button"
+              className="text-primary underline-offset-2 hover:underline"
+              onClick={() => {
+                setNextContainerSearch(serverId, query)
+                navigateWorkspace({ tab: 'containers', serverId, containerSearch: query })
+              }}
+            >
+              {label}
+            </button>
+          )
         },
       },
       { id: 'size', header: '大小', cell: ({ row }) => row.original.size },
@@ -86,42 +102,26 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       {
         id: 'actions',
         header: '操作',
-        meta: { width: '5rem' },
+        meta: { width: '3rem' },
         cell: ({ row }) => {
           const img = row.original
           return (
-            <div>
-              <Button type="button" variant="ghost" size="icon-sm" title="Layers" onClick={() => setLayersTarget(img)}>
-                <Layers />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                title="Inspect"
-                onClick={() => setInspectTarget(img)}
-              >
-                <ScanSearch />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                title="删除"
-                onClick={() => {
-                  setRemoveForce(false)
-                  setRemoveTarget(img)
-                }}
-                className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <ImageActionsMenu
+              image={img}
+              busy={removeImage.isPending}
+              onLayers={() => setLayersTarget(img)}
+              onInspect={() => setInspectTarget(img)}
+              onRemove={() => {
+                setRemoveForce(false)
+                setRemoveTarget(img)
+              }}
+            />
           )
         },
       },
     ],
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [removeImage.isPending]
   )
 
   const removeDescription = removeTarget

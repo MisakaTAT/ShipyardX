@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Box, Plus } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
 import LogDialog from '@/features/docker-containers/ui/log-dialog'
@@ -12,6 +12,7 @@ import { ContainerStateBadge } from '@/features/docker-containers/ui/container-s
 import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
 import RunContainerDialog from '@/features/docker-containers/ui/run-container/run-container-dialog'
+import { consumeNextContainerSearch } from '@/shared/lib/workspace-nav'
 import {
   useContainerAction,
   useContainers,
@@ -33,6 +34,11 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const [execTarget, setExecTarget] = useState<Container | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Container | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Container | null>(null)
+
+  useEffect(() => {
+    const next = consumeNextContainerSearch(serverId)
+    if (next) setSearch(next)
+  }, [serverId])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return containers

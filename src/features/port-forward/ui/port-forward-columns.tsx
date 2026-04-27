@@ -63,8 +63,7 @@ export function buildPortForwardColumns({
         return f.running ? (
           <button
             type="button"
-            className="inline-flex cursor-pointer items-center gap-1 text-foreground hover:underline"
-            title="在浏览器中打开"
+            className="text-primary underline-offset-2 hover:underline"
             onClick={() => void openUrl(`http://${f.bind_address}:${f.local_port}`)}
           >
             {f.bind_address}:{f.local_port}

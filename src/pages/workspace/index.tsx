@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   Activity,
@@ -25,6 +26,7 @@ import { DockerAccessGuide } from '@/pages/workspace/docker-access-guide'
 import { WorkspaceTabs, type WorkspaceTabItem } from '@/pages/workspace/workspace-tabs'
 import { KeepAlive } from '@/shared/components/keep-alive'
 import { cn } from '@/shared/lib/utils'
+import { onWorkspaceNavigate, type WorkspaceNavigateTarget } from '@/shared/lib/workspace-nav'
 
 export type WorkspaceTab =
   | 'overview'
@@ -60,6 +62,13 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   const { status: dockerStatus, ok: dockerOk, recheck } = useDockerAccess(selectedServer.id)
 
   const { events, status: eventStatus, clearEvents } = useDockerEventInvalidation(selectedServer.id, dockerOk)
+
+  useEffect(() => {
+    return onWorkspaceNavigate((t: WorkspaceNavigateTarget) => {
+      if (t.serverId && t.serverId !== selectedServer.id) return
+      onActiveTabChange(t.tab)
+    })
+  }, [onActiveTabChange, selectedServer.id])
 
   const handleDisconnect = () => {
     const label = selectedServer.name
