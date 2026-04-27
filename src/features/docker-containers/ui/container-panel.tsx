@@ -47,6 +47,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.image.toLowerCase().includes(q) ||
+        c.volumes.some((v) => v.toLowerCase().includes(q)) ||
         c.id.toLowerCase().includes(q) ||
         c.state.toLowerCase().includes(q)
     )

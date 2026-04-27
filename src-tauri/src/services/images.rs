@@ -20,8 +20,8 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Resul
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let containers_resp = docker_get(&server, "/containers/json?all=1")?;
-        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
-            .map_err(|e| format!("解析容器列表失败: {}", e))?;
+        let containers: Vec<ContainerSummary> =
+            serde_json::from_str(&containers_resp).map_err(|e| format!("解析容器列表失败: {}", e))?;
 
         let mut used_by: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
         for c in containers {
@@ -65,8 +65,7 @@ pub async fn get_image_history(
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, &format!("/images/{}/history", image_id))?;
-        let api: Vec<ImageHistoryItem> =
-            serde_json::from_str(&resp).map_err(|e| format!("解析镜像历史失败: {}", e))?;
+        let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp).map_err(|e| format!("解析镜像历史失败: {}", e))?;
         Ok(api
             .into_iter()
             .map(|l| crate::models::app::image::ImageLayer {

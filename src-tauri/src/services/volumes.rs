@@ -22,8 +22,8 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
         );
 
         let containers_resp = docker_get(&server, "/containers/json?all=1")?;
-        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
-            .map_err(|e| format!("解析容器列表失败: {}", e))?;
+        let containers: Vec<ContainerSummary> =
+            serde_json::from_str(&containers_resp).map_err(|e| format!("解析容器列表失败: {}", e))?;
 
         let mut used_by: HashMap<String, Vec<String>> = HashMap::new();
         for c in containers {

@@ -78,6 +78,7 @@ export type Container = {
 	ip: string,
 	ports: string,
 	created_ts: number,
+	volumes: string[],
 };
 
 export type ContainerExecTerminalParams = {

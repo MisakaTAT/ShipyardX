@@ -42,7 +42,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         state,
         status,
         ports,
-        mounts: _,
+        mounts,
         created,
         network_settings,
     } = c;
@@ -58,6 +58,15 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         .unwrap_or("-")
         .to_string();
 
+    let mut volumes: Vec<String> = mounts
+        .into_iter()
+        .filter(|m| m.mount_type == "volume")
+        .map(|m| m.name)
+        .filter(|s| !s.is_empty())
+        .collect();
+    volumes.sort();
+    volumes.dedup();
+
     Container {
         id: short_container_id(&id),
         name,
@@ -67,6 +76,7 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         ip,
         ports: format_ports(&ports),
         created_ts: created,
+        volumes,
     }
 }
 

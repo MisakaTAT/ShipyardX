@@ -11,6 +11,7 @@ pub struct Container {
     pub ip: String,
     pub ports: String,
     pub created_ts: i64,
+    pub volumes: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Type)]

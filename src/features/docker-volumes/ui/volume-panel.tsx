@@ -7,6 +7,7 @@ import { Button } from '@/shared/ui/button'
 import { formatDateTimeString } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
+import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
 
 interface VolumePanelProps {
   serverId: string
@@ -69,7 +70,22 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         id: 'used_by',
         header: 'Used by',
         meta: { width: '10rem' },
-        cell: ({ row }) => <span title={row.original.used_by}>{row.original.used_by || '-'}</span>,
+        cell: ({ row }) => {
+          const v = row.original
+          if (!v.used_by) return <span>-</span>
+          return (
+            <button
+              type="button"
+              className="text-primary underline-offset-2 hover:underline"
+              onClick={() => {
+                setNextContainerSearch(serverId, v.name)
+                navigateWorkspace({ tab: 'containers', serverId, containerSearch: v.name })
+              }}
+            >
+              {v.used_by}
+            </button>
+          )
+        },
       },
       {
         id: 'mountpoint',
@@ -110,7 +126,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         },
       },
     ],
-    []
+    [serverId]
   )
 
   return (
