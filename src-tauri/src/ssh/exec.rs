@@ -26,8 +26,11 @@ pub fn ssh_exec(config: &ServerConfig, command: &str) -> Result<String, String> 
 
     if exit_code != 0 {
         let stderr = String::from_utf8_lossy(&stderr_buf).trim().to_string();
+        let stdout_trimmed = stdout.trim().to_string();
         let msg = if !stderr.is_empty() {
             stderr
+        } else if !stdout_trimmed.is_empty() {
+            stdout_trimmed
         } else {
             format!("命令失败，退出码: {}", exit_code)
         };

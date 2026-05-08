@@ -76,6 +76,14 @@ pub fn run() {
             commands::terminal::open_terminal,
             commands::terminal::open_container_exec_terminal,
             commands::terminal::close_terminal,
+            commands::appstore::sync_appstore,
+            commands::appstore::list_apps,
+            commands::appstore::get_app_detail,
+            commands::appstore::install_app,
+            commands::appstore::uninstall_app,
+            commands::appstore::list_installed_apps,
+            commands::appstore::operate_installed_app,
+            commands::appstore::get_installed_app_status,
         ])
         .events(collect_events![
             DockerStreamPayload,

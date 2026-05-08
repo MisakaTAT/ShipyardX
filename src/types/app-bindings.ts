@@ -56,6 +56,14 @@ export const commands = {
 	openTerminal: (serverId: string, cols: number, rows: number) => __TAURI_INVOKE<TerminalSession>("open_terminal", { serverId, cols, rows }),
 	openContainerExecTerminal: (serverId: string, params: ContainerExecTerminalParams) => __TAURI_INVOKE<TerminalSession>("open_container_exec_terminal", { serverId, params }),
 	closeTerminal: (sessionId: string) => __TAURI_INVOKE<null>("close_terminal", { sessionId }),
+	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
+	listApps: () => __TAURI_INVOKE<AppListItem[]>("list_apps"),
+	getAppDetail: (appKey: string) => __TAURI_INVOKE<AppDetail_Serialize>("get_app_detail", { appKey }),
+	installApp: (serverId: string, req: InstallAppRequest) => __TAURI_INVOKE<InstalledApp>("install_app", { serverId, req }),
+	uninstallApp: (installId: string) => __TAURI_INVOKE<null>("uninstall_app", { installId }),
+	listInstalledApps: (serverId: string | null) => __TAURI_INVOKE<InstalledApp[]>("list_installed_apps", { serverId }),
+	operateInstalledApp: (installId: string, operation: string) => __TAURI_INVOKE<string>("operate_installed_app", { installId, operation }),
+	getInstalledAppStatus: (installId: string) => __TAURI_INVOKE<string>("get_installed_app_status", { installId }),
 };
 
 /** Events */
@@ -69,6 +77,74 @@ export const events = {
 };
 
 /* Types */
+// 传递给前端的应用详情
+export type AppDetail = AppDetail_Serialize | AppDetail_Deserialize;
+
+// 传递给前端的应用详情
+export type AppDetail_Deserialize = {
+	key: string,
+	name: string,
+	tags: string[],
+	description: DescriptionI18n,
+	short_desc_zh: string,
+	short_desc_en: string,
+	website: string,
+	github: string,
+	document: string,
+	icon: string,
+	installed: boolean,
+	versions: AppVersionInfo_Deserialize[],
+	readme_zh: string,
+	readme_en: string,
+};
+
+// 传递给前端的应用详情
+export type AppDetail_Serialize = {
+	key: string,
+	name: string,
+	tags: string[],
+	description: DescriptionI18n,
+	short_desc_zh: string,
+	short_desc_en: string,
+	website: string,
+	github: string,
+	document: string,
+	icon: string,
+	installed: boolean,
+	versions: AppVersionInfo_Serialize[],
+	readme_zh: string,
+	readme_en: string,
+};
+
+// 传递给前端的应用列表项（含已安装状态）
+export type AppListItem = {
+	key: string,
+	name: string,
+	type: string,
+	tags: string[],
+	description: string,
+	short_desc_zh: string,
+	short_desc_en: string,
+	website: string,
+	icon: string,
+	installed: boolean,
+	versions: string[],
+};
+
+export type AppVersionInfo = AppVersionInfo_Serialize | AppVersionInfo_Deserialize;
+
+export type AppVersionInfo_Deserialize = {
+	version: string,
+	form_fields: FormField_Deserialize[],
+	compose_preview: string,
+};
+
+export type AppVersionInfo_Serialize = {
+	version: string,
+	form_fields: FormField_Serialize[],
+	compose_preview: string,
+};
+
 export type Container = {
 	id: string,
 	name: string,
@@ -120,6 +196,19 @@ export type DaemonUpdate = {
 	cgroup_driver: string,
 	socket_path: string,
 	sudo_password: string | null,
+};
+
+export type DescriptionI18n = {
+	en?: string,
+	"es-es"?: string,
+	ja?: string,
+	ms?: string,
+	"pt-br"?: string,
+	ru?: string,
+	ko?: string,
+	"zh-Hant"?: string,
+	zh?: string,
+	tr?: string,
 };
 
 export type DockerEngineInfo = {
@@ -185,6 +274,48 @@ export type DockerStreamStatus = {
 
 export type EventStreamStatus = "connecting" | "connected" | "disconnected" | "stopped";
 
+export type FormField = FormField_Serialize | FormField_Deserialize;
+
+export type FormFieldLabel = {
+	en?: string,
+	"es-es"?: string,
+	ja?: string,
+	ms?: string,
+	"pt-br"?: string,
+	ru?: string,
+	ko?: string,
+	"zh-Hant"?: string,
+	zh?: string,
+	tr?: string,
+};
+
+export type FormFieldValue = {
+	label: string,
+	value: string,
+};
+
+export type FormField_Deserialize = {
+	envKey: string,
+	default?: string,
+	label: FormFieldLabel,
+	required?: boolean,
+	type?: string,
+	values?: FormFieldValue[],
+	random?: boolean,
+	rule?: string,
+};
+
+export type FormField_Serialize = {
+	envKey: string,
+	default: string,
+	label: FormFieldLabel,
+	required: boolean,
+	type: string,
+	values: FormFieldValue[],
+	random: boolean,
+	rule: string,
+};
+
 export type Image = {
 	id: string,
 	repository: string,
@@ -200,6 +331,27 @@ export type ImageLayer = {
 	size: number,
 	command: string,
 	comment: string,
+};
+
+// 安装应用的请求参数
+export type InstallAppRequest = {
+	server_id: string,
+	app_key: string,
+	version: string,
+	// 用户填写的环境变量值，key=envKey, value=用户输入
+	env_values: { [key in string]: string },
+};
+
+// 已安装的应用信息
+export type InstalledApp = {
+	install_id: string,
+	app_key: string,
+	app_name: string,
+	version: string,
+	server_id: string,
+	install_path: string,
+	status: string,
+	created_at: string,
 };
 
 export type LocalAddress = {
