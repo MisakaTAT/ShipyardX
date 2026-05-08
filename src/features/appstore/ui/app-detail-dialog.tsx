@@ -5,6 +5,8 @@ import { StandardDialog } from '@/shared/components/standard-dialog'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
 import type { ServerConfig } from '@/types/app-bindings'
+import { marked } from 'marked'
+import Editor from '@monaco-editor/react'
 
 const TAG_LABELS: Record<string, string> = {
   Tool: '工具',
@@ -169,14 +171,12 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
             )}
           </div>
 
-          {/* README preview */}
+          {/* README */}
           {detail.readme_zh && (
-            <div className="max-h-40 overflow-auto rounded-lg border border-border bg-muted/30 p-3">
-              <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                {detail.readme_zh.slice(0, 2000)}
-                {detail.readme_zh.length > 2000 ? '...' : ''}
-              </pre>
-            </div>
+            <div
+              className="max-h-64 overflow-auto rounded-lg border border-border p-3 text-xs leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-[13px] [&_h3]:font-medium [&_p]:my-1.5 [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_code]:text-[11px] [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[11px] [&_pre]:overflow-x-auto"
+              dangerouslySetInnerHTML={{ __html: marked(detail.readme_zh) as string }}
+            />
           )}
 
           {/* Version selection */}
@@ -226,15 +226,34 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
             </div>
           )}
 
-          {/* Docker Compose preview */}
+          {/* Docker Compose 配置 */}
           {selectedVersion && (
             <div>
               <h4 className="mb-2 text-[13px] font-medium text-foreground">Docker Compose 配置</h4>
-              <pre className="max-h-48 overflow-auto rounded-lg border border-border bg-muted p-3">
-                <code className="text-[11px] leading-relaxed text-muted-foreground">
-                  {selectedVersion.compose_preview}
-                </code>
-              </pre>
+              <div className="overflow-hidden rounded-lg border border-border" style={{ background: '#1e1e1e' }}>
+                <Editor
+                  height="260px"
+                  language="yaml"
+                  theme="vs-dark"
+                  value={selectedVersion.compose_preview}
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on' as const,
+                    fontSize: 12,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    tabSize: 2,
+                    lineNumbers: 'on' as const,
+                    renderLineHighlight: 'none' as const,
+                    padding: { top: 12, bottom: 12 },
+                    folding: true,
+                    overviewRulerLanes: 0,
+                    hideCursorInOverviewRuler: true,
+                    automaticLayout: true,
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
