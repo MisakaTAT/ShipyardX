@@ -1,8 +1,15 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use specta::Type;
 
-/// 1Panel App Store 应用根 data.yml 结构
-/// 注意：实际 1Panel appstore 的 data.yml 中 description 是普通字符串，i18n 在 additionalProperties 里
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum YamlPrimitive {
+    String(String),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct AppManifest {
     pub name: String,
@@ -65,7 +72,6 @@ pub struct AppAdditional {
     pub document: Option<String>,
 }
 
-/// 版本子目录下的版本 data.yml 结构
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct VersionManifest {
     #[serde(rename = "additionalProperties")]
@@ -137,20 +143,6 @@ pub struct FormFieldValue {
     pub value: String,
 }
 
-/// 已安装的应用信息
-#[derive(Debug, Serialize, Deserialize, Clone, Type)]
-pub struct InstalledApp {
-    pub install_id: String,
-    pub app_key: String,
-    pub app_name: String,
-    pub version: String,
-    pub server_id: String,
-    pub install_path: String,
-    pub status: String, // running, stopped, error, unknown
-    pub created_at: String,
-}
-
-/// 传递给前端的应用列表项（含已安装状态）
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct AppListItem {
     pub key: String,
@@ -163,11 +155,9 @@ pub struct AppListItem {
     pub short_desc_en: String,
     pub website: String,
     pub icon: String, // base64
-    pub installed: bool,
     pub versions: Vec<String>,
 }
 
-/// 传递给前端的应用详情
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct AppDetail {
     pub key: String,
@@ -180,7 +170,6 @@ pub struct AppDetail {
     pub github: String,
     pub document: String,
     pub icon: String,
-    pub installed: bool,
     pub versions: Vec<AppVersionInfo>,
     pub readme_zh: String,
     pub readme_en: String,
@@ -190,64 +179,24 @@ pub struct AppDetail {
 pub struct AppVersionInfo {
     pub version: String,
     pub form_fields: Vec<FormField>,
-    pub compose_preview: String, // docker-compose.yml 内容预览
+    pub compose_preview: String,
 }
 
-/// 安装应用的请求参数
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
-pub struct InstallAppRequest {
+pub struct InstallApp {
     pub server_id: String,
     pub app_key: String,
     pub version: String,
-    /// 用户填写的环境变量值，key=envKey, value=用户输入
     pub env_values: std::collections::HashMap<String, String>,
 }
 
-/// 自定义反序列化：将 YAML 中的数字/布尔值转为字符串
-fn deser_opt_string_from_any<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    use serde::de::Visitor;
-    use std::fmt;
-
-    struct AnyToString;
-
-    impl<'de> Visitor<'de> for AnyToString {
-        type Value = Option<String>;
-
-        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "a string, number, or boolean")
-        }
-
-        fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-            Ok(if v.is_empty() { None } else { Some(v.to_string()) })
-        }
-
-        fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
-            Ok(if v.is_empty() { None } else { Some(v) })
-        }
-
-        fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<Self::Value, E> {
-            Ok(Some(v.to_string()))
-        }
-
-        fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<Self::Value, E> {
-            Ok(Some(v.to_string()))
-        }
-
-        fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<Self::Value, E> {
-            Ok(Some(v.to_string()))
-        }
-
-        fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Self::Value, E> {
-            Ok(Some(v.to_string()))
-        }
-
-        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
-            Ok(None)
-        }
-    }
-
-    deserializer.deserialize_any(AnyToString)
+fn deser_opt_string_from_any<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Ok(match Option::<YamlPrimitive>::deserialize(d)? {
+        None => None,
+        Some(YamlPrimitive::String(s)) if s.is_empty() => None,
+        Some(YamlPrimitive::String(s)) => Some(s),
+        Some(YamlPrimitive::Int(n)) => Some(n.to_string()),
+        Some(YamlPrimitive::Float(f)) => Some(f.to_string()),
+        Some(YamlPrimitive::Bool(b)) => Some(b.to_string()),
+    })
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Search, Server as ServerIcon } from 'lucide-react'
+import { Loader2, Plus, Search, Server as ServerIcon } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import ServerDialog from '@/features/servers/ui/server-dialog'
 import { Button } from '@/shared/ui/button'
@@ -12,7 +12,7 @@ interface ConnectionsProps {
 }
 
 export default function Connections({ onConnect }: ConnectionsProps) {
-  const { data: servers = [] } = useServers()
+  const { data: servers = [], isLoading, isFetching } = useServers()
   const deleteServer = useDeleteServer()
   const setServers = useSetServers()
 
@@ -28,6 +28,14 @@ export default function Connections({ onConnect }: ConnectionsProps) {
   const openAdd = () => {
     setEditingServer(null)
     setShowDialog(true)
+  }
+
+  if (isLoading || (isFetching && servers.length === 0)) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -51,7 +59,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                 value={search}
                 onChange={setSearch}
                 placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
-                className="mt-4 w-full"
+                className="mt-3 w-full"
               />
             </div>
           ) : null}
@@ -65,8 +73,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                   </div>
                   <h2 className="text-sm font-semibold text-foreground">尚未配置远程服务器</h2>
                   <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    配置完成后，可在此查看系统概览、管理 Docker
-                    容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
+                    立即配置连接，便捷管理 Docker 容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
                   </p>
                   <div className="mt-5">
                     <Button onClick={openAdd}>

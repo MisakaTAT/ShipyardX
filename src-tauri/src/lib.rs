@@ -15,7 +15,7 @@ use std::sync::Mutex;
 use config::store::{get_data_file, load_servers};
 use models::app::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
-    DockerStreamStatus, EventStreamStatus,
+    DockerStreamStatus, EventStreamStatus, InstallStepEvent,
 };
 use specta_typescript::Typescript;
 use tauri::Manager;
@@ -80,10 +80,6 @@ pub fn run() {
             commands::appstore::list_apps,
             commands::appstore::get_app_detail,
             commands::appstore::install_app,
-            commands::appstore::uninstall_app,
-            commands::appstore::list_installed_apps,
-            commands::appstore::operate_installed_app,
-            commands::appstore::get_installed_app_status,
         ])
         .events(collect_events![
             DockerStreamPayload,
@@ -92,6 +88,7 @@ pub fn run() {
             DockerStreamError,
             DockerSshStreamChunk,
             DockerSshStreamDone,
+            InstallStepEvent,
         ])
         .typ::<EventStreamStatus>();
 

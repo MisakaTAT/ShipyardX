@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeftRight, Play, Plus, Search, Square } from 'lucide-react'
+import { ArrowLeftRight, Loader2, Play, Plus, Search, Square } from 'lucide-react'
 import type { PortForward } from '@/types/app-bindings'
 import PortForwardCreateDialog from '@/features/port-forward/ui/port-forward-create-dialog'
 import { Button } from '@/shared/ui/button'
@@ -37,7 +37,7 @@ export default function PortForwardPage() {
 
   const enabledCount = rules.filter((r) => r.enabled).length
   const runningCount = rules.filter((r) => r.running).length
-  usePortForwardPolling(runningCount > 0)
+  usePortForwardPolling(rulesLoading ? false : runningCount > 0)
 
   const filteredRules: PortForward[] = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -71,6 +71,14 @@ export default function PortForwardPage() {
       }),
     [serverById, speeds, setEnabled, remove]
   )
+
+  if (rulesLoading && rules.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -113,7 +121,7 @@ export default function PortForwardPage() {
                 value={search}
                 onChange={setSearch}
                 placeholder='搜索主机、容器、端口或错误信息… ("/" 快速聚焦)'
-                className="mt-4 w-full"
+                className="mt-3 w-full"
               />
             </div>
           ) : null}

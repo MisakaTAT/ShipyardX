@@ -1,44 +1,78 @@
-import { useEffect, useState } from 'react'
-import { Globe, Loader2, ServerIcon, Store } from 'lucide-react'
-import { useAppDetail, useInstallApp, type FormField, type AppVersionInfo } from '@/features/appstore/api/use-appstore'
+import { useEffect, useState, useCallback } from 'react'
+import { CheckCircle2, Circle, Globe, Loader2, Stone, XCircle } from 'lucide-react'
+import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstore'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
-import type { ServerConfig } from '@/types/app-bindings'
-import { marked } from 'marked'
+import type { AppVersionInfo_Serialize, FormField_Serialize, ServerConfig } from '@/types/app-bindings'
+import { listen } from '@tauri-apps/api/event'
 import Editor from '@monaco-editor/react'
+import { HighlightLog } from '@/features/appstore/ui/highlight-log'
+import { MarkdownViewer } from '@/features/appstore/ui/markdown-viewer'
 
-const TAG_LABELS: Record<string, string> = {
-  Tool: '工具',
-  Runtime: '运行时',
-  Website: '网站',
-  Database: '数据库',
-  Storage: '存储',
-  Monitoring: '监控',
-  AI: 'AI',
-  VPN: 'VPN',
-  CMS: 'CMS',
-  DevOps: 'DevOps',
-  Security: '安全',
-  Media: '媒体',
-  Game: '游戏',
-  Other: '其他',
+interface InstallStep {
+  step: string
+  status: string
+  message: string
+  output_chunk?: string
+}
+
+const STEP_LABELS: Record<string, string> = {
+  prepare: '准备部署模板',
+  deploy: '部署文件',
+  network: '创建网络',
+  start: '启动容器',
 }
 
 interface AppDetailDialogProps {
   appKey: string | null
   servers: ServerConfig[]
+  mode: 'readme' | 'install'
   onClose: () => void
 }
 
-export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogProps) {
+export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDialogProps) {
   const { data: detail, isLoading } = useAppDetail(appKey)
   const install = useInstallApp()
-  const [selectedVersion, setSelectedVersion] = useState<AppVersionInfo | null>(null)
+  const [selectedVersion, setSelectedVersion] = useState<AppVersionInfo_Serialize | null>(null)
   const [selectedServerId, setSelectedServerId] = useState<string>('')
   const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [installSteps, setInstallSteps] = useState<Map<string, InstallStep>>(new Map())
+  const [stepOutputs, setStepOutputs] = useState<Map<string, string[]>>(new Map())
 
-  // 自动预选第一台服务器（必须在条件返回之前调用）
+  // 监听安装步骤事件
+  useEffect(() => {
+    const unlisten = listen<InstallStep>('install-step-event', (event) => {
+      const payload = event.payload
+      if (payload.output_chunk) {
+        // 流式输出片段
+        setStepOutputs((prev) => {
+          const next = new Map(prev)
+          const existing = next.get(payload.step) || []
+          next.set(payload.step, [...existing, payload.output_chunk!])
+          return next
+        })
+      } else if (payload.step) {
+        // 状态变更
+        setInstallSteps((prev) => {
+          const next = new Map(prev)
+          next.set(payload.step, payload)
+          return next
+        })
+      }
+    })
+    return () => {
+      unlisten.then((fn) => fn())
+    }
+  }, [])
+
+  // 重置安装状态
+  const resetInstall = useCallback(() => {
+    setInstallSteps(new Map())
+    setStepOutputs(new Map())
+  }, [])
+
+  // 自动预选第一台服务器
   useEffect(() => {
     if (appKey && servers.length > 0 && !selectedServerId) {
       setSelectedServerId(servers[0].id)
@@ -52,6 +86,8 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
       setSelectedVersion(null)
       setSelectedServerId('')
       setFormValues({})
+      resetInstall()
+      install.reset()
       onClose()
     }
   }
@@ -59,6 +95,7 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
   const handleInstall = () => {
     if (!detail || !selectedVersion || !selectedServerId) return
 
+    resetInstall()
     install.mutate({
       serverId: selectedServerId,
       req: {
@@ -81,13 +118,18 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
       open={!!appKey}
       onOpenChange={handleOpenChange}
       title={isLoadingContent ? '加载中...' : detail.name}
-      icon={Store}
+      icon={Stone}
       widthClassName="w-[640px]"
       footer={
-        selectedVersion ? (
+        mode === 'readme' ? null : install.isSuccess || install.isError ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
+              关闭
+            </Button>
+          </div>
+        ) : selectedVersion ? (
           <div className="flex items-center justify-end gap-2">
             <div className="flex items-center gap-1.5">
-              <ServerIcon className="size-3.5 text-muted-foreground" />
               <select
                 value={selectedServerId}
                 onChange={(e) => setSelectedServerId(e.target.value)}
@@ -101,7 +143,7 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
                 ))}
               </select>
             </div>
-            <Button onClick={handleInstall} disabled={install.isPending || !selectedServerId} size="sm">
+            <Button onClick={handleInstall} disabled={install.isPending || !selectedServerId}>
               {install.isPending && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
               安装
             </Button>
@@ -113,9 +155,9 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
-      ) : (
+      ) : mode === 'readme' ? (
+        /* Readme 浏览 */
         <div className="space-y-4">
-          {/* Header info */}
           <div className="flex items-start gap-3">
             {detail.icon && (
               <img
@@ -131,19 +173,12 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
               <div className="mt-2 flex flex-wrap gap-1">
                 {detail.tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="text-[10px]">
-                    {TAG_LABELS[tag] || tag}
+                    {tag}
                   </Badge>
                 ))}
-                {detail.installed && (
-                  <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                    已安装
-                  </Badge>
-                )}
               </div>
             </div>
           </div>
-
-          {/* Links */}
           <div className="flex gap-2">
             {detail.website && (
               <a
@@ -170,15 +205,50 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
               </a>
             )}
           </div>
-
-          {/* README */}
-          {detail.readme_zh && (
-            <div
-              className="max-h-64 overflow-auto rounded-lg border border-border p-3 text-xs leading-relaxed [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h3]:text-[13px] [&_h3]:font-medium [&_p]:my-1.5 [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_code]:text-[11px] [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[11px] [&_pre]:overflow-x-auto"
-              dangerouslySetInnerHTML={{ __html: marked(detail.readme_zh) as string }}
-            />
-          )}
-
+          {detail.readme_zh && <MarkdownViewer content={detail.readme_zh} />}
+        </div>
+      ) : install.isPending || install.isSuccess || install.isError ? (
+        /* 安装进度 / 结果 */
+        <div className="space-y-1 py-2">
+          {['prepare', 'deploy', 'network', 'start'].map((stepKey) => {
+            const step = installSteps.get(stepKey)
+            const label = STEP_LABELS[stepKey] || stepKey
+            const isRunning = step?.status === 'running'
+            const isDone = step?.status === 'done'
+            const isError = step?.status === 'error'
+            const outputs = stepOutputs.get(stepKey) || []
+            const hasOutput = outputs.length > 0
+            return (
+              <div key={stepKey}>
+                <div
+                  className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-xs transition-colors ${
+                    isRunning ? 'bg-accent text-foreground' : ''
+                  }${isError ? 'bg-red-500/10 text-red-600 dark:text-red-400' : ''}${
+                    isDone ? 'text-muted-foreground' : ''
+                  }${!step ? 'text-muted-foreground/40' : ''}`}
+                >
+                  {isDone ? (
+                    <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500" />
+                  ) : isError ? (
+                    <XCircle className="size-3.5 shrink-0 text-red-500" />
+                  ) : isRunning ? (
+                    <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+                  ) : (
+                    <Circle className="size-3.5 shrink-0" />
+                  )}
+                  <span>{label}</span>
+                  {step?.message && !hasOutput && (
+                    <span className="ml-auto max-w-[200px] truncate text-[11px]">{step.message}</span>
+                  )}
+                </div>
+                {/* 实时输出日志 */}
+                {hasOutput && <HighlightLog outputs={outputs} />}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="space-y-4">
           {/* Version selection */}
           <div>
             <h4 className="mb-2 text-[13px] font-medium text-foreground">选择版本</h4>
@@ -197,7 +267,7 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
                     const defaults: Record<string, string> = {}
                     for (const field of v.form_fields) {
                       if (field.default) {
-                        defaults[field.env_key] = field.default
+                        defaults[field.envKey] = field.default
                       }
                     }
                     setFormValues(defaults)
@@ -216,10 +286,10 @@ export function AppDetailDialog({ appKey, servers, onClose }: AppDetailDialogPro
               <div className="space-y-3">
                 {selectedVersion.form_fields.map((field) => (
                   <FormFieldInput
-                    key={field.env_key}
+                    key={field.envKey}
                     field={field}
-                    value={formValues[field.env_key] || ''}
-                    onChange={(v) => handleValueChange(field.env_key, v)}
+                    value={formValues[field.envKey] || ''}
+                    onChange={(v) => handleValueChange(field.envKey, v)}
                   />
                 ))}
               </div>
@@ -267,11 +337,11 @@ function FormFieldInput({
   value,
   onChange,
 }: {
-  field: FormField
+  field: FormField_Serialize
   value: string
   onChange: (value: string) => void
 }) {
-  const label = field.label?.zh || field.label?.en || field.env_key
+  const label = field.label?.zh || field.label?.en || field.envKey
   const isPassword = field.type === 'password'
   const fieldType = isPassword ? 'password' : 'text'
 

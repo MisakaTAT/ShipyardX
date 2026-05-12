@@ -59,11 +59,7 @@ export const commands = {
 	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
 	listApps: () => __TAURI_INVOKE<AppListItem[]>("list_apps"),
 	getAppDetail: (appKey: string) => __TAURI_INVOKE<AppDetail_Serialize>("get_app_detail", { appKey }),
-	installApp: (serverId: string, req: InstallAppRequest) => __TAURI_INVOKE<InstalledApp>("install_app", { serverId, req }),
-	uninstallApp: (installId: string) => __TAURI_INVOKE<null>("uninstall_app", { installId }),
-	listInstalledApps: (serverId: string | null) => __TAURI_INVOKE<InstalledApp[]>("list_installed_apps", { serverId }),
-	operateInstalledApp: (installId: string, operation: string) => __TAURI_INVOKE<string>("operate_installed_app", { installId, operation }),
-	getInstalledAppStatus: (installId: string) => __TAURI_INVOKE<string>("get_installed_app_status", { installId }),
+	installApp: (serverId: string, req: InstallApp) => __TAURI_INVOKE<null>("install_app", { serverId, req }),
 };
 
 /** Events */
@@ -74,13 +70,12 @@ export const events = {
 	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
 	dockerStreamStatus: makeEvent<DockerStreamStatus>("docker-stream-status"),
+	installStepEvent: makeEvent<InstallStepEvent>("install-step-event"),
 };
 
 /* Types */
-// 传递给前端的应用详情
 export type AppDetail = AppDetail_Serialize | AppDetail_Deserialize;
 
-// 传递给前端的应用详情
 export type AppDetail_Deserialize = {
 	key: string,
 	name: string,
@@ -92,13 +87,11 @@ export type AppDetail_Deserialize = {
 	github: string,
 	document: string,
 	icon: string,
-	installed: boolean,
 	versions: AppVersionInfo_Deserialize[],
 	readme_zh: string,
 	readme_en: string,
 };
 
-// 传递给前端的应用详情
 export type AppDetail_Serialize = {
 	key: string,
 	name: string,
@@ -110,13 +103,11 @@ export type AppDetail_Serialize = {
 	github: string,
 	document: string,
 	icon: string,
-	installed: boolean,
 	versions: AppVersionInfo_Serialize[],
 	readme_zh: string,
 	readme_en: string,
 };
 
-// 传递给前端的应用列表项（含已安装状态）
 export type AppListItem = {
 	key: string,
 	name: string,
@@ -127,7 +118,6 @@ export type AppListItem = {
 	short_desc_en: string,
 	website: string,
 	icon: string,
-	installed: boolean,
 	versions: string[],
 };
 
@@ -333,25 +323,18 @@ export type ImageLayer = {
 	comment: string,
 };
 
-// 安装应用的请求参数
-export type InstallAppRequest = {
+export type InstallApp = {
 	server_id: string,
 	app_key: string,
 	version: string,
-	// 用户填写的环境变量值，key=envKey, value=用户输入
 	env_values: { [key in string]: string },
 };
 
-// 已安装的应用信息
-export type InstalledApp = {
-	install_id: string,
-	app_key: string,
-	app_name: string,
-	version: string,
-	server_id: string,
-	install_path: string,
+export type InstallStepEvent = {
+	step: string,
 	status: string,
-	created_at: string,
+	message: string,
+	output_chunk: string | null,
 };
 
 export type LocalAddress = {
