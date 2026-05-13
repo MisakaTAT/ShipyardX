@@ -209,7 +209,7 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
         </div>
       ) : install.isPending || install.isSuccess || install.isError ? (
         /* 安装进度 / 结果 */
-        <div className="space-y-1 py-2">
+        <div>
           {['prepare', 'deploy', 'network', 'start'].map((stepKey) => {
             const step = installSteps.get(stepKey)
             const label = STEP_LABELS[stepKey] || stepKey
