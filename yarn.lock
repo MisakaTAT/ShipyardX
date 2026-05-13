@@ -5203,7 +5203,6 @@ __metadata:
     typescript-eslint: "npm:^8.59.0"
     vite: "npm:^7.0.4"
     wouter: "npm:3"
-    zero-md: "npm:^3.1.7"
     zod: "npm:^4.3.6"
   languageName: unknown
   linkType: soft
@@ -5930,13 +5929,6 @@ __metadata:
   version: 2.1.2
   resolution: "yoctocolors@npm:2.1.2"
   checksum: 10c0/b220f30f53ebc2167330c3adc86a3c7f158bcba0236f6c67e25644c3188e2571a6014ffc1321943bb619460259d3d27eb4c9cc58c2d884c1b195805883ec7066
-  languageName: node
-  linkType: hard
-
-"zero-md@npm:^3.1.7":
-  version: 3.1.7
-  resolution: "zero-md@npm:3.1.7"
-  checksum: 10c0/3632249324155ef9732d6b07ab3d07b9e84894901492796e9b19418aa8b1948348b2d6b1578a631763d63913c7c9a51118134667d18154871f41010252190a6f
   languageName: node
   linkType: hard
 
