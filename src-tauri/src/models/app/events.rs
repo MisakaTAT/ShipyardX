@@ -59,3 +59,11 @@ pub struct DockerSshStreamDone {
     pub stream_id: String,
     pub success: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct InstallStepEvent {
+    pub step: String,
+    pub status: String,
+    pub message: String,
+    pub output_chunk: Option<String>,
+}

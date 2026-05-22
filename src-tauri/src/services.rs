@@ -1,3 +1,4 @@
+pub mod appstore;
 pub mod containers;
 pub mod docker_events;
 pub mod images;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { commands } from '@/types/app-bindings'
 
@@ -6,6 +6,7 @@ export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | '
 
 export function useDockerAccess(serverId: string) {
   const [status, setStatus] = useState<DockerStatus>('checking')
+  const ran = useRef(false)
 
   const check = useCallback(
     async (notify = false) => {
@@ -32,6 +33,8 @@ export function useDockerAccess(serverId: string) {
   )
 
   useEffect(() => {
+    if (ran.current) return
+    ran.current = true
     void check()
   }, [check])
 

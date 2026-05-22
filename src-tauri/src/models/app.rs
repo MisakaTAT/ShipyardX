@@ -1,3 +1,4 @@
+pub mod appstore;
 pub mod container;
 pub mod daemon;
 pub mod events;
