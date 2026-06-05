@@ -4,7 +4,6 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use russh::ChannelMsg;
-use serde::Deserialize;
 use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
 use tungstenite::protocol::Message;
@@ -13,9 +12,9 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
+use crate::contracts::frontend::server::ServerConfig;
+use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
-use crate::models::app::server::ServerConfig;
-use crate::models::app::terminal::{ContainerExecTerminalParams, TerminalSession, WsServerMsg};
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
@@ -250,15 +249,6 @@ async fn run_terminal_io_loop(
             _ = tokio::time::sleep(Duration::from_millis(TERMINAL_SSH_READ_POLL_MS as u64)) => {}
         }
     }
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum WsClientCtrl {
-    #[serde(rename = "resize")]
-    Resize { cols: u32, rows: u32 },
-    #[serde(rename = "close")]
-    Close,
 }
 
 fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {

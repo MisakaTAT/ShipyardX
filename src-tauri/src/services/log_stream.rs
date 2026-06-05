@@ -2,8 +2,8 @@ use std::sync::mpsc;
 
 use tauri::{AppHandle, Emitter, State};
 
+use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
-use crate::models::app::server::ServerConfig;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 

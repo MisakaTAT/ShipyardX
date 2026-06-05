@@ -2,11 +2,11 @@ use tauri::State;
 
 use std::collections::HashMap;
 
+use crate::contracts::docker_api::container::ContainerSummary;
+use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList};
+use crate::contracts::frontend::volume::Volume;
 use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response};
 use crate::error::{AppError, AppResult};
-use crate::models::app::volume::Volume;
-use crate::models::docker::container::ContainerSummary;
-use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 

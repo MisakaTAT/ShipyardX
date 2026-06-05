@@ -1,7 +1,7 @@
-use crate::models::app::container::Container;
-use crate::models::app::image::Image;
-use crate::models::docker::container::{ContainerSummary, PortBinding};
-use crate::models::docker::image::ImageSummary;
+use crate::contracts::docker_api::container::{ContainerSummary, PortBinding};
+use crate::contracts::docker_api::image::ImageSummary;
+use crate::contracts::frontend::container::Container;
+use crate::contracts::frontend::image::Image;
 
 fn format_ports(ports: &[PortBinding]) -> String {
     ports

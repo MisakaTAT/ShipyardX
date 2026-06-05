@@ -1,10 +1,10 @@
 use tauri::State;
 
 use crate::config::store::save_servers;
+use crate::contracts::docker_api::common::DockerVersion;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_get_async;
 use crate::error::AppResult;
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::common::DockerVersion;
 use crate::state::{AppState, get_server_config};
 use crate::utils::id::generate_id;
 

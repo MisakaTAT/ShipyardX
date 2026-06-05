@@ -1,7 +1,7 @@
 use tauri::State;
 
+use crate::contracts::frontend::network::{Network, NetworkCreate};
 use crate::error::AppResult;
-use crate::models::app::network::{Network, NetworkCreate};
 use crate::services;
 use crate::state::AppState;
 

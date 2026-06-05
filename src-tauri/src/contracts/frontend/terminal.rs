@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::error::AppError;
+use crate::contracts::frontend::error::AppError;
 
 #[derive(Debug, Deserialize, Type)]
 pub struct ContainerExecTerminalParams {
@@ -19,6 +19,15 @@ pub enum WsServerMsg {
     Closed,
     #[serde(rename = "error")]
     Error { error: AppError },
+}
+
+#[derive(Debug, Deserialize, Type)]
+#[serde(tag = "type")]
+pub enum WsClientCtrl {
+    #[serde(rename = "resize")]
+    Resize { cols: u32, rows: u32 },
+    #[serde(rename = "close")]
+    Close,
 }
 
 impl WsServerMsg {

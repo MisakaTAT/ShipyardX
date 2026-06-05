@@ -4,13 +4,13 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
-use crate::docker::client::docker_stream_async;
-use crate::error::{AppError, AppResult};
-use crate::models::app::events::{
+use crate::contracts::docker_api::events::StreamEvent;
+use crate::contracts::frontend::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::events::StreamEvent;
+use crate::contracts::frontend::server::ServerConfig;
+use crate::docker::client::docker_stream_async;
+use crate::error::{AppError, AppResult};
 use crate::ssh::client::block_on;
 use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;

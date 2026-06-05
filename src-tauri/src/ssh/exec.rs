@@ -1,7 +1,7 @@
 use russh::ChannelMsg;
 
+use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::models::app::server::ServerConfig;
 
 use super::client::{connect, disconnect};
 

@@ -8,10 +8,12 @@ use tokio::fs;
 use tokio::process::Command;
 use uuid::Uuid;
 
+use crate::contracts::frontend::appstore::{
+    AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest,
+};
+use crate::contracts::frontend::events::InstallStepEvent;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::models::app::appstore::{AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest};
-use crate::models::app::events::InstallStepEvent;
-use crate::models::app::server::ServerConfig;
 use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async};
 
 const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
@@ -25,7 +27,7 @@ fn apps_dir(cache_dir: &Path) -> PathBuf {
     cache_dir.join("apps")
 }
 
-fn pick_description(desc: &crate::models::app::appstore::DescriptionI18n) -> String {
+fn pick_description(desc: &crate::contracts::frontend::appstore::DescriptionI18n) -> String {
     if !desc.zh.is_empty() {
         return desc.zh.clone();
     }

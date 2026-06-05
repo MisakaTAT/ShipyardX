@@ -4,14 +4,14 @@ use russh::ChannelMsg;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
+use crate::contracts::docker_api::container::ContainerSummary;
+use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
+use crate::contracts::frontend::events::{DockerSshStreamChunk, DockerSshStreamDone};
+use crate::contracts::frontend::image::Image;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{docker_delete_async, docker_get_async, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
-use crate::models::app::events::{DockerSshStreamChunk, DockerSshStreamDone};
-use crate::models::app::image::Image;
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::container::ContainerSummary;
-use crate::models::docker::image::{ImageHistoryItem, ImageSummary};
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
@@ -55,14 +55,14 @@ pub async fn get_image_history(
     server_id: String,
     image_id: String,
     state: State<'_, AppState>,
-) -> AppResult<Vec<crate::models::app::image::ImageLayer>> {
+) -> AppResult<Vec<crate::contracts::frontend::image::ImageLayer>> {
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, &format!("/images/{}/history", image_id)).await?;
     let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("image.history_parse_failed", "解析镜像历史失败").with_source(e))?;
     Ok(api
         .into_iter()
-        .map(|l| crate::models::app::image::ImageLayer {
+        .map(|l| crate::contracts::frontend::image::ImageLayer {
             id: l.id,
             created_ts: l.created,
             size: l.size,

@@ -10,10 +10,10 @@ use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use russh::client;
 
+use crate::contracts::docker_api::common::DockerError;
+use crate::contracts::docker_api::system::DaemonConfig;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppErrorKind, AppResult};
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::common::DockerError;
-use crate::models::docker::system::DaemonConfig;
 use crate::ssh::client::{SshClientHandler, connect, disconnect};
 use crate::ssh::exec::ssh_exec_async;
 
@@ -22,7 +22,7 @@ const READ_DAEMON_CONFIG_CMD: &str =
     "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
 
 #[derive(Clone, Debug)]
-pub enum DockerEndpoint {
+pub(crate) enum DockerEndpoint {
     Unix { path: String },
     Tcp { host: String, port: u16 },
 }
@@ -36,7 +36,7 @@ fn cache_key(config: &ServerConfig) -> String {
     format!("{}@{}:{}", config.username, config.host, config.port)
 }
 
-pub fn invalidate_docker_endpoint(config: &ServerConfig) {
+pub(crate) fn invalidate_docker_endpoint(config: &ServerConfig) {
     endpoint_cache().lock().unwrap().remove(&cache_key(config));
 }
 
@@ -81,7 +81,7 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
     ))
 }
 
-pub async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerEndpoint> {
+pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerEndpoint> {
     let key = cache_key(config);
     if let Some(endpoint) = endpoint_cache().lock().unwrap().get(&key) {
         return Ok(endpoint.clone());
@@ -100,7 +100,7 @@ pub async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerE
     Ok(endpoint)
 }
 
-pub struct DockerStreamResponse {
+pub(crate) struct DockerStreamResponse {
     body: Incoming,
     connection_task: tokio::task::JoinHandle<()>,
     ssh_handle: Option<client::Handle<SshClientHandler>>,
@@ -290,7 +290,7 @@ pub async fn request_empty(config: &ServerConfig, method: Method, path: &str) ->
     Ok(())
 }
 
-pub async fn open_stream(config: &ServerConfig, method: Method, path: &str) -> AppResult<DockerStreamResponse> {
+pub(crate) async fn open_stream(config: &ServerConfig, method: Method, path: &str) -> AppResult<DockerStreamResponse> {
     let (handle, mut sender, connection_task) = open_http_sender(config).await?;
     let request = Request::builder()
         .method(method)

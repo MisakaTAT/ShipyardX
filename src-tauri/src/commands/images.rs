@@ -1,8 +1,8 @@
 use tauri::{AppHandle, State};
 
+use crate::contracts::frontend::image::Image;
+use crate::contracts::frontend::image::ImageLayer;
 use crate::error::AppResult;
-use crate::models::app::image::Image;
-use crate::models::app::image::ImageLayer;
 use crate::services;
 use crate::state::AppState;
 

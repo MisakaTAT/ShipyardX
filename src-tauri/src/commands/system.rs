@@ -1,9 +1,9 @@
 use tauri::State;
 
+use crate::contracts::frontend::container::ContainerStats;
+use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
+use crate::contracts::frontend::info::DockerEngineInfo;
 use crate::error::AppResult;
-use crate::models::app::container::ContainerStats;
-use crate::models::app::daemon::{DaemonSettings, DaemonUpdate};
-use crate::models::app::info::DockerEngineInfo;
 use crate::services;
 use crate::state::AppState;
 

@@ -1,5 +1,5 @@
-use crate::models::app::container::ContainerStats;
-use crate::models::docker::stats::DockerStats;
+use crate::contracts::docker_api::stats::DockerStats;
+use crate::contracts::frontend::container::ContainerStats;
 
 fn cpu_percent(raw: &DockerStats) -> f64 {
     let cpu_delta = raw

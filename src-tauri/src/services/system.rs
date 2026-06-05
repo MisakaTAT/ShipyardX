@@ -2,16 +2,16 @@ use tauri::State;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 
+use crate::contracts::docker_api::stats::DockerStats;
+use crate::contracts::docker_api::system::{DaemonConfig, SystemInfo};
+use crate::contracts::frontend::container::ContainerStats;
+use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
+use crate::contracts::frontend::info::DockerEngineInfo;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{docker_get_async, invalidate_api_version, resolve_api_version_async};
 use crate::docker::stats::compute_stats;
 use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
 use crate::error::{AppError, AppResult};
-use crate::models::app::container::ContainerStats;
-use crate::models::app::daemon::{DaemonSettings, DaemonUpdate};
-use crate::models::app::info::DockerEngineInfo;
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::stats::DockerStats;
-use crate::models::docker::system::{DaemonConfig, SystemInfo};
 use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
 

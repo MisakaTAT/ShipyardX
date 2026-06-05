@@ -4,10 +4,10 @@ use std::sync::{Mutex, OnceLock};
 use hyper::Method;
 use serde::Serialize;
 
+use crate::contracts::docker_api::common::DockerVersion;
+use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::transport::{open_stream, request_empty, request_json_body_text, request_text};
 use crate::error::{AppError, AppResult};
-use crate::models::app::server::ServerConfig;
-use crate::models::docker::common::DockerVersion;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();

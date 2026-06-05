@@ -1,7 +1,7 @@
 use tauri::State;
 
+use crate::contracts::frontend::container::{Container, RunContainer};
 use crate::error::AppResult;
-use crate::models::app::container::{Container, RunContainer};
 use crate::services;
 use crate::state::AppState;
 

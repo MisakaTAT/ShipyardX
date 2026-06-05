@@ -2,17 +2,17 @@ use std::collections::HashMap;
 
 use tauri::State;
 
+use crate::contracts::docker_api::container::{
+    ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
+    ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerSummary, EndpointIpamConfig, EndpointSettings,
+};
+use crate::contracts::frontend::container::{Container, RunContainer};
 use crate::docker::client::{
     docker_delete_async, docker_get_async, docker_post_async, docker_post_json_response_async, docker_stream_async,
     pretty_json_response,
 };
 use crate::docker::mapping::api_container_to_dto;
 use crate::error::{AppError, AppResult};
-use crate::models::app::container::{Container, RunContainer};
-use crate::models::docker::container::{
-    ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
-    ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerSummary, EndpointIpamConfig, EndpointSettings,
-};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 

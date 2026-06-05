@@ -1,8 +1,8 @@
 mod commands;
 mod config;
+mod contracts;
 mod docker;
 mod error;
-mod models;
 mod services;
 mod ssh;
 mod state;
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
-use models::app::events::{
+use contracts::frontend::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
     DockerStreamStatus, EventStreamStatus, InstallStepEvent,
 };

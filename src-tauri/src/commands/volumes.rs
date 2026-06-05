@@ -1,7 +1,7 @@
 use tauri::State;
 
+use crate::contracts::frontend::volume::Volume;
 use crate::error::AppResult;
-use crate::models::app::volume::Volume;
 use crate::services;
 use crate::state::AppState;
 

@@ -1,11 +1,11 @@
 use tauri::State;
 
-use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response};
-use crate::error::{AppError, AppResult};
-use crate::models::app::network::{Network, NetworkCreate};
-use crate::models::docker::network::{
+use crate::contracts::docker_api::network::{
     self as engine_network, NetworkCreateIpam, NetworkCreateIpamConfig, NetworkSummary,
 };
+use crate::contracts::frontend::network::{Network, NetworkCreate};
+use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response};
+use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 

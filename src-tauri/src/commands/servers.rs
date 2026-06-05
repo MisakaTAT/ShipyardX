@@ -1,7 +1,7 @@
 use tauri::State;
 
+use crate::contracts::frontend::server::ServerConfig;
 use crate::error::AppResult;
-use crate::models::app::server::ServerConfig;
 use crate::services;
 use crate::state::AppState;
 

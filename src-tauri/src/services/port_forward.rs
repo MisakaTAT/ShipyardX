@@ -13,9 +13,9 @@ use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream as TokioTcpStream;
 
+use crate::contracts::frontend::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
+use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::models::app::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
-use crate::models::app::server::ServerConfig;
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, PortForwardHandle, get_server_config};
 use crate::utils::id::generate_id;
@@ -442,18 +442,10 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     let tx_bytes = Arc::new(AtomicU64::new(0));
     let rx_bytes = Arc::new(AtomicU64::new(0));
     let handle = PortForwardHandle {
-        id: rule.id.clone(),
         shutdown: shutdown.clone(),
         last_error: last_error.clone(),
         server_id: rule.server_id.clone(),
-        container_id: rule.container_id.clone(),
-        container_name: rule.container_name.clone(),
-        protocol: rule.protocol.clone(),
-        container_port: rule.container_port,
-        remote_host: rule.remote_host.clone(),
-        remote_port: rule.remote_port,
         local_port: actual_local_port,
-        bind_address: rule.bind_address.clone(),
         tx_bytes: tx_bytes.clone(),
         rx_bytes: rx_bytes.clone(),
     };

@@ -1,6 +1,7 @@
 pub mod appstore;
 pub mod container;
 pub mod daemon;
+pub mod error;
 pub mod events;
 pub mod image;
 pub mod info;
