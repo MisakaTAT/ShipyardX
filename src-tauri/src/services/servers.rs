@@ -1,9 +1,10 @@
 use tauri::State;
 
 use crate::config::store::save_servers;
+use crate::docker::client::docker_get_async;
 use crate::error::AppResult;
 use crate::models::app::server::ServerConfig;
-use crate::ssh::exec::ssh_exec_async;
+use crate::models::docker::common::DockerVersion;
 use crate::state::{AppState, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -48,6 +49,12 @@ pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
 }
 
 async fn test_connection_with_config(server: ServerConfig) -> AppResult<String> {
-    let version = ssh_exec_async(&server, "docker version --format 'Server: {{.Server.Version}}'").await?;
-    Ok(format!("连接成功！Docker {}", version.trim()))
+    let version = docker_get_async(&server, "/version").await?;
+    let version: DockerVersion = serde_json::from_str(version.trim())?;
+    let display = if version.version.trim().is_empty() {
+        version.api_version
+    } else {
+        version.version
+    };
+    Ok(format!("连接成功！Docker {}", display.trim()))
 }

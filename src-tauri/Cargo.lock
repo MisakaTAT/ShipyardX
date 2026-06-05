@@ -4161,7 +4161,11 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
+ "bytes",
  "chrono",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "network-interface",
  "russh",
  "serde",

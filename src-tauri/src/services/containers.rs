@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
 
 use crate::docker::client::{
-    docker_delete_async, docker_get_async, docker_post_async, docker_post_json_response_async, pretty_json_response,
-    resolve_api_version_async,
+    docker_delete_async, docker_get_async, docker_post_async, docker_post_json_response_async, docker_stream_async,
+    pretty_json_response,
 };
 use crate::docker::mapping::api_container_to_dto;
 use crate::error::{AppError, AppResult};
@@ -14,7 +13,6 @@ use crate::models::docker::container::{
     ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
     ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerSummary, EndpointIpamConfig, EndpointSettings,
 };
-use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
@@ -75,18 +73,16 @@ pub async fn get_container_logs(
     state: State<'_, AppState>,
 ) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
-    let ver = resolve_api_version_async(&server).await?;
     let ts = if timestamps { "&timestamps=1" } else { "" };
-    let cmd = format!(
-        "curl -s --unix-socket /var/run/docker.sock \
-        'http://localhost/v{}/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
-        ver, container_id, tail, ts
+    let path = format!(
+        "/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}",
+        container_id, tail, ts
     );
-    let b64 = ssh_exec_async(&server, &cmd).await?;
-    let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
-    let raw = BASE64
-        .decode(clean)
-        .map_err(|e| AppError::internal("container.logs_decode_failed", "解码容器日志失败").with_source(e))?;
+    let mut stream = docker_stream_async(&server, &path).await?;
+    let mut raw = Vec::new();
+    while let Some(chunk) = stream.next_chunk().await? {
+        raw.extend_from_slice(&chunk);
+    }
     Ok(demux_log_stream(&raw))
 }
 
@@ -286,8 +282,11 @@ pub async fn run_container(server_id: String, params: RunContainer, state: State
     let raw = docker_post_json_response_async(&server, &path, &body).await?;
 
     let created: ContainerCreateResponse = serde_json::from_str(&raw).map_err(|e| {
-        AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败")
-            .with_detail(format!("{} — {}", e, &raw.chars().take(120).collect::<String>()))
+        AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败").with_detail(format!(
+            "{} — {}",
+            e,
+            &raw.chars().take(120).collect::<String>()
+        ))
     })?;
 
     let id = created.id.trim();

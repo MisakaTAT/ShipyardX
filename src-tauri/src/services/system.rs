@@ -4,6 +4,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 use crate::docker::client::{docker_get_async, invalidate_api_version, resolve_api_version_async};
 use crate::docker::stats::compute_stats;
+use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
 use crate::error::{AppError, AppResult};
 use crate::models::app::container::ContainerStats;
 use crate::models::app::daemon::{DaemonSettings, DaemonUpdate};
@@ -120,25 +121,54 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     invalidate_api_version(&server);
+    invalidate_docker_endpoint(&server);
     match resolve_api_version_async(&server).await {
         Ok(_) => Ok(()),
         Err(e) => {
-            let diag = ssh_exec_async(
-                &server,
-                "if [ ! -S /var/run/docker.sock ]; then echo 'no_docker'; elif [ ! -r /var/run/docker.sock ]; then echo 'no_permission'; else echo 'ok'; fi",
-            )
-            .await
-            .unwrap_or_else(|_| "ok".to_string());
-            match diag.trim() {
-                "no_docker" => Err(AppError::unavailable(
-                    "docker.unavailable",
-                    "Docker 未安装、未运行，或 /var/run/docker.sock 不可用。",
-                )),
-                "no_permission" => Err(AppError::permission(
-                    "docker.permission_denied",
-                    "当前用户没有访问 Docker Socket 的权限。",
-                )),
-                _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
+            let endpoint = resolve_docker_endpoint(&server).await.ok();
+            match endpoint {
+                Some(DockerEndpoint::Unix { path }) => {
+                    let diag = ssh_exec_async(
+                        &server,
+                        &format!(
+                            "if [ ! -S \"{0}\" ]; then echo 'no_docker'; elif [ ! -r \"{0}\" ]; then echo 'no_permission'; else echo 'ok'; fi",
+                            path
+                        ),
+                    )
+                    .await
+                    .unwrap_or_else(|_| "ok".to_string());
+                    match diag.trim() {
+                        "no_docker" => Err(AppError::unavailable(
+                            "docker.unavailable",
+                            format!("Docker 未安装、未运行，或 {path} 不可用。"),
+                        )),
+                        "no_permission" => Err(AppError::permission(
+                            "docker.permission_denied",
+                            format!("当前用户没有访问 Docker Socket 的权限：{path}"),
+                        )),
+                        _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
+                            .with_detail(e.detail.unwrap_or(e.message))
+                            .retryable(true)),
+                    }
+                }
+                Some(DockerEndpoint::Tcp { host, port }) => {
+                    let diag = ssh_exec_async(
+                        &server,
+                        &format!("if command -v nc >/dev/null 2>&1; then nc -z -w 2 '{host}' {port} >/dev/null 2>&1 && echo ok || echo no_docker; else echo ok; fi"),
+                    )
+                    .await
+                    .unwrap_or_else(|_| "ok".to_string());
+                    match diag.trim() {
+                        "no_docker" => Err(AppError::unavailable(
+                            "docker.unavailable",
+                            format!("Docker TCP Host 不可达：{host}:{port}"),
+                        )),
+                        _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
+                            .with_detail(e.detail.unwrap_or(e.message))
+                            .retryable(true)),
+                    }
+                }
+                None => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
                     .with_detail(e.detail.unwrap_or(e.message))
                     .retryable(true)),
             }
@@ -210,6 +240,7 @@ pub async fn update_docker_daemon_settings(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
+    invalidate_docker_endpoint(&server);
     let read_cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
     let current_raw = ssh_exec_async(&server, read_cmd).await?;
     let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
@@ -231,7 +262,11 @@ pub async fn update_docker_daemon_settings(
     };
 
     let socket = params.socket_path.trim();
-    cfg.hosts = if socket.is_empty() { None } else { Some(vec![socket.to_string()]) };
+    cfg.hosts = if socket.is_empty() {
+        None
+    } else {
+        Some(vec![socket.to_string()])
+    };
 
     if params.log_rotation {
         cfg.log_driver = Some("json-file".to_string());

@@ -1,18 +1,17 @@
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-use russh::ChannelMsg;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
-use crate::docker::client::resolve_api_version;
+use crate::docker::client::docker_stream_async;
 use crate::error::{AppError, AppResult};
 use crate::models::app::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::events::StreamEvent;
-use crate::ssh::client::{block_on, connect, disconnect};
+use crate::ssh::client::block_on;
 use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -107,6 +106,11 @@ fn is_refresh_event(event_type: &str, action: &str) -> bool {
 const RECONNECT_DELAYS: &[u64] = &[1, 2, 4, 8, 15, 30];
 const THROTTLE_MS: u128 = 500;
 
+enum StreamLoopExit {
+    Stopped,
+    Reconnect(Option<AppError>),
+}
+
 fn emit_stream_status(
     ah: &AppHandle,
     stream_id: &str,
@@ -138,38 +142,17 @@ fn run_event_stream_thread(
 
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connecting);
 
-        let ver = match resolve_api_version(&config) {
-            Ok(v) => v,
-            Err(e) => {
-                let _ = DockerStreamError {
-                    stream_id: stream_id.clone(),
-                    error: AppError::unavailable("docker.api_version_failed", "获取 Docker API 版本失败")
-                        .with_detail(e.detail.unwrap_or(e.message)),
-                }
-                .emit(&ah);
-                wait_or_stop(&rx, reconnect_delay(attempt));
-                attempt += 1;
-                continue;
-            }
-        };
-
         let stream_result = block_on(async {
-            let mut handle = connect(&config).await.map_err(|e| {
-                AppError::unavailable("docker.events_connect_failed", "SSH 连接失败")
-                    .with_detail(e.detail.unwrap_or(e.message))
-            })?;
-            let mut channel = handle.channel_open_session().await.map_err(|e| {
-                AppError::unavailable("docker.events_channel_failed", "Docker 事件流通道创建失败").with_source(e)
-            })?;
-
-            let cmd = format!(
-                "curl -s -N --unix-socket /var/run/docker.sock 'http://localhost/v{}/events'",
-                ver
-            );
-
-            channel.exec(true, cmd).await.map_err(|e| {
-                AppError::unavailable("docker.events_start_failed", "启动 Docker 事件流失败").with_source(e)
-            })?;
+            let mut stream = match docker_stream_async(&config, "/events").await {
+                Ok(stream) => stream,
+                Err(error) => {
+                    return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Reconnect(Some(
+                        AppError::unavailable("docker.events_start_failed", "启动 Docker 事件流失败")
+                            .with_detail(error.detail.unwrap_or(error.message))
+                            .retryable(true),
+                    )));
+                }
+            };
 
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connected);
 
@@ -179,17 +162,15 @@ fn run_event_stream_thread(
             loop {
                 match rx.try_recv() {
                     Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                        let _ = channel.close().await;
-                        disconnect(&mut handle).await;
-                        return Ok::<bool, AppError>(true);
+                        return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Stopped);
                     }
                     Err(mpsc::TryRecvError::Empty) => {}
                 }
 
                 tokio::select! {
-                    msg = channel.wait() => {
-                        match msg {
-                            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                    chunk = stream.next_chunk() => {
+                        match chunk {
+                            Ok(Some(data)) => {
                                 let chunk = String::from_utf8_lossy(&data);
                                 line_buf.push_str(&chunk);
 
@@ -227,12 +208,8 @@ fn run_event_stream_thread(
                                     }
                                 }
                             }
-                            Some(ChannelMsg::ExitStatus { .. }) => {}
-                            Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
-                                disconnect(&mut handle).await;
-                                return Ok(false);
-                            }
-                            _ => {}
+                            Ok(None) => return Ok(StreamLoopExit::Reconnect(None)),
+                            Err(error) => return Ok(StreamLoopExit::Reconnect(Some(error))),
                         }
                     }
                     _ = tokio::time::sleep(Duration::from_millis(50)) => {}
@@ -241,21 +218,35 @@ fn run_event_stream_thread(
         });
 
         match stream_result {
-            Ok(true) => {
+            Ok(StreamLoopExit::Stopped) => {
                 emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
                 return;
             }
-            Ok(false) => {}
+            Ok(StreamLoopExit::Reconnect(error)) => {
+                attempt = 0;
+                if let Some(error) = error {
+                    let _ = DockerStreamError {
+                        stream_id: stream_id.clone(),
+                        error,
+                    }
+                    .emit(&ah);
+                }
+            }
             Err(error) => {
                 let _ = DockerStreamError {
                     stream_id: stream_id.clone(),
                     error,
                 }
                 .emit(&ah);
+                attempt += 1;
             }
         }
 
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Disconnected);
+        if wait_or_stop(&rx, reconnect_delay(attempt)) {
+            emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
+            return;
+        }
     }
 }
 
