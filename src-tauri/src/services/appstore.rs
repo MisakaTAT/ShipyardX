@@ -136,7 +136,11 @@ pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
                     continue;
                 }
                 let ver_name = ver_entry.file_name().to_string_lossy().to_string();
-                if ver_name == "latest" || fs::try_exists(ver_dir.join("docker-compose.yml")).await.unwrap_or(false) {
+                if ver_name == "latest"
+                    || fs::try_exists(ver_dir.join("docker-compose.yml"))
+                        .await
+                        .unwrap_or(false)
+                {
                     versions.push(ver_name);
                 }
             }
@@ -194,7 +198,9 @@ pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDeta
     };
 
     let readme_zh = fs::read_to_string(app_dir.join("README.md")).await.unwrap_or_default();
-    let readme_en = fs::read_to_string(app_dir.join("README_en.md")).await.unwrap_or_default();
+    let readme_en = fs::read_to_string(app_dir.join("README_en.md"))
+        .await
+        .unwrap_or_default();
 
     let mut version_infos: Vec<AppVersionInfo> = Vec::new();
     if let Ok(mut entries) = fs::read_dir(&app_dir).await {

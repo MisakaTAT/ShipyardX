@@ -1,8 +1,6 @@
 use tauri::State;
 
-use crate::docker::client::{
-    docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response,
-};
+use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response};
 use crate::error::{AppError, AppResult};
 use crate::models::app::network::{Network, NetworkCreate};
 use crate::models::docker::network::{
