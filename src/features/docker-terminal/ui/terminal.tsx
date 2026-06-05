@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Terminal as WTerminal, WebSocketTransport, useTerminal } from '@wterm/react'
-import '@wterm/react/css'
+import { FitAddon } from '@xterm/addon-fit'
+import { Terminal as XTerm } from '@xterm/xterm'
+import '@xterm/xterm/css/xterm.css'
 import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
 import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
@@ -14,21 +15,6 @@ const WS_OPEN_RETRY_DELAY_MS = 100
 const OVERLAY_FADE_OUT_MS = 220
 const TERMINAL_VIEW_PADDING_PX = 8
 const TERMINAL_SURFACE_BG = '#1e1e1e'
-const DEFAULT_ROW_HEIGHT_PX = 17
-
-/**
- * 覆盖 @wterm/dom 默认 .wterm 样式里的 padding / border-radius / box-shadow，
- * 并强制 border-box + 100% 宽度。高度由 JS 按 row-height 整数倍对齐（见下方 ResizeObserver）
- * 以规避 wterm `_scrollToBottom` 里 `floor(maxScroll / rh) * rh` 的 snap 截掉最后一行的问题。
- */
-const TERMINAL_STYLE = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: 0,
-  borderRadius: 0,
-  boxShadow: 'none',
-  scrollbarGutter: 'stable',
-} as const
 
 /**
  * 终端 WebSocket 协议（单路二进制 + 首字节 channel tag）：
@@ -43,20 +29,20 @@ const TAG_CTRL = 0x01
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
 
-function ptyFrame(data: string): Uint8Array {
+function ptyFrame(data: string): ArrayBuffer {
   const payload = textEncoder.encode(data)
-  const out = new Uint8Array(1 + payload.length)
+  const out = new Uint8Array(new ArrayBuffer(1 + payload.length))
   out[0] = TAG_DATA
   out.set(payload, 1)
-  return out
+  return out.buffer
 }
 
-function ctrlFrame(payload: Record<string, unknown>): Uint8Array {
+function ctrlFrame(payload: Record<string, unknown>): ArrayBuffer {
   const json = textEncoder.encode(JSON.stringify(payload))
-  const out = new Uint8Array(1 + json.length)
+  const out = new Uint8Array(new ArrayBuffer(1 + json.length))
   out[0] = TAG_CTRL
   out.set(json, 1)
-  return out
+  return out.buffer
 }
 
 type ControlInbound = { type: 'closed' } | { type: 'error'; error: AppErrorLike }
@@ -82,33 +68,39 @@ type TransportCallbacks = {
   onClose: () => void
 }
 
-function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<WebSocketTransport> {
+function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     let settled = false
-    const transport = new WebSocketTransport({
-      reconnect: false,
-      onData: (data) => {
-        if (!(data instanceof Uint8Array) || data.length === 0) return
-        const tag = data[0]
-        const body = data.subarray(1)
-        if (tag === TAG_DATA) cb.onPty(body)
-        else if (tag === TAG_CTRL) {
-          const msg = parseControlInbound(body)
-          if (msg) cb.onControl(msg)
-        }
-      },
-      onOpen: () => {
-        settled = true
-        resolve(transport)
-      },
-      onClose: () => {
-        if (settled) cb.onClose()
-      },
-      onError: () => {
-        if (!settled) reject(new Error('WebSocket 连接失败'))
-      },
-    })
-    transport.connect(url)
+    const transport = new WebSocket(url)
+    transport.binaryType = 'arraybuffer'
+    transport.onmessage = (event) => {
+      const data =
+        event.data instanceof ArrayBuffer
+          ? new Uint8Array(event.data)
+          : event.data instanceof Blob
+            ? null
+            : event.data instanceof Uint8Array
+              ? event.data
+              : null
+      if (!data || data.length === 0) return
+      const tag = data[0]
+      const body = data.subarray(1)
+      if (tag === TAG_DATA) cb.onPty(body)
+      else if (tag === TAG_CTRL) {
+        const msg = parseControlInbound(body)
+        if (msg) cb.onControl(msg)
+      }
+    }
+    transport.onopen = () => {
+      settled = true
+      resolve(transport)
+    }
+    transport.onclose = () => {
+      if (settled) cb.onClose()
+    }
+    transport.onerror = () => {
+      if (!settled) reject(new Error('WebSocket 连接失败'))
+    }
   })
 }
 
@@ -116,7 +108,7 @@ async function openTerminalTransport(
   sessionId: string,
   wsPort: number,
   cb: TransportCallbacks
-): Promise<WebSocketTransport> {
+): Promise<WebSocket> {
   const url = terminalSocketUrl(sessionId, wsPort)
   let lastError: unknown
   for (let i = 0; i < WS_OPEN_RETRIES; i += 1) {
@@ -130,8 +122,8 @@ async function openTerminalTransport(
   throw lastError ?? new Error('WebSocket 多次重试仍无法连接')
 }
 
-function closeTerminalTransport(transport: WebSocketTransport) {
-  if (transport.connected) transport.send(ctrlFrame({ type: 'close' }))
+function closeTerminalTransport(transport: WebSocket) {
+  if (transport.readyState === WebSocket.OPEN) transport.send(ctrlFrame({ type: 'close' }))
   transport.close()
 }
 
@@ -149,12 +141,14 @@ type EndSessionOptions = {
 }
 
 export default function Terminal({ serverId, containerId }: TerminalProps) {
-  const { ref: termRef, write: termWrite, focus: termFocus } = useTerminal()
+  const xtermRef = useRef<XTerm | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
+  const fitFrameRef = useRef<number | null>(null)
   const sizeRef = useRef({ cols: 80, rows: 24 })
   const backendSessionIdRef = useRef<string | null>(null)
-  const transportRef = useRef<WebSocketTransport | null>(null)
+  const transportRef = useRef<WebSocket | null>(null)
   const overlayFadeTimerRef = useRef<number | null>(null)
-  const terminalHostRef = useRef<HTMLDivElement | null>(null)
+  const terminalMountRef = useRef<HTMLDivElement | null>(null)
   const serverIdLiveRef = useRef(serverId)
   const containerIdLiveRef = useRef<string | undefined>(containerId)
   const connectInFlightRef = useRef(false)
@@ -177,32 +171,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     if (phase === 'error') setErrorDetailsExpanded(false)
   }, [phase, errorText])
 
-  /**
-   * 把 .wterm 的可视高度对齐到 rowHeight 的整数倍。wterm 内部 _scrollToBottom 会把
-   * scrollTop snap 到 floor(maxScroll / rh) * rh，若 maxScroll 不是 rh 倍数，最后一行会被切掉。
-   */
-  const alignTerminalHeight = useCallback(() => {
-    const host = terminalHostRef.current
-    const wt = host?.querySelector<HTMLElement>('.wterm')
-    if (!host || !wt) return
-    const rh = Number.parseFloat(getComputedStyle(wt).getPropertyValue('--term-row-height')) || DEFAULT_ROW_HEIGHT_PX
-    if (rh <= 0) return
-    const cs = getComputedStyle(host)
-    const availH = host.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0)
-    wt.style.height = `${Math.max(rh, Math.floor(availH / rh) * rh)}px`
+  const termWrite = useCallback((data: string | Uint8Array) => {
+    xtermRef.current?.write(data)
   }, [])
 
-  useEffect(() => {
-    const host = terminalHostRef.current
-    if (!host) return
-    const ro = new ResizeObserver(() => alignTerminalHeight())
-    ro.observe(host)
-    const rafId = requestAnimationFrame(alignTerminalHeight)
-    return () => {
-      cancelAnimationFrame(rafId)
-      ro.disconnect()
-    }
-  }, [alignTerminalHeight])
+  const termFocus = useCallback(() => {
+    xtermRef.current?.focus()
+  }, [])
 
   useEffect(() => {
     serverEpochRef.current += 1
@@ -367,14 +342,110 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
   const handleTerminalData = useCallback((data: string) => {
     const transport = transportRef.current
-    if (transport?.connected) transport.send(ptyFrame(data))
+    if (transport?.readyState === WebSocket.OPEN) transport.send(ptyFrame(data))
   }, [])
 
-  const handleTerminalResize = useCallback((cols: number, rows: number) => {
+  const syncTerminalSize = useCallback((cols: number, rows: number, force = false) => {
+    if (cols <= 0 || rows <= 0) return
+    const changed = cols !== sizeRef.current.cols || rows !== sizeRef.current.rows
     sizeRef.current = { cols, rows }
     const transport = transportRef.current
-    if (transport?.connected) transport.send(ctrlFrame({ type: 'resize', cols, rows }))
+    if ((force || changed) && transport?.readyState === WebSocket.OPEN) {
+      transport.send(ctrlFrame({ type: 'resize', cols, rows }))
+    }
   }, [])
+
+  const fitTerminalNow = useCallback(
+    (forceResize = false) => {
+      const terminal = xtermRef.current
+      const fitAddon = fitAddonRef.current
+      if (!terminal || !fitAddon) return
+
+      fitAddon.fit()
+      syncTerminalSize(terminal.cols, terminal.rows, forceResize)
+    },
+    [syncTerminalSize]
+  )
+
+  const fitTerminal = useCallback((forceResize = false) => {
+    if (fitFrameRef.current !== null) window.cancelAnimationFrame(fitFrameRef.current)
+    fitFrameRef.current = window.requestAnimationFrame(() => {
+      fitFrameRef.current = null
+      fitTerminalNow(forceResize)
+    })
+  }, [fitTerminalNow])
+
+  useEffect(() => {
+    const mount = terminalMountRef.current
+    if (!mount) return
+
+    const terminal = new XTerm({
+      allowProposedApi: false,
+      cursorBlink: true,
+      cursorStyle: 'block',
+      // fontFamily: 'var(--font-mono)',
+      // fontSize: 13,
+      // lineHeight: 1.25,
+      scrollback: 5000,
+      // tabStopWidth: 8,
+      theme: {
+        background: TERMINAL_SURFACE_BG,
+        // foreground: '#d4d4d4',
+        // cursor: '#f8f8f2',
+        // cursorAccent: TERMINAL_SURFACE_BG,
+        // selectionBackground: '#264f78',
+        // black: '#000000',
+        // red: '#cd3131',
+        // green: '#0dbc79',
+        // yellow: '#e5e510',
+        // blue: '#2472c8',
+        // magenta: '#bc3fbc',
+        // cyan: '#11a8cd',
+        // white: '#e5e5e5',
+        // brightBlack: '#666666',
+        // brightRed: '#f14c4c',
+        // brightGreen: '#23d18b',
+        // brightYellow: '#f5f543',
+        // brightBlue: '#3b8eea',
+        // brightMagenta: '#d670d6',
+        // brightCyan: '#29b8db',
+        // brightWhite: '#e5e5e5',
+      },
+    })
+    const fitAddon = new FitAddon()
+    terminal.loadAddon(fitAddon)
+    terminal.open(mount)
+    const dataDisposable = terminal.onData(handleTerminalData)
+    const resizeDisposable = terminal.onResize(({ cols, rows }) => syncTerminalSize(cols, rows))
+
+    xtermRef.current = terminal
+    fitAddonRef.current = fitAddon
+    fitTerminal()
+
+    const handleWindowResize = () => fitTerminal(true)
+    const ro = new ResizeObserver(() => fitTerminal(true))
+    ro.observe(mount)
+    window.addEventListener('resize', handleWindowResize)
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', handleWindowResize)
+      if (fitFrameRef.current !== null) {
+        window.cancelAnimationFrame(fitFrameRef.current)
+        fitFrameRef.current = null
+      }
+      xtermRef.current = null
+      fitAddonRef.current = null
+      dataDisposable.dispose()
+      resizeDisposable.dispose()
+      terminal.dispose()
+    }
+  }, [fitTerminal, handleTerminalData, syncTerminalSize])
+
+  useEffect(() => {
+    if (phase !== 'connected') return
+    fitTerminal(true)
+  }, [fitTerminal, phase])
 
   const overlayVisible = phase !== 'connected'
   const terminalVisible = phase === 'connected'
@@ -383,25 +454,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   return (
     <div className="relative h-full w-full overflow-hidden select-text" style={{ background: TERMINAL_SURFACE_BG }}>
       <div
-        ref={terminalHostRef}
         className="absolute inset-0 box-border"
         style={{
           padding: TERMINAL_VIEW_PADDING_PX,
           visibility: terminalVisible ? 'visible' : 'hidden',
         }}
       >
-        <WTerminal
-          ref={termRef}
-          autoResize
-          cursorBlink
-          theme="default"
-          onData={handleTerminalData}
-          onResize={handleTerminalResize}
-          onReady={() => {
-            requestAnimationFrame(alignTerminalHeight)
-          }}
-          style={TERMINAL_STYLE}
-        />
+        <div ref={terminalMountRef} className="h-full w-full overflow-hidden" />
       </div>
 
       {overlayMounted && (

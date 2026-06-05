@@ -1963,30 +1963,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@wterm/core@npm:0.1.9":
-  version: 0.1.9
-  resolution: "@wterm/core@npm:0.1.9"
-  checksum: 10c0/9d68c87f664ec919d81f7890664c8d8424e0a392e97126885a4182201d02cfe7abce5ffbceb50cc2029be125757957e0d37efc25abc4376a726d54997693dd58
+"@xterm/addon-fit@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "@xterm/addon-fit@npm:0.11.0"
+  checksum: 10c0/c0ce94f7e877d07e7197d15d041cc629ce2e853016400aadddc9810838ea8a26e836f87f325eba36df88c03feb72d9f13cd8c3bb41ee31e701f1058edb8553c3
   languageName: node
   linkType: hard
 
-"@wterm/dom@npm:^0.1.9":
-  version: 0.1.9
-  resolution: "@wterm/dom@npm:0.1.9"
-  dependencies:
-    "@wterm/core": "npm:0.1.9"
-  checksum: 10c0/b7389aa46685a76194ebffa5f3304ab8062b6a639abd5528836b2220d7470890efbd9070e41c98c7e50ca11d91b9a0f481f30ee2e07619a23dc09a6f15045587
-  languageName: node
-  linkType: hard
-
-"@wterm/react@npm:^0.1.9":
-  version: 0.1.9
-  resolution: "@wterm/react@npm:0.1.9"
-  peerDependencies:
-    "@wterm/dom": 0.1.9
-    react: ^18.0.0 || ^19.0.0
-    react-dom: ^18.0.0 || ^19.0.0
-  checksum: 10c0/bb2120ed7b0c588345152f0de1a77cc7ec81aa9b0b266caba357373dd0f6c7b3768055d42d5c19465bdaecd5f54cb0ccb7d31891b26329c7b8b5b6a05dcdf255
+"@xterm/xterm@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@xterm/xterm@npm:6.0.0"
+  checksum: 10c0/b99122553f323a65b708e5eba9903d4c5a1bcb59fe576d29d6e91a33002bccfd1b99403e1e839e1942f4952039db6d3d74ca9d65ed0399b4e9a0a5f35b8c12d9
   languageName: node
   linkType: hard
 
@@ -5169,8 +5156,8 @@ __metadata:
     "@types/react": "npm:^19.1.8"
     "@types/react-dom": "npm:^19.1.6"
     "@vitejs/plugin-react": "npm:^4.6.0"
-    "@wterm/dom": "npm:^0.1.9"
-    "@wterm/react": "npm:^0.1.9"
+    "@xterm/addon-fit": "npm:^0.11.0"
+    "@xterm/xterm": "npm:^6.0.0"
     ansi_up: "npm:^6.0.6"
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"

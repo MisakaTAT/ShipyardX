@@ -182,6 +182,15 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     }
 }
 
+async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, rows: u32) -> bool {
+    if cols == 0 || rows == 0 {
+        return false;
+    }
+    docker_post_async(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}"))
+        .await
+        .is_ok()
+}
+
 async fn run_docker_exec_io_loop(
     session_id: String,
     rx: mpsc::Receiver<TerminalMsg>,
@@ -194,18 +203,23 @@ async fn run_docker_exec_io_loop(
 ) {
     let mut input_buf = Vec::<u8>::new();
     let mut read_buf = [0u8; 8192];
-    let mut last_cols = initial_cols;
-    let mut last_rows = initial_rows;
+    let mut last_cols = 0;
+    let mut last_rows = 0;
+
+    if resize_docker_exec(config, exec_id, initial_cols, initial_rows).await {
+        last_cols = initial_cols;
+        last_rows = initial_rows;
+    }
 
     loop {
+        let mut pending_resize = None;
+
         loop {
             match rx.try_recv() {
                 Ok(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
                 Ok(TerminalMsg::Resize { cols, rows }) => {
                     if cols != last_cols || rows != last_rows {
-                        last_cols = cols;
-                        last_rows = rows;
-                        let _ = docker_post_async(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}")).await;
+                        pending_resize = Some((cols, rows));
                     }
                 }
                 Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
@@ -215,6 +229,13 @@ async fn run_docker_exec_io_loop(
                 }
                 Err(mpsc::TryRecvError::Empty) => break,
             }
+        }
+
+        if let Some((cols, rows)) = pending_resize
+            && resize_docker_exec(config, exec_id, cols, rows).await
+        {
+            last_cols = cols;
+            last_rows = rows;
         }
 
         if !input_buf.is_empty() {
