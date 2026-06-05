@@ -1,95 +1,88 @@
-use std::io::Read;
-use std::time::Duration;
+use russh::ChannelMsg;
 
 use crate::models::app::server::ServerConfig;
 
-use super::session::create_ssh_session;
+use super::client::{block_on, connect, disconnect, map_error};
 
-pub fn ssh_exec_streaming<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> Result<String, String>
+struct CommandResult {
+    stdout: String,
+    stderr: String,
+    exit_code: i32,
+}
+
+async fn run_command<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> Result<CommandResult, String>
 where
     F: FnMut(&str),
 {
-    let sess = create_ssh_session(config)?;
-    let mut channel = sess.channel_session().map_err(|e| format!("创建通道失败: {}", e))?;
-    channel.exec(command).map_err(|e| format!("执行命令失败: {}", e))?;
+    let mut handle = connect(config).await?;
+    let mut channel = handle
+        .channel_open_session()
+        .await
+        .map_err(|e| map_error("创建通道失败", e))?;
 
-    sess.set_blocking(false);
-    let mut buf = [0u8; 8192];
+    channel
+        .exec(true, command)
+        .await
+        .map_err(|e| map_error("执行命令失败", e))?;
+
     let mut stdout = String::new();
+    let mut stderr = String::new();
+    let mut exit_code = None;
 
-    loop {
-        match channel.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+    while let Some(msg) = channel.wait().await {
+        match msg {
+            ChannelMsg::Data { data } => {
+                let chunk = String::from_utf8_lossy(&data).to_string();
                 on_chunk(&chunk);
                 stdout.push_str(&chunk);
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(50));
-                continue;
+            ChannelMsg::ExtendedData { data, .. } => {
+                stderr.push_str(&String::from_utf8_lossy(&data));
             }
-            Err(_) => break,
-        }
-        if channel.eof() {
-            break;
+            ChannelMsg::ExitStatus { exit_status: code } => {
+                exit_code = Some(code as i32);
+            }
+            ChannelMsg::ExitSignal { error_message, .. } => {
+                if !error_message.is_empty() {
+                    stderr.push_str(&error_message);
+                }
+            }
+            _ => {}
         }
     }
 
-    let mut stderr_buf = Vec::new();
-    let _ = channel.stderr().read_to_end(&mut stderr_buf);
+    disconnect(&mut handle).await;
 
-    channel.wait_close().ok();
-    let exit_code = channel.exit_status().unwrap_or(-1);
+    Ok(CommandResult {
+        stdout,
+        stderr,
+        exit_code: exit_code.unwrap_or(-1),
+    })
+}
 
-    if exit_code != 0 {
-        let stderr = String::from_utf8_lossy(&stderr_buf).trim().to_string();
-        let stdout_trimmed = stdout.trim().to_string();
-        let msg = if !stderr.is_empty() {
-            stderr
-        } else if !stdout_trimmed.is_empty() {
-            stdout_trimmed
-        } else {
-            format!("命令失败，退出码: {}", exit_code)
-        };
-        return Err(msg);
+fn command_error(result: &CommandResult) -> String {
+    let stderr = result.stderr.trim();
+    let stdout = result.stdout.trim();
+    if !stderr.is_empty() {
+        stderr.to_string()
+    } else if !stdout.is_empty() {
+        stdout.to_string()
+    } else {
+        format!("命令失败，退出码: {}", result.exit_code)
     }
+}
 
-    Ok(stdout)
+pub fn ssh_exec_streaming<F>(config: &ServerConfig, command: &str, on_chunk: F) -> Result<String, String>
+where
+    F: FnMut(&str),
+{
+    let result = block_on(run_command(config, command, on_chunk))?;
+    if result.exit_code != 0 {
+        return Err(command_error(&result));
+    }
+    Ok(result.stdout)
 }
 
 pub fn ssh_exec(config: &ServerConfig, command: &str) -> Result<String, String> {
-    let command = command.trim();
-
-    let sess = create_ssh_session(config)?;
-
-    let mut channel = sess.channel_session().map_err(|e| format!("创建通道失败: {}", e))?;
-    channel.exec(command).map_err(|e| format!("执行命令失败: {}", e))?;
-
-    let mut stdout_raw = Vec::new();
-    channel
-        .read_to_end(&mut stdout_raw)
-        .map_err(|e| format!("读取标准输出失败: {}", e))?;
-    let stdout = String::from_utf8_lossy(&stdout_raw).into_owned();
-
-    let mut stderr_buf = Vec::new();
-    let _ = channel.stderr().read_to_end(&mut stderr_buf);
-
-    channel.wait_close().ok();
-    let exit_code = channel.exit_status().unwrap_or(-1);
-
-    if exit_code != 0 {
-        let stderr = String::from_utf8_lossy(&stderr_buf).trim().to_string();
-        let stdout_trimmed = stdout.trim().to_string();
-        let msg = if !stderr.is_empty() {
-            stderr
-        } else if !stdout_trimmed.is_empty() {
-            stdout_trimmed
-        } else {
-            format!("命令失败，退出码: {}", exit_code)
-        };
-        return Err(msg);
-    }
-
-    Ok(stdout)
+    ssh_exec_streaming(config, command.trim(), |_| {})
 }

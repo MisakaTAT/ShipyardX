@@ -1,10 +1,10 @@
-use std::io::Read;
 use std::sync::mpsc;
 
+use russh::ChannelMsg;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::models::app::server::ServerConfig;
-use crate::ssh::session::create_ssh_session;
+use crate::ssh::client::{block_on, connect, disconnect, map_error};
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -17,76 +17,75 @@ fn run_log_stream_thread(
     rx: mpsc::Receiver<()>,
     ah: AppHandle,
 ) {
-    let sess = match create_ssh_session(&config) {
-        Ok(s) => s,
-        Err(e) => {
+    let result = block_on(async move {
+        let mut handle = match connect(&config).await {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = ah.emit(
+                    &format!("log-data:{}", stream_id),
+                    format!("\x1b[31m连接失败: {}\x1b[0m\r\n", e).into_bytes(),
+                );
+                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                return;
+            }
+        };
+
+        let ts_flag = if timestamps { "--timestamps " } else { "" };
+        let cmd = format!("docker logs -f --tail {} {}{}  2>&1", tail, ts_flag, container_id);
+
+        let mut channel = match handle.channel_open_session().await {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = ah.emit(
+                    &format!("log-data:{}", stream_id),
+                    format!("\x1b[31m通道失败: {}\x1b[0m\r\n", map_error("通道失败", e)).into_bytes(),
+                );
+                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                return;
+            }
+        };
+
+        if let Err(e) = channel.exec(true, cmd).await {
             let _ = ah.emit(
                 &format!("log-data:{}", stream_id),
-                format!("\x1b[31m连接失败: {}\x1b[0m\r\n", e).into_bytes(),
+                format!("\x1b[31m启动失败: {}\x1b[0m\r\n", map_error("启动失败", e)).into_bytes(),
             );
             let _ = ah.emit(&format!("log-done:{}", stream_id), ());
             return;
         }
-    };
 
-    let ts_flag = if timestamps { "--timestamps " } else { "" };
-    let cmd = format!("docker logs -f --tail {} {}{}  2>&1", tail, ts_flag, container_id);
-
-    let mut channel = match sess.channel_session() {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = ah.emit(
-                &format!("log-data:{}", stream_id),
-                format!("\x1b[31m通道失败: {}\x1b[0m\r\n", e).into_bytes(),
-            );
-            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-            return;
-        }
-    };
-
-    if let Err(e) = channel.exec(&cmd) {
-        let _ = ah.emit(
-            &format!("log-data:{}", stream_id),
-            format!("\x1b[31m启动失败: {}\x1b[0m\r\n", e).into_bytes(),
-        );
-        let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-        return;
-    }
-
-    sess.set_blocking(false);
-    let mut buf = [0u8; 8192];
-
-    loop {
-        match rx.try_recv() {
-            Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                return;
+        loop {
+            match rx.try_recv() {
+                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
+                    let _ = channel.close().await;
+                    let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                    disconnect(&mut handle).await;
+                    return;
+                }
+                Err(mpsc::TryRecvError::Empty) => {}
             }
-            Err(mpsc::TryRecvError::Empty) => {}
-        }
 
-        match channel.read(&mut buf) {
-            Ok(0) => {
-                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                return;
-            }
-            Ok(n) => {
-                let _ = ah.emit(&format!("log-data:{}", stream_id), buf[..n].to_vec());
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Err(_) => {
-                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                return;
+            tokio::select! {
+                msg = channel.wait() => {
+                    match msg {
+                        Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                            let _ = ah.emit(&format!("log-data:{}", stream_id), data.to_vec());
+                        }
+                        Some(ChannelMsg::ExitStatus { .. }) => {}
+                        Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                            disconnect(&mut handle).await;
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(20)) => {}
             }
         }
+    });
 
-        if channel.eof() {
-            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-            return;
-        }
-    }
+    let _ = result;
 }
 
 pub fn start_log_stream(

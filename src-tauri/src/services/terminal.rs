@@ -1,11 +1,12 @@
-use std::io::{ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::sync::OnceLock;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use russh::ChannelMsg;
 use serde::Deserialize;
 use tauri::{AppHandle, Manager, State};
+use tokio::io::AsyncWriteExt;
 use tungstenite::protocol::Message;
 use tungstenite::{
     accept_hdr,
@@ -14,8 +15,8 @@ use tungstenite::{
 
 use crate::models::app::server::ServerConfig;
 use crate::models::app::terminal::{ContainerExecTerminalParams, TerminalSession, WsServerMsg};
+use crate::ssh::client::{block_on, connect, disconnect, map_error};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
-use crate::ssh::session::create_ssh_session;
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -90,33 +91,31 @@ fn run_terminal_thread(
     cols: u32,
     rows: u32,
 ) {
-    let sess = match create_ssh_session(&config) {
-        Ok(s) => s,
-        Err(e) => {
-            fail_terminal(&ah, &session_id, e);
-            return;
-        }
-    };
+    let fail_session_id = session_id.clone();
+    let fail_handle = ah.clone();
+    let result = block_on(async move {
+        let mut handle = connect(&config).await?;
+        let channel = handle
+            .channel_open_session()
+            .await
+            .map_err(|e| map_error("通道创建失败", e))?;
 
-    let mut channel = match sess.channel_session() {
-        Ok(c) => c,
-        Err(e) => {
-            fail_terminal(&ah, &session_id, format!("通道创建失败: {}", e));
-            return;
-        }
-    };
+        channel
+            .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
+            .await
+            .map_err(|e| map_error("PTY 请求失败", e))?;
+        channel
+            .request_shell(true)
+            .await
+            .map_err(|e| map_error("Shell 启动失败", e))?;
 
-    if let Err(e) = channel.request_pty("xterm-256color", None, Some((cols, rows, 0, 0))) {
-        fail_terminal(&ah, &session_id, format!("PTY 请求失败: {}", e));
-        return;
+        run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
+        Ok::<(), String>(())
+    });
+
+    if let Err(e) = result {
+        fail_terminal(&fail_handle, &fail_session_id, e);
     }
-
-    if let Err(e) = channel.shell() {
-        fail_terminal(&ah, &session_id, format!("Shell 启动失败: {}", e));
-        return;
-    }
-
-    run_terminal_io_loop(session_id, rx, ah, sess, channel, cols, rows);
 }
 
 struct ContainerExecThreadCtx {
@@ -149,64 +148,59 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
         return;
     }
 
-    let sess = match create_ssh_session(&config) {
-        Ok(s) => s,
-        Err(e) => {
-            fail_terminal(&ah, &session_id, e);
-            return;
+    let fail_session_id = session_id.clone();
+    let fail_handle = ah.clone();
+    let result = block_on(async move {
+        let mut handle = connect(&config).await?;
+        let channel = handle
+            .channel_open_session()
+            .await
+            .map_err(|e| map_error("通道创建失败", e))?;
+
+        channel
+            .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
+            .await
+            .map_err(|e| map_error("PTY 请求失败", e))?;
+
+        let mut cmd = String::from("docker exec -it ");
+        if let Some(raw_user) = user {
+            let trimmed = raw_user.trim();
+            if !trimmed.is_empty() {
+                cmd.push_str("-u ");
+                cmd.push_str(&shell_single_quote(trimmed));
+                cmd.push(' ');
+            }
         }
-    };
+        cmd.push_str(&shell_single_quote(&container_id));
+        cmd.push(' ');
+        cmd.push_str(&shell_single_quote(&shell));
+        channel
+            .exec(true, cmd)
+            .await
+            .map_err(|e| map_error("docker exec 启动失败", e))?;
 
-    let mut channel = match sess.channel_session() {
-        Ok(c) => c,
-        Err(e) => {
-            fail_terminal(&ah, &session_id, format!("通道创建失败: {}", e));
-            return;
-        }
-    };
+        run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
+        Ok::<(), String>(())
+    });
 
-    if let Err(e) = channel.request_pty("xterm-256color", None, Some((cols, rows, 0, 0))) {
-        fail_terminal(&ah, &session_id, format!("PTY 请求失败: {}", e));
-        return;
+    if let Err(e) = result {
+        fail_terminal(&fail_handle, &fail_session_id, e);
     }
-
-    let mut cmd = String::from("docker exec -it ");
-    if let Some(raw_user) = user {
-        let trimmed = raw_user.trim();
-        if !trimmed.is_empty() {
-            cmd.push_str("-u ");
-            cmd.push_str(&shell_single_quote(trimmed));
-            cmd.push(' ');
-        }
-    }
-    cmd.push_str(&shell_single_quote(&container_id));
-    cmd.push(' ');
-    cmd.push_str(&shell_single_quote(&shell));
-    if let Err(e) = channel.exec(&cmd) {
-        fail_terminal(&ah, &session_id, format!("docker exec 启动失败: {}", e));
-        return;
-    }
-
-    run_terminal_io_loop(session_id, rx, ah, sess, channel, cols, rows);
 }
 
-const TERMINAL_SSH_DRAIN_TIMEOUT_MS: u32 = 1;
-
-fn run_terminal_io_loop(
+async fn run_terminal_io_loop(
     session_id: String,
     rx: mpsc::Receiver<TerminalMsg>,
     ah: AppHandle,
-    sess: ssh2::Session,
-    mut channel: ssh2::Channel,
+    handle: &mut russh::client::Handle<crate::ssh::client::SshClientHandler>,
+    mut channel: russh::Channel<russh::client::Msg>,
     initial_cols: u32,
     initial_rows: u32,
 ) {
-    sess.set_blocking(true);
-    sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
-    let mut buf = [0u8; 8192];
     let mut input_buf = Vec::<u8>::new();
     let mut last_cols = initial_cols;
     let mut last_rows = initial_rows;
+    let mut writer = channel.make_writer();
 
     loop {
         loop {
@@ -217,16 +211,17 @@ fn run_terminal_io_loop(
                 Ok(TerminalMsg::Resize { cols, rows }) => {
                     if cols != last_cols || rows != last_rows {
                         if !input_buf.is_empty() {
-                            let _ = channel.write_all(&input_buf);
+                            let _ = writer.write_all(&input_buf).await;
                             input_buf.clear();
                         }
                         last_cols = cols;
                         last_rows = rows;
-                        let _ = channel.request_pty_size(cols, rows, None, None);
+                        let _ = channel.window_change(cols, rows, 0, 0).await;
                     }
                 }
                 Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
-                    let _ = channel.close();
+                    let _ = channel.close().await;
+                    disconnect(handle).await;
                     send_control(&ah, &session_id, WsServerMsg::Closed);
                     return;
                 }
@@ -235,38 +230,25 @@ fn run_terminal_io_loop(
         }
 
         if !input_buf.is_empty() {
-            let _ = channel.write_all(&input_buf);
-            let _ = channel.flush();
+            let _ = writer.write_all(&input_buf).await;
             input_buf.clear();
         }
 
-        sess.set_timeout(TERMINAL_SSH_READ_POLL_MS);
-        match channel.read(&mut buf) {
-            Ok(0) => {
-                send_control(&ah, &session_id, WsServerMsg::Closed);
-                return;
-            }
-            Ok(n) => {
-                let mut output = buf[..n].to_vec();
-                sess.set_timeout(TERMINAL_SSH_DRAIN_TIMEOUT_MS);
-                loop {
-                    match channel.read(&mut buf) {
-                        Ok(0) => {
-                            send_pty_bytes(&ah, &session_id, &output);
-                            send_control(&ah, &session_id, WsServerMsg::Closed);
-                            return;
-                        }
-                        Ok(extra) => output.extend_from_slice(&buf[..extra]),
-                        Err(_) => break,
+        tokio::select! {
+            msg = channel.wait() => {
+                match msg {
+                    Some(ChannelMsg::Data { data }) => send_pty_bytes(&ah, &session_id, &data),
+                    Some(ChannelMsg::ExtendedData { data, .. }) => send_pty_bytes(&ah, &session_id, &data),
+                    Some(ChannelMsg::ExitStatus { .. }) => {}
+                    Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                        disconnect(handle).await;
+                        send_control(&ah, &session_id, WsServerMsg::Closed);
+                        return;
                     }
+                    _ => {}
                 }
-                send_pty_bytes(&ah, &session_id, &output);
             }
-            Err(ref e) if e.kind() == ErrorKind::TimedOut => {}
-            Err(_) => {
-                send_control(&ah, &session_id, WsServerMsg::Closed);
-                return;
-            }
+            _ = tokio::time::sleep(Duration::from_millis(TERMINAL_SSH_READ_POLL_MS as u64)) => {}
         }
     }
 }

@@ -5,6 +5,7 @@ use std::sync::{
     mpsc,
 };
 
+use crate::models::app::events::EventStreamStatus;
 use crate::models::app::server::ServerConfig;
 
 pub enum TerminalMsg {
@@ -24,6 +25,7 @@ pub struct StreamHandle {
 pub struct EventStreamHandle {
     pub stream_id: String,
     pub tx: mpsc::Sender<()>,
+    pub status: Arc<Mutex<EventStreamStatus>>,
 }
 
 pub struct AppState {

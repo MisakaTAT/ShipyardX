@@ -1,7 +1,7 @@
-use std::io::Read;
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
+use russh::ChannelMsg;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
@@ -11,7 +11,7 @@ use crate::models::app::events::{
 };
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::events::StreamEvent;
-use crate::ssh::session::create_ssh_session;
+use crate::ssh::client::{block_on, connect, disconnect, map_error};
 use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -106,24 +106,36 @@ fn is_refresh_event(event_type: &str, action: &str) -> bool {
 const RECONNECT_DELAYS: &[u64] = &[1, 2, 4, 8, 15, 30];
 const THROTTLE_MS: u128 = 500;
 
-fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Receiver<()>, ah: AppHandle) {
+fn emit_stream_status(
+    ah: &AppHandle,
+    stream_id: &str,
+    status_slot: &Arc<Mutex<EventStreamStatus>>,
+    status: EventStreamStatus,
+) {
+    *status_slot.lock().unwrap() = status;
+    let _ = DockerStreamStatus {
+        stream_id: stream_id.to_string(),
+        status,
+    }
+    .emit(ah);
+}
+
+fn run_event_stream_thread(
+    config: ServerConfig,
+    stream_id: String,
+    status_slot: Arc<Mutex<EventStreamStatus>>,
+    rx: mpsc::Receiver<()>,
+    ah: AppHandle,
+) {
     let mut attempt = 0usize;
 
     loop {
         if rx.try_recv().is_ok() || matches!(rx.try_recv(), Err(mpsc::TryRecvError::Disconnected)) {
-            let _ = DockerStreamStatus {
-                stream_id: stream_id.clone(),
-                status: EventStreamStatus::Stopped,
-            }
-            .emit(&ah);
+            emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
             return;
         }
 
-        let _ = DockerStreamStatus {
-            stream_id: stream_id.clone(),
-            status: EventStreamStatus::Connecting,
-        }
-        .emit(&ah);
+        emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connecting);
 
         let ver = match resolve_api_version(&config) {
             Ok(v) => v,
@@ -139,131 +151,108 @@ fn run_event_stream_thread(config: ServerConfig, stream_id: String, rx: mpsc::Re
             }
         };
 
-        let sess = match create_ssh_session(&config) {
-            Ok(s) => s,
-            Err(e) => {
-                let _ = DockerStreamError {
-                    stream_id: stream_id.clone(),
-                    message: format!("SSH 连接失败: {}", e),
-                }
-                .emit(&ah);
-                wait_or_stop(&rx, reconnect_delay(attempt));
-                attempt += 1;
-                continue;
-            }
-        };
+        let stream_result = block_on(async {
+            let mut handle = connect(&config).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
+            let mut channel = handle
+                .channel_open_session()
+                .await
+                .map_err(|e| format!("通道创建失败: {}", map_error("通道创建失败", e)))?;
 
-        let mut channel = match sess.channel_session() {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = DockerStreamError {
-                    stream_id: stream_id.clone(),
-                    message: format!("通道创建失败: {}", e),
-                }
-                .emit(&ah);
-                wait_or_stop(&rx, reconnect_delay(attempt));
-                attempt += 1;
-                continue;
-            }
-        };
+            let cmd = format!(
+                "curl -s -N --unix-socket /var/run/docker.sock 'http://localhost/v{}/events'",
+                ver
+            );
 
-        let cmd = format!(
-            "curl -s -N --unix-socket /var/run/docker.sock 'http://localhost/v{}/events'",
-            ver
-        );
+            channel
+                .exec(true, cmd)
+                .await
+                .map_err(|e| format!("启动事件流失败: {}", map_error("启动事件流失败", e)))?;
 
-        if let Err(e) = channel.exec(&cmd) {
-            let _ = DockerStreamError {
-                stream_id: stream_id.clone(),
-                message: format!("启动事件流失败: {}", e),
-            }
-            .emit(&ah);
-            wait_or_stop(&rx, reconnect_delay(attempt));
-            attempt += 1;
-            continue;
-        }
+            emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connected);
 
-        sess.set_blocking(false);
-        let _ = DockerStreamStatus {
-            stream_id: stream_id.clone(),
-            status: EventStreamStatus::Connected,
-        }
-        .emit(&ah);
-        attempt = 0;
+            let mut line_buf = String::new();
+            let mut last_refresh: Option<Instant> = None;
 
-        let mut buf = [0u8; 4096];
-        let mut line_buf = String::new();
-        let mut last_refresh: Option<Instant> = None;
-
-        loop {
-            match rx.try_recv() {
-                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                    let _ = DockerStreamStatus {
-                        stream_id: stream_id.clone(),
-                        status: EventStreamStatus::Stopped,
+            loop {
+                match rx.try_recv() {
+                    Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
+                        let _ = channel.close().await;
+                        disconnect(&mut handle).await;
+                        return Ok::<bool, String>(true);
                     }
-                    .emit(&ah);
-                    return;
+                    Err(mpsc::TryRecvError::Empty) => {}
                 }
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
 
-            match channel.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let chunk = String::from_utf8_lossy(&buf[..n]);
-                    line_buf.push_str(&chunk);
+                tokio::select! {
+                    msg = channel.wait() => {
+                        match msg {
+                            Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                                let chunk = String::from_utf8_lossy(&data);
+                                line_buf.push_str(&chunk);
 
-                    while let Some(pos) = line_buf.find('\n') {
-                        let line: String = line_buf.drain(..=pos).collect();
-                        let trimmed = line.trim();
-                        if trimmed.is_empty() {
-                            continue;
-                        }
-
-                        if let Some(event) = parse_docker_event(trimmed) {
-                            let event_type = event.event_type.clone();
-                            let action = event.action.clone();
-                            let _ = DockerStreamPayload {
-                                stream_id: stream_id.clone(),
-                                event,
-                            }
-                            .emit(&ah);
-
-                            if is_refresh_event(&event_type, &action) {
-                                let now = Instant::now();
-                                let should_emit = match last_refresh {
-                                    Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
-                                    None => true,
-                                };
-                                if should_emit {
-                                    let _ = DockerStreamRefresh {
-                                        stream_id: stream_id.clone(),
-                                        resource: event_type,
+                                while let Some(pos) = line_buf.find('\n') {
+                                    let line: String = line_buf.drain(..=pos).collect();
+                                    let trimmed = line.trim();
+                                    if trimmed.is_empty() {
+                                        continue;
                                     }
-                                    .emit(&ah);
-                                    last_refresh = Some(now);
+
+                                    if let Some(event) = parse_docker_event(trimmed) {
+                                        let event_type = event.event_type.clone();
+                                        let action = event.action.clone();
+                                        let _ = DockerStreamPayload {
+                                            stream_id: stream_id.clone(),
+                                            event,
+                                        }
+                                        .emit(&ah);
+
+                                        if is_refresh_event(&event_type, &action) {
+                                            let now = Instant::now();
+                                            let should_emit = match last_refresh {
+                                                Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
+                                                None => true,
+                                            };
+                                            if should_emit {
+                                                let _ = DockerStreamRefresh {
+                                                    stream_id: stream_id.clone(),
+                                                    resource: event_type,
+                                                }
+                                                .emit(&ah);
+                                                last_refresh = Some(now);
+                                            }
+                                        }
+                                    }
                                 }
                             }
+                            Some(ChannelMsg::ExitStatus { .. }) => {}
+                            Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                                disconnect(&mut handle).await;
+                                return Ok(false);
+                            }
+                            _ => {}
                         }
                     }
+                    _ = tokio::time::sleep(Duration::from_millis(50)) => {}
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(Duration::from_millis(50));
-                }
-                Err(_) => break,
             }
+        });
 
-            if channel.eof() {
-                break;
+        match stream_result {
+            Ok(true) => {
+                emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
+                return;
+            }
+            Ok(false) => {}
+            Err(message) => {
+                let _ = DockerStreamError {
+                    stream_id: stream_id.clone(),
+                    message,
+                }
+                .emit(&ah);
             }
         }
 
-        let _ = DockerStreamStatus {
-            stream_id: stream_id.clone(),
-            status: EventStreamStatus::Disconnected,
-        }
-        .emit(&ah);
+        emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Disconnected);
     }
 }
 
@@ -288,22 +277,31 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     {
         let streams = state.event_streams.lock().unwrap();
         if let Some(existing) = streams.get(&server_id) {
+            let current = *existing.status.lock().unwrap();
+            let _ = DockerStreamStatus {
+                stream_id: existing.stream_id.clone(),
+                status: current,
+            }
+            .emit(&app_handle);
             return Ok(existing.stream_id.clone());
         }
     }
 
     let stream_id = generate_id();
     let (tx, rx) = mpsc::channel::<()>();
+    let status = Arc::new(Mutex::new(EventStreamStatus::Connecting));
 
     let sid = stream_id.clone();
+    let status_for_thread = status.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_event_stream_thread(server, sid, rx, ah));
+    std::thread::spawn(move || run_event_stream_thread(server, sid, status_for_thread, rx, ah));
 
     state.event_streams.lock().unwrap().insert(
         server_id,
         EventStreamHandle {
             stream_id: stream_id.clone(),
             tx,
+            status,
         },
     );
 

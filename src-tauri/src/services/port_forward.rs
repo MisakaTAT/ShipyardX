@@ -1,4 +1,4 @@
-use std::io::{ErrorKind, Read, Write};
+use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -10,16 +10,16 @@ use tauri::State;
 use std::collections::BTreeSet;
 
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpStream as TokioTcpStream;
 
 use crate::models::app::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
 use crate::models::app::server::ServerConfig;
-use crate::ssh::session::create_ssh_session;
+use crate::ssh::client::{block_on, connect, disconnect, map_error};
 use crate::state::{AppState, PortForwardHandle, get_server_config};
 use crate::utils::id::generate_id;
 
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";
-const PORT_FORWARD_IO_POLL_MS: u32 = 400;
-
 struct PortForwardBridgeArgs {
     local_stream: TcpStream,
     server_cfg: ServerConfig,
@@ -53,7 +53,7 @@ fn normalize_host(ip: &str) -> String {
 
 fn bridge_once(args: PortForwardBridgeArgs) {
     let PortForwardBridgeArgs {
-        mut local_stream,
+        local_stream,
         server_cfg,
         remote_host,
         remote_port,
@@ -67,65 +67,67 @@ fn bridge_once(args: PortForwardBridgeArgs) {
         return;
     }
 
-    let io_timeout = Some(Duration::from_millis(PORT_FORWARD_IO_POLL_MS as u64));
-    let _ = local_stream.set_read_timeout(io_timeout);
-    let _ = local_stream.set_write_timeout(io_timeout);
     let _ = local_stream.set_nodelay(true);
 
-    let sess = match create_ssh_session(&server_cfg) {
-        Ok(s) => s,
-        Err(e) => {
-            *last_error.lock().unwrap() = Some(format!("SSH 连接失败: {}", e));
-            return;
+    let result = block_on(async move {
+        let mut handle = connect(&server_cfg).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
+        let channel = handle
+            .channel_open_direct_tcpip(remote_host.clone(), remote_port as u32, "127.0.0.1", 0)
+            .await
+            .map_err(|e| format!("目标端口不可达: {}", map_error("目标端口不可达", e)))?;
+
+        local_stream
+            .set_nonblocking(true)
+            .map_err(|e| format!("本地 socket 设置失败: {}", e))?;
+        let local_stream = TokioTcpStream::from_std(local_stream).map_err(|e| format!("接管本地连接失败: {}", e))?;
+        let remote_stream = channel.into_stream();
+
+        let (local_read, local_write) = tokio::io::split(local_stream);
+        let (remote_read, remote_write) = tokio::io::split(remote_stream);
+
+        tokio::select! {
+            res = async {
+                tokio::try_join!(
+                    transfer_stream(local_read, remote_write, tx_bytes.clone()),
+                    transfer_stream(remote_read, local_write, rx_bytes.clone())
+                )?;
+                Ok::<(), String>(())
+            } => {
+                disconnect(&mut handle).await;
+                res
+            }
+            _ = wait_for_shutdown(shutdown.clone()) => {
+                disconnect(&mut handle).await;
+                Ok(())
+            }
         }
-    };
+    });
 
-    sess.set_blocking(true);
-    sess.set_timeout(PORT_FORWARD_IO_POLL_MS);
+    if let Err(e) = result {
+        *last_error.lock().unwrap() = Some(e);
+    }
+}
 
-    let mut channel = match sess.channel_direct_tcpip(&remote_host, remote_port, None) {
-        Ok(c) => c,
-        Err(e) => {
-            *last_error.lock().unwrap() = Some(format!("目标端口不可达: {}", e));
-            return;
-        }
-    };
-
+async fn transfer_stream<R, W>(mut reader: R, mut writer: W, counter: Arc<AtomicU64>) -> Result<(), String>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let mut buf = [0u8; 16 * 1024];
     loop {
-        if shutdown.load(Ordering::Relaxed) {
-            break;
+        let n = reader.read(&mut buf).await.map_err(|e| e.to_string())?;
+        if n == 0 {
+            writer.shutdown().await.map_err(|e| e.to_string())?;
+            return Ok(());
         }
+        writer.write_all(&buf[..n]).await.map_err(|e| e.to_string())?;
+        counter.fetch_add(n as u64, Ordering::Relaxed);
+    }
+}
 
-        // local -> remote (TX: upload to remote)
-        match local_stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                if channel.write_all(&buf[..n]).is_err() {
-                    break;
-                }
-                tx_bytes.fetch_add(n as u64, Ordering::Relaxed);
-            }
-            Err(e) if matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => {}
-            Err(_) => break,
-        }
-
-        if shutdown.load(Ordering::Relaxed) {
-            break;
-        }
-
-        // remote -> local (RX: download from remote)
-        match channel.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                if local_stream.write_all(&buf[..n]).is_err() {
-                    break;
-                }
-                rx_bytes.fetch_add(n as u64, Ordering::Relaxed);
-            }
-            Err(e) if matches!(e.kind(), ErrorKind::TimedOut | ErrorKind::WouldBlock) => {}
-            Err(_) => break,
-        }
+async fn wait_for_shutdown(shutdown: Arc<AtomicBool>) {
+    while !shutdown.load(Ordering::Relaxed) {
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
 
@@ -185,14 +187,16 @@ fn accept_loop(args: PortForwardAcceptArgs) {
 
 fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> Result<(), String> {
     let start = Instant::now();
-    let sess = create_ssh_session(server_cfg).map_err(|e| format!("SSH 连接失败: {}", e))?;
-
-    // 同样使用 channel_direct_tcpip 做连通性探测。
-    let channel = sess
-        .channel_direct_tcpip(remote_host, remote_port, None)
-        .map_err(|e| format!("目标端口不可达: {}", e))?;
-
-    drop(channel);
+    block_on(async {
+        let mut handle = connect(server_cfg).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
+        let channel = handle
+            .channel_open_direct_tcpip(remote_host, remote_port as u32, "127.0.0.1", 0)
+            .await
+            .map_err(|e| format!("目标端口不可达: {}", map_error("目标端口不可达", e)))?;
+        drop(channel);
+        disconnect(&mut handle).await;
+        Ok::<(), String>(())
+    })?;
     let _elapsed = start.elapsed();
     Ok(())
 }

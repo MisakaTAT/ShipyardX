@@ -1,6 +1,6 @@
-use std::io::Read;
 use std::sync::mpsc;
 
+use russh::ChannelMsg;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
@@ -11,7 +11,7 @@ use crate::models::app::image::Image;
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::container::ContainerSummary;
 use crate::models::docker::image::{ImageHistoryItem, ImageSummary};
-use crate::ssh::session::create_ssh_session;
+use crate::ssh::client::{block_on, connect, disconnect, map_error};
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -94,95 +94,84 @@ pub async fn remove_image(
 }
 
 fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mpsc::Receiver<()>, ah: AppHandle) {
-    let sess = match create_ssh_session(&config) {
-        Ok(s) => s,
-        Err(e) => {
-            let _ = DockerSshStreamChunk {
-                stream_id: pull_id.clone(),
-                chunk: format!("连接失败: {}\n", e),
-            }
-            .emit(&ah);
-            let _ = DockerSshStreamDone {
-                stream_id: pull_id.clone(),
-                success: false,
-            }
-            .emit(&ah);
-            return;
-        }
-    };
-
-    let mut channel = match sess.channel_session() {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = DockerSshStreamChunk {
-                stream_id: pull_id.clone(),
-                chunk: format!("通道失败: {}\n", e),
-            }
-            .emit(&ah);
-            let _ = DockerSshStreamDone {
-                stream_id: pull_id.clone(),
-                success: false,
-            }
-            .emit(&ah);
-            return;
-        }
-    };
-
-    if let Err(e) = channel.exec(&format!("docker pull {} 2>&1", image)) {
-        let _ = DockerSshStreamChunk {
-            stream_id: pull_id.clone(),
-            chunk: format!("执行失败: {}\n", e),
-        }
-        .emit(&ah);
-        let _ = DockerSshStreamDone {
-            stream_id: pull_id.clone(),
-            success: false,
-        }
-        .emit(&ah);
-        return;
-    }
-
-    sess.set_blocking(false);
-    let mut buf = [0u8; 4096];
-
-    loop {
-        match rx.try_recv() {
-            Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                let _ = DockerSshStreamDone {
-                    stream_id: pull_id.clone(),
-                    success: false,
-                }
-                .emit(&ah);
-                return;
-            }
-            Err(mpsc::TryRecvError::Empty) => {}
-        }
-        match channel.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
+    let done_stream_id = pull_id.clone();
+    let done_handle = ah.clone();
+    let success = block_on(async move {
+        let mut handle = match connect(&config).await {
+            Ok(s) => s,
+            Err(e) => {
                 let _ = DockerSshStreamChunk {
                     stream_id: pull_id.clone(),
-                    chunk: String::from_utf8_lossy(&buf[..n]).to_string(),
+                    chunk: format!("连接失败: {}\n", e),
                 }
                 .emit(&ah);
+                return false;
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
-            Err(_) => break,
-        }
-        if channel.eof() {
-            break;
-        }
-    }
+        };
 
-    channel.wait_close().ok();
-    let success = channel.exit_status().unwrap_or(-1) == 0;
+        let mut channel = match handle.channel_open_session().await {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = DockerSshStreamChunk {
+                    stream_id: pull_id.clone(),
+                    chunk: format!("通道失败: {}\n", map_error("通道失败", e)),
+                }
+                .emit(&ah);
+                disconnect(&mut handle).await;
+                return false;
+            }
+        };
+
+        if let Err(e) = channel.exec(true, format!("docker pull {} 2>&1", image)).await {
+            let _ = DockerSshStreamChunk {
+                stream_id: pull_id.clone(),
+                chunk: format!("执行失败: {}\n", map_error("执行失败", e)),
+            }
+            .emit(&ah);
+            disconnect(&mut handle).await;
+            return false;
+        }
+
+        let mut exit_code = -1i32;
+        loop {
+            match rx.try_recv() {
+                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
+                    let _ = channel.close().await;
+                    disconnect(&mut handle).await;
+                    return false;
+                }
+                Err(mpsc::TryRecvError::Empty) => {}
+            }
+
+            tokio::select! {
+                msg = channel.wait() => {
+                    match msg {
+                        Some(ChannelMsg::Data { data }) | Some(ChannelMsg::ExtendedData { data, .. }) => {
+                            let _ = DockerSshStreamChunk {
+                                stream_id: pull_id.clone(),
+                                chunk: String::from_utf8_lossy(&data).to_string(),
+                            }.emit(&ah);
+                        }
+                        Some(ChannelMsg::ExitStatus { exit_status }) => {
+                            exit_code = exit_status as i32;
+                        }
+                        Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                            disconnect(&mut handle).await;
+                            return exit_code == 0;
+                        }
+                        _ => {}
+                    }
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(20)) => {}
+            }
+        }
+    });
+
     let _ = DockerSshStreamDone {
-        stream_id: pull_id.clone(),
+        stream_id: done_stream_id,
         success,
     }
-    .emit(&ah);
+    .emit(&done_handle);
 }
 
 pub fn start_image_pull(
