@@ -3,6 +3,7 @@ mod config;
 mod contracts;
 mod docker;
 mod error;
+mod scripts;
 mod services;
 mod ssh;
 mod state;

@@ -15,6 +15,7 @@ use tungstenite::{
 use crate::contracts::frontend::server::ServerConfig;
 use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
+use crate::scripts::{TERMINAL_DOCKER_EXEC_SH, render};
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
@@ -161,18 +162,20 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
                 AppError::internal("terminal.exec_pty_request_failed", "请求容器终端 PTY 失败").with_source(e)
             })?;
 
-        let mut cmd = String::from("docker exec -it ");
-        if let Some(raw_user) = user {
-            let trimmed = raw_user.trim();
-            if !trimmed.is_empty() {
-                cmd.push_str("-u ");
-                cmd.push_str(&shell_single_quote(trimmed));
-                cmd.push(' ');
-            }
-        }
-        cmd.push_str(&shell_single_quote(&container_id));
-        cmd.push(' ');
-        cmd.push_str(&shell_single_quote(&shell));
+        let user_flag = user
+            .as_deref()
+            .map(str::trim)
+            .filter(|trimmed| !trimmed.is_empty())
+            .map(|trimmed| format!("-u {} ", shell_single_quote(trimmed)))
+            .unwrap_or_default();
+        let cmd = render(
+            TERMINAL_DOCKER_EXEC_SH,
+            &[
+                ("__USER_FLAG__", &user_flag),
+                ("__CONTAINER_ID__", &shell_single_quote(&container_id)),
+                ("__SHELL__", &shell_single_quote(&shell)),
+            ],
+        );
         channel.exec(true, cmd).await.map_err(|e| {
             AppError::internal("terminal.docker_exec_start_failed", "启动 docker exec 失败").with_source(e)
         })?;

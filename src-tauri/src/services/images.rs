@@ -12,6 +12,7 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{docker_delete_async, docker_get_async, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
+use crate::scripts::{DOCKER_PULL_IMAGE_SH, render};
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
@@ -114,7 +115,8 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
             }
         };
 
-        if let Err(e) = channel.exec(true, format!("docker pull {} 2>&1", image)).await {
+        let pull_cmd = render(DOCKER_PULL_IMAGE_SH, &[("__IMAGE__", &shell_quote(&image))]);
+        if let Err(e) = channel.exec(true, pull_cmd).await {
             let _ = DockerSshStreamChunk {
                 stream_id: pull_id.clone(),
                 chunk: format!("执行失败: {}\n", e),
@@ -186,6 +188,10 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
         error: result.err(),
     }
     .emit(&done_handle);
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
 }
 
 pub fn start_image_pull(

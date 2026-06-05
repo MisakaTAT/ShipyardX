@@ -12,6 +12,11 @@ use crate::docker::client::{docker_get_async, invalidate_api_version, resolve_ap
 use crate::docker::stats::compute_stats;
 use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
 use crate::error::{AppError, AppResult};
+use crate::scripts::{
+    DOCKER_CHECK_SOCKET_SH, DOCKER_CHECK_TCP_SH, DOCKER_READ_DAEMON_CONFIG_SH, SYSTEM_RESTART_WITH_PASSWORD_SH,
+    SYSTEM_RESTART_WITHOUT_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH,
+    render,
+};
 use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
 
@@ -23,7 +28,6 @@ const ERR_RC_SERVICE: &str = "__ERR_RC_SERVICE__";
 const ERR_SERVICE_OP: &str = "__ERR_SERVICE_OP__";
 const ERR_SUDO_NONINTERACTIVE: &str = "__ERR_SUDO_NONINTERACTIVE__";
 const ERR_NO_SUDO: &str = "__ERR_NO_SUDO__";
-
 fn map_restart_error(err: AppError) -> AppError {
     let detail = err.detail.clone().unwrap_or_else(|| err.message.clone());
     if detail.contains(ERR_BAD_SUDO_PASSWORD) {
@@ -73,20 +77,29 @@ fn map_restart_error(err: AppError) -> AppError {
 async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> AppResult<()> {
     let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
         let pwd_b64 = STANDARD.encode(pwd);
-        format!(
-            "PASS_B64='{}'; PASS=\"$(printf '%s' \"$PASS_B64\" | base64 -d)\"; has(){{ command -v \"$1\" >/dev/null 2>&1; }}; run(){{ if [ \"$(id -u)\" = \"0\" ]; then \"$@\"; elif has sudo; then if printf '%s\\n' \"$PASS\" | sudo -S -p '' -k -v >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | sudo -S -p '' \"$@\"; else echo \"{}\" 1>&2; return 1; fi; elif has su; then if printf '%s\\n' \"$PASS\" | su -c 'true' root >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | su -c \"$*\" root; else echo \"{}\" 1>&2; return 1; fi; else return 127; fi; }}; if has systemctl; then run systemctl restart docker.service || run systemctl restart docker || {{ echo \"{}\" 1>&2; exit 1; }}; elif has rc-service; then run rc-service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; elif has service; then run service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; else echo \"{}\" 1>&2; exit 1; fi",
-            pwd_b64,
-            ERR_BAD_SUDO_PASSWORD,
-            ERR_BAD_SU_PASSWORD,
-            ERR_SYSTEMCTL,
-            ERR_RC_SERVICE,
-            ERR_SERVICE_OP,
-            ERR_NO_MANAGER
+        render(
+            SYSTEM_RESTART_WITH_PASSWORD_SH,
+            &[
+                ("__PASS_B64__", &pwd_b64),
+                ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
+                ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
+                ("__ERR_SYSTEMCTL__", ERR_SYSTEMCTL),
+                ("__ERR_RC_SERVICE__", ERR_RC_SERVICE),
+                ("__ERR_SERVICE_OP__", ERR_SERVICE_OP),
+                ("__ERR_NO_MANAGER__", ERR_NO_MANAGER),
+            ],
         )
     } else {
-        format!(
-            "has(){{ command -v \"$1\" >/dev/null 2>&1; }}; run(){{ if [ \"$(id -u)\" = \"0\" ]; then \"$@\"; elif has sudo; then if sudo -n true 2>/dev/null; then sudo -n \"$@\"; else echo \"{}\" 1>&2; exit 1; fi; else echo \"{}\" 1>&2; exit 1; fi; }}; if has systemctl; then run systemctl restart docker.service || run systemctl restart docker || {{ echo \"{}\" 1>&2; exit 1; }}; elif has rc-service; then run rc-service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; elif has service; then run service docker restart || {{ echo \"{}\" 1>&2; exit 1; }}; else echo \"{}\" 1>&2; exit 1; fi",
-            ERR_SUDO_NONINTERACTIVE, ERR_NO_SUDO, ERR_SYSTEMCTL, ERR_RC_SERVICE, ERR_SERVICE_OP, ERR_NO_MANAGER
+        render(
+            SYSTEM_RESTART_WITHOUT_PASSWORD_SH,
+            &[
+                ("__ERR_SUDO_NONINTERACTIVE__", ERR_SUDO_NONINTERACTIVE),
+                ("__ERR_NO_SUDO__", ERR_NO_SUDO),
+                ("__ERR_SYSTEMCTL__", ERR_SYSTEMCTL),
+                ("__ERR_RC_SERVICE__", ERR_RC_SERVICE),
+                ("__ERR_SERVICE_OP__", ERR_SERVICE_OP),
+                ("__ERR_NO_MANAGER__", ERR_NO_MANAGER),
+            ],
         )
     };
     ssh_exec_async(server, &restart_cmd).await.map_err(map_restart_error)?;
@@ -128,15 +141,9 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
             let endpoint = resolve_docker_endpoint(&server).await.ok();
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
-                    let diag = ssh_exec_async(
-                        &server,
-                        &format!(
-                            "if [ ! -S \"{0}\" ]; then echo 'no_docker'; elif [ ! -r \"{0}\" ]; then echo 'no_permission'; else echo 'ok'; fi",
-                            path
-                        ),
-                    )
-                    .await
-                    .unwrap_or_else(|_| "ok".to_string());
+                    let diag = ssh_exec_async(&server, &render(DOCKER_CHECK_SOCKET_SH, &[("__SOCKET_PATH__", &path)]))
+                        .await
+                        .unwrap_or_else(|_| "ok".to_string());
                     match diag.trim() {
                         "no_docker" => Err(AppError::unavailable(
                             "docker.unavailable",
@@ -152,9 +159,10 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                     }
                 }
                 Some(DockerEndpoint::Tcp { host, port }) => {
+                    let port_str = port.to_string();
                     let diag = ssh_exec_async(
                         &server,
-                        &format!("if command -v nc >/dev/null 2>&1; then nc -z -w 2 '{host}' {port} >/dev/null 2>&1 && echo ok || echo no_docker; else echo ok; fi"),
+                        &render(DOCKER_CHECK_TCP_SH, &[("__HOST__", &host), ("__PORT__", &port_str)]),
                     )
                     .await
                     .unwrap_or_else(|_| "ok".to_string());
@@ -194,8 +202,7 @@ pub async fn get_container_stats(
 
 pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
     let server = get_server_config(&state, &server_id)?;
-    let cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
-    let raw = ssh_exec_async(&server, cmd).await?;
+    let raw = ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?;
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
 
     let mirror_url = cfg.registry_mirrors.clone().unwrap_or_default();
@@ -241,8 +248,7 @@ pub async fn update_docker_daemon_settings(
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     invalidate_docker_endpoint(&server);
-    let read_cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
-    let current_raw = ssh_exec_async(&server, read_cmd).await?;
+    let current_raw = ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?;
     let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
     let mirrors: Vec<String> = params
@@ -294,15 +300,17 @@ pub async fn update_docker_daemon_settings(
     let b64 = STANDARD.encode(json);
     let write_cmd = if let Some(pwd) = params.sudo_password.clone().filter(|s| !s.is_empty()) {
         let pwd_b64 = STANDARD.encode(pwd);
-        format!(
-            "CFG_B64='{}'; PASS_B64='{}'; PASS=\"$(printf '%s' \"$PASS_B64\" | base64 -d)\"; if [ \"$(id -u)\" = \"0\" ]; then printf '%s' \"$CFG_B64\" | base64 -d | tee /etc/docker/daemon.json >/dev/null; elif command -v sudo >/dev/null 2>&1; then if printf '%s\\n' \"$PASS\" | sudo -S -p '' -k -v >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | sudo -S -p '' sh -c \"printf '%s' '$CFG_B64' | base64 -d | tee /etc/docker/daemon.json >/dev/null\"; else echo \"{}\" 1>&2; exit 1; fi; elif command -v su >/dev/null 2>&1; then if printf '%s\\n' \"$PASS\" | su -c 'true' root >/dev/null 2>&1; then printf '%s\\n' \"$PASS\" | su -c \"printf '%s' '$CFG_B64' | base64 -d | tee /etc/docker/daemon.json >/dev/null\" root; else echo \"{}\" 1>&2; exit 1; fi; else exit 1; fi",
-            b64, pwd_b64, ERR_BAD_SUDO_PASSWORD, ERR_BAD_SU_PASSWORD
+        render(
+            SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH,
+            &[
+                ("__CFG_B64__", &b64),
+                ("__PASS_B64__", &pwd_b64),
+                ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
+                ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
+            ],
         )
     } else {
-        format!(
-            "printf '%s' '{}' | base64 -d | (sudo -n tee /etc/docker/daemon.json >/dev/null || tee /etc/docker/daemon.json >/dev/null)",
-            b64
-        )
+        render(SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH, &[("__CFG_B64__", &b64)])
     };
     ssh_exec_async(&server, &write_cmd).await.map_err(map_restart_error)?;
     Ok(())

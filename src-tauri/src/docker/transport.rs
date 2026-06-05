@@ -14,12 +14,11 @@ use crate::contracts::docker_api::common::DockerError;
 use crate::contracts::docker_api::system::DaemonConfig;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppErrorKind, AppResult};
+use crate::scripts::DOCKER_READ_DAEMON_CONFIG_SH;
 use crate::ssh::client::{SshClientHandler, connect, disconnect};
 use crate::ssh::exec::ssh_exec_async;
 
 const DEFAULT_DOCKER_HOST: &str = "unix:///var/run/docker.sock";
-const READ_DAEMON_CONFIG_CMD: &str =
-    "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
 
 #[derive(Clone, Debug)]
 pub(crate) enum DockerEndpoint {
@@ -87,7 +86,7 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
         return Ok(endpoint.clone());
     }
 
-    let raw = ssh_exec_async(config, READ_DAEMON_CONFIG_CMD).await?;
+    let raw = ssh_exec_async(config, DOCKER_READ_DAEMON_CONFIG_SH).await?;
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
     let host = cfg
         .hosts

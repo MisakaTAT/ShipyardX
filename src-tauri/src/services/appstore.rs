@@ -14,6 +14,9 @@ use crate::contracts::frontend::appstore::{
 use crate::contracts::frontend::events::InstallStepEvent;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
+use crate::scripts::{
+    APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_SH, render,
+};
 use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async};
 
 const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
@@ -321,9 +324,13 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     let env_b64 = STANDARD.encode(env_content.as_bytes());
 
     // 使用双引号让 shell 展开 $HOME
-    let setup_cmd = format!(
-        "mkdir -p \"{0}\" && printf '%s' \"{1}\" | base64 -d > \"{0}/docker-compose.yml\" && printf '%s' \"{2}\" | base64 -d > \"{0}/.env\"",
-        remote_base, compose_b64, env_b64
+    let setup_cmd = render(
+        APPSTORE_DEPLOY_FILES_SH,
+        &[
+            ("__REMOTE_BASE__", &remote_base),
+            ("__COMPOSE_B64__", &compose_b64),
+            ("__ENV_B64__", &env_b64),
+        ],
     );
 
     ssh_exec_streaming_async(server, &setup_cmd, |chunk| {
@@ -350,19 +357,19 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
 
     // Step 3: 创建网络
     emit_step(app, "network", "running", "正在创建 Docker 网络...");
-    let net_cmd = "docker network create shipyardx-network 2>/dev/null; true".to_string();
+    let net_cmd = APPSTORE_CREATE_NETWORK_SH.to_string();
     let _ = ssh_exec_async(server, &net_cmd).await;
     emit_step(app, "network", "done", "Docker 网络就绪");
 
     // Step 4: 启动容器
     emit_step(app, "start", "running", "正在启动容器服务...");
-    let up_cmd_v2 = format!(
-        "cd \"{0}\" && docker compose -f docker-compose.yml up -d 2>&1",
-        remote_base
+    let up_cmd_v2 = render(
+        APPSTORE_COMPOSE_UP_SH,
+        &[("__REMOTE_BASE__", &remote_base), ("__COMPOSE_BIN__", "docker compose")],
     );
-    let up_cmd_v1 = format!(
-        "cd \"{0}\" && docker-compose -f docker-compose.yml up -d 2>&1",
-        remote_base
+    let up_cmd_v1 = render(
+        APPSTORE_COMPOSE_UP_SH,
+        &[("__REMOTE_BASE__", &remote_base), ("__COMPOSE_BIN__", "docker-compose")],
     );
 
     let result = ssh_exec_streaming_async(server, &up_cmd_v2, |chunk| {
@@ -435,9 +442,14 @@ async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote
         .unwrap_or(Path::new(remote_dir))
         .display();
 
-    let remote_cmd = format!(
-        "mkdir -p \"{}\" && printf '%s' \"{}\" | base64 -d | tar -xzf - -C \"{}\"",
-        remote_dir, tar_b64, remote_parent
+    let remote_parent_str = remote_parent.to_string();
+    let remote_cmd = render(
+        APPSTORE_EXTRACT_DATA_SH,
+        &[
+            ("__REMOTE_DIR__", remote_dir),
+            ("__TAR_B64__", &tar_b64),
+            ("__REMOTE_PARENT__", &remote_parent_str),
+        ],
     );
 
     ssh_exec_async(server, &remote_cmd).await?;
