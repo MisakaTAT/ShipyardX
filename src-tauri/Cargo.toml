@@ -31,6 +31,7 @@ bytes = "1"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
+tempfile = "3"
 uuid = { version = "1.23.0", features = ["v4"] }
 network-interface = { version = "2.0.5", features = ["serde"] }
 specta = { version = "2.0.0-rc.24", features = ["derive", "function"] }

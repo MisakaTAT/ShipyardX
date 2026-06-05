@@ -35,15 +35,18 @@ pub struct AppState {
     pub(crate) streams: Mutex<HashMap<String, StreamHandle>>,
     pub(crate) terminal_ws_clients: Mutex<HashMap<String, mpsc::Sender<Vec<u8>>>>,
     pub(crate) event_streams: Mutex<HashMap<String, EventStreamHandle>>,
-    pub(crate) port_forwards: Mutex<HashMap<String, PortForwardHandle>>,
-    pub(crate) port_forward_last_errors: Mutex<HashMap<String, String>>,
+    pub(crate) port_forwards: Mutex<HashMap<String, PortForwardRuntimeState>>,
 }
 
-pub(crate) struct PortForwardHandle {
+pub(crate) struct PortForwardRuntimeHandle {
     pub(crate) shutdown: Arc<AtomicBool>,
-    pub(crate) last_error: Arc<Mutex<Option<String>>>,
     pub(crate) server_id: String,
     pub(crate) local_port: u16,
     pub(crate) tx_bytes: Arc<AtomicU64>,
     pub(crate) rx_bytes: Arc<AtomicU64>,
+}
+
+pub(crate) struct PortForwardRuntimeState {
+    pub(crate) handle: Option<PortForwardRuntimeHandle>,
+    pub(crate) last_error: Option<String>,
 }

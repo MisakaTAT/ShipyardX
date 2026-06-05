@@ -118,7 +118,6 @@ pub fn run() {
                 terminal_ws_clients: Mutex::new(HashMap::new()),
                 event_streams: Mutex::new(HashMap::new()),
                 port_forwards: Mutex::new(HashMap::new()),
-                port_forward_last_errors: Mutex::new(HashMap::new()),
             });
             Ok(())
         })

@@ -1,7 +1,9 @@
 mod app_state;
 
 pub use app_state::AppState;
-pub(crate) use app_state::{EventStreamHandle, PortForwardHandle, StreamHandle, TerminalHandle, TerminalMsg};
+pub(crate) use app_state::{
+    EventStreamHandle, PortForwardRuntimeHandle, PortForwardRuntimeState, StreamHandle, TerminalHandle, TerminalMsg,
+};
 
 use tauri::State;
 

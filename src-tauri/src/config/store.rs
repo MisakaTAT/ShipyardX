@@ -6,6 +6,7 @@ use aes_gcm::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use tauri::{AppHandle, Manager};
+use tempfile::NamedTempFile;
 
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
@@ -71,6 +72,29 @@ pub fn data_dir_from_file(data_file: &Path) -> PathBuf {
     data_file.parent().unwrap_or(data_file).to_path_buf()
 }
 
+pub fn atomic_write(path: &Path, contents: &[u8]) -> AppResult<()> {
+    let dir = data_dir_from_file(path);
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| AppError::internal("config.data_dir_create_failed", "创建配置目录失败").with_source(e))?;
+
+    let mut temp = NamedTempFile::new_in(&dir)
+        .map_err(|e| AppError::internal("config.tempfile_create_failed", "创建临时配置文件失败").with_source(e))?;
+    use std::io::Write;
+    temp.write_all(contents)
+        .map_err(|e| AppError::internal("config.tempfile_write_failed", "写入临时配置文件失败").with_source(e))?;
+    temp.as_file_mut()
+        .sync_all()
+        .map_err(|e| AppError::internal("config.tempfile_sync_failed", "同步临时配置文件失败").with_source(e))?;
+    temp.persist(path)
+        .map_err(|e| AppError::internal("config.file_replace_failed", "替换配置文件失败").with_source(e.error))?;
+
+    if let Ok(dir_file) = std::fs::File::open(&dir) {
+        let _ = dir_file.sync_all();
+    }
+
+    Ok(())
+}
+
 pub fn load_servers(path: &Path) -> Vec<ServerConfig> {
     let key = match get_or_create_key(&data_dir_from_file(path)) {
         Ok(k) => k,
@@ -118,6 +142,8 @@ pub fn save_servers(path: &Path, servers: &[ServerConfig]) -> AppResult<()> {
 
     let json = serde_json::to_string_pretty(&out)
         .map_err(|e| AppError::internal("config.server_serialize_failed", "序列化服务器配置失败").with_source(e))?;
-    std::fs::write(path, json)
-        .map_err(|e| AppError::internal("config.server_write_failed", "写入服务器配置失败").with_source(e))
+    atomic_write(path, json.as_bytes()).map_err(|e| {
+        AppError::internal("config.server_write_failed", "写入服务器配置失败")
+            .with_detail(e.detail.unwrap_or(e.message))
+    })
 }

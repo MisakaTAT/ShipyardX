@@ -17,7 +17,7 @@ use crate::contracts::frontend::port_forward::{LocalAddress, PortForward, PortFo
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, connect, disconnect};
-use crate::state::{AppState, PortForwardHandle, get_server_config};
+use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config};
 use crate::utils::id::generate_id;
 
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";
@@ -45,6 +45,15 @@ struct PortForwardAcceptArgs {
     last_error: Arc<Mutex<Option<String>>>,
     tx_bytes: Arc<AtomicU64>,
     rx_bytes: Arc<AtomicU64>,
+}
+
+fn set_port_forward_error(state: &State<AppState>, id: &str, error: Option<String>) {
+    let mut runtime = state.port_forwards.lock().unwrap();
+    let entry = runtime.entry(id.to_string()).or_insert(PortForwardRuntimeState {
+        handle: None,
+        last_error: None,
+    });
+    entry.last_error = error;
 }
 
 fn normalize_host(ip: &str) -> String {
@@ -221,7 +230,13 @@ fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) 
 }
 
 fn is_rule_running(state: &State<AppState>, id: &str) -> bool {
-    state.port_forwards.lock().unwrap().contains_key(id)
+    state
+        .port_forwards
+        .lock()
+        .unwrap()
+        .get(id)
+        .and_then(|state| state.handle.as_ref())
+        .is_some()
 }
 
 fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<PortForwardRule>> {
@@ -246,21 +261,22 @@ fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwar
     let json = serde_json::to_string_pretty(rules).map_err(|e| {
         AppError::internal("port_forward.rules_serialize_failed", "序列化端口转发配置失败").with_source(e)
     })?;
-    std::fs::write(&path, json).map_err(|e| {
-        AppError::internal("port_forward.rules_write_failed", "写入 port_forwards.json 失败").with_source(e)
+    crate::config::store::atomic_write(&path, json.as_bytes()).map_err(|e| {
+        AppError::internal("port_forward.rules_write_failed", "写入 port_forwards.json 失败")
+            .with_detail(e.detail.unwrap_or(e.message))
     })
 }
 
 pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let runtime = state.port_forwards.lock().unwrap();
-    let errors = state.port_forward_last_errors.lock().unwrap();
 
     let mut out: Vec<PortForward> = Vec::new();
     for r in rules.into_iter().filter(|x| x.server_id == server_id) {
-        let handle = runtime.get(&r.id);
+        let runtime_state = runtime.get(&r.id);
+        let handle = runtime_state.and_then(|state| state.handle.as_ref());
         let running = handle.is_some();
-        let handle_last_error = handle.and_then(|h| h.last_error.lock().unwrap().clone());
+        let handle_last_error = runtime_state.and_then(|state| state.last_error.clone());
         let actual_port = if running {
             handle.map(|h| h.local_port).unwrap_or(r.local_port)
         } else {
@@ -283,7 +299,7 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppR
             running,
             tx_bytes: tx,
             rx_bytes: rx,
-            last_error: errors.get(&r.id).cloned().or(handle_last_error),
+            last_error: handle_last_error,
         });
     }
     Ok(out)
@@ -385,9 +401,9 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
 
     // 同步运行时状态：禁用即停止。
     if !enabled && let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
-        handle.shutdown.store(true, Ordering::Relaxed);
-        // 清理错误信息
-        state.port_forward_last_errors.lock().unwrap().remove(&id);
+        if let Some(runtime) = handle.handle {
+            runtime.shutdown.store(true, Ordering::Relaxed);
+        }
     }
 
     Ok(())
@@ -400,9 +416,10 @@ pub fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppS
 pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     // 先停止运行时。
     if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
-        handle.shutdown.store(true, Ordering::Relaxed);
+        if let Some(runtime) = handle.handle {
+            runtime.shutdown.store(true, Ordering::Relaxed);
+        }
     }
-    state.port_forward_last_errors.lock().unwrap().remove(&id);
 
     let mut rules = load_port_forward_rules_from_state(&state)?;
     rules.retain(|r| r.id != id);
@@ -441,13 +458,15 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     let last_error = Arc::new(Mutex::new(None));
     let tx_bytes = Arc::new(AtomicU64::new(0));
     let rx_bytes = Arc::new(AtomicU64::new(0));
-    let handle = PortForwardHandle {
-        shutdown: shutdown.clone(),
-        last_error: last_error.clone(),
-        server_id: rule.server_id.clone(),
-        local_port: actual_local_port,
-        tx_bytes: tx_bytes.clone(),
-        rx_bytes: rx_bytes.clone(),
+    let handle = PortForwardRuntimeState {
+        handle: Some(PortForwardRuntimeHandle {
+            shutdown: shutdown.clone(),
+            server_id: rule.server_id.clone(),
+            local_port: actual_local_port,
+            tx_bytes: tx_bytes.clone(),
+            rx_bytes: rx_bytes.clone(),
+        }),
+        last_error: None,
     };
     state.port_forwards.lock().unwrap().insert(rule.id.clone(), handle);
 
@@ -487,29 +506,32 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
         .lock()
         .unwrap()
         .iter()
-        .filter(|(_, h)| h.server_id == server_id)
+        .filter(|(_, state)| {
+            state
+                .handle
+                .as_ref()
+                .map(|handle| handle.server_id == server_id)
+                .unwrap_or(false)
+        })
         .map(|(id, _)| id.clone())
         .collect();
 
     for id in running_ids {
         if !enabled_ids.contains(&id) {
             if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
-                handle.shutdown.store(true, Ordering::Relaxed);
+                if let Some(runtime) = handle.handle {
+                    runtime.shutdown.store(true, Ordering::Relaxed);
+                }
             }
-            state.port_forward_last_errors.lock().unwrap().remove(&id);
         }
     }
 
     // 启动所有 enabled 规则（对失败做错误记录，不要中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
-            state
-                .port_forward_last_errors
-                .lock()
-                .unwrap()
-                .insert(r.id.clone(), error_message(e));
+            set_port_forward_error(&state, &r.id, Some(error_message(e)));
         } else {
-            state.port_forward_last_errors.lock().unwrap().remove(&r.id);
+            set_port_forward_error(&state, &r.id, None);
         }
     }
 
@@ -519,13 +541,13 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
 pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let runtime = state.port_forwards.lock().unwrap();
-    let errors = state.port_forward_last_errors.lock().unwrap();
 
     let mut out: Vec<PortForward> = Vec::with_capacity(rules.len());
     for r in rules.into_iter() {
-        let handle = runtime.get(&r.id);
+        let runtime_state = runtime.get(&r.id);
+        let handle = runtime_state.and_then(|state| state.handle.as_ref());
         let running = handle.is_some();
-        let handle_last_error = handle.and_then(|h| h.last_error.lock().unwrap().clone());
+        let handle_last_error = runtime_state.and_then(|state| state.last_error.clone());
         let actual_port = if running {
             handle.map(|h| h.local_port).unwrap_or(r.local_port)
         } else {
@@ -549,7 +571,7 @@ pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortF
             running,
             tx_bytes: tx,
             rx_bytes: rx,
-            last_error: errors.get(&r.id).cloned().or(handle_last_error),
+            last_error: handle_last_error,
         });
     }
 
@@ -567,22 +589,19 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     for id in running_ids {
         if !enabled_ids.contains(&id) {
             if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
-                handle.shutdown.store(true, Ordering::Relaxed);
+                if let Some(runtime) = handle.handle {
+                    runtime.shutdown.store(true, Ordering::Relaxed);
+                }
             }
-            state.port_forward_last_errors.lock().unwrap().remove(&id);
         }
     }
 
     // 启动所有 enabled 规则（对失败做错误记录，不中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
-            state
-                .port_forward_last_errors
-                .lock()
-                .unwrap()
-                .insert(r.id.clone(), error_message(e));
+            set_port_forward_error(&state, &r.id, Some(error_message(e)));
         } else {
-            state.port_forward_last_errors.lock().unwrap().remove(&r.id);
+            set_port_forward_error(&state, &r.id, None);
         }
     }
 
@@ -597,16 +616,18 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
         .remove(&id)
         .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
 
-    handle.shutdown.store(true, Ordering::Relaxed);
-    state.port_forward_last_errors.lock().unwrap().remove(&id);
+    if let Some(runtime) = handle.handle {
+        runtime.shutdown.store(true, Ordering::Relaxed);
+    }
     Ok(())
 }
 
 pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
     let handles: Vec<_> = state.port_forwards.lock().unwrap().drain().collect();
-    for (id, handle) in handles {
-        handle.shutdown.store(true, Ordering::Relaxed);
-        state.port_forward_last_errors.lock().unwrap().remove(&id);
+    for (_id, handle) in handles {
+        if let Some(runtime) = handle.handle {
+            runtime.shutdown.store(true, Ordering::Relaxed);
+        }
     }
     Ok(())
 }

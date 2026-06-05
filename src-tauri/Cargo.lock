@@ -4177,6 +4177,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-opener",
  "tauri-specta",
+ "tempfile",
  "tokio",
  "tungstenite",
  "uuid",

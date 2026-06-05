@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use hyper::Method;
 use serde::Serialize;
@@ -9,8 +10,15 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::transport::{open_stream, request_empty, request_json_body_text, request_text};
 use crate::error::{AppError, AppResult};
 
-fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+const API_VERSION_CACHE_TTL: Duration = Duration::from_secs(300);
+
+struct CacheEntry {
+    value: String,
+    fetched_at: Instant,
+}
+
+fn api_version_cache() -> &'static Mutex<HashMap<String, CacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, CacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -24,8 +32,10 @@ pub fn invalidate_api_version(config: &ServerConfig) {
 
 pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<String> {
     let key = cache_key(config);
-    if let Some(ver) = api_version_cache().lock().unwrap().get(&key) {
-        return Ok(ver.clone());
+    if let Some(entry) = api_version_cache().lock().unwrap().get(&key)
+        && entry.fetched_at.elapsed() < API_VERSION_CACHE_TTL
+    {
+        return Ok(entry.value.clone());
     }
 
     let resp = request_text(config, Method::GET, "/version").await?;
@@ -39,7 +49,13 @@ pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<Strin
     })?;
 
     let api_ver = version.api_version;
-    api_version_cache().lock().unwrap().insert(key, api_ver.clone());
+    api_version_cache().lock().unwrap().insert(
+        key,
+        CacheEntry {
+            value: api_ver.clone(),
+            fetched_at: Instant::now(),
+        },
+    );
     Ok(api_ver)
 }
 
