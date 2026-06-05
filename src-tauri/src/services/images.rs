@@ -1,6 +1,7 @@
 use std::sync::mpsc;
+use std::time::Duration;
 
-use russh::ChannelMsg;
+use serde::Deserialize;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
@@ -9,11 +10,10 @@ use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
 use crate::contracts::frontend::events::{DockerSshStreamChunk, DockerSshStreamDone};
 use crate::contracts::frontend::image::Image;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::{docker_delete_async, docker_get_async, pretty_json_response};
+use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_stream_async, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
-use crate::scripts::{DOCKER_PULL_IMAGE_SH, render};
-use crate::ssh::client::{block_on, connect, disconnect};
+use crate::ssh::client::block_on;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -87,97 +87,37 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
     let done_stream_id = pull_id.clone();
     let done_handle = ah.clone();
     let result = block_on(async move {
-        let mut handle = match connect(&config).await {
-            Ok(s) => s,
-            Err(e) => {
-                let _ = DockerSshStreamChunk {
-                    stream_id: pull_id.clone(),
-                    chunk: format!("连接失败: {}\n", e.message),
-                }
-                .emit(&ah);
-                return Err(
-                    AppError::unavailable("image.pull_connect_failed", "连接镜像仓库所在主机失败")
-                        .with_detail(e.detail.unwrap_or(e.message)),
-                );
-            }
-        };
-
-        let mut channel = match handle.channel_open_session().await {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = DockerSshStreamChunk {
-                    stream_id: pull_id.clone(),
-                    chunk: format!("通道失败: {}\n", e),
-                }
-                .emit(&ah);
-                disconnect(&mut handle).await;
-                return Err(AppError::internal("image.pull_channel_failed", "创建镜像拉取通道失败").with_source(e));
-            }
-        };
-
-        let pull_cmd = render(DOCKER_PULL_IMAGE_SH, &[("__IMAGE__", &shell_quote(&image))]);
-        if let Err(e) = channel.exec(true, pull_cmd).await {
+        let path = format!("/images/create?fromImage={}", encode_query_component(&image));
+        let mut stream = docker_post_stream_async(&config, &path).await.map_err(|e| {
             let _ = DockerSshStreamChunk {
                 stream_id: pull_id.clone(),
-                chunk: format!("执行失败: {}\n", e),
+                chunk: format!("连接 Docker API 失败: {}\n", e.message),
             }
             .emit(&ah);
-            disconnect(&mut handle).await;
-            return Err(AppError::internal("image.pull_exec_failed", "启动镜像拉取命令失败").with_source(e));
-        }
+            e
+        })?;
 
-        let mut exit_code = -1i32;
-        let mut stderr = String::new();
+        let mut buffer = String::new();
         loop {
             match rx.try_recv() {
                 Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                    let _ = channel.close().await;
-                    disconnect(&mut handle).await;
+                    stream.close().await;
                     return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
                 }
                 Err(mpsc::TryRecvError::Empty) => {}
             }
 
-            tokio::select! {
-                msg = channel.wait() => {
-                    match msg {
-                        Some(ChannelMsg::Data { data }) => {
-                            let text = String::from_utf8_lossy(&data).to_string();
-                            let _ = DockerSshStreamChunk {
-                                stream_id: pull_id.clone(),
-                                chunk: text,
-                            }.emit(&ah);
-                        }
-                        Some(ChannelMsg::ExtendedData { data, .. }) => {
-                            let text = String::from_utf8_lossy(&data).to_string();
-                            stderr.push_str(&text);
-                            let _ = DockerSshStreamChunk {
-                                stream_id: pull_id.clone(),
-                                chunk: text,
-                            }.emit(&ah);
-                        }
-                        Some(ChannelMsg::ExitStatus { exit_status }) => {
-                            exit_code = exit_status as i32;
-                        }
-                        Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
-                            disconnect(&mut handle).await;
-                            if exit_code == 0 {
-                                return Ok(());
-                            }
-                            let detail = stderr.trim();
-                            return Err(
-                                AppError::unavailable("image.pull_failed", "镜像拉取失败")
-                                    .with_detail(if detail.is_empty() {
-                                        format!("docker pull 退出码: {}", exit_code)
-                                    } else {
-                                        detail.to_string()
-                                    })
-                            );
-                        }
-                        _ => {}
-                    }
+            match tokio::time::timeout(Duration::from_millis(80), stream.next_chunk()).await {
+                Ok(Ok(Some(chunk))) => {
+                    buffer.push_str(&String::from_utf8_lossy(&chunk));
+                    emit_pull_lines(&pull_id, &ah, &mut buffer)?;
                 }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(20)) => {}
+                Ok(Ok(None)) => {
+                    emit_pull_tail(&pull_id, &ah, &mut buffer)?;
+                    return Ok(());
+                }
+                Ok(Err(e)) => return Err(e),
+                Err(_) => {}
             }
         }
     });
@@ -190,8 +130,88 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
     .emit(&done_handle);
 }
 
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', r"'\''"))
+#[derive(Deserialize)]
+struct ImagePullEvent {
+    status: Option<String>,
+    progress: Option<String>,
+    id: Option<String>,
+    error: Option<String>,
+    #[serde(rename = "errorDetail")]
+    error_detail: Option<ImagePullErrorDetail>,
+}
+
+#[derive(Deserialize)]
+struct ImagePullErrorDetail {
+    message: Option<String>,
+}
+
+fn encode_query_component(value: &str) -> String {
+    value
+        .bytes()
+        .flat_map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                vec![byte as char]
+            }
+            _ => format!("%{byte:02X}").chars().collect(),
+        })
+        .collect()
+}
+
+fn emit_pull_lines(stream_id: &str, app: &AppHandle, buffer: &mut String) -> AppResult<()> {
+    while let Some(pos) = buffer.find('\n') {
+        let line = buffer[..pos].trim_end_matches('\r').to_string();
+        buffer.drain(..=pos);
+        emit_pull_line(stream_id, app, &line)?;
+    }
+    Ok(())
+}
+
+fn emit_pull_tail(stream_id: &str, app: &AppHandle, buffer: &mut String) -> AppResult<()> {
+    let line = buffer.trim();
+    if !line.is_empty() {
+        emit_pull_line(stream_id, app, line)?;
+    }
+    buffer.clear();
+    Ok(())
+}
+
+fn emit_pull_line(stream_id: &str, app: &AppHandle, line: &str) -> AppResult<()> {
+    if line.trim().is_empty() {
+        return Ok(());
+    }
+
+    let event: ImagePullEvent = serde_json::from_str(line)
+        .map_err(|e| AppError::internal("image.pull_event_parse_failed", "解析镜像拉取进度失败").with_source(e))?;
+
+    let error = event
+        .error_detail
+        .as_ref()
+        .and_then(|detail| detail.message.as_deref())
+        .or(event.error.as_deref())
+        .filter(|message| !message.trim().is_empty())
+        .map(str::to_string);
+    if let Some(error) = error {
+        return Err(AppError::unavailable("image.pull_failed", "镜像拉取失败").with_detail(error));
+    }
+
+    if let Some(text) = format_pull_event(event) {
+        let _ = DockerSshStreamChunk {
+            stream_id: stream_id.to_string(),
+            chunk: text,
+        }
+        .emit(app);
+    }
+    Ok(())
+}
+
+fn format_pull_event(event: ImagePullEvent) -> Option<String> {
+    let status = event.status?;
+    let prefix = event.id.map(|id| format!("{id}: ")).unwrap_or_default();
+    let progress = event.progress.filter(|value| !value.trim().is_empty());
+    Some(match progress {
+        Some(progress) => format!("{prefix}{status} {progress}\n"),
+        None => format!("{prefix}{status}\n"),
+    })
 }
 
 pub fn start_image_pull(

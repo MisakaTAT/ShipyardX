@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -8,7 +9,8 @@ use hyper::client::conn::http1;
 use hyper::header::{CONTENT_TYPE, HOST};
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
-use russh::client;
+use russh::{ChannelStream, client};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::contracts::docker_api::common::DockerError;
 use crate::contracts::docker_api::system::DaemonConfig;
@@ -19,6 +21,7 @@ use crate::ssh::client::{SshClientHandler, connect, disconnect};
 use crate::ssh::exec::ssh_exec_async;
 
 const DEFAULT_DOCKER_HOST: &str = "unix:///var/run/docker.sock";
+const ENDPOINT_CACHE_TTL: Duration = Duration::from_secs(300);
 
 #[derive(Clone, Debug)]
 pub(crate) enum DockerEndpoint {
@@ -26,8 +29,13 @@ pub(crate) enum DockerEndpoint {
     Tcp { host: String, port: u16 },
 }
 
-fn endpoint_cache() -> &'static Mutex<HashMap<String, DockerEndpoint>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, DockerEndpoint>>> = OnceLock::new();
+struct EndpointCacheEntry {
+    value: DockerEndpoint,
+    fetched_at: Instant,
+}
+
+fn endpoint_cache() -> &'static Mutex<HashMap<String, EndpointCacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, EndpointCacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -82,8 +90,10 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
 
 pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerEndpoint> {
     let key = cache_key(config);
-    if let Some(endpoint) = endpoint_cache().lock().unwrap().get(&key) {
-        return Ok(endpoint.clone());
+    if let Some(entry) = endpoint_cache().lock().unwrap().get(&key)
+        && entry.fetched_at.elapsed() < ENDPOINT_CACHE_TTL
+    {
+        return Ok(entry.value.clone());
     }
 
     let raw = ssh_exec_async(config, DOCKER_READ_DAEMON_CONFIG_SH).await?;
@@ -95,7 +105,13 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
         .map(|host| host.as_str())
         .unwrap_or(DEFAULT_DOCKER_HOST);
     let endpoint = parse_docker_host(host)?;
-    endpoint_cache().lock().unwrap().insert(key, endpoint.clone());
+    endpoint_cache().lock().unwrap().insert(
+        key,
+        EndpointCacheEntry {
+            value: endpoint.clone(),
+            fetched_at: Instant::now(),
+        },
+    );
     Ok(endpoint)
 }
 
@@ -125,6 +141,10 @@ impl DockerStreamResponse {
         }
     }
 
+    pub async fn close(&mut self) {
+        self.finish().await;
+    }
+
     async fn finish(&mut self) {
         if let Some(mut handle) = self.ssh_handle.take() {
             disconnect(&mut handle).await;
@@ -138,6 +158,39 @@ impl Drop for DockerStreamResponse {
     fn drop(&mut self) {
         self.connection_task.abort();
     }
+}
+
+pub(crate) struct DockerHijackConnection {
+    io: ChannelStream<client::Msg>,
+    pending: Vec<u8>,
+    ssh_handle: Option<client::Handle<SshClientHandler>>,
+}
+
+impl DockerHijackConnection {
+    pub async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if !self.pending.is_empty() {
+            let n = self.pending.len().min(buf.len());
+            buf[..n].copy_from_slice(&self.pending[..n]);
+            self.pending.drain(..n);
+            return Ok(n);
+        }
+        self.io.read(buf).await
+    }
+
+    pub async fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.io.write_all(buf).await
+    }
+
+    pub async fn close(&mut self) {
+        let _ = self.io.shutdown().await;
+        if let Some(mut handle) = self.ssh_handle.take() {
+            disconnect(&mut handle).await;
+        }
+    }
+}
+
+impl Drop for DockerHijackConnection {
+    fn drop(&mut self) {}
 }
 
 struct DockerRawResponse {
@@ -324,5 +377,119 @@ pub(crate) async fn open_stream(config: &ServerConfig, method: Method, path: &st
         body: response.into_body(),
         connection_task,
         ssh_handle: Some(handle),
+    })
+}
+
+pub(crate) async fn open_hijack(
+    config: &ServerConfig,
+    method: Method,
+    path: &str,
+    body: Vec<u8>,
+) -> AppResult<DockerHijackConnection> {
+    let mut handle = connect(config).await?;
+    let endpoint = resolve_docker_endpoint(config).await?;
+    let channel = match endpoint {
+        DockerEndpoint::Unix { path } => handle
+            .channel_open_direct_streamlocal(path)
+            .await
+            .map_err(|e| map_transport_error("docker.socket_open_failed", "打开 Docker Socket 通道失败", e))?,
+        DockerEndpoint::Tcp { host, port } => handle
+            .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+            .await
+            .map_err(|e| map_transport_error("docker.tcp_open_failed", "打开 Docker TCP 通道失败", e))?,
+    };
+    let mut io = channel.into_stream();
+    let request_head = format!(
+        "{} {} HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Length: {}\r\n\r\n",
+        method,
+        path,
+        body.len()
+    );
+    io.write_all(request_head.as_bytes())
+        .await
+        .map_err(|e| map_transport_error("docker.request_send_failed", "发送 Docker HTTP 请求失败", e))?;
+    io.write_all(&body)
+        .await
+        .map_err(|e| map_transport_error("docker.request_send_failed", "发送 Docker HTTP 请求失败", e))?;
+    io.flush()
+        .await
+        .map_err(|e| map_transport_error("docker.request_send_failed", "发送 Docker HTTP 请求失败", e))?;
+
+    let (status, headers, pending) = read_hijack_response_head(&mut io).await?;
+    if !status.is_success() && status != StatusCode::SWITCHING_PROTOCOLS {
+        let body = read_hijack_error_body(&mut io, &headers, pending).await?;
+        disconnect(&mut handle).await;
+        return Err(docker_api_error(status, &body));
+    }
+
+    Ok(DockerHijackConnection {
+        io,
+        pending,
+        ssh_handle: Some(handle),
+    })
+}
+
+async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppResult<(StatusCode, String, Vec<u8>)> {
+    let mut received = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let header_end = loop {
+        if let Some(pos) = find_header_end(&received) {
+            break pos;
+        }
+        let n = tokio::time::timeout(Duration::from_secs(15), io.read(&mut chunk))
+            .await
+            .map_err(|_| AppError::timeout("docker.hijack_timeout", "等待 Docker hijack 响应超时").retryable(true))?
+            .map_err(|e| map_transport_error("docker.response_read_failed", "读取 Docker HTTP 响应失败", e))?;
+        if n == 0 {
+            return Err(AppError::unavailable("docker.hijack_closed", "Docker hijack 连接已关闭").retryable(true));
+        }
+        received.extend_from_slice(&chunk[..n]);
+    };
+
+    let pending = received.split_off(header_end + 4);
+    let headers = String::from_utf8_lossy(&received[..header_end]).to_string();
+    let status = headers
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .and_then(|code| StatusCode::from_u16(code).ok())
+        .ok_or_else(|| AppError::internal("docker.hijack_status_invalid", "解析 Docker hijack 状态失败"))?;
+
+    Ok((status, headers, pending))
+}
+
+async fn read_hijack_error_body(
+    io: &mut ChannelStream<client::Msg>,
+    headers: &str,
+    mut body: Vec<u8>,
+) -> AppResult<Vec<u8>> {
+    let Some(content_length) = header_value(headers, "content-length").and_then(|value| value.parse::<usize>().ok())
+    else {
+        return Ok(body);
+    };
+    let mut chunk = [0u8; 4096];
+    while body.len() < content_length {
+        let n = tokio::time::timeout(Duration::from_secs(2), io.read(&mut chunk))
+            .await
+            .map_err(|_| AppError::timeout("docker.hijack_error_timeout", "读取 Docker 错误响应超时").retryable(true))?
+            .map_err(|e| map_transport_error("docker.response_read_failed", "读取 Docker HTTP 响应失败", e))?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&chunk[..n]);
+    }
+    body.truncate(content_length);
+    Ok(body)
+}
+
+fn find_header_end(buf: &[u8]) -> Option<usize> {
+    buf.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.eq_ignore_ascii_case(name).then_some(value.trim())
     })
 }

@@ -12,10 +12,11 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
+use crate::contracts::docker_api::container::{ContainerExecCreate, ContainerExecCreateResponse, ContainerExecStart};
 use crate::contracts::frontend::server::ServerConfig;
 use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
+use crate::docker::client::{docker_post_async, docker_post_json_hijack_async, docker_post_json_response_async};
 use crate::error::{AppError, AppResult};
-use crate::scripts::{TERMINAL_DOCKER_EXEC_SH, render};
 use crate::ssh::client::{block_on, connect, disconnect};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
@@ -47,10 +48,6 @@ fn is_safe_docker_ident(v: &str) -> bool {
     }
     v.bytes()
         .all(|b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'-' | b'.'))
-}
-
-fn shell_single_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
@@ -150,42 +147,104 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     let fail_session_id = session_id.clone();
     let fail_handle = ah.clone();
     let result = block_on(async move {
-        let mut handle = connect(&config).await?;
-        let channel = handle.channel_open_session().await.map_err(|e| {
-            AppError::internal("terminal.exec_channel_open_failed", "容器终端通道创建失败").with_source(e)
+        let shell = if shell.trim().is_empty() {
+            "/bin/sh".to_string()
+        } else {
+            shell.trim().to_string()
+        };
+        let exec = ContainerExecCreate {
+            attach_stdin: true,
+            attach_stdout: true,
+            attach_stderr: true,
+            tty: true,
+            open_stdin: true,
+            cmd: vec![shell],
+            user: user
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+        };
+        let raw = docker_post_json_response_async(&config, &format!("/containers/{container_id}/exec"), &exec).await?;
+        let created: ContainerExecCreateResponse = serde_json::from_str(raw.trim()).map_err(|e| {
+            AppError::internal("terminal.exec_create_parse_failed", "解析容器终端创建结果失败").with_source(e)
         })?;
+        let start = ContainerExecStart {
+            detach: false,
+            tty: true,
+        };
+        let mut hijack = docker_post_json_hijack_async(&config, &format!("/exec/{}/start", created.id), &start).await?;
 
-        channel
-            .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
-            .await
-            .map_err(|e| {
-                AppError::internal("terminal.exec_pty_request_failed", "请求容器终端 PTY 失败").with_source(e)
-            })?;
-
-        let user_flag = user
-            .as_deref()
-            .map(str::trim)
-            .filter(|trimmed| !trimmed.is_empty())
-            .map(|trimmed| format!("-u {} ", shell_single_quote(trimmed)))
-            .unwrap_or_default();
-        let cmd = render(
-            TERMINAL_DOCKER_EXEC_SH,
-            &[
-                ("__USER_FLAG__", &user_flag),
-                ("__CONTAINER_ID__", &shell_single_quote(&container_id)),
-                ("__SHELL__", &shell_single_quote(&shell)),
-            ],
-        );
-        channel.exec(true, cmd).await.map_err(|e| {
-            AppError::internal("terminal.docker_exec_start_failed", "启动 docker exec 失败").with_source(e)
-        })?;
-
-        run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
+        run_docker_exec_io_loop(session_id, rx, ah, &config, &created.id, &mut hijack, cols, rows).await;
         Ok::<(), AppError>(())
     });
 
     if let Err(e) = result {
         fail_terminal(&fail_handle, &fail_session_id, e);
+    }
+}
+
+async fn run_docker_exec_io_loop(
+    session_id: String,
+    rx: mpsc::Receiver<TerminalMsg>,
+    ah: AppHandle,
+    config: &ServerConfig,
+    exec_id: &str,
+    hijack: &mut crate::docker::transport::DockerHijackConnection,
+    initial_cols: u32,
+    initial_rows: u32,
+) {
+    let mut input_buf = Vec::<u8>::new();
+    let mut read_buf = [0u8; 8192];
+    let mut last_cols = initial_cols;
+    let mut last_rows = initial_rows;
+
+    loop {
+        loop {
+            match rx.try_recv() {
+                Ok(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
+                Ok(TerminalMsg::Resize { cols, rows }) => {
+                    if cols != last_cols || rows != last_rows {
+                        last_cols = cols;
+                        last_rows = rows;
+                        let _ = docker_post_async(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}")).await;
+                    }
+                }
+                Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
+                    hijack.close().await;
+                    send_control(&ah, &session_id, WsServerMsg::Closed);
+                    return;
+                }
+                Err(mpsc::TryRecvError::Empty) => break,
+            }
+        }
+
+        if !input_buf.is_empty() {
+            if hijack.write_all(&input_buf).await.is_err() {
+                hijack.close().await;
+                send_control(&ah, &session_id, WsServerMsg::Closed);
+                return;
+            }
+            input_buf.clear();
+        }
+
+        match tokio::time::timeout(
+            Duration::from_millis(TERMINAL_SSH_READ_POLL_MS as u64),
+            hijack.read(&mut read_buf),
+        )
+        .await
+        {
+            Ok(Ok(0)) => {
+                hijack.close().await;
+                send_control(&ah, &session_id, WsServerMsg::Closed);
+                return;
+            }
+            Ok(Ok(n)) => send_pty_bytes(&ah, &session_id, &read_buf[..n]),
+            Ok(Err(_)) => {
+                hijack.close().await;
+                send_control(&ah, &session_id, WsServerMsg::Closed);
+                return;
+            }
+            Err(_) => {}
+        }
     }
 }
 

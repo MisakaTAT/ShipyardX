@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::contracts::docker_api::common::DockerVersion;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::transport::{open_stream, request_empty, request_json_body_text, request_text};
+use crate::docker::transport::{open_hijack, open_stream, request_empty, request_json_body_text, request_text};
 use crate::error::{AppError, AppResult};
 
 const API_VERSION_CACHE_TTL: Duration = Duration::from_secs(300);
@@ -118,6 +118,32 @@ pub async fn docker_stream_async(
 ) -> AppResult<crate::docker::transport::DockerStreamResponse> {
     let ver = resolve_api_version_async(config).await?;
     open_stream(config, Method::GET, &docker_api_path(&ver, path)).await
+}
+
+pub async fn docker_post_stream_async(
+    config: &ServerConfig,
+    path: &str,
+) -> AppResult<crate::docker::transport::DockerStreamResponse> {
+    let ver = resolve_api_version_async(config).await?;
+    open_stream(config, Method::POST, &docker_api_path(&ver, path)).await
+}
+
+pub async fn docker_post_json_hijack_async<T: Serialize>(
+    config: &ServerConfig,
+    path: &str,
+    body: &T,
+) -> AppResult<crate::docker::transport::DockerHijackConnection> {
+    let ver = resolve_api_version_async(config).await?;
+    let body = serde_json::to_vec(body).map_err(|e| {
+        AppError::wrap(
+            "docker.request_body_serialize_failed",
+            crate::error::AppErrorKind::Internal,
+            "序列化 Docker 请求体失败",
+            e,
+        )
+    })?;
+
+    open_hijack(config, Method::POST, &docker_api_path(&ver, path), body).await
 }
 
 pub fn pretty_json_response(raw: &str) -> AppResult<String> {

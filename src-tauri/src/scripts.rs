@@ -5,8 +5,6 @@ pub(crate) const APPSTORE_EXTRACT_DATA_SH: &str = include_str!("scripts/appstore
 pub(crate) const DOCKER_READ_DAEMON_CONFIG_SH: &str = include_str!("scripts/docker_read_daemon_config.sh");
 pub(crate) const DOCKER_CHECK_SOCKET_SH: &str = include_str!("scripts/docker_check_socket.sh");
 pub(crate) const DOCKER_CHECK_TCP_SH: &str = include_str!("scripts/docker_check_tcp.sh");
-pub(crate) const DOCKER_PULL_IMAGE_SH: &str = include_str!("scripts/docker_pull_image.sh");
-pub(crate) const TERMINAL_DOCKER_EXEC_SH: &str = include_str!("scripts/terminal_docker_exec.sh");
 pub(crate) const SYSTEM_RESTART_WITH_PASSWORD_SH: &str = include_str!("scripts/system_restart_with_password.sh");
 pub(crate) const SYSTEM_RESTART_WITHOUT_PASSWORD_SH: &str = include_str!("scripts/system_restart_without_password.sh");
 pub(crate) const SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH: &str =
@@ -20,4 +18,17 @@ pub(crate) fn render(template: &str, replacements: &[(&str, &str)]) -> String {
         rendered = rendered.replace(from, to);
     }
     rendered
+}
+
+pub(crate) fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
+}
+
+pub(crate) fn render_shell(template: &str, raw: &[(&str, &str)], quoted: &[(&str, &str)]) -> String {
+    let quoted_replacements: Vec<(&str, String)> = quoted.iter().map(|(from, to)| (*from, shell_quote(to))).collect();
+    let quoted_refs: Vec<(&str, &str)> = quoted_replacements
+        .iter()
+        .map(|(from, to)| (*from, to.as_str()))
+        .collect();
+    render(&render(template, raw), &quoted_refs)
 }

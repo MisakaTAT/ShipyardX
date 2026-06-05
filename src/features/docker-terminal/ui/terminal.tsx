@@ -27,6 +27,7 @@ const TERMINAL_STYLE = {
   padding: 0,
   borderRadius: 0,
   boxShadow: 'none',
+  scrollbarGutter: 'stable',
 } as const
 
 /**
@@ -424,7 +425,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     {wasEverConnected
                       ? '与远程主机的会话已结束，可重新建立连接。'
                       : isContainerExec
-                        ? '将通过 SSH 在远程主机上执行 docker exec 并接入容器交互终端。'
+                        ? '将通过 Docker API 创建 exec 会话并接入容器交互终端。'
                         : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
                   </p>
                 </div>
@@ -490,7 +491,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
                 <p className="text-sm text-muted-foreground">
                   {isContainerExec
-                    ? '正在通过 SSH 启动 docker exec 并连接容器终端，请稍候。'
+                    ? '正在通过 Docker API 启动容器终端，请稍候。'
                     : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
                 </p>
               </div>
@@ -502,9 +503,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                   <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
                     <ShieldAlert className="size-7 text-amber-500" />
                   </div>
-                  <h2 className="text-lg font-semibold text-foreground">无法建立 SSH 连接</h2>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {isContainerExec ? '无法连接容器终端' : '无法建立 SSH 连接'}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。
+                    {isContainerExec
+                      ? '请确认容器仍在运行，并检查当前连接是否有 Docker API 访问权限。'
+                      : '请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。'}
                   </p>
                 </div>
 

@@ -15,7 +15,8 @@ use crate::contracts::frontend::events::InstallStepEvent;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
-    APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_SH, render,
+    APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_SH,
+    render_shell,
 };
 use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async};
 
@@ -317,20 +318,16 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     // Step 2: 部署文件
     emit_step(app, "deploy", "running", "正在部署文件到远程服务器...");
     let install_id = Uuid::new_v4().to_string();
-    let remote_base = format!("$HOME/shipyardx/apps/{}", install_id);
+    let remote_rel_base = format!("shipyardx/apps/{}", install_id);
 
     let compose_b64 = STANDARD.encode(rendered.as_bytes());
     let env_content = build_env_file(&env_values);
     let env_b64 = STANDARD.encode(env_content.as_bytes());
 
-    // 使用双引号让 shell 展开 $HOME
-    let setup_cmd = render(
+    let setup_cmd = render_shell(
         APPSTORE_DEPLOY_FILES_SH,
-        &[
-            ("__REMOTE_BASE__", &remote_base),
-            ("__COMPOSE_B64__", &compose_b64),
-            ("__ENV_B64__", &env_b64),
-        ],
+        &[("__COMPOSE_B64__", &compose_b64), ("__ENV_B64__", &env_b64)],
+        &[("__REMOTE_REL_BASE__", &remote_rel_base)],
     );
 
     ssh_exec_streaming_async(server, &setup_cmd, |chunk| {
@@ -346,7 +343,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     let local_data_meta = fs::metadata(&local_data_dir).await.ok();
     if local_data_meta.as_ref().is_some_and(|meta| meta.is_dir()) {
         emit_step(app, "deploy", "running", "正在复制数据目录...");
-        copy_data_dir_to_remote(server, &local_data_dir, &format!("{}/data", remote_base))
+        copy_data_dir_to_remote(server, &local_data_dir, &format!("{}/data", remote_rel_base))
             .await
             .map_err(|e| {
                 emit_step(app, "deploy", "error", &format!("复制数据失败: {}", e));
@@ -363,13 +360,15 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
 
     // Step 4: 启动容器
     emit_step(app, "start", "running", "正在启动容器服务...");
-    let up_cmd_v2 = render(
+    let up_cmd_v2 = render_shell(
         APPSTORE_COMPOSE_UP_SH,
-        &[("__REMOTE_BASE__", &remote_base), ("__COMPOSE_BIN__", "docker compose")],
+        &[("__COMPOSE_BIN__", "docker compose")],
+        &[("__REMOTE_REL_BASE__", &remote_rel_base)],
     );
-    let up_cmd_v1 = render(
+    let up_cmd_v1 = render_shell(
         APPSTORE_COMPOSE_UP_SH,
-        &[("__REMOTE_BASE__", &remote_base), ("__COMPOSE_BIN__", "docker-compose")],
+        &[("__COMPOSE_BIN__", "docker-compose")],
+        &[("__REMOTE_REL_BASE__", &remote_rel_base)],
     );
 
     let result = ssh_exec_streaming_async(server, &up_cmd_v2, |chunk| {
@@ -419,7 +418,7 @@ fn build_env_file(env_values: &HashMap<String, String>) -> String {
         .join("\n")
 }
 
-async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: &str) -> AppResult<()> {
+async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_rel_dir: &str) -> AppResult<()> {
     let parent = local_dir.parent().unwrap_or(local_dir);
     let dir_name = local_dir.file_name().unwrap().to_str().unwrap();
 
@@ -437,18 +436,18 @@ async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote
         .map_err(|e| AppError::internal("appstore.tar_spawn_failed", "打包数据目录失败").with_source(e))?;
     let tar_b64 = STANDARD.encode(&output.stdout);
 
-    let remote_parent = Path::new(remote_dir)
+    let remote_parent = Path::new(remote_rel_dir)
         .parent()
-        .unwrap_or(Path::new(remote_dir))
+        .unwrap_or(Path::new(remote_rel_dir))
         .display();
 
     let remote_parent_str = remote_parent.to_string();
-    let remote_cmd = render(
+    let remote_cmd = render_shell(
         APPSTORE_EXTRACT_DATA_SH,
+        &[("__TAR_B64__", &tar_b64)],
         &[
-            ("__REMOTE_DIR__", remote_dir),
-            ("__TAR_B64__", &tar_b64),
-            ("__REMOTE_PARENT__", &remote_parent_str),
+            ("__REMOTE_REL_DIR__", remote_rel_dir),
+            ("__REMOTE_REL_PARENT__", &remote_parent_str),
         ],
     );
 

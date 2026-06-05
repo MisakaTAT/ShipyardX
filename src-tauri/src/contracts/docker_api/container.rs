@@ -158,3 +158,35 @@ pub struct ContainerCreateRestartPolicy {
     #[serde(rename = "MaximumRetryCount")]
     pub maximum_retry_count: u32,
 }
+
+#[derive(Serialize)]
+pub struct ContainerExecCreate {
+    #[serde(rename = "AttachStdin")]
+    pub attach_stdin: bool,
+    #[serde(rename = "AttachStdout")]
+    pub attach_stdout: bool,
+    #[serde(rename = "AttachStderr")]
+    pub attach_stderr: bool,
+    #[serde(rename = "Tty")]
+    pub tty: bool,
+    #[serde(rename = "OpenStdin")]
+    pub open_stdin: bool,
+    #[serde(rename = "Cmd")]
+    pub cmd: Vec<String>,
+    #[serde(rename = "User", skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ContainerExecCreateResponse {
+    #[serde(rename = "Id")]
+    pub id: String,
+}
+
+#[derive(Serialize)]
+pub struct ContainerExecStart {
+    #[serde(rename = "Detach")]
+    pub detach: bool,
+    #[serde(rename = "Tty")]
+    pub tty: bool,
+}

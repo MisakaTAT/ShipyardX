@@ -15,7 +15,7 @@ use crate::error::{AppError, AppResult};
 use crate::scripts::{
     DOCKER_CHECK_SOCKET_SH, DOCKER_CHECK_TCP_SH, DOCKER_READ_DAEMON_CONFIG_SH, SYSTEM_RESTART_WITH_PASSWORD_SH,
     SYSTEM_RESTART_WITHOUT_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH,
-    render,
+    render, render_shell,
 };
 use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
@@ -141,9 +141,12 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
             let endpoint = resolve_docker_endpoint(&server).await.ok();
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
-                    let diag = ssh_exec_async(&server, &render(DOCKER_CHECK_SOCKET_SH, &[("__SOCKET_PATH__", &path)]))
-                        .await
-                        .unwrap_or_else(|_| "ok".to_string());
+                    let diag = ssh_exec_async(
+                        &server,
+                        &render_shell(DOCKER_CHECK_SOCKET_SH, &[], &[("__SOCKET_PATH__", &path)]),
+                    )
+                    .await
+                    .unwrap_or_else(|_| "ok".to_string());
                     match diag.trim() {
                         "no_docker" => Err(AppError::unavailable(
                             "docker.unavailable",
@@ -162,7 +165,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                     let port_str = port.to_string();
                     let diag = ssh_exec_async(
                         &server,
-                        &render(DOCKER_CHECK_TCP_SH, &[("__HOST__", &host), ("__PORT__", &port_str)]),
+                        &render_shell(DOCKER_CHECK_TCP_SH, &[("__PORT__", &port_str)], &[("__HOST__", &host)]),
                     )
                     .await
                     .unwrap_or_else(|_| "ok".to_string());
