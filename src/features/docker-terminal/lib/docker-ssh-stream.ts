@@ -1,4 +1,4 @@
-import { events } from '@/types/app-bindings'
+import { events, type AppError, type DockerSshStreamDone } from '@/types/app-bindings'
 
 export function appendSshStreamChunkToLines(lines: string[], chunk: string): string[] {
   const newLines = chunk.split('\n')
@@ -10,10 +10,14 @@ export function appendSshStreamChunkToLines(lines: string[], chunk: string): str
   return [...lines, ...newLines]
 }
 
+type DockerSshStreamDoneWithError = DockerSshStreamDone & {
+  error?: AppError | null
+}
+
 export async function subscribeDockerSshStream(
   streamId: string,
   onChunk: (chunk: string) => void,
-  onDone: (success: boolean) => void
+  onDone: (payload: DockerSshStreamDoneWithError) => void
 ): Promise<() => void> {
   const unChunk = await events.dockerSshStreamChunk.listen((e) => {
     if (e.payload.stream_id !== streamId) return
@@ -21,7 +25,7 @@ export async function subscribeDockerSshStream(
   })
   const unDone = await events.dockerSshStreamDone.listen((e) => {
     if (e.payload.stream_id !== streamId) return
-    onDone(e.payload.success)
+    onDone(e.payload as DockerSshStreamDoneWithError)
   })
   return () => {
     unChunk()

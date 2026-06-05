@@ -5,6 +5,7 @@ use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 use russh::{Disconnect, client};
 use tokio::runtime::{Builder, Runtime};
 
+use crate::error::{AppError, AppResult};
 use crate::models::app::server::ServerConfig;
 
 use super::limits::{CONNECT_TIMEOUT, SOCKET_IO_TIMEOUT};
@@ -53,11 +54,7 @@ where
     }
 }
 
-pub fn map_error(context: &str, err: impl std::fmt::Display) -> String {
-    format!("{}: {}", context, err)
-}
-
-pub async fn connect(config: &ServerConfig) -> Result<client::Handle<SshClientHandler>, String> {
+pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClientHandler>> {
     let client_config = Arc::new(client::Config {
         inactivity_timeout: Some(SOCKET_IO_TIMEOUT),
         keepalive_interval: Some(std::time::Duration::from_secs(15)),
@@ -70,8 +67,18 @@ pub async fn connect(config: &ServerConfig) -> Result<client::Handle<SshClientHa
         client::connect(client_config, (config.host.as_str(), config.port), SshClientHandler),
     )
     .await
-    .map_err(|_| format!("连接 {}:{} 超时", config.host, config.port))?
-    .map_err(|e| map_error("SSH 连接失败", e))?;
+    .map_err(|_| {
+        AppError::timeout(
+            "ssh.connect_timeout",
+            format!("连接 {}:{} 超时", config.host, config.port),
+        )
+        .retryable(true)
+    })?
+    .map_err(|e| {
+        AppError::unavailable("ssh.connect_failed", "SSH 连接失败")
+            .with_detail(e.to_string())
+            .retryable(true)
+    })?;
 
     let auth = match config.auth_type.as_str() {
         "password" => {
@@ -79,21 +86,27 @@ pub async fn connect(config: &ServerConfig) -> Result<client::Handle<SshClientHa
             handle
                 .authenticate_password(config.username.clone(), password.to_string())
                 .await
-                .map_err(|e| map_error("密码认证失败", e))?
+                .map_err(|e| AppError::auth("ssh.password_auth_failed", "密码认证失败").with_detail(e.to_string()))?
         }
         "key" => {
             let raw = config.key_path.as_deref().unwrap_or("~/.ssh/id_rsa");
             let expanded = expand_key_path(raw);
             let key_path = Path::new(&expanded);
             if !key_path.is_file() {
-                return Err(format!("密钥文件不存在或不可读: {}", expanded));
+                return Err(AppError::validation(
+                    "ssh.key_not_found",
+                    format!("密钥文件不存在或不可读: {}", expanded),
+                ));
             }
 
-            let key = load_secret_key(key_path, None).map_err(|e| map_error("读取私钥失败", e))?;
+            let key = load_secret_key(key_path, None)
+                .map_err(|e| AppError::validation("ssh.key_read_failed", "读取私钥失败").with_detail(e.to_string()))?;
             let rsa_hash = handle
                 .best_supported_rsa_hash()
                 .await
-                .map_err(|e| map_error("探测 RSA 签名算法失败", e))?
+                .map_err(|e| {
+                    AppError::internal("ssh.rsa_probe_failed", "探测 RSA 签名算法失败").with_detail(e.to_string())
+                })?
                 .flatten();
 
             handle
@@ -102,13 +115,19 @@ pub async fn connect(config: &ServerConfig) -> Result<client::Handle<SshClientHa
                     PrivateKeyWithHashAlg::new(Arc::new(key), rsa_hash),
                 )
                 .await
-                .map_err(|e| map_error("密钥认证失败", e))?
+                .map_err(|e| AppError::auth("ssh.public_key_auth_failed", "密钥认证失败").with_detail(e.to_string()))?
         }
-        other => return Err(format!("不支持的认证类型: {}", other)),
+        other => {
+            return Err(AppError::validation(
+                "ssh.auth_type_invalid",
+                format!("不支持的认证类型: {}", other),
+            ));
+        }
     };
 
     if !auth.success() {
-        return Err("认证未完成，请检查用户名和凭据".to_string());
+        return Err(AppError::auth("ssh.auth_incomplete", "认证未完成，请检查用户名和凭据")
+            .with_action("请检查用户名、密码或密钥配置"));
     }
 
     Ok(handle)

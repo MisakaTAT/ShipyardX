@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
 import { Cpu, HardDrive, MemoryStick, Network } from 'lucide-react'
-import { toast } from 'sonner'
 import type { ContainerStats } from '@/types/app-bindings'
 import { formatBytes } from '@/shared/lib/format'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { toastAppError } from '@/shared/lib/errors'
 
 interface Props {
   serverId: string
@@ -108,7 +108,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
       setStats(s)
       setLastUpdated(formatNowTime())
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setLoading(false)
     }

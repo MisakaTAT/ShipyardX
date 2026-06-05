@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import { toastAppError } from '@/shared/lib/errors'
 
 export function usePortForwards() {
   return useQuery({
@@ -21,7 +22,7 @@ export function useCreatePortForwardRule() {
       toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
       qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -63,7 +64,7 @@ export function useSetPortForwardEnabled() {
       toast.success(enabled ? '规则已启用' : '规则已禁用')
       qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -75,7 +76,7 @@ export function useDeletePortForward() {
       toast.success('已删除规则')
       qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -87,7 +88,7 @@ export function useStartAllPortForwards() {
       toast.success('已启动所有已启用规则')
       qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -99,6 +100,6 @@ export function useStopAllPortForwards() {
       toast.success('已停止所有转发')
       qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }

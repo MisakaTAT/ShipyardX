@@ -13,9 +13,10 @@ use tungstenite::{
     handshake::server::{Request, Response},
 };
 
+use crate::error::{AppError, AppResult};
 use crate::models::app::server::ServerConfig;
 use crate::models::app::terminal::{ContainerExecTerminalParams, TerminalSession, WsServerMsg};
-use crate::ssh::client::{block_on, connect, disconnect, map_error};
+use crate::ssh::client::{block_on, connect, disconnect};
 use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
 use crate::utils::id::generate_id;
@@ -73,14 +74,8 @@ fn send_pty_bytes(app: &AppHandle, session_id: &str, bytes: &[u8]) {
     terminal_ws_send(app, session_id, pty_frame(bytes));
 }
 
-fn fail_terminal(app: &AppHandle, session_id: &str, message: impl AsRef<str>) {
-    send_control(
-        app,
-        session_id,
-        WsServerMsg::Error {
-            message: message.as_ref().to_string(),
-        },
-    );
+fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) {
+    send_control(app, session_id, WsServerMsg::Error { error: error.into() });
 }
 
 fn run_terminal_thread(
@@ -98,19 +93,19 @@ fn run_terminal_thread(
         let channel = handle
             .channel_open_session()
             .await
-            .map_err(|e| map_error("通道创建失败", e))?;
+            .map_err(|e| AppError::internal("terminal.channel_open_failed", "终端通道创建失败").with_source(e))?;
 
         channel
             .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
             .await
-            .map_err(|e| map_error("PTY 请求失败", e))?;
+            .map_err(|e| AppError::internal("terminal.pty_request_failed", "请求终端 PTY 失败").with_source(e))?;
         channel
             .request_shell(true)
             .await
-            .map_err(|e| map_error("Shell 启动失败", e))?;
+            .map_err(|e| AppError::internal("terminal.shell_start_failed", "启动远程 Shell 失败").with_source(e))?;
 
         run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
-        Ok::<(), String>(())
+        Ok::<(), AppError>(())
     });
 
     if let Err(e) = result {
@@ -144,7 +139,11 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     } = ctx;
 
     if !is_safe_docker_ident(&container_id) {
-        fail_terminal(&ah, &session_id, "容器 ID/名称包含非法字符");
+        fail_terminal(
+            &ah,
+            &session_id,
+            AppError::validation("terminal.container_id_invalid", "容器 ID/名称包含非法字符"),
+        );
         return;
     }
 
@@ -152,15 +151,16 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     let fail_handle = ah.clone();
     let result = block_on(async move {
         let mut handle = connect(&config).await?;
-        let channel = handle
-            .channel_open_session()
-            .await
-            .map_err(|e| map_error("通道创建失败", e))?;
+        let channel = handle.channel_open_session().await.map_err(|e| {
+            AppError::internal("terminal.exec_channel_open_failed", "容器终端通道创建失败").with_source(e)
+        })?;
 
         channel
             .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
             .await
-            .map_err(|e| map_error("PTY 请求失败", e))?;
+            .map_err(|e| {
+                AppError::internal("terminal.exec_pty_request_failed", "请求容器终端 PTY 失败").with_source(e)
+            })?;
 
         let mut cmd = String::from("docker exec -it ");
         if let Some(raw_user) = user {
@@ -174,13 +174,12 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
         cmd.push_str(&shell_single_quote(&container_id));
         cmd.push(' ');
         cmd.push_str(&shell_single_quote(&shell));
-        channel
-            .exec(true, cmd)
-            .await
-            .map_err(|e| map_error("docker exec 启动失败", e))?;
+        channel.exec(true, cmd).await.map_err(|e| {
+            AppError::internal("terminal.docker_exec_start_failed", "启动 docker exec 失败").with_source(e)
+        })?;
 
         run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
-        Ok::<(), String>(())
+        Ok::<(), AppError>(())
     });
 
     if let Err(e) = result {
@@ -380,7 +379,7 @@ pub fn open_terminal(
     rows: u32,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<TerminalSession, String> {
+) -> AppResult<TerminalSession> {
     start_terminal_ws_server_once(app_handle.clone());
     let ws_port = terminal_ws_port();
     let server = get_server_config(&state, &server_id)?;
@@ -404,7 +403,7 @@ pub fn open_container_exec_terminal(
     params: ContainerExecTerminalParams,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<TerminalSession, String> {
+) -> AppResult<TerminalSession> {
     start_terminal_ws_server_once(app_handle.clone());
     let ws_port = terminal_ws_port();
     let server = get_server_config(&state, &server_id)?;
@@ -437,7 +436,7 @@ pub fn open_container_exec_terminal(
     Ok(TerminalSession { session_id, ws_port })
 }
 
-pub fn close_terminal(session_id: String, state: State<AppState>) -> Result<(), String> {
+pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<()> {
     let mut terminals = state.terminals.lock().unwrap();
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);

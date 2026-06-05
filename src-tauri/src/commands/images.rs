@@ -1,5 +1,6 @@
 use tauri::{AppHandle, State};
 
+use crate::error::AppResult;
 use crate::models::app::image::Image;
 use crate::models::app::image::ImageLayer;
 use crate::services;
@@ -7,14 +8,14 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
-pub async fn list_images(server_id: String, state: State<'_, AppState>) -> Result<Vec<Image>, String> {
-    services::images::list_images(server_id, state).await
+pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
+    Ok(services::images::list_images(server_id, state).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> Result<String, String> {
-    services::images::inspect_image(server_id, image_id, state).await
+pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
+    Ok(services::images::inspect_image(server_id, image_id, state).await?)
 }
 
 #[tauri::command]
@@ -23,8 +24,8 @@ pub async fn get_image_history(
     server_id: String,
     image_id: String,
     state: State<'_, AppState>,
-) -> Result<Vec<ImageLayer>, String> {
-    services::images::get_image_history(server_id, image_id, state).await
+) -> AppResult<Vec<ImageLayer>> {
+    Ok(services::images::get_image_history(server_id, image_id, state).await?)
 }
 
 #[tauri::command]
@@ -34,8 +35,8 @@ pub async fn remove_image(
     image_id: String,
     force: bool,
     state: State<'_, AppState>,
-) -> Result<(), String> {
-    services::images::remove_image(server_id, image_id, force, state).await
+) -> AppResult<()> {
+    Ok(services::images::remove_image(server_id, image_id, force, state).await?)
 }
 
 #[tauri::command]
@@ -45,8 +46,8 @@ pub fn start_image_pull(
     image: String,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<String, String> {
-    services::images::start_image_pull(server_id, image, state, app_handle)
+) -> AppResult<String> {
+    Ok(services::images::start_image_pull(server_id, image, state, app_handle)?)
 }
 
 #[tauri::command]

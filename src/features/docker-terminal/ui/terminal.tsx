@@ -4,6 +4,7 @@ import '@wterm/react/css'
 import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
 import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
+import { getErrorMessage, normalizeAppError, type AppErrorLike } from '@/shared/lib/errors'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { cn } from '@/shared/lib/utils'
@@ -32,7 +33,7 @@ const TERMINAL_STYLE = {
  * 终端 WebSocket 协议（单路二进制 + 首字节 channel tag）：
  *   tag 0x00 + payload = PTY 字节流（双向）
  *   tag 0x01 + payload = 控制 JSON（UTF-8，双向）
- *     下行：{ type: 'closed' } | { type: 'error', message }
+ *     下行：{ type: 'closed' } | { type: 'error', error }
  *     上行：{ type: 'resize', cols, rows } | { type: 'close' }
  */
 const TAG_DATA = 0x00
@@ -57,13 +58,13 @@ function ctrlFrame(payload: Record<string, unknown>): Uint8Array {
   return out
 }
 
-type ControlInbound = { type: 'closed' } | { type: 'error'; message: string }
+type ControlInbound = { type: 'closed' } | { type: 'error'; error: AppErrorLike }
 
 function parseControlInbound(bytes: Uint8Array): ControlInbound | null {
   try {
-    const o = JSON.parse(textDecoder.decode(bytes)) as { type?: string; message?: unknown }
+    const o = JSON.parse(textDecoder.decode(bytes)) as { type?: string; error?: unknown }
     if (o.type === 'closed') return { type: 'closed' }
-    if (o.type === 'error' && typeof o.message === 'string') return { type: 'error', message: o.message }
+    if (o.type === 'error' && o.error) return { type: 'error', error: normalizeAppError(o.error) }
   } catch {
     return null
   }
@@ -319,7 +320,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
         onControl: (msg) => {
           shellReadyPendingRef.current = false
           if (msg.type === 'error') {
-            endSession({ updateUi: true, reason: 'error', errorMessage: msg.message })
+            endSession({ updateUi: true, reason: 'error', errorMessage: msg.error.message })
           } else {
             endSession({ updateUi: true, reason: 'remote' })
           }
@@ -356,7 +357,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       }
       if (mountAliveRef.current && epochAtStart === serverEpochRef.current) {
         setPhase('error')
-        setErrorText(String(e))
+        setErrorText(getErrorMessage(e))
       }
     } finally {
       connectInFlightRef.current = false

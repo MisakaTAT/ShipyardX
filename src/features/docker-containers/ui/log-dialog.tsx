@@ -4,11 +4,11 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
 import { Virtuoso } from 'react-virtuoso'
 import { RefreshCw, Play, Square, Clock, Copy, Check } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
+import { toastAppError } from '@/shared/lib/errors'
 
 interface Props {
   serverId: string
@@ -89,7 +89,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
       const normalized = logs.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
       setLines(normalized.length ? normalized.split('\n') : [])
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setLoading(false)
     }
@@ -130,7 +130,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
         streamIdRef.current = null
       })
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
       setFollow(false)
     }
   }, [serverId, containerId, tail, timestamps, stopStream])

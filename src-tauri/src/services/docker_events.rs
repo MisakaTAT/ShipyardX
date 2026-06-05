@@ -6,12 +6,13 @@ use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
 use crate::docker::client::resolve_api_version;
+use crate::error::{AppError, AppResult};
 use crate::models::app::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::events::StreamEvent;
-use crate::ssh::client::{block_on, connect, disconnect, map_error};
+use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -142,7 +143,8 @@ fn run_event_stream_thread(
             Err(e) => {
                 let _ = DockerStreamError {
                     stream_id: stream_id.clone(),
-                    message: format!("获取 API 版本失败: {}", e),
+                    error: AppError::unavailable("docker.api_version_failed", "获取 Docker API 版本失败")
+                        .with_detail(e.detail.unwrap_or(e.message)),
                 }
                 .emit(&ah);
                 wait_or_stop(&rx, reconnect_delay(attempt));
@@ -152,21 +154,22 @@ fn run_event_stream_thread(
         };
 
         let stream_result = block_on(async {
-            let mut handle = connect(&config).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
-            let mut channel = handle
-                .channel_open_session()
-                .await
-                .map_err(|e| format!("通道创建失败: {}", map_error("通道创建失败", e)))?;
+            let mut handle = connect(&config).await.map_err(|e| {
+                AppError::unavailable("docker.events_connect_failed", "SSH 连接失败")
+                    .with_detail(e.detail.unwrap_or(e.message))
+            })?;
+            let mut channel = handle.channel_open_session().await.map_err(|e| {
+                AppError::unavailable("docker.events_channel_failed", "Docker 事件流通道创建失败").with_source(e)
+            })?;
 
             let cmd = format!(
                 "curl -s -N --unix-socket /var/run/docker.sock 'http://localhost/v{}/events'",
                 ver
             );
 
-            channel
-                .exec(true, cmd)
-                .await
-                .map_err(|e| format!("启动事件流失败: {}", map_error("启动事件流失败", e)))?;
+            channel.exec(true, cmd).await.map_err(|e| {
+                AppError::unavailable("docker.events_start_failed", "启动 Docker 事件流失败").with_source(e)
+            })?;
 
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connected);
 
@@ -178,7 +181,7 @@ fn run_event_stream_thread(
                     Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
                         let _ = channel.close().await;
                         disconnect(&mut handle).await;
-                        return Ok::<bool, String>(true);
+                        return Ok::<bool, AppError>(true);
                     }
                     Err(mpsc::TryRecvError::Empty) => {}
                 }
@@ -243,10 +246,10 @@ fn run_event_stream_thread(
                 return;
             }
             Ok(false) => {}
-            Err(message) => {
+            Err(error) => {
                 let _ = DockerStreamError {
                     stream_id: stream_id.clone(),
-                    message,
+                    error,
                 }
                 .emit(&ah);
             }
@@ -271,7 +274,7 @@ fn wait_or_stop(rx: &mpsc::Receiver<()>, duration: Duration) -> bool {
     }
 }
 
-pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> Result<String, String> {
+pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
 
     {

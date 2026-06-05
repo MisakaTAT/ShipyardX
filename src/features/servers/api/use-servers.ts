@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { commands, type ServerConfig } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import { toastAppError } from '@/shared/lib/errors'
 
 const EMPTY_SERVERS: ServerConfig[] = []
 
@@ -20,7 +20,7 @@ export function useDeleteServer() {
     onSuccess: (updated) => {
       qc.setQueryData(qk.servers(), updated)
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 

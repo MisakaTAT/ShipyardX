@@ -3,17 +3,19 @@ use tauri::State;
 use std::collections::HashMap;
 
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
+use crate::error::{AppError, AppResult};
 use crate::models::app::volume::Volume;
 use crate::models::docker::container::ContainerSummary;
 use crate::models::docker::volume::{VolumeCreate, VolumeList};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Result<Vec<Volume>, String> {
+pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/volumes")?;
-        let api: VolumeList = serde_json::from_str(&resp).map_err(|e| format!("解析存储卷列表失败: {}", e))?;
+        let api: VolumeList = serde_json::from_str(&resp)
+            .map_err(|e| AppError::internal("volume.list_parse_failed", "解析存储卷列表失败").with_source(e))?;
         let mut list = api.volumes.unwrap_or_default();
         sort_by_created_desc_then_id(
             &mut list,
@@ -22,8 +24,8 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
         );
 
         let containers_resp = docker_get(&server, "/containers/json?all=1")?;
-        let containers: Vec<ContainerSummary> =
-            serde_json::from_str(&containers_resp).map_err(|e| format!("解析容器列表失败: {}", e))?;
+        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
+            .map_err(|e| AppError::internal("volume.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
 
         let mut used_by: HashMap<String, Vec<String>> = HashMap::new();
         for c in containers {
@@ -74,24 +76,24 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> Resu
             .collect())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "加载存储卷列表任务执行失败").with_source(e))?
 }
 
-pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> Result<String, String> {
+pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, &format!("/volumes/{}", name))?;
         pretty_json_response(&resp)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "检查存储卷详情任务执行失败").with_source(e))?
 }
 
-pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || docker_delete(&server, &format!("/volumes/{}", name)))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| AppError::internal("task.join", "删除存储卷任务执行失败").with_source(e))?
 }
 
 pub async fn create_volume(
@@ -100,7 +102,7 @@ pub async fn create_volume(
     driver: Option<String>,
     driver_opts: Option<std::collections::HashMap<String, String>>,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let name = name.trim().to_string();
     let driver = driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() { "local".to_string() } else { driver };
@@ -114,5 +116,5 @@ pub async fn create_volume(
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || docker_post_json(&server, "/volumes/create", &body))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| AppError::internal("task.join", "创建存储卷任务执行失败").with_source(e))?
 }

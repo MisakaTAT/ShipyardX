@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { qk } from '@/shared/api/query-keys'
 import { commands, type AppListItem, type InstallApp } from '@/types/app-bindings'
+import { toastAppError } from '@/shared/lib/errors'
 
 export function useAppStoreSync() {
   const qc = useQueryClient()
@@ -11,7 +12,7 @@ export function useAppStoreSync() {
       qc.invalidateQueries({ queryKey: qk.apps() })
       toast.success(msg)
     },
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 

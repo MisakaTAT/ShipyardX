@@ -5,6 +5,7 @@ import { commands, type RunContainer, type Image } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
 import { imageRefExistsOnHost } from '@/shared/lib/docker-image-ref'
 import { qk } from '@/shared/api/query-keys'
+import { getErrorMessage, toastAppError } from '@/shared/lib/errors'
 
 export type Phase = 'form' | 'progress'
 export type StepState = 'pending' | 'active' | 'done' | 'error'
@@ -109,9 +110,9 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
         onSuccess()
       } catch (e) {
         if (!mountedRef.current) return
-        const msg = String(e)
+        const msg = getErrorMessage(e)
         setProgressError(msg)
-        toast.error(msg)
+        toastAppError(e)
         setRunStep((prev) => (prev === 'active' ? 'error' : prev))
         setImageStep((prev) => (prev === 'active' ? 'error' : prev))
       }

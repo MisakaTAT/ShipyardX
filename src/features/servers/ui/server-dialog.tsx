@@ -16,6 +16,7 @@ import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { toastAppError } from '@/shared/lib/errors'
 
 interface ServerDialogProps {
   open: boolean
@@ -65,7 +66,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       onSave(servers)
       onOpenChange(false)
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setLoading(false)
     }
@@ -99,7 +100,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       const msg = await commands.testConnectionDirect(testPayload)
       toast.success(msg)
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e, '连接测试失败')
     } finally {
       setLoading(false)
     }

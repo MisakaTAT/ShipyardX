@@ -1,5 +1,6 @@
 import { commands } from '@/types/app-bindings'
 import { appendSshStreamChunkToLines, subscribeDockerSshStream } from '@/features/docker-terminal/lib/docker-ssh-stream'
+import { normalizeAppError } from '@/shared/lib/errors'
 
 export async function pullImage(
   serverId: string,
@@ -13,8 +14,8 @@ export async function pullImage(
   const streamId = await commands.startImagePull(serverId, image)
   options?.onStreamId?.(streamId)
 
-  let resolveDone!: (v: boolean) => void
-  const donePromise = new Promise<boolean>((r) => {
+  let resolveDone!: (v: { success: boolean; error?: ReturnType<typeof normalizeAppError> }) => void
+  const donePromise = new Promise<{ success: boolean; error?: ReturnType<typeof normalizeAppError> }>((r) => {
     resolveDone = r
   })
 
@@ -24,10 +25,15 @@ export async function pullImage(
       lines = appendSshStreamChunkToLines(lines, chunk)
       onLogsUpdate([...lines])
     },
-    resolveDone
+    (payload) => {
+      resolveDone({
+        success: payload.success,
+        error: payload.error ? normalizeAppError(payload.error) : undefined,
+      })
+    }
   )
 
-  const success = await donePromise
+  const { success, error } = await donePromise
   unlisten()
 
   if (!success) {
@@ -38,7 +44,16 @@ export async function pullImage(
     }
     lines = [...lines, '', '✗ 拉取失败']
     onLogsUpdate(lines)
-    throw new Error('拉取失败')
+    throw (
+      error ?? {
+        code: 'image.pull_failed',
+        kind: 'unavailable' as const,
+        message: '拉取失败',
+        detail: null,
+        retryable: false,
+        action: null,
+      }
+    )
   }
 
   lines = [...lines, '', '✓ 拉取成功']

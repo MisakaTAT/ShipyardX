@@ -3,8 +3,9 @@ use std::sync::mpsc;
 use russh::ChannelMsg;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::error::AppResult;
 use crate::models::app::server::ServerConfig;
-use crate::ssh::client::{block_on, connect, disconnect, map_error};
+use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -23,7 +24,7 @@ fn run_log_stream_thread(
             Err(e) => {
                 let _ = ah.emit(
                     &format!("log-data:{}", stream_id),
-                    format!("\x1b[31m连接失败: {}\x1b[0m\r\n", e).into_bytes(),
+                    format!("\x1b[31m连接失败: {}\x1b[0m\r\n", e.message).into_bytes(),
                 );
                 let _ = ah.emit(&format!("log-done:{}", stream_id), ());
                 return;
@@ -38,7 +39,7 @@ fn run_log_stream_thread(
             Err(e) => {
                 let _ = ah.emit(
                     &format!("log-data:{}", stream_id),
-                    format!("\x1b[31m通道失败: {}\x1b[0m\r\n", map_error("通道失败", e)).into_bytes(),
+                    format!("\x1b[31m通道失败: {}\x1b[0m\r\n", e).into_bytes(),
                 );
                 let _ = ah.emit(&format!("log-done:{}", stream_id), ());
                 return;
@@ -48,7 +49,7 @@ fn run_log_stream_thread(
         if let Err(e) = channel.exec(true, cmd).await {
             let _ = ah.emit(
                 &format!("log-data:{}", stream_id),
-                format!("\x1b[31m启动失败: {}\x1b[0m\r\n", map_error("启动失败", e)).into_bytes(),
+                format!("\x1b[31m启动失败: {}\x1b[0m\r\n", e).into_bytes(),
             );
             let _ = ah.emit(&format!("log-done:{}", stream_id), ());
             return;
@@ -95,7 +96,7 @@ pub fn start_log_stream(
     timestamps: bool,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
     let stream_id = generate_id();
     let (tx, rx) = mpsc::channel::<()>();

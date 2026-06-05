@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { commands, type RunContainer } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import { toastAppError } from '@/shared/lib/errors'
 
 export function useContainers(serverId: string) {
   return useQuery({
@@ -34,7 +34,7 @@ export function useContainerAction(serverId: string) {
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.containers(serverId) }),
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 

@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
+use crate::error::{AppError, AppResult};
 use crate::models::app::network::{Network, NetworkCreate};
 use crate::models::docker::network::{
     self as engine_network, NetworkCreateIpam, NetworkCreateIpamConfig, NetworkSummary,
@@ -8,12 +9,12 @@ use crate::models::docker::network::{
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Result<Vec<Network>, String> {
+pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Network>> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/networks")?;
-        let mut api: Vec<NetworkSummary> =
-            serde_json::from_str(&resp).map_err(|e| format!("解析网络列表失败: {}", e))?;
+        let mut api: Vec<NetworkSummary> = serde_json::from_str(&resp)
+            .map_err(|e| AppError::internal("network.list_parse_failed", "解析网络列表失败").with_source(e))?;
         sort_by_created_desc_then_id(
             &mut api,
             |x| x.created.clone().unwrap_or_default(),
@@ -55,35 +56,27 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> Res
             .collect())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "加载网络列表任务执行失败").with_source(e))?
 }
 
-pub async fn inspect_network(
-    server_id: String,
-    network_id: String,
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn inspect_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, &format!("/networks/{}", network_id))?;
         pretty_json_response(&resp)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "检查网络详情任务执行失败").with_source(e))?
 }
 
-pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || docker_delete(&server, &format!("/networks/{}", network_id)))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| AppError::internal("task.join", "删除网络任务执行失败").with_source(e))?
 }
 
-pub async fn create_network(
-    server_id: String,
-    params: NetworkCreate,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn create_network(server_id: String, params: NetworkCreate, state: State<'_, AppState>) -> AppResult<()> {
     let name = params.name.trim().to_string();
     let driver = params.driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() {
@@ -113,5 +106,5 @@ pub async fn create_network(
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || docker_post_json(&server, "/networks/create", &body))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| AppError::internal("task.join", "创建网络任务执行失败").with_source(e))?
 }

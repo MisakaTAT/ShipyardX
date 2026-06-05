@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import { toastAppError } from '@/shared/lib/errors'
 
 export function useVolumes(serverId: string) {
   return useQuery({
@@ -15,7 +15,7 @@ export function useRemoveVolume(serverId: string) {
   return useMutation({
     mutationFn: (name: string) => commands.removeVolume(serverId, name),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.volumes(serverId) }),
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -30,6 +30,6 @@ export function useCreateVolume(serverId: string) {
   return useMutation({
     mutationFn: (vars: CreateVolumeVars) => commands.createVolume(serverId, vars.name, vars.driver, vars.driverOpts),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.volumes(serverId) }),
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }

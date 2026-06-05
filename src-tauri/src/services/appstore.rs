@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use uuid::Uuid;
 
+use crate::error::{AppError, AppResult};
 use crate::models::app::appstore::{AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest};
 use crate::models::app::events::InstallStepEvent;
 use crate::models::app::server::ServerConfig;
@@ -33,7 +34,7 @@ fn pick_description(desc: &crate::models::app::appstore::DescriptionI18n) -> Str
     String::new()
 }
 
-pub fn sync_appstore(app: &AppHandle) -> Result<PathBuf, String> {
+pub fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
     let cache_dir = appstore_cache_dir(app);
     let git_dir = cache_dir.join(".git");
 
@@ -43,14 +44,16 @@ pub fn sync_appstore(app: &AppHandle) -> Result<PathBuf, String> {
             .arg("pull")
             .arg("--ff-only")
             .output()
-            .map_err(|e| format!("git pull 失败: {}", e))?;
+            .map_err(|e| AppError::internal("appstore.git_pull_spawn_failed", "执行 git pull 失败").with_source(e))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("Not a git repository") || stderr.contains("error:") {
                 let _ = fs::remove_dir_all(&cache_dir);
                 return sync_appstore(app);
             }
-            return Err(format!("git pull 失败: {}", stderr.trim()));
+            return Err(
+                AppError::unavailable("appstore.git_pull_failed", "同步应用商店失败").with_detail(stderr.trim())
+            );
         }
     } else {
         let _ = fs::create_dir_all(&cache_dir);
@@ -58,17 +61,19 @@ pub fn sync_appstore(app: &AppHandle) -> Result<PathBuf, String> {
             .args(["clone", "--depth", "1", APPSTORE_REPO_URL])
             .arg(cache_dir.to_str().unwrap())
             .output()
-            .map_err(|e| format!("git clone 失败: {}", e))?;
+            .map_err(|e| AppError::internal("appstore.git_clone_spawn_failed", "执行 git clone 失败").with_source(e))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("克隆应用商店失败: {}", stderr.trim()));
+            return Err(
+                AppError::unavailable("appstore.git_clone_failed", "克隆应用商店失败").with_detail(stderr.trim())
+            );
         }
     }
 
     Ok(cache_dir)
 }
 
-pub fn list_apps(app: &AppHandle) -> Result<Vec<AppListItem>, String> {
+pub fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     let cache_dir = appstore_cache_dir(app);
     let apps_dir = apps_dir(&cache_dir);
 
@@ -78,8 +83,11 @@ pub fn list_apps(app: &AppHandle) -> Result<Vec<AppListItem>, String> {
 
     let mut items: Vec<AppListItem> = Vec::new();
 
-    for entry in fs::read_dir(&apps_dir).map_err(|e| format!("读取 apps 目录失败: {}", e))? {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(&apps_dir)
+        .map_err(|e| AppError::internal("appstore.apps_dir_read_failed", "读取 apps 目录失败").with_source(e))?
+    {
+        let entry = entry
+            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录项失败").with_source(e))?;
         let app_dir = entry.path();
         if !app_dir.is_dir() {
             continue;
@@ -138,21 +146,29 @@ pub fn list_apps(app: &AppHandle) -> Result<Vec<AppListItem>, String> {
     Ok(items)
 }
 
-pub fn get_app_detail(app: &AppHandle, app_key: &str) -> Result<AppDetail, String> {
+pub fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
     let cache_dir = appstore_cache_dir(app);
     let app_dir = apps_dir(&cache_dir).join(app_key);
 
     if !app_dir.exists() {
-        return Err(format!("应用 {} 不存在", app_key));
+        return Err(AppError::not_found(
+            "appstore.app_not_found",
+            format!("应用 {} 不存在", app_key),
+        ));
     }
 
     let data_yml = app_dir.join("data.yml");
     if !data_yml.exists() {
-        return Err(format!("应用 {} 的 data.yml 不存在", app_key));
+        return Err(AppError::not_found(
+            "appstore.manifest_not_found",
+            format!("应用 {} 的 data.yml 不存在", app_key),
+        ));
     }
 
-    let yaml_str = fs::read_to_string(&data_yml).map_err(|e| e.to_string())?;
-    let manifest: AppManifest = serde_yaml::from_str(&yaml_str).map_err(|e| format!("解析 data.yml 失败: {}", e))?;
+    let yaml_str = fs::read_to_string(&data_yml)
+        .map_err(|e| AppError::internal("appstore.manifest_read_failed", "读取 data.yml 失败").with_source(e))?;
+    let manifest: AppManifest = serde_yaml::from_str(&yaml_str)
+        .map_err(|e| AppError::internal("appstore.manifest_parse_failed", "解析 data.yml 失败").with_source(e))?;
 
     let logo_path = app_dir.join("logo.png");
     let icon = if logo_path.exists() {
@@ -237,23 +253,24 @@ fn emit_output(app: &AppHandle, step: &str, chunk: &str) {
     .emit(app);
 }
 
-pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> Result<(), String> {
+pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
     let cache_dir = appstore_cache_dir(app);
     let app_dir = apps_dir(&cache_dir).join(&req.app_key);
     let version_dir = app_dir.join(&req.version);
 
     if !version_dir.exists() {
-        return Err(format!(
-            "应用 {} 版本 {} 的 docker-compose.yml 不存在",
-            req.app_key, req.version
-        ));
+        return Err(AppError::not_found(
+            "appstore.version_not_found",
+            format!("应用 {} 版本 {} 的 docker-compose.yml 不存在", req.app_key, req.version),
+        )
+        .with_detail(format!("app_key={}, version={}", req.app_key, req.version)));
     }
 
     // Step 1: 准备模板
     emit_step(app, "prepare", "running", "正在准备部署模板...");
     let compose_template = fs::read_to_string(version_dir.join("docker-compose.yml")).map_err(|e| {
         emit_step(app, "prepare", "error", &format!("读取模板失败: {}", e));
-        e.to_string()
+        AppError::internal("appstore.compose_template_read_failed", "读取部署模板失败").with_source(e)
     })?;
 
     // 注入 1Panel 标准变量：CONTAINER_NAME
@@ -286,7 +303,7 @@ pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallAp
     })
     .map_err(|e| {
         emit_step(app, "deploy", "error", &format!("部署文件失败: {}", e));
-        format!("部署文件失败: {}", e)
+        AppError::internal("appstore.deploy_files_failed", "部署文件失败").with_detail(e.detail.unwrap_or(e.message))
     })?;
 
     let local_data_dir = version_dir.join("data");
@@ -322,12 +339,16 @@ pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallAp
     match result {
         Ok(_) => {}
         Err(e) => {
-            let _ = ssh_exec_streaming(server, &up_cmd_v1, |chunk| {
+            ssh_exec_streaming(server, &up_cmd_v1, |chunk| {
                 emit_output(app, "start", chunk);
             })
             .map_err(|e2| {
                 emit_step(app, "start", "error", "容器启动失败");
-                format!("docker compose 失败: {}\ndocker-compose 也失败: {}", e, e2)
+                AppError::unavailable("appstore.compose_up_failed", "容器启动失败").with_detail(format!(
+                    "docker compose: {}\ndocker-compose: {}",
+                    e.detail.unwrap_or(e.message),
+                    e2.detail.unwrap_or(e2.message)
+                ))
             })?;
         }
     };
@@ -357,7 +378,7 @@ fn build_env_file(env_values: &HashMap<String, String>) -> String {
         .join("\n")
 }
 
-fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: &str) -> Result<(), String> {
+fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: &str) -> AppResult<()> {
     let parent = local_dir.parent().unwrap_or(local_dir);
     let dir_name = local_dir.file_name().unwrap().to_str().unwrap();
 
@@ -369,7 +390,9 @@ fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: 
         .arg(parent.to_str().unwrap())
         .arg(dir_name);
 
-    let output = tar_cmd.output().map_err(|e| format!("tar 失败: {}", e))?;
+    let output = tar_cmd
+        .output()
+        .map_err(|e| AppError::internal("appstore.tar_spawn_failed", "打包数据目录失败").with_source(e))?;
     let tar_b64 = STANDARD.encode(&output.stdout);
 
     let remote_parent = Path::new(remote_dir)

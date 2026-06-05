@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::error::AppError;
+
 #[derive(Debug, Deserialize, Type)]
 pub struct ContainerExecTerminalParams {
     pub container_id: String,
@@ -16,7 +18,7 @@ pub enum WsServerMsg {
     #[serde(rename = "closed")]
     Closed,
     #[serde(rename = "error")]
-    Error { message: String },
+    Error { error: AppError },
 }
 
 impl WsServerMsg {

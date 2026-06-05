@@ -4,6 +4,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 
 use crate::docker::client::{docker_get, invalidate_api_version, resolve_api_version};
 use crate::docker::stats::compute_stats;
+use crate::error::{AppError, AppResult};
 use crate::models::app::container::ContainerStats;
 use crate::models::app::daemon::{DaemonSettings, DaemonUpdate};
 use crate::models::app::info::DockerEngineInfo;
@@ -22,36 +23,53 @@ const ERR_SERVICE_OP: &str = "__ERR_SERVICE_OP__";
 const ERR_SUDO_NONINTERACTIVE: &str = "__ERR_SUDO_NONINTERACTIVE__";
 const ERR_NO_SUDO: &str = "__ERR_NO_SUDO__";
 
-fn map_restart_error(err: String) -> String {
-    if err.contains(ERR_BAD_SUDO_PASSWORD) {
-        return "提权失败：sudo 密码错误，请重新输入。".to_string();
+fn map_restart_error(err: AppError) -> AppError {
+    let detail = err.detail.clone().unwrap_or_else(|| err.message.clone());
+    if detail.contains(ERR_BAD_SUDO_PASSWORD) {
+        return AppError::auth("system.sudo_password_invalid", "提权失败：sudo 密码错误，请重新输入。")
+            .with_action("请重新输入正确的 sudo 密码");
     }
-    if err.contains(ERR_BAD_SU_PASSWORD) {
-        return "提权失败：root 密码错误，请重新输入。".to_string();
+    if detail.contains(ERR_BAD_SU_PASSWORD) {
+        return AppError::auth("system.su_password_invalid", "提权失败：root 密码错误，请重新输入。")
+            .with_action("请重新输入正确的 root 密码");
     }
-    if err.contains(ERR_NO_MANAGER) {
-        return "重启失败：未检测到可用的服务管理器（systemctl / rc-service / service）。请在服务器上手动重启 Docker。"
-            .to_string();
+    if detail.contains(ERR_NO_MANAGER) {
+        return AppError::unavailable(
+            "system.service_manager_missing",
+            "重启失败：未检测到可用的服务管理器（systemctl / rc-service / service）。请在服务器上手动重启 Docker。",
+        );
     }
-    if err.contains(ERR_SUDO_NONINTERACTIVE) {
-        return "重启失败：无法非交互使用 sudo（未配置 NOPASSWD）。请在服务器连接中填写 sudo 密码，或在 sudoers 中为该用户配置 docker/systemctl 的无密码规则。"
-            .to_string();
+    if detail.contains(ERR_SUDO_NONINTERACTIVE) {
+        return AppError::permission(
+            "system.sudo_password_required",
+            "重启失败：无法非交互使用 sudo（未配置 NOPASSWD）。请在服务器连接中填写 sudo 密码，或在 sudoers 中为该用户配置 docker/systemctl 的无密码规则。",
+        )
+        .with_action("提供 sudo 密码或配置 NOPASSWD");
     }
-    if err.contains(ERR_NO_SUDO) {
-        return "重启失败：当前用户非 root 且未找到 sudo，无法重启 Docker 服务。请使用 root 或具备 sudo 的账户。"
-            .to_string();
+    if detail.contains(ERR_NO_SUDO) {
+        return AppError::permission(
+            "system.sudo_unavailable",
+            "重启失败：当前用户非 root 且未找到 sudo，无法重启 Docker 服务。请使用 root 或具备 sudo 的账户。",
+        );
     }
-    if err.contains(ERR_SYSTEMCTL) {
-        return "重启失败：systemctl 重启 docker 未成功（可能为权限、单元名或服务状态问题）。若本机可执行 systemctl restart docker.service，请尝试在连接中填写 sudo 密码。"
-            .to_string();
+    if detail.contains(ERR_SYSTEMCTL) {
+        return AppError::unavailable(
+            "system.service_restart_failed",
+            "重启失败：systemctl 重启 docker 未成功（可能为权限、单元名或服务状态问题）。若本机可执行 systemctl restart docker.service，请尝试在连接中填写 sudo 密码。",
+        )
+        .retryable(true);
     }
-    if err.contains(ERR_RC_SERVICE) || err.contains(ERR_SERVICE_OP) {
-        return "重启失败：已检测到服务管理器，但执行 docker restart 失败，请检查服务名称与权限。".to_string();
+    if detail.contains(ERR_RC_SERVICE) || detail.contains(ERR_SERVICE_OP) {
+        return AppError::unavailable(
+            "system.service_operation_failed",
+            "重启失败：已检测到服务管理器，但执行 docker restart 失败，请检查服务名称与权限。",
+        )
+        .retryable(true);
     }
-    format!("重启失败：{}", err)
+    AppError::internal("system.restart_failed", "重启 Docker 服务失败").with_detail(detail)
 }
 
-fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> Result<(), String> {
+fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> AppResult<()> {
     let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
         let pwd_b64 = STANDARD.encode(pwd);
         format!(
@@ -74,11 +92,12 @@ fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) 
     Ok(())
 }
 
-pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> Result<DockerEngineInfo, String> {
+pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(&server, "/info")?;
-        let v: SystemInfo = serde_json::from_str(&resp).map_err(|e| format!("解析失败: {}", e))?;
+        let v: SystemInfo = serde_json::from_str(&resp)
+            .map_err(|e| AppError::internal("system.info_parse_failed", "解析 Docker 信息失败").with_source(e))?;
         Ok(DockerEngineInfo {
             containers: v.containers.unwrap_or(0),
             containers_running: v.containers_running.unwrap_or(0),
@@ -99,10 +118,10 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> R
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "加载 Docker 信息任务执行失败").with_source(e))?
 }
 
-pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         invalidate_api_version(&server);
@@ -115,39 +134,45 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                 )
                 .unwrap_or_else(|_| "ok".to_string());
                 match diag.trim() {
-                    "no_docker" => Err("no_docker".to_string()),
-                    "no_permission" => Err("no_permission".to_string()),
-                    _ => Err(e),
+                    "no_docker" => Err(AppError::unavailable(
+                        "docker.unavailable",
+                        "Docker 未安装、未运行，或 /var/run/docker.sock 不可用。",
+                    )),
+                    "no_permission" => Err(AppError::permission(
+                        "docker.permission_denied",
+                        "当前用户没有访问 Docker Socket 的权限。",
+                    )),
+                    _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
+                        .with_detail(e.detail.unwrap_or(e.message))
+                        .retryable(true)),
                 }
             }
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "检查 Docker 访问权限任务执行失败").with_source(e))?
 }
 
 pub async fn get_container_stats(
     server_id: String,
     container_id: String,
     state: State<'_, AppState>,
-) -> Result<ContainerStats, String> {
+) -> AppResult<ContainerStats> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let resp = docker_get(
             &server,
             &format!("/containers/{}/stats?stream=false&one-shot=true", container_id),
         )?;
-        let raw: DockerStats = serde_json::from_str(&resp).map_err(|e| format!("解析 stats 失败: {}", e))?;
+        let raw: DockerStats = serde_json::from_str(&resp)
+            .map_err(|e| AppError::internal("container.stats_parse_failed", "解析容器统计信息失败").with_source(e))?;
         Ok(compute_stats(raw))
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "读取容器统计任务执行失败").with_source(e))?
 }
 
-pub async fn get_docker_daemon_settings(
-    server_id: String,
-    state: State<'_, AppState>,
-) -> Result<DaemonSettings, String> {
+pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
@@ -190,14 +215,14 @@ pub async fn get_docker_daemon_settings(
         })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "读取 Docker daemon 配置任务执行失败").with_source(e))?
 }
 
 pub async fn update_docker_daemon_settings(
     server_id: String,
     params: DaemonUpdate,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         let read_cmd = "if [ -r /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json; else echo '{}'; fi";
@@ -247,7 +272,8 @@ pub async fn update_docker_daemon_settings(
             cfg.log_opts = None;
         }
 
-        let json = serde_json::to_string_pretty(&cfg).map_err(|e| format!("序列化 daemon 配置失败: {}", e))?;
+        let json = serde_json::to_string_pretty(&cfg)
+            .map_err(|e| AppError::internal("daemon.serialize_failed", "序列化 Docker daemon 配置失败").with_source(e))?;
         let b64 = STANDARD.encode(json);
         let write_cmd = if let Some(pwd) = params.sudo_password.clone().filter(|s| !s.is_empty()) {
             let pwd_b64 = STANDARD.encode(pwd);
@@ -265,19 +291,19 @@ pub async fn update_docker_daemon_settings(
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "更新 Docker daemon 配置任务执行失败").with_source(e))?
 }
 
 pub async fn restart_docker_daemon(
     server_id: String,
     sudo_password: Option<String>,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     tokio::task::spawn_blocking(move || {
         restart_docker_service(&server, sudo_password)?;
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| AppError::internal("task.join", "重启 Docker daemon 任务执行失败").with_source(e))?
 }

@@ -108,6 +108,17 @@ export type AppDetail_Serialize = {
 	readme_en: string,
 };
 
+export type AppError = {
+	code: string,
+	kind: AppErrorKind,
+	message: string,
+	detail: string | null,
+	retryable: boolean,
+	action: string | null,
+};
+
+export type AppErrorKind = "validation" | "auth" | "permission" | "not_found" | "conflict" | "unavailable" | "timeout" | "internal";
+
 export type AppListItem = {
 	key: string,
 	name: string,
@@ -240,11 +251,12 @@ export type DockerSshStreamChunk = {
 export type DockerSshStreamDone = {
 	stream_id: string,
 	success: boolean,
+	error: AppError | null,
 };
 
 export type DockerStreamError = {
 	stream_id: string,
-	message: string,
+	error: AppError,
 };
 
 export type DockerStreamPayload = {

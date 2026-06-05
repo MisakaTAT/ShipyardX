@@ -13,9 +13,10 @@ use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream as TokioTcpStream;
 
+use crate::error::{AppError, AppResult};
 use crate::models::app::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
 use crate::models::app::server::ServerConfig;
-use crate::ssh::client::{block_on, connect, disconnect, map_error};
+use crate::ssh::client::{block_on, connect, disconnect};
 use crate::state::{AppState, PortForwardHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -29,6 +30,10 @@ struct PortForwardBridgeArgs {
     last_error: Arc<Mutex<Option<String>>>,
     tx_bytes: Arc<AtomicU64>,
     rx_bytes: Arc<AtomicU64>,
+}
+
+fn error_message(error: AppError) -> String {
+    error.detail.unwrap_or(error.message)
 }
 
 struct PortForwardAcceptArgs {
@@ -70,16 +75,20 @@ fn bridge_once(args: PortForwardBridgeArgs) {
     let _ = local_stream.set_nodelay(true);
 
     let result = block_on(async move {
-        let mut handle = connect(&server_cfg).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
+        let mut handle = connect(&server_cfg).await.map_err(|e| {
+            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
+        })?;
         let channel = handle
             .channel_open_direct_tcpip(remote_host.clone(), remote_port as u32, "127.0.0.1", 0)
             .await
-            .map_err(|e| format!("目标端口不可达: {}", map_error("目标端口不可达", e)))?;
+            .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
 
-        local_stream
-            .set_nonblocking(true)
-            .map_err(|e| format!("本地 socket 设置失败: {}", e))?;
-        let local_stream = TokioTcpStream::from_std(local_stream).map_err(|e| format!("接管本地连接失败: {}", e))?;
+        local_stream.set_nonblocking(true).map_err(|e| {
+            AppError::internal("port_forward.local_socket_config_failed", "本地 socket 设置失败").with_source(e)
+        })?;
+        let local_stream = TokioTcpStream::from_std(local_stream).map_err(|e| {
+            AppError::internal("port_forward.local_socket_takeover_failed", "接管本地连接失败").with_source(e)
+        })?;
         let remote_stream = channel.into_stream();
 
         let (local_read, local_write) = tokio::io::split(local_stream);
@@ -91,7 +100,7 @@ fn bridge_once(args: PortForwardBridgeArgs) {
                     transfer_stream(local_read, remote_write, tx_bytes.clone()),
                     transfer_stream(remote_read, local_write, rx_bytes.clone())
                 )?;
-                Ok::<(), String>(())
+                Ok::<(), AppError>(())
             } => {
                 disconnect(&mut handle).await;
                 res
@@ -104,23 +113,31 @@ fn bridge_once(args: PortForwardBridgeArgs) {
     });
 
     if let Err(e) = result {
-        *last_error.lock().unwrap() = Some(e);
+        *last_error.lock().unwrap() = Some(error_message(e));
     }
 }
 
-async fn transfer_stream<R, W>(mut reader: R, mut writer: W, counter: Arc<AtomicU64>) -> Result<(), String>
+async fn transfer_stream<R, W>(mut reader: R, mut writer: W, counter: Arc<AtomicU64>) -> AppResult<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
     let mut buf = [0u8; 16 * 1024];
     loop {
-        let n = reader.read(&mut buf).await.map_err(|e| e.to_string())?;
+        let n = reader
+            .read(&mut buf)
+            .await
+            .map_err(|e| AppError::internal("port_forward.read_failed", "读取端口转发数据失败").with_source(e))?;
         if n == 0 {
-            writer.shutdown().await.map_err(|e| e.to_string())?;
+            writer.shutdown().await.map_err(|e| {
+                AppError::internal("port_forward.shutdown_failed", "关闭端口转发写入端失败").with_source(e)
+            })?;
             return Ok(());
         }
-        writer.write_all(&buf[..n]).await.map_err(|e| e.to_string())?;
+        writer
+            .write_all(&buf[..n])
+            .await
+            .map_err(|e| AppError::internal("port_forward.write_failed", "写入端口转发数据失败").with_source(e))?;
         counter.fetch_add(n as u64, Ordering::Relaxed);
     }
 }
@@ -185,17 +202,19 @@ fn accept_loop(args: PortForwardAcceptArgs) {
     }
 }
 
-fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> Result<(), String> {
+fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
     let start = Instant::now();
     block_on(async {
-        let mut handle = connect(server_cfg).await.map_err(|e| format!("SSH 连接失败: {}", e))?;
+        let mut handle = connect(server_cfg).await.map_err(|e| {
+            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
+        })?;
         let channel = handle
             .channel_open_direct_tcpip(remote_host, remote_port as u32, "127.0.0.1", 0)
             .await
-            .map_err(|e| format!("目标端口不可达: {}", map_error("目标端口不可达", e)))?;
+            .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
         drop(channel);
         disconnect(&mut handle).await;
-        Ok::<(), String>(())
+        Ok::<(), AppError>(())
     })?;
     let _elapsed = start.elapsed();
     Ok(())
@@ -205,26 +224,34 @@ fn is_rule_running(state: &State<AppState>, id: &str) -> bool {
     state.port_forwards.lock().unwrap().contains_key(id)
 }
 
-fn load_port_forward_rules_from_state(state: &State<AppState>) -> Result<Vec<PortForwardRule>, String> {
+fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<PortForwardRule>> {
     let data_file = state.data_file.lock().unwrap().clone();
     let path = crate::config::store::data_dir_from_file(&data_file).join("port_forwards.json");
     let rules_raw = std::fs::read_to_string(&path).unwrap_or_default();
     if rules_raw.trim().is_empty() {
         return Ok(vec![]);
     }
-    serde_json::from_str::<Vec<PortForwardRule>>(&rules_raw).map_err(|e| format!("解析 port_forwards.json 失败: {}", e))
+    serde_json::from_str::<Vec<PortForwardRule>>(&rules_raw).map_err(|e| {
+        AppError::internal("port_forward.rules_parse_failed", "解析 port_forwards.json 失败").with_source(e)
+    })
 }
 
-fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwardRule]) -> Result<(), String> {
+fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwardRule]) -> AppResult<()> {
     let data_file = state.data_file.lock().unwrap().clone();
     let dir = crate::config::store::data_dir_from_file(&data_file);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("创建配置目录失败: {}", e))?;
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        AppError::internal("port_forward.config_dir_create_failed", "创建端口转发配置目录失败").with_source(e)
+    })?;
     let path = dir.join("port_forwards.json");
-    let json = serde_json::to_string_pretty(rules).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| format!("写入 port_forwards.json 失败: {}", e))
+    let json = serde_json::to_string_pretty(rules).map_err(|e| {
+        AppError::internal("port_forward.rules_serialize_failed", "序列化端口转发配置失败").with_source(e)
+    })?;
+    std::fs::write(&path, json).map_err(|e| {
+        AppError::internal("port_forward.rules_write_failed", "写入 port_forwards.json 失败").with_source(e)
+    })
 }
 
-pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> Result<Vec<PortForward>, String> {
+pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let runtime = state.port_forwards.lock().unwrap();
     let errors = state.port_forward_last_errors.lock().unwrap();
@@ -266,7 +293,7 @@ pub fn create_port_forward_rule(
     server_id: String,
     params: PortForwardCreate,
     state: State<'_, AppState>,
-) -> Result<PortForward, String> {
+) -> AppResult<PortForward> {
     let protocol = params.protocol.trim().to_lowercase();
 
     let remote_host = normalize_host(&params.remote_host);
@@ -285,8 +312,9 @@ pub fn create_port_forward_rule(
 
     // 非随机端口需要做可用性校验
     if params.local_port != 0 {
-        let l = TcpListener::bind((bind_addr.as_str(), params.local_port))
-            .map_err(|e| format!("本地端口被占用或无法绑定: {}", e))?;
+        let l = TcpListener::bind((bind_addr.as_str(), params.local_port)).map_err(|e| {
+            AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
+        })?;
         drop(l);
 
         let existing_rules = load_port_forward_rules_from_state(&state)?;
@@ -294,7 +322,10 @@ pub fn create_port_forward_rule(
             .iter()
             .any(|r| r.local_port == params.local_port && r.bind_address == bind_addr)
         {
-            return Err(format!("本地端口 {} 已被其他规则占用", params.local_port));
+            return Err(AppError::conflict(
+                "port_forward.local_port_conflict",
+                format!("本地端口 {} 已被其他规则占用", params.local_port),
+            ));
         }
     }
 
@@ -337,7 +368,7 @@ pub fn create_port_forward_rule(
     })
 }
 
-fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, AppState>) -> Result<(), String> {
+fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
     let mut rules = load_port_forward_rules_from_state(&state)?;
     let mut found = false;
     for r in &mut rules {
@@ -348,7 +379,7 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
         }
     }
     if !found {
-        return Err("端口转发不存在".to_string());
+        return Err(AppError::not_found("port_forward.not_found", "端口转发不存在"));
     }
     save_port_forward_rules_to_state(&state, &rules)?;
 
@@ -362,11 +393,11 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
     Ok(())
 }
 
-pub fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> Result<(), String> {
+pub fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
     update_rule_enabled_and_runtime(id, enabled, state)
 }
 
-pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     // 先停止运行时。
     if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
         handle.shutdown.store(true, Ordering::Relaxed);
@@ -379,9 +410,9 @@ pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> Result<(),
     Ok(())
 }
 
-fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -> Result<(), String> {
+fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -> AppResult<()> {
     if !rule.enabled {
-        return Err("该规则已被禁用".to_string());
+        return Err(AppError::validation("port_forward.rule_disabled", "该规则已被禁用"));
     }
     if is_rule_running(state, &rule.id) {
         return Ok(());
@@ -394,11 +425,12 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     };
 
     // 绑定本地端口（0 = 随机分配）
-    let listener =
-        TcpListener::bind((bind_addr, rule.local_port)).map_err(|e| format!("本地端口被占用或无法绑定: {}", e))?;
+    let listener = TcpListener::bind((bind_addr, rule.local_port)).map_err(|e| {
+        AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
+    })?;
     let actual_local_port = listener
         .local_addr()
-        .map_err(|e| format!("读取本地端口失败: {}", e))?
+        .map_err(|e| AppError::internal("port_forward.local_addr_read_failed", "读取本地端口失败").with_source(e))?
         .port();
 
     // 探测目标端口可达性（容器进程挂了会更早失败）。
@@ -448,7 +480,7 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     Ok(())
 }
 
-pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let enabled_rules: Vec<PortForwardRule> = rules
         .into_iter()
@@ -479,7 +511,11 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> Resul
     // 启动所有 enabled 规则（对失败做错误记录，不要中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
-            state.port_forward_last_errors.lock().unwrap().insert(r.id.clone(), e);
+            state
+                .port_forward_last_errors
+                .lock()
+                .unwrap()
+                .insert(r.id.clone(), error_message(e));
         } else {
             state.port_forward_last_errors.lock().unwrap().remove(&r.id);
         }
@@ -488,7 +524,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> Resul
     Ok(())
 }
 
-pub fn list_all_port_forwards(state: State<'_, AppState>) -> Result<Vec<PortForward>, String> {
+pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let runtime = state.port_forwards.lock().unwrap();
     let errors = state.port_forward_last_errors.lock().unwrap();
@@ -528,7 +564,7 @@ pub fn list_all_port_forwards(state: State<'_, AppState>) -> Result<Vec<PortForw
     Ok(out)
 }
 
-pub fn start_all_enabled_global(state: State<'_, AppState>) -> Result<(), String> {
+pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     let rules = load_port_forward_rules_from_state(&state)?;
 
     let enabled_rules: Vec<PortForwardRule> = rules.into_iter().filter(|r| r.enabled).collect();
@@ -548,7 +584,11 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> Result<(), String
     // 启动所有 enabled 规则（对失败做错误记录，不中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
-            state.port_forward_last_errors.lock().unwrap().insert(r.id.clone(), e);
+            state
+                .port_forward_last_errors
+                .lock()
+                .unwrap()
+                .insert(r.id.clone(), error_message(e));
         } else {
             state.port_forward_last_errors.lock().unwrap().remove(&r.id);
         }
@@ -557,20 +597,20 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> Result<(), String
     Ok(())
 }
 
-pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     let handle = state
         .port_forwards
         .lock()
         .unwrap()
         .remove(&id)
-        .ok_or_else(|| "端口转发不存在".to_string())?;
+        .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
 
     handle.shutdown.store(true, Ordering::Relaxed);
     state.port_forward_last_errors.lock().unwrap().remove(&id);
     Ok(())
 }
 
-pub fn stop_all_global(state: State<'_, AppState>) -> Result<(), String> {
+pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
     let handles: Vec<_> = state.port_forwards.lock().unwrap().drain().collect();
     for (id, handle) in handles {
         handle.shutdown.store(true, Ordering::Relaxed);
@@ -579,8 +619,10 @@ pub fn stop_all_global(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
-pub fn list_local_addresses() -> Result<Vec<LocalAddress>, String> {
-    let interfaces = NetworkInterface::show().map_err(|e| e.to_string())?;
+pub fn list_local_addresses() -> AppResult<Vec<LocalAddress>> {
+    let interfaces = NetworkInterface::show().map_err(|e| {
+        AppError::internal("port_forward.interfaces_list_failed", "读取本地网卡地址失败").with_source(e)
+    })?;
 
     let mut seen = BTreeSet::new();
     let mut result: Vec<LocalAddress> = Vec::new();

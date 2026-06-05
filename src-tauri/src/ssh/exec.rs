@@ -1,8 +1,9 @@
 use russh::ChannelMsg;
 
+use crate::error::{AppError, AppResult};
 use crate::models::app::server::ServerConfig;
 
-use super::client::{block_on, connect, disconnect, map_error};
+use super::client::{block_on, connect, disconnect};
 
 struct CommandResult {
     stdout: String,
@@ -10,7 +11,7 @@ struct CommandResult {
     exit_code: i32,
 }
 
-async fn run_command<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> Result<CommandResult, String>
+async fn run_command<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> AppResult<CommandResult>
 where
     F: FnMut(&str),
 {
@@ -18,12 +19,12 @@ where
     let mut channel = handle
         .channel_open_session()
         .await
-        .map_err(|e| map_error("创建通道失败", e))?;
+        .map_err(|e| AppError::internal("ssh.channel_open_failed", "创建 SSH 通道失败").with_source(e))?;
 
     channel
         .exec(true, command)
         .await
-        .map_err(|e| map_error("执行命令失败", e))?;
+        .map_err(|e| AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e))?;
 
     let mut stdout = String::new();
     let mut stderr = String::new();
@@ -60,19 +61,21 @@ where
     })
 }
 
-fn command_error(result: &CommandResult) -> String {
+fn command_error(result: &CommandResult) -> AppError {
     let stderr = result.stderr.trim();
     let stdout = result.stdout.trim();
-    if !stderr.is_empty() {
+    let detail = if !stderr.is_empty() {
         stderr.to_string()
     } else if !stdout.is_empty() {
         stdout.to_string()
     } else {
         format!("命令失败，退出码: {}", result.exit_code)
-    }
+    };
+
+    AppError::internal("ssh.command_failed", "远程命令执行失败").with_detail(detail)
 }
 
-pub fn ssh_exec_streaming<F>(config: &ServerConfig, command: &str, on_chunk: F) -> Result<String, String>
+pub fn ssh_exec_streaming<F>(config: &ServerConfig, command: &str, on_chunk: F) -> AppResult<String>
 where
     F: FnMut(&str),
 {
@@ -83,6 +86,6 @@ where
     Ok(result.stdout)
 }
 
-pub fn ssh_exec(config: &ServerConfig, command: &str) -> Result<String, String> {
+pub fn ssh_exec(config: &ServerConfig, command: &str) -> AppResult<String> {
     ssh_exec_streaming(config, command.trim(), |_| {})
 }

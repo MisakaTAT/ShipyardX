@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { commands } from '@/types/app-bindings'
 import Editor from '@monaco-editor/react'
 import { Check, Copy, RefreshCw, ScanSearch } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
+import { toastAppError } from '@/shared/lib/errors'
 
 type InspectKind = 'container' | 'image' | 'network' | 'volume'
 
@@ -44,7 +44,7 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
       setJson(text)
     } catch (e) {
       setJson('')
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setLoading(false)
     }

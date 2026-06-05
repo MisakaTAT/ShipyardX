@@ -17,6 +17,7 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreatePortForwardRule } from '@/features/port-forward/api/use-port-forwards'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { toastAppError } from '@/shared/lib/errors'
 
 interface PortForwardCreateDialogProps {
   open: boolean
@@ -59,7 +60,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
       const data = await commands.getServers()
       setServers(data)
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setServersLoading(false)
     }
@@ -84,7 +85,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
       const data = await commands.listContainers(serverId)
       setContainers(data)
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
       setContainers([])
     } finally {
       setContainersLoading(false)

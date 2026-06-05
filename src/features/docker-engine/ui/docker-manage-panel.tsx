@@ -18,6 +18,7 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLab
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
+import { isPermissionRelatedError, normalizeAppError, toastAppError } from '@/shared/lib/errors'
 
 interface Props {
   serverId: string
@@ -46,7 +47,7 @@ export default function DockerManagePanel({ serverId }: Props) {
       const data = await commands.getDockerDaemonSettings(serverId)
       daemonForm.reset(daemonSettingsToFormValues(data))
     } catch (e) {
-      toast.error(String(e))
+      toastAppError(e)
     } finally {
       setLoading(false)
     }
@@ -55,10 +56,6 @@ export default function DockerManagePanel({ serverId }: Props) {
   useEffect(() => {
     void load()
   }, [load])
-
-  const shouldAskForPassword = (msg: string) => {
-    return msg.includes('权限不足') || msg.includes('sudo') || msg.includes('提权失败')
-  }
 
   const persistUpdate = async (values: DockerDaemonFormValues, password?: string) => {
     const params = formValuesToDaemonUpdate(values, password ?? null)
@@ -70,13 +67,12 @@ export default function DockerManagePanel({ serverId }: Props) {
       setPendingAction(null)
       await load()
     } catch (e) {
-      const msg = String(e)
-      if (!password && shouldAskForPassword(msg)) {
+      if (!password && isPermissionRelatedError(e)) {
         setPendingAction('save')
         setAuthOpen(true)
         return
       }
-      toast.error(msg)
+      toastAppError(e)
     } finally {
       setSaving(false)
     }
@@ -87,7 +83,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     try {
       await commands.restartDockerDaemon(serverId, password ?? null)
 
-      let lastError = ''
+      let lastError: ReturnType<typeof normalizeAppError> | null = null
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
@@ -95,13 +91,22 @@ export default function DockerManagePanel({ serverId }: Props) {
           recovered = true
           break
         } catch (e) {
-          lastError = String(e)
+          lastError = normalizeAppError(e, 'Docker 尚未恢复连接')
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }
       }
 
       if (!recovered) {
-        throw new Error(lastError || '重启命令已执行，但 Docker 尚未恢复连接，请稍后重试')
+        throw (
+          lastError ?? {
+            code: 'docker.restart_recovery_timeout',
+            kind: 'timeout' as const,
+            message: '重启命令已执行，但 Docker 尚未恢复连接，请稍后重试',
+            detail: null,
+            retryable: true,
+            action: '稍后重试，或检查 Docker 服务状态',
+          }
+        )
       }
 
       toast.success('重启完成')
@@ -109,13 +114,12 @@ export default function DockerManagePanel({ serverId }: Props) {
       setPendingAction(null)
       await load()
     } catch (e) {
-      const msg = String(e)
-      if (!password && shouldAskForPassword(msg)) {
+      if (!password && isPermissionRelatedError(e)) {
         setPendingAction('restart')
         setAuthOpen(true)
         return
       }
-      toast.error(msg)
+      toastAppError(e)
     } finally {
       setRestarting(false)
     }

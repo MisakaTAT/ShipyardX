@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useMemo, useState, type ComponentProps, 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { Box, Play, Plus, Trash2, X } from 'lucide-react'
-import { toast } from 'sonner'
 import { commands, type Image, type Network } from '@/types/app-bindings'
 import {
   runContainerFormDefaultValues,
@@ -32,6 +31,7 @@ import { modalDialogContent } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
 import { PullProgress } from '@/features/docker-containers/ui/run-container/pull-progress'
 import { useRunContainerFlow } from '@/features/docker-containers/ui/run-container/use-run-container'
+import { toastAppError } from '@/shared/lib/errors'
 
 const SECTION_SHELL = 'space-y-2.5'
 const SECTION_TITLE = 'text-sm font-semibold tracking-tight'
@@ -173,7 +173,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         const params = buildRunParamsFromForm(runFormValuesToBuildArgs(data))
         flow.submit(params, data.forcePull, images)
       } catch (e) {
-        toast.error(String(e))
+        toastAppError(e)
       }
     },
     [flow, images]

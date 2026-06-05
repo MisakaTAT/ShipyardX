@@ -1,5 +1,6 @@
 use tauri::{AppHandle, State};
 
+use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;
 
@@ -12,8 +13,15 @@ pub fn start_log_stream(
     timestamps: bool,
     state: State<AppState>,
     app_handle: AppHandle,
-) -> Result<String, String> {
-    services::log_stream::start_log_stream(server_id, container_id, tail, timestamps, state, app_handle)
+) -> AppResult<String> {
+    Ok(services::log_stream::start_log_stream(
+        server_id,
+        container_id,
+        tail,
+        timestamps,
+        state,
+        app_handle,
+    )?)
 }
 
 #[tauri::command]

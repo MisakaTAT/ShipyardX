@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri_specta::Event;
 
+use crate::error::AppError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum EventStreamStatus {
@@ -45,7 +47,7 @@ pub struct DockerStreamRefresh {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct DockerStreamError {
     pub stream_id: String,
-    pub message: String,
+    pub error: AppError,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
@@ -58,6 +60,7 @@ pub struct DockerSshStreamChunk {
 pub struct DockerSshStreamDone {
     pub stream_id: String,
     pub success: bool,
+    pub error: Option<AppError>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]

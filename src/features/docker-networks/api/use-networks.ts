@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { commands, type NetworkCreate } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import { toastAppError } from '@/shared/lib/errors'
 
 export function useNetworks(serverId: string) {
   return useQuery({
@@ -15,7 +15,7 @@ export function useRemoveNetwork(serverId: string) {
   return useMutation({
     mutationFn: (networkId: string) => commands.removeNetwork(serverId, networkId),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.networks(serverId) }),
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }
 
@@ -24,6 +24,6 @@ export function useCreateNetwork(serverId: string) {
   return useMutation({
     mutationFn: (params: NetworkCreate) => commands.createNetwork(serverId, params),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.networks(serverId) }),
-    onError: (err) => toast.error(String(err)),
+    onError: (err) => toastAppError(err),
   })
 }

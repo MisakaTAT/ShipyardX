@@ -1,12 +1,14 @@
 mod commands;
 mod config;
 mod docker;
+mod error;
 mod models;
 mod services;
 mod ssh;
 mod state;
 mod utils;
 
+pub use error::{AppError, AppErrorKind, AppResult};
 pub use state::AppState;
 
 use std::collections::HashMap;
@@ -90,7 +92,9 @@ pub fn run() {
             DockerSshStreamDone,
             InstallStepEvent,
         ])
-        .typ::<EventStreamStatus>();
+        .typ::<EventStreamStatus>()
+        .typ::<AppError>()
+        .typ::<AppErrorKind>();
 
     #[cfg(debug_assertions)]
     specta_builder

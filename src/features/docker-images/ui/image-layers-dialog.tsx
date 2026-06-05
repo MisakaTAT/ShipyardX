@@ -4,6 +4,7 @@ import { Layers, Loader2 } from 'lucide-react'
 import { formatUnixSeconds } from '@/shared/lib/datetime'
 import { formatBytes } from '@/shared/lib/format'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { getErrorMessage } from '@/shared/lib/errors'
 
 export interface ImageLayersDialogProps {
   serverId: string
@@ -26,7 +27,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
         const hist = await commands.getImageHistory(serverId, image.id)
         if (!cancelled) setLayers(hist ?? [])
       } catch (e) {
-        if (!cancelled) setError(String(e))
+        if (!cancelled) setError(getErrorMessage(e))
       }
     })()
     return () => {
