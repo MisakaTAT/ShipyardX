@@ -39,10 +39,8 @@ export function ContainerActionsMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button type="button" variant="ghost" size="icon-sm" title="更多操作">
-          <MoreHorizontal />
-        </Button>
+      <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" title="更多操作" />}>
+        <MoreHorizontal />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuItem onClick={() => onAction('start')} disabled={isRunning || disabled}>

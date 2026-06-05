@@ -671,11 +671,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
               </div>
 
               <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Button type="button" variant="outline" size="sm">
-                    <Download />
-                    导出
-                  </Button>
+                <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" />}>
+                  <Download />
+                  导出
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
                   <DropdownMenuItem
