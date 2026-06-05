@@ -1,12 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { save } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { CanvasAddon } from '@xterm/addon-canvas'
 import { FitAddon } from '@xterm/addon-fit'
+import { ImageAddon } from '@xterm/addon-image'
+import { LigaturesAddon } from '@xterm/addon-ligatures'
+import { SearchAddon } from '@xterm/addon-search'
+import { SerializeAddon } from '@xterm/addon-serialize'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { ChevronDown, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react'
+import {
+  ChevronDown,
+  Download,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Terminal as TerminalIcon,
+  X,
+} from 'lucide-react'
+import { useAppSettings } from '@/app/settings-store'
+import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { getErrorMessage, normalizeAppError, type AppErrorLike } from '@/shared/lib/errors'
 import { Input } from '@/shared/ui/input'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { cn } from '@/shared/lib/utils'
 
@@ -104,11 +126,7 @@ function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<
   })
 }
 
-async function openTerminalTransport(
-  sessionId: string,
-  wsPort: number,
-  cb: TransportCallbacks
-): Promise<WebSocket> {
+async function openTerminalTransport(sessionId: string, wsPort: number, cb: TransportCallbacks): Promise<WebSocket> {
   const url = terminalSocketUrl(sessionId, wsPort)
   let lastError: unknown
   for (let i = 0; i < WS_OPEN_RETRIES; i += 1) {
@@ -127,6 +145,32 @@ function closeTerminalTransport(transport: WebSocket) {
   transport.close()
 }
 
+function attachRendererAddon(terminal: XTerm, frontend: 'xterm-canvas' | 'xterm-webgl') {
+  if (frontend === 'xterm-webgl') {
+    try {
+      const webglAddon = new WebglAddon()
+      terminal.loadAddon(webglAddon)
+      return webglAddon
+    } catch {
+      try {
+        const canvasAddon = new CanvasAddon()
+        terminal.loadAddon(canvasAddon)
+        return canvasAddon
+      } catch {
+        return null
+      }
+    }
+  }
+
+  try {
+    const canvasAddon = new CanvasAddon()
+    terminal.loadAddon(canvasAddon)
+    return canvasAddon
+  } catch {
+    return null
+  }
+}
+
 interface TerminalProps {
   serverId: string
   containerId?: string
@@ -141,8 +185,25 @@ type EndSessionOptions = {
 }
 
 export default function Terminal({ serverId, containerId }: TerminalProps) {
+  const {
+    settings: {
+      terminal: {
+        frontend: terminalFrontend,
+        theme: terminalThemeName,
+        scrollback,
+        ligatures,
+        fontFamily,
+        fontSize,
+        cursorStyle,
+        cursorBlink,
+        lineHeight,
+      },
+    },
+  } = useAppSettings()
   const xtermRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const searchAddonRef = useRef<SearchAddon | null>(null)
+  const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const fitFrameRef = useRef<number | null>(null)
   const sizeRef = useRef({ cols: 80, rows: 24 })
   const backendSessionIdRef = useRef<string | null>(null)
@@ -163,6 +224,11 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const [execUser, setExecUser] = useState('')
   const [execShellPreset, setExecShellPreset] = useState<'/bin/ash' | '/bin/bash' | '/bin/sh' | 'custom'>('/bin/sh')
   const [execCustomShell, setExecCustomShell] = useState('')
+  const [searchToolbarOpen, setSearchToolbarOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResultIndex, setSearchResultIndex] = useState(0)
+  const [searchResultCount, setSearchResultCount] = useState(0)
+  const [toolStatus, setToolStatus] = useState('')
 
   serverIdLiveRef.current = serverId
   containerIdLiveRef.current = containerId
@@ -170,6 +236,12 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   useEffect(() => {
     if (phase === 'error') setErrorDetailsExpanded(false)
   }, [phase, errorText])
+
+  useEffect(() => {
+    if (!toolStatus) return
+    const timer = window.setTimeout(() => setToolStatus(''), 1800)
+    return () => window.clearTimeout(timer)
+  }, [toolStatus])
 
   const termWrite = useCallback((data: string | Uint8Array) => {
     xtermRef.current?.write(data)
@@ -179,12 +251,64 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     xtermRef.current?.focus()
   }, [])
 
+  const runSearch = useCallback((term: string, direction: 'next' | 'previous' = 'next') => {
+    const addon = searchAddonRef.current
+    if (!addon) return false
+    if (!term.trim()) {
+      addon.clearDecorations()
+      setSearchResultIndex(0)
+      setSearchResultCount(0)
+      return false
+    }
+    return direction === 'previous'
+      ? addon.findPrevious(term, {
+          decorations: {
+            matchBackground: '#3b82f633',
+            matchOverviewRuler: '#3b82f6',
+            activeMatchBackground: '#f59e0b55',
+            activeMatchColorOverviewRuler: '#f59e0b',
+          },
+        })
+      : addon.findNext(term, {
+          decorations: {
+            matchBackground: '#3b82f633',
+            matchOverviewRuler: '#3b82f6',
+            activeMatchBackground: '#f59e0b55',
+            activeMatchColorOverviewRuler: '#f59e0b',
+          },
+        })
+  }, [])
+
+  const downloadExport = useCallback(async (content: string, filename: string, type: string) => {
+    try {
+      const path = await save({
+        defaultPath: filename,
+        filters: [
+          {
+            name: type === 'text/html;charset=utf-8' ? 'HTML' : 'Text',
+            extensions: [type === 'text/html;charset=utf-8' ? 'html' : 'txt'],
+          },
+        ],
+      })
+      if (!path) return
+      await commands.saveTerminalExport(path, content)
+      setToolStatus('已导出文件')
+    } catch {
+      setToolStatus('导出失败')
+    }
+  }, [])
+
   useEffect(() => {
     serverEpochRef.current += 1
     setPhase('disconnected')
     setErrorText('')
     setWasEverConnected(false)
     setOverlayMounted(true)
+    setSearchToolbarOpen(false)
+    setSearchQuery('')
+    setSearchResultIndex(0)
+    setSearchResultCount(0)
+    setToolStatus('')
   }, [serverId, containerId])
 
   useEffect(() => {
@@ -345,6 +469,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     if (transport?.readyState === WebSocket.OPEN) transport.send(ptyFrame(data))
   }, [])
 
+  const clearSearch = useCallback(() => {
+    setSearchQuery('')
+    searchAddonRef.current?.clearDecorations()
+    setSearchResultIndex(0)
+    setSearchResultCount(0)
+  }, [])
+
   const syncTerminalSize = useCallback((cols: number, rows: number, force = false) => {
     if (cols <= 0 || rows <= 0) return
     const changed = cols !== sizeRef.current.cols || rows !== sizeRef.current.rows
@@ -367,56 +498,63 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     [syncTerminalSize]
   )
 
-  const fitTerminal = useCallback((forceResize = false) => {
-    if (fitFrameRef.current !== null) window.cancelAnimationFrame(fitFrameRef.current)
-    fitFrameRef.current = window.requestAnimationFrame(() => {
-      fitFrameRef.current = null
-      fitTerminalNow(forceResize)
-    })
-  }, [fitTerminalNow])
+  const fitTerminal = useCallback(
+    (forceResize = false) => {
+      if (fitFrameRef.current !== null) window.cancelAnimationFrame(fitFrameRef.current)
+      fitFrameRef.current = window.requestAnimationFrame(() => {
+        fitFrameRef.current = null
+        fitTerminalNow(forceResize)
+      })
+    },
+    [fitTerminalNow]
+  )
 
   useEffect(() => {
     const mount = terminalMountRef.current
     if (!mount) return
+    const terminalTheme = XTERM_THEME_MAP[terminalThemeName] ?? XTERM_THEME_MAP.Dracula
 
     const terminal = new XTerm({
-      allowProposedApi: false,
-      cursorBlink: true,
-      cursorStyle: 'block',
-      // fontFamily: 'var(--font-mono)',
-      // fontSize: 13,
-      // lineHeight: 1.25,
-      scrollback: 5000,
-      // tabStopWidth: 8,
+      allowProposedApi: ligatures,
+      cursorBlink,
+      cursorStyle,
+      fontFamily,
+      fontSize,
+      lineHeight: 1 + lineHeight,
+      scrollback,
       theme: {
-        background: TERMINAL_SURFACE_BG,
-        // foreground: '#d4d4d4',
-        // cursor: '#f8f8f2',
-        // cursorAccent: TERMINAL_SURFACE_BG,
-        // selectionBackground: '#264f78',
-        // black: '#000000',
-        // red: '#cd3131',
-        // green: '#0dbc79',
-        // yellow: '#e5e510',
-        // blue: '#2472c8',
-        // magenta: '#bc3fbc',
-        // cyan: '#11a8cd',
-        // white: '#e5e5e5',
-        // brightBlack: '#666666',
-        // brightRed: '#f14c4c',
-        // brightGreen: '#23d18b',
-        // brightYellow: '#f5f543',
-        // brightBlue: '#3b8eea',
-        // brightMagenta: '#d670d6',
-        // brightCyan: '#29b8db',
-        // brightWhite: '#e5e5e5',
+        ...terminalTheme,
+        cursorAccent: terminalTheme.background,
       },
     })
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
     terminal.open(mount)
+    const unicode11Addon = new Unicode11Addon()
+    terminal.loadAddon(unicode11Addon)
+    terminal.unicode.activeVersion = '11'
+    const imageAddon = new ImageAddon()
+    terminal.loadAddon(imageAddon)
+    const ligaturesAddon = ligatures ? new LigaturesAddon() : null
+    if (ligaturesAddon) terminal.loadAddon(ligaturesAddon)
+    const searchAddon = new SearchAddon()
+    terminal.loadAddon(searchAddon)
+    searchAddonRef.current = searchAddon
+    const serializeAddon = new SerializeAddon()
+    terminal.loadAddon(serializeAddon)
+    serializeAddonRef.current = serializeAddon
+    const webLinksAddon = new WebLinksAddon((event, uri) => {
+      event.preventDefault()
+      void openUrl(uri).catch(() => {})
+    })
+    terminal.loadAddon(webLinksAddon)
+    const rendererAddon = attachRendererAddon(terminal, terminalFrontend)
     const dataDisposable = terminal.onData(handleTerminalData)
     const resizeDisposable = terminal.onResize(({ cols, rows }) => syncTerminalSize(cols, rows))
+    const searchResultsDisposable = searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
+      setSearchResultIndex(resultCount > 0 ? resultIndex + 1 : 0)
+      setSearchResultCount(resultCount)
+    })
 
     xtermRef.current = terminal
     fitAddonRef.current = fitAddon
@@ -436,11 +574,34 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       }
       xtermRef.current = null
       fitAddonRef.current = null
+      searchAddonRef.current = null
+      serializeAddonRef.current = null
       dataDisposable.dispose()
       resizeDisposable.dispose()
+      searchResultsDisposable.dispose()
+      rendererAddon?.dispose()
+      webLinksAddon.dispose()
+      serializeAddon.dispose()
+      searchAddon.dispose()
+      ligaturesAddon?.dispose()
+      imageAddon.dispose()
+      unicode11Addon.dispose()
       terminal.dispose()
     }
-  }, [fitTerminal, handleTerminalData, syncTerminalSize])
+  }, [
+    cursorBlink,
+    cursorStyle,
+    fitTerminal,
+    fontFamily,
+    fontSize,
+    handleTerminalData,
+    ligatures,
+    lineHeight,
+    scrollback,
+    syncTerminalSize,
+    terminalThemeName,
+    terminalFrontend,
+  ])
 
   useEffect(() => {
     if (phase !== 'connected') return
@@ -452,7 +613,12 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const isContainerExec = Boolean(containerId)
 
   return (
-    <div className="relative h-full w-full overflow-hidden select-text" style={{ background: TERMINAL_SURFACE_BG }}>
+    <div
+      className="relative h-full w-full overflow-hidden select-text"
+      style={{
+        background: (XTERM_THEME_MAP[terminalThemeName] ?? XTERM_THEME_MAP.Dracula).background ?? TERMINAL_SURFACE_BG,
+      }}
+    >
       <div
         className="absolute inset-0 box-border"
         style={{
@@ -460,6 +626,101 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
           visibility: terminalVisible ? 'visible' : 'hidden',
         }}
       >
+        <div className="pointer-events-none absolute top-2 right-2 left-2 z-10 flex justify-end">
+          {searchToolbarOpen ? (
+            <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/70 bg-background/85 p-2 shadow-sm backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Search className="size-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => {
+                    const nextQuery = event.target.value
+                    setSearchQuery(nextQuery)
+                    runSearch(nextQuery)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      runSearch(searchQuery, event.shiftKey ? 'previous' : 'next')
+                    }
+                    if (event.key === 'Escape') {
+                      clearSearch()
+                      setSearchToolbarOpen(false)
+                    }
+                  }}
+                  placeholder="搜索终端内容"
+                  className="h-8 w-52 rounded-md border-border bg-card/80 px-2.5 py-0 text-sm"
+                />
+                <span className="min-w-12 text-center text-xs text-muted-foreground">
+                  {searchResultCount > 0 ? `${searchResultIndex}/${searchResultCount}` : '0/0'}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-xs"
+                  onClick={() => runSearch(searchQuery, 'previous')}
+                >
+                  <ChevronDown className="rotate-180" />
+                </Button>
+                <Button type="button" variant="outline" size="icon-xs" onClick={() => runSearch(searchQuery, 'next')}>
+                  <ChevronDown />
+                </Button>
+                <Button type="button" variant="outline" size="icon-xs" onClick={clearSearch}>
+                  <X />
+                </Button>
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button type="button" variant="outline" size="sm">
+                    <Download />
+                    导出
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-40">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const content = serializeAddonRef.current?.serialize()
+                      if (!content) return
+                      downloadExport(content, 'terminal.txt', 'text/plain;charset=utf-8')
+                    }}
+                  >
+                    导出 TXT
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const content = serializeAddonRef.current?.serializeAsHTML()
+                      if (!content) return
+                      downloadExport(content, 'terminal.html', 'text/html;charset=utf-8')
+                    }}
+                  >
+                    导出 HTML
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-xs"
+                onClick={() => {
+                  clearSearch()
+                  setSearchToolbarOpen(false)
+                }}
+              >
+                <Search />
+              </Button>
+
+              {toolStatus ? <span className="text-xs text-muted-foreground">{toolStatus}</span> : null}
+            </div>
+          ) : (
+            <div className="pointer-events-auto">
+              <Button type="button" variant="outline" size="icon-sm" onClick={() => setSearchToolbarOpen(true)}>
+                <Search />
+              </Button>
+            </div>
+          )}
+        </div>
         <div ref={terminalMountRef} className="h-full w-full overflow-hidden" />
       </div>
 

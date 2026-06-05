@@ -4,6 +4,7 @@ export const APP_PATHS = {
   workspace: '/workspace',
   portForward: '/port-forward',
   store: '/store',
+  settings: '/settings',
 } as const
 
 export type AppMainPath = (typeof APP_PATHS)[keyof typeof APP_PATHS]

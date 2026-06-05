@@ -1,6 +1,7 @@
 use tauri::State;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use font_kit::source::SystemSource;
 
 use crate::contracts::docker_api::stats::DockerStats;
 use crate::contracts::docker_api::system::{DaemonConfig, SystemInfo};
@@ -28,6 +29,17 @@ const ERR_RC_SERVICE: &str = "__ERR_RC_SERVICE__";
 const ERR_SERVICE_OP: &str = "__ERR_SERVICE_OP__";
 const ERR_SUDO_NONINTERACTIVE: &str = "__ERR_SUDO_NONINTERACTIVE__";
 const ERR_NO_SUDO: &str = "__ERR_NO_SUDO__";
+
+pub fn list_system_fonts() -> AppResult<Vec<String>> {
+    let source = SystemSource::new();
+    let mut fonts = source
+        .all_families()
+        .map_err(|e| AppError::internal("system.fonts_list_failed", "读取系统字体失败").with_source(e))?;
+    fonts.sort_unstable();
+    fonts.dedup();
+    Ok(fonts)
+}
+
 fn map_restart_error(err: AppError) -> AppError {
     let detail = err.detail.clone().unwrap_or_else(|| err.message.clone());
     if detail.contains(ERR_BAD_SUDO_PASSWORD) {

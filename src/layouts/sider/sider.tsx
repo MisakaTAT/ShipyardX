@@ -5,6 +5,7 @@ import { Moon, Settings, Sun } from 'lucide-react'
 import { useTheme, useIsLightMode, runThemeTransition } from '@/app/theme'
 import { PRIMARY_NAV } from '@/layouts/sider/nav-config'
 import { NavButton } from '@/layouts/sider/nav-button'
+import { APP_PATHS } from '@/shared/lib/app-router'
 
 export default function Sider() {
   const [location, navigate] = useLocation()
@@ -48,7 +49,7 @@ export default function Sider() {
         <NavButton title={light ? '切换深色' : '切换浅色'} onClick={toggleTheme}>
           {light ? <Moon className="size-5" /> : <Sun className="size-5" />}
         </NavButton>
-        <NavButton title="设置" onClick={() => {}}>
+        <NavButton title="设置" active={location === APP_PATHS.settings} onClick={() => navigate(APP_PATHS.settings)}>
           <Settings className="size-5" />
         </NavButton>
       </div>

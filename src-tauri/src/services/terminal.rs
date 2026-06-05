@@ -1,3 +1,4 @@
+use std::fs;
 use std::net::TcpListener;
 use std::sync::OnceLock;
 use std::sync::mpsc;
@@ -41,6 +42,12 @@ fn ctrl_frame(json: &str) -> Vec<u8> {
 }
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
+
+pub fn save_terminal_export(path: String, content: String) -> AppResult<()> {
+    fs::write(&path, content)
+        .map_err(|e| AppError::internal("terminal.export_write_failed", "写入终端导出文件失败").with_source(e))?;
+    Ok(())
+}
 
 fn is_safe_docker_ident(v: &str) -> bool {
     if v.is_empty() {

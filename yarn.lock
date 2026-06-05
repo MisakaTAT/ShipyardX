@@ -1536,6 +1536,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tauri-apps/api@npm:^2.11.0":
+  version: 2.11.0
+  resolution: "@tauri-apps/api@npm:2.11.0"
+  checksum: 10c0/70c9f692d14ef7a5f69aa56d474e993f2c25f393e30a26099cca198040ccd33724e4978cefd455c73ecb169b36ca9b7ee010db88b05b0a8bd4a85801caa317d6
+  languageName: node
+  linkType: hard
+
 "@tauri-apps/cli-darwin-arm64@npm:2.10.1":
   version: 2.10.1
   resolution: "@tauri-apps/cli-darwin-arm64@npm:2.10.1"
@@ -1654,6 +1661,15 @@ __metadata:
   bin:
     tauri: tauri.js
   checksum: 10c0/a68f340a752092fc4f417fb7a8d4dc044031fe47c9c458ec3a1d25280d26f54dd7f33c97f797ce006936113b2d5ee54d25cef56bb84d803f1f11f7d3b5f81fd5
+  languageName: node
+  linkType: hard
+
+"@tauri-apps/plugin-dialog@npm:^2.7.1":
+  version: 2.7.1
+  resolution: "@tauri-apps/plugin-dialog@npm:2.7.1"
+  dependencies:
+    "@tauri-apps/api": "npm:^2.11.0"
+  checksum: 10c0/ae441f1fa34ef0c1494e4e4ee1d7e91ce7d140a1d6f7282c844c52fc5a021676570be4472473a8d3cfb404e42c2570caf4567d535f02bbeaf11da903c224c576
   languageName: node
   linkType: hard
 
@@ -1963,10 +1979,71 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@xterm/addon-canvas@npm:^0.7.0":
+  version: 0.7.0
+  resolution: "@xterm/addon-canvas@npm:0.7.0"
+  peerDependencies:
+    "@xterm/xterm": ^5.0.0
+  checksum: 10c0/b28b4e67042055432b887e20cd439e3304f1ffd25b3fab47aedfad83217d78f888e85dd9ff6f643557ec0b7649a9ec2d528ee0c50ccaf60ad07f5d68ea2beaec
+  languageName: node
+  linkType: hard
+
 "@xterm/addon-fit@npm:^0.11.0":
   version: 0.11.0
   resolution: "@xterm/addon-fit@npm:0.11.0"
   checksum: 10c0/c0ce94f7e877d07e7197d15d041cc629ce2e853016400aadddc9810838ea8a26e836f87f325eba36df88c03feb72d9f13cd8c3bb41ee31e701f1058edb8553c3
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-image@npm:^0.9.0":
+  version: 0.9.0
+  resolution: "@xterm/addon-image@npm:0.9.0"
+  checksum: 10c0/9a710410b984670c88125e08a2d75eb1bf91fc2e95976c8cc91a5d6c4a9ada5421fe84f2ea662a91fc060c099659ddb2a98841bf7a8f61c098293cd6daac1659
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-ligatures@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "@xterm/addon-ligatures@npm:0.10.0"
+  dependencies:
+    font-finder: "npm:^1.1.0"
+    font-ligatures: "npm:^1.4.1"
+  checksum: 10c0/43e53d39342982cf2af0e561806284e7bf7a6a5fe2f480835579cd6d87cb90f3f6b1204abd4ba41d8c0278f43be566091477c2e521eb9850663d2d16cb53d58e
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-search@npm:^0.16.0":
+  version: 0.16.0
+  resolution: "@xterm/addon-search@npm:0.16.0"
+  checksum: 10c0/bcd4c27852df1a9cfffb112174a510b0a410fc72f7f2ca431ae2ed3414c575cb1022795d491c7111382195b2d7f299b1f43d69674905c84cf31bafec7e48be9f
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-serialize@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "@xterm/addon-serialize@npm:0.14.0"
+  checksum: 10c0/38202b715e1f0eaf56bad70a4dd3a8da41b4209cc634101eae162aab557c373261d196034921ce6183b7ec256fdf5f5133035fac7e99038d840cc04469727bd7
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-unicode11@npm:^0.9.0":
+  version: 0.9.0
+  resolution: "@xterm/addon-unicode11@npm:0.9.0"
+  checksum: 10c0/6a1e34d081f5467ebb356159c0ee38319a30ea920fd948b8f56bbbb965b84ad5f0bdafcd8b75b2fab15f59376cc133abaa8615621d4ba839345922e7d869209c
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-web-links@npm:^0.12.0":
+  version: 0.12.0
+  resolution: "@xterm/addon-web-links@npm:0.12.0"
+  checksum: 10c0/1c4847f43948483a6a0f59994090b8b9d9f6006a1e4a8deed7d9c28fcb47422d77eb418fb8fc63fbfb0c486c49e4646b73188ff2efac5290b680db34f298f334
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-webgl@npm:^0.19.0":
+  version: 0.19.0
+  resolution: "@xterm/addon-webgl@npm:0.19.0"
+  checksum: 10c0/238f9af3745bc027c78a6ec6ed155721f82f2f0934bc65adffc0ae997c23ad053b18f04fceb121a38945d2fc31bf0e4baa01714c4c2916781bb27873d9d5cd8b
   languageName: node
   linkType: hard
 
@@ -3164,6 +3241,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"font-finder@npm:^1.0.3, font-finder@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "font-finder@npm:1.1.0"
+  dependencies:
+    get-system-fonts: "npm:^2.0.0"
+    promise-stream-reader: "npm:^1.0.1"
+  checksum: 10c0/2cd3842306abebd0d46b46c29649aecdae32a29d4e96a0ba23127669ca65d2196850324098ef4a3981da6f428dc264d7789c4e11979db1060cf3858b969aec38
+  languageName: node
+  linkType: hard
+
+"font-ligatures@npm:^1.4.1":
+  version: 1.4.1
+  resolution: "font-ligatures@npm:1.4.1"
+  dependencies:
+    font-finder: "npm:^1.0.3"
+    lru-cache: "npm:^6.0.0"
+    opentype.js: "npm:^0.8.0"
+  checksum: 10c0/350e445414d725b1c6e6735a6ef5ac2afffaf91ac4e30c8a954a7c6a7fbe7a334781b485f4a615d384ea06bf09e38a7bca575ba630a5fb56644d4f92ea6b9401
+  languageName: node
+  linkType: hard
+
 "formdata-polyfill@npm:^4.0.10":
   version: 4.0.10
   resolution: "formdata-polyfill@npm:4.0.10"
@@ -3323,6 +3421,13 @@ __metadata:
     "@sec-ant/readable-stream": "npm:^0.4.1"
     is-stream: "npm:^4.0.1"
   checksum: 10c0/d70e73857f2eea1826ac570c3a912757dcfbe8a718a033fa0c23e12ac8e7d633195b01710e0559af574cbb5af101009b42df7b6f6b29ceec8dbdf7291931b948
+  languageName: node
+  linkType: hard
+
+"get-system-fonts@npm:^2.0.0":
+  version: 2.0.2
+  resolution: "get-system-fonts@npm:2.0.2"
+  checksum: 10c0/5c2a1ae53df9e165a94efd10a746277ee55eacf6ba2bddf734b0032b451ad3c2136f6f07ebe0f4dadcea7637a504ec592d7e1dab2562c6b821f871c8f93224f6
   languageName: node
   linkType: hard
 
@@ -3989,6 +4094,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lru-cache@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "lru-cache@npm:6.0.0"
+  dependencies:
+    yallist: "npm:^4.0.0"
+  checksum: 10c0/cb53e582785c48187d7a188d3379c181b5ca2a9c78d2bce3e7dee36f32761d1c42983da3fe12b55cb74e1779fa94cdc2e5367c028a9b35317184ede0c07a30a9
+  languageName: node
+  linkType: hard
+
 "lucide-react@npm:^1.8.0":
   version: 1.14.0
   resolution: "lucide-react@npm:1.14.0"
@@ -4276,8 +4390,8 @@ __metadata:
   linkType: hard
 
 "node-gyp@npm:latest":
-  version: 12.3.0
-  resolution: "node-gyp@npm:12.3.0"
+  version: 12.4.0
+  resolution: "node-gyp@npm:12.4.0"
   dependencies:
     env-paths: "npm:^2.2.0"
     exponential-backoff: "npm:^3.1.1"
@@ -4291,7 +4405,7 @@ __metadata:
     which: "npm:^6.0.0"
   bin:
     node-gyp: bin/node-gyp.js
-  checksum: 10c0/9d9032b405cbe42f72a105259d9eb679376470c102df4a2dbaa51e07d59bf741dcffb85897087ea9d8318b9cabb824a8978af51508ae142f0239ae1e6a3c2329
+  checksum: 10c0/9acb7c798e124275a6f9c1f7eb64b5abd6196bb885a3945fb44ee0dccf435514e88cdfb0f228ee7ff76ef25107c1f39ff37a067bf92fd00b9aff9234db29ff9e
   languageName: node
   linkType: hard
 
@@ -4400,6 +4514,17 @@ __metadata:
     powershell-utils: "npm:^0.1.0"
     wsl-utils: "npm:^0.3.0"
   checksum: 10c0/7aeeda4131268ed90f90e7728dda5c46bb0c6205b27a4be3e86ea33593e30dd393423e20e31c00802a8e635ef59becaee33ef9749a8ceb027567cd253e9e7b1e
+  languageName: node
+  linkType: hard
+
+"opentype.js@npm:^0.8.0":
+  version: 0.8.0
+  resolution: "opentype.js@npm:0.8.0"
+  dependencies:
+    tiny-inflate: "npm:^1.0.2"
+  bin:
+    ot: ./bin/ot
+  checksum: 10c0/461e1ea942b7d5f66542b62535c5605c2f056d229609b9a8254531696d12830c044c896747c88d05923bf4acf7d4efb845362b46712b06bf7d3ca25596a9967f
   languageName: node
   linkType: hard
 
@@ -4704,6 +4829,13 @@ __metadata:
   version: 6.1.0
   resolution: "proc-log@npm:6.1.0"
   checksum: 10c0/4f178d4062733ead9d71a9b1ab24ebcecdfe2250916a5b1555f04fe2eda972a0ec76fbaa8df1ad9c02707add6749219d118a4fc46dc56bdfe4dde4b47d80bb82
+  languageName: node
+  linkType: hard
+
+"promise-stream-reader@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "promise-stream-reader@npm:1.0.1"
+  checksum: 10c0/c0ad303d579462e82298a8da2afadd990f0fe082c48f13d97c7e8e9b92b8a9c7fb80a8b6b87a19ef8cf5480379aac84644879d6ccbf52993294f43097cd902e1
   languageName: node
   linkType: hard
 
@@ -5027,7 +5159,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:^7.3.5, semver@npm:^7.7.3":
+"semver@npm:^7.3.5":
+  version: 7.8.2
+  resolution: "semver@npm:7.8.2"
+  bin:
+    semver: bin/semver.js
+  checksum: 10c0/8e8c193fa75b938e5b3ccf6707c6447e4b34f73e493e72b03f3185393489f45e049144052f624217c346d6c6e0a301dda8eeab2f14413e337218ecb1cbd2de16
+  languageName: node
+  linkType: hard
+
+"semver@npm:^7.7.3":
   version: 7.8.0
   resolution: "semver@npm:7.8.0"
   bin:
@@ -5150,13 +5291,22 @@ __metadata:
     "@tanstack/react-table": "npm:^8.21.3"
     "@tauri-apps/api": "npm:^2"
     "@tauri-apps/cli": "npm:^2"
+    "@tauri-apps/plugin-dialog": "npm:^2.7.1"
     "@tauri-apps/plugin-opener": "npm:^2"
     "@types/lodash-es": "npm:^4.17.12"
     "@types/node": "npm:^25.5.0"
     "@types/react": "npm:^19.1.8"
     "@types/react-dom": "npm:^19.1.6"
     "@vitejs/plugin-react": "npm:^4.6.0"
+    "@xterm/addon-canvas": "npm:^0.7.0"
     "@xterm/addon-fit": "npm:^0.11.0"
+    "@xterm/addon-image": "npm:^0.9.0"
+    "@xterm/addon-ligatures": "npm:^0.10.0"
+    "@xterm/addon-search": "npm:^0.16.0"
+    "@xterm/addon-serialize": "npm:^0.14.0"
+    "@xterm/addon-unicode11": "npm:^0.9.0"
+    "@xterm/addon-web-links": "npm:^0.12.0"
+    "@xterm/addon-webgl": "npm:^0.19.0"
     "@xterm/xterm": "npm:^6.0.0"
     ansi_up: "npm:^6.0.6"
     class-variance-authority: "npm:^0.7.1"
@@ -5416,15 +5566,22 @@ __metadata:
   linkType: hard
 
 "tar@npm:^7.5.4":
-  version: 7.5.15
-  resolution: "tar@npm:7.5.15"
+  version: 7.5.16
+  resolution: "tar@npm:7.5.16"
   dependencies:
     "@isaacs/fs-minipass": "npm:^4.0.0"
     chownr: "npm:^3.0.0"
     minipass: "npm:^7.1.2"
     minizlib: "npm:^3.1.0"
     yallist: "npm:^5.0.0"
-  checksum: 10c0/8f039edb1d12fdd7df6c6f9877d125afe9f3da3f5f9317df326fdd090d48793d6998cede1506a1471f3e3a250db270a89dace28005eb5e99c5a9132d704ac956
+  checksum: 10c0/4f37f3c4bd2ca2755fd736a5df1d573c1a868ec1b1e893346aeafa95ac510f9e2fd1469420bd866cc7904799e5bd4ac62b5d4f03fe27747d6e1e373b44505c5c
+  languageName: node
+  linkType: hard
+
+"tiny-inflate@npm:^1.0.2":
+  version: 1.0.3
+  resolution: "tiny-inflate@npm:1.0.3"
+  checksum: 10c0/fab687537254f6ec44c9a2e880048fe70da3542aba28f73cda3e74c95cabf342a339372f2a6c032e322324f01accc03ca26c04ba2bad9b3eb8cf3ee99bba7f9b
   languageName: node
   linkType: hard
 
@@ -5436,12 +5593,12 @@ __metadata:
   linkType: hard
 
 "tinyglobby@npm:^0.2.12":
-  version: 0.2.16
-  resolution: "tinyglobby@npm:0.2.16"
+  version: 0.2.17
+  resolution: "tinyglobby@npm:0.2.17"
   dependencies:
     fdir: "npm:^6.5.0"
     picomatch: "npm:^4.0.4"
-  checksum: 10c0/f2e09fd93dd95c41e522113b686ff6f7c13020962f8698a864a257f3d7737599afc47722b7ab726e12f8a813f779906187911ff8ee6701ede65072671a7e934b
+  checksum: 10c0/7f7bb0f197c88bc4b20c231e0deca4240ca3bf313a88f5a7fee93a872b84966a4d50220947c0455ad07a60b3b360961c5b7fd979222aeb716a9f99b412002e4c
   languageName: node
   linkType: hard
 
@@ -5614,9 +5771,9 @@ __metadata:
   linkType: hard
 
 "undici@npm:^6.25.0":
-  version: 6.25.0
-  resolution: "undici@npm:6.25.0"
-  checksum: 10c0/2597cc6689bdb02c210c557b1f85febbfda65becae6e6fc1061508e2f33734d25207f81cd8af56ada9956329eb3a7bd7431e87dcfeceba20ee87059b57dcf985
+  version: 6.26.0
+  resolution: "undici@npm:6.26.0"
+  checksum: 10c0/cf2b4caf58c33d6582970991290cc7a6486d6e738845f25dcdd16952d708ec844815c6d30362919764fcaf30f719891289341f1ada496f003ce2700310453a47
   languageName: node
   linkType: hard
 
@@ -5866,6 +6023,13 @@ __metadata:
   version: 3.1.1
   resolution: "yallist@npm:3.1.1"
   checksum: 10c0/c66a5c46bc89af1625476f7f0f2ec3653c1a1791d2f9407cfb4c2ba812a1e1c9941416d71ba9719876530e3340a99925f697142989371b72d93b9ee628afd8c1
+  languageName: node
+  linkType: hard
+
+"yallist@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "yallist@npm:4.0.0"
+  checksum: 10c0/2286b5e8dbfe22204ab66e2ef5cc9bbb1e55dfc873bbe0d568aa943eb255d131890dfd5bf243637273d31119b870f49c18fcde2c6ffbb7a7a092b870dc90625a
   languageName: node
   linkType: hard
 

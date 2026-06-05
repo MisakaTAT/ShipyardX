@@ -57,6 +57,7 @@ pub fn run() {
             commands::volumes::inspect_volume,
             commands::volumes::remove_volume,
             commands::system::check_docker_access,
+            commands::system::list_system_fonts,
             commands::system::get_docker_info,
             commands::system::get_container_stats,
             commands::system::get_docker_daemon_settings,
@@ -79,6 +80,7 @@ pub fn run() {
             commands::terminal::open_terminal,
             commands::terminal::open_container_exec_terminal,
             commands::terminal::close_terminal,
+            commands::terminal::save_terminal_export,
             commands::appstore::sync_appstore,
             commands::appstore::list_apps,
             commands::appstore::get_app_detail,
@@ -105,6 +107,7 @@ pub fn run() {
     let invoke_handler = specta_builder.invoke_handler();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(invoke_handler)
         .setup(move |app| {

@@ -6,6 +6,7 @@ import Connections from '@/pages/connections'
 import Workspace, { type WorkspaceTab } from '@/pages/workspace'
 import AppStore from '@/pages/app-store'
 import PortForward from '@/pages/port-forward'
+import SettingsPage from '@/pages/settings'
 import { KeepAlive } from '@/shared/components/keep-alive'
 import { APP_PATHS, appMemoryLocation } from '@/shared/lib/app-router'
 
@@ -24,6 +25,7 @@ function LayoutContent() {
   const isStore = location === APP_PATHS.store
   const isPortForward = location === APP_PATHS.portForward
   const isWorkspace = location === APP_PATHS.workspace
+  const isSettings = location === APP_PATHS.settings
 
   useEffect(() => {
     setWorkspaceTab('overview')
@@ -54,6 +56,12 @@ function LayoutContent() {
         {isPortForward ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <PortForward />
+          </div>
+        ) : null}
+
+        {isSettings ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <SettingsPage />
           </div>
         ) : null}
 

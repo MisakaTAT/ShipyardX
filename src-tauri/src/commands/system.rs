@@ -9,6 +9,12 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
+pub fn list_system_fonts() -> AppResult<Vec<String>> {
+    services::system::list_system_fonts()
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     Ok(services::system::check_docker_access(server_id, state).await?)
 }
