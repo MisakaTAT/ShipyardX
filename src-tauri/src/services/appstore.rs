@@ -1,17 +1,18 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
+use tokio::fs;
+use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::error::{AppError, AppResult};
 use crate::models::app::appstore::{AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest};
 use crate::models::app::events::InstallStepEvent;
 use crate::models::app::server::ServerConfig;
-use crate::ssh::exec::{ssh_exec, ssh_exec_streaming};
+use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async};
 
 const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
 
@@ -34,33 +35,35 @@ fn pick_description(desc: &crate::models::app::appstore::DescriptionI18n) -> Str
     String::new()
 }
 
-pub fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
+pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
     let cache_dir = appstore_cache_dir(app);
     let git_dir = cache_dir.join(".git");
 
-    if git_dir.exists() {
-        let output = std::process::Command::new("git")
+    if fs::try_exists(&git_dir).await.unwrap_or(false) {
+        let output = Command::new("git")
             .args(["-C", cache_dir.to_str().unwrap()])
             .arg("pull")
             .arg("--ff-only")
             .output()
+            .await
             .map_err(|e| AppError::internal("appstore.git_pull_spawn_failed", "执行 git pull 失败").with_source(e))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("Not a git repository") || stderr.contains("error:") {
-                let _ = fs::remove_dir_all(&cache_dir);
-                return sync_appstore(app);
+                let _ = fs::remove_dir_all(&cache_dir).await;
+                return Box::pin(sync_appstore(app)).await;
             }
             return Err(
                 AppError::unavailable("appstore.git_pull_failed", "同步应用商店失败").with_detail(stderr.trim())
             );
         }
     } else {
-        let _ = fs::create_dir_all(&cache_dir);
-        let output = std::process::Command::new("git")
+        let _ = fs::create_dir_all(&cache_dir).await;
+        let output = Command::new("git")
             .args(["clone", "--depth", "1", APPSTORE_REPO_URL])
             .arg(cache_dir.to_str().unwrap())
             .output()
+            .await
             .map_err(|e| AppError::internal("appstore.git_clone_spawn_failed", "执行 git clone 失败").with_source(e))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -73,56 +76,67 @@ pub fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
     Ok(cache_dir)
 }
 
-pub fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
+pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     let cache_dir = appstore_cache_dir(app);
     let apps_dir = apps_dir(&cache_dir);
 
-    if !apps_dir.exists() {
+    if !fs::try_exists(&apps_dir).await.unwrap_or(false) {
         return Ok(vec![]);
     }
 
     let mut items: Vec<AppListItem> = Vec::new();
 
-    for entry in fs::read_dir(&apps_dir)
-        .map_err(|e| AppError::internal("appstore.apps_dir_read_failed", "读取 apps 目录失败").with_source(e))?
+    let mut entries = fs::read_dir(&apps_dir)
+        .await
+        .map_err(|e| AppError::internal("appstore.apps_dir_read_failed", "读取 apps 目录失败").with_source(e))?;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录项失败").with_source(e))?
     {
-        let entry = entry
-            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录项失败").with_source(e))?;
         let app_dir = entry.path();
-        if !app_dir.is_dir() {
+        if !entry
+            .file_type()
+            .await
+            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录类型失败").with_source(e))?
+            .is_dir()
+        {
             continue;
         }
 
         let key = app_dir.file_name().unwrap().to_string_lossy().to_string();
 
         let data_yml = app_dir.join("data.yml");
-        if !data_yml.exists() {
+        if !fs::try_exists(&data_yml).await.unwrap_or(false) {
             continue;
         }
 
-        let yaml_str = fs::read_to_string(&data_yml).unwrap_or_default();
+        let yaml_str = fs::read_to_string(&data_yml).await.unwrap_or_default();
         let manifest: AppManifest = match serde_yaml::from_str(&yaml_str) {
             Ok(m) => m,
             Err(_) => continue,
         };
 
         let logo_path = app_dir.join("logo.png");
-        let icon = if logo_path.exists() {
-            let bytes = fs::read(&logo_path).unwrap_or_default();
+        let icon = if fs::try_exists(&logo_path).await.unwrap_or(false) {
+            let bytes = fs::read(&logo_path).await.unwrap_or_default();
             STANDARD.encode(&bytes)
         } else {
             String::new()
         };
 
         let mut versions: Vec<String> = Vec::new();
-        if let Ok(entries) = fs::read_dir(&app_dir) {
-            for ver_entry in entries.flatten() {
+        if let Ok(mut version_entries) = fs::read_dir(&app_dir).await {
+            while let Ok(Some(ver_entry)) = version_entries.next_entry().await {
                 let ver_dir = ver_entry.path();
-                if !ver_dir.is_dir() {
+                let Ok(file_type) = ver_entry.file_type().await else {
+                    continue;
+                };
+                if !file_type.is_dir() {
                     continue;
                 }
                 let ver_name = ver_entry.file_name().to_string_lossy().to_string();
-                if ver_name == "latest" || ver_dir.join("docker-compose.yml").exists() {
+                if ver_name == "latest" || fs::try_exists(ver_dir.join("docker-compose.yml")).await.unwrap_or(false) {
                     versions.push(ver_name);
                 }
             }
@@ -146,11 +160,11 @@ pub fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     Ok(items)
 }
 
-pub fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
+pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
     let cache_dir = appstore_cache_dir(app);
     let app_dir = apps_dir(&cache_dir).join(app_key);
 
-    if !app_dir.exists() {
+    if !fs::try_exists(&app_dir).await.unwrap_or(false) {
         return Err(AppError::not_found(
             "appstore.app_not_found",
             format!("应用 {} 不存在", app_key),
@@ -158,7 +172,7 @@ pub fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
     }
 
     let data_yml = app_dir.join("data.yml");
-    if !data_yml.exists() {
+    if !fs::try_exists(&data_yml).await.unwrap_or(false) {
         return Err(AppError::not_found(
             "appstore.manifest_not_found",
             format!("应用 {} 的 data.yml 不存在", app_key),
@@ -166,40 +180,44 @@ pub fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
     }
 
     let yaml_str = fs::read_to_string(&data_yml)
+        .await
         .map_err(|e| AppError::internal("appstore.manifest_read_failed", "读取 data.yml 失败").with_source(e))?;
     let manifest: AppManifest = serde_yaml::from_str(&yaml_str)
         .map_err(|e| AppError::internal("appstore.manifest_parse_failed", "解析 data.yml 失败").with_source(e))?;
 
     let logo_path = app_dir.join("logo.png");
-    let icon = if logo_path.exists() {
-        let bytes = fs::read(&logo_path).unwrap_or_default();
+    let icon = if fs::try_exists(&logo_path).await.unwrap_or(false) {
+        let bytes = fs::read(&logo_path).await.unwrap_or_default();
         STANDARD.encode(&bytes)
     } else {
         String::new()
     };
 
-    let readme_zh = fs::read_to_string(app_dir.join("README.md")).unwrap_or_default();
-    let readme_en = fs::read_to_string(app_dir.join("README_en.md")).unwrap_or_default();
+    let readme_zh = fs::read_to_string(app_dir.join("README.md")).await.unwrap_or_default();
+    let readme_en = fs::read_to_string(app_dir.join("README_en.md")).await.unwrap_or_default();
 
     let mut version_infos: Vec<AppVersionInfo> = Vec::new();
-    if let Ok(entries) = fs::read_dir(&app_dir) {
-        for entry in entries.flatten() {
+    if let Ok(mut entries) = fs::read_dir(&app_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
             let ver_dir = entry.path();
-            if !ver_dir.is_dir() {
+            let Ok(file_type) = entry.file_type().await else {
+                continue;
+            };
+            if !file_type.is_dir() {
                 continue;
             }
             let ver_name = entry.file_name().to_string_lossy().to_string();
 
             let compose_path = ver_dir.join("docker-compose.yml");
-            if !compose_path.exists() {
+            if !fs::try_exists(&compose_path).await.unwrap_or(false) {
                 continue;
             }
 
-            let compose_preview = fs::read_to_string(&compose_path).unwrap_or_default();
+            let compose_preview = fs::read_to_string(&compose_path).await.unwrap_or_default();
 
             let ver_data = ver_dir.join("data.yml");
-            let form_fields = if ver_data.exists() {
-                let ver_yaml = fs::read_to_string(&ver_data).unwrap_or_default();
+            let form_fields = if fs::try_exists(&ver_data).await.unwrap_or(false) {
+                let ver_yaml = fs::read_to_string(&ver_data).await.unwrap_or_default();
                 match serde_yaml::from_str::<VersionManifest>(&ver_yaml) {
                     Ok(vm) => vm.additional.form_fields,
                     Err(_) => vec![],
@@ -253,12 +271,12 @@ fn emit_output(app: &AppHandle, step: &str, chunk: &str) {
     .emit(app);
 }
 
-pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
+pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
     let cache_dir = appstore_cache_dir(app);
     let app_dir = apps_dir(&cache_dir).join(&req.app_key);
     let version_dir = app_dir.join(&req.version);
 
-    if !version_dir.exists() {
+    if !fs::try_exists(&version_dir).await.unwrap_or(false) {
         return Err(AppError::not_found(
             "appstore.version_not_found",
             format!("应用 {} 版本 {} 的 docker-compose.yml 不存在", req.app_key, req.version),
@@ -268,10 +286,12 @@ pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallAp
 
     // Step 1: 准备模板
     emit_step(app, "prepare", "running", "正在准备部署模板...");
-    let compose_template = fs::read_to_string(version_dir.join("docker-compose.yml")).map_err(|e| {
-        emit_step(app, "prepare", "error", &format!("读取模板失败: {}", e));
-        AppError::internal("appstore.compose_template_read_failed", "读取部署模板失败").with_source(e)
-    })?;
+    let compose_template = fs::read_to_string(version_dir.join("docker-compose.yml"))
+        .await
+        .map_err(|e| {
+            emit_step(app, "prepare", "error", &format!("读取模板失败: {}", e));
+            AppError::internal("appstore.compose_template_read_failed", "读取部署模板失败").with_source(e)
+        })?;
 
     // 注入 1Panel 标准变量：CONTAINER_NAME
     let mut env_values = req.env_values.clone();
@@ -298,28 +318,32 @@ pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallAp
         remote_base, compose_b64, env_b64
     );
 
-    ssh_exec_streaming(server, &setup_cmd, |chunk| {
+    ssh_exec_streaming_async(server, &setup_cmd, |chunk| {
         emit_output(app, "deploy", chunk);
     })
+    .await
     .map_err(|e| {
         emit_step(app, "deploy", "error", &format!("部署文件失败: {}", e));
         AppError::internal("appstore.deploy_files_failed", "部署文件失败").with_detail(e.detail.unwrap_or(e.message))
     })?;
 
     let local_data_dir = version_dir.join("data");
-    if local_data_dir.exists() && local_data_dir.is_dir() {
+    let local_data_meta = fs::metadata(&local_data_dir).await.ok();
+    if local_data_meta.as_ref().is_some_and(|meta| meta.is_dir()) {
         emit_step(app, "deploy", "running", "正在复制数据目录...");
-        copy_data_dir_to_remote(server, &local_data_dir, &format!("{}/data", remote_base)).map_err(|e| {
-            emit_step(app, "deploy", "error", &format!("复制数据失败: {}", e));
-            e
-        })?;
+        copy_data_dir_to_remote(server, &local_data_dir, &format!("{}/data", remote_base))
+            .await
+            .map_err(|e| {
+                emit_step(app, "deploy", "error", &format!("复制数据失败: {}", e));
+                e
+            })?;
     }
     emit_step(app, "deploy", "done", "文件部署完成");
 
     // Step 3: 创建网络
     emit_step(app, "network", "running", "正在创建 Docker 网络...");
     let net_cmd = "docker network create shipyardx-network 2>/dev/null; true".to_string();
-    let _ = ssh_exec(server, &net_cmd);
+    let _ = ssh_exec_async(server, &net_cmd).await;
     emit_step(app, "network", "done", "Docker 网络就绪");
 
     // Step 4: 启动容器
@@ -333,15 +357,17 @@ pub fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallAp
         remote_base
     );
 
-    let result = ssh_exec_streaming(server, &up_cmd_v2, |chunk| {
+    let result = ssh_exec_streaming_async(server, &up_cmd_v2, |chunk| {
         emit_output(app, "start", chunk);
-    });
+    })
+    .await;
     match result {
         Ok(_) => {}
         Err(e) => {
-            ssh_exec_streaming(server, &up_cmd_v1, |chunk| {
+            ssh_exec_streaming_async(server, &up_cmd_v1, |chunk| {
                 emit_output(app, "start", chunk);
             })
+            .await
             .map_err(|e2| {
                 emit_step(app, "start", "error", "容器启动失败");
                 AppError::unavailable("appstore.compose_up_failed", "容器启动失败").with_detail(format!(
@@ -378,11 +404,11 @@ fn build_env_file(env_values: &HashMap<String, String>) -> String {
         .join("\n")
 }
 
-fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: &str) -> AppResult<()> {
+async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: &str) -> AppResult<()> {
     let parent = local_dir.parent().unwrap_or(local_dir);
     let dir_name = local_dir.file_name().unwrap().to_str().unwrap();
 
-    let mut tar_cmd = std::process::Command::new("tar");
+    let mut tar_cmd = Command::new("tar");
     tar_cmd
         .arg("-czf")
         .arg("-")
@@ -392,6 +418,7 @@ fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: 
 
     let output = tar_cmd
         .output()
+        .await
         .map_err(|e| AppError::internal("appstore.tar_spawn_failed", "打包数据目录失败").with_source(e))?;
     let tar_b64 = STANDARD.encode(&output.stdout);
 
@@ -405,6 +432,6 @@ fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_dir: 
         remote_dir, tar_b64, remote_parent
     );
 
-    ssh_exec(server, &remote_cmd)?;
+    ssh_exec_async(server, &remote_cmd).await?;
     Ok(())
 }

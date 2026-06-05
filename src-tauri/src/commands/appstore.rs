@@ -8,36 +8,20 @@ use crate::state::AppState;
 #[tauri::command]
 #[specta::specta]
 pub async fn sync_appstore(app: AppHandle) -> AppResult<String> {
-    let handle = app.clone();
-    Ok(tokio::task::spawn_blocking(move || {
-        let cache_dir = services::appstore::sync_appstore(&handle)?;
-        Ok::<String, AppError>(format!("应用商店已同步到: {}", cache_dir.display()))
-    })
-    .await
-    .map_err(AppError::from)??)
+    let cache_dir = services::appstore::sync_appstore(&app).await?;
+    Ok(format!("应用商店已同步到: {}", cache_dir.display()))
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn list_apps(app: AppHandle) -> AppResult<Vec<AppListItem>> {
-    let handle = app.clone();
-    Ok(
-        tokio::task::spawn_blocking(move || services::appstore::list_apps(&handle))
-            .await
-            .map_err(AppError::from)??,
-    )
+    Ok(services::appstore::list_apps(&app).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn get_app_detail(app: AppHandle, app_key: String) -> AppResult<AppDetail> {
-    let handle = app.clone();
-    let key = app_key.clone();
-    Ok(
-        tokio::task::spawn_blocking(move || services::appstore::get_app_detail(&handle, &key))
-            .await
-            .map_err(AppError::from)??,
-    )
+    Ok(services::appstore::get_app_detail(&app, &app_key).await?)
 }
 
 #[tauri::command]
@@ -48,7 +32,6 @@ pub async fn install_app(
     req: InstallApp,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    let handle = app.clone();
     let server = {
         let s = state.servers.lock().unwrap();
         s.iter()
@@ -56,9 +39,5 @@ pub async fn install_app(
             .cloned()
             .ok_or_else(|| AppError::not_found("server.not_found", "服务器不存在"))?
     };
-    Ok(
-        tokio::task::spawn_blocking(move || services::appstore::install_app_inner(&handle, &server, &req))
-            .await
-            .map_err(AppError::from)??,
-    )
+    Ok(services::appstore::install_app_inner(&app, &server, &req).await?)
 }

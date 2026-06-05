@@ -4,7 +4,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
 
 use crate::docker::client::{
-    docker_delete, docker_get, docker_post, docker_post_json_response, pretty_json_response, resolve_api_version,
+    docker_delete_async, docker_get_async, docker_post_async, docker_post_json_response_async, pretty_json_response,
+    resolve_api_version_async,
 };
 use crate::docker::mapping::api_container_to_dto;
 use crate::error::{AppError, AppResult};
@@ -13,47 +14,37 @@ use crate::models::docker::container::{
     ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
     ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerSummary, EndpointIpamConfig, EndpointSettings,
 };
-use crate::ssh::exec::ssh_exec;
+use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, "/containers/json?all=1")?;
-        let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp).map_err(|e| {
-            AppError::internal("container.list_parse_failed", "解析容器列表失败").with_detail(format!(
-                "{} — 原始响应: {}",
-                e,
-                &resp[..resp.len().min(200)]
-            ))
-        })?;
-        sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
-        Ok(api.into_iter().map(api_container_to_dto).collect())
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "加载容器列表任务执行失败").with_source(e))?
+    let resp = docker_get_async(&server, "/containers/json?all=1").await?;
+    let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp).map_err(|e| {
+        AppError::internal("container.list_parse_failed", "解析容器列表失败").with_detail(format!(
+            "{} — 原始响应: {}",
+            e,
+            &resp[..resp.len().min(200)]
+        ))
+    })?;
+    sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
+    Ok(api.into_iter().map(api_container_to_dto).collect())
 }
 
 pub async fn start_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || docker_post(&server, &format!("/containers/{}/start", container_id)))
-        .await
-        .map_err(|e| AppError::internal("task.join", "启动容器任务执行失败").with_source(e))?
+    docker_post_async(&server, &format!("/containers/{}/start", container_id)).await
 }
 
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || docker_post(&server, &format!("/containers/{}/stop", container_id)))
-        .await
-        .map_err(|e| AppError::internal("task.join", "停止容器任务执行失败").with_source(e))?
+    docker_post_async(&server, &format!("/containers/{}/stop", container_id)).await
 }
 
 pub async fn restart_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || docker_post(&server, &format!("/containers/{}/restart", container_id)))
-        .await
-        .map_err(|e| AppError::internal("task.join", "重启容器任务执行失败").with_source(e))?
+    docker_post_async(&server, &format!("/containers/{}/restart", container_id)).await
 }
 
 pub async fn remove_container(
@@ -63,11 +54,7 @@ pub async fn remove_container(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        docker_delete(&server, &format!("/containers/{}?force={}", container_id, force))
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "删除容器任务执行失败").with_source(e))?
+    docker_delete_async(&server, &format!("/containers/{}?force={}", container_id, force)).await
 }
 
 pub async fn inspect_container(
@@ -76,12 +63,8 @@ pub async fn inspect_container(
     state: State<'_, AppState>,
 ) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, &format!("/containers/{}/json", container_id))?;
-        pretty_json_response(&resp)
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "检查容器详情任务执行失败").with_source(e))?
+    let resp = docker_get_async(&server, &format!("/containers/{}/json", container_id)).await?;
+    pretty_json_response(&resp)
 }
 
 pub async fn get_container_logs(
@@ -92,23 +75,19 @@ pub async fn get_container_logs(
     state: State<'_, AppState>,
 ) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let ver = resolve_api_version(&server)?;
-        let ts = if timestamps { "&timestamps=1" } else { "" };
-        let cmd = format!(
-            "curl -s --unix-socket /var/run/docker.sock \
-            'http://localhost/v{}/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
-            ver, container_id, tail, ts
-        );
-        let b64 = ssh_exec(&server, &cmd)?;
-        let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
-        let raw = BASE64
-            .decode(clean)
-            .map_err(|e| AppError::internal("container.logs_decode_failed", "解码容器日志失败").with_source(e))?;
-        Ok(demux_log_stream(&raw))
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "读取容器日志任务执行失败").with_source(e))?
+    let ver = resolve_api_version_async(&server).await?;
+    let ts = if timestamps { "&timestamps=1" } else { "" };
+    let cmd = format!(
+        "curl -s --unix-socket /var/run/docker.sock \
+        'http://localhost/v{}/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}' | base64",
+        ver, container_id, tail, ts
+    );
+    let b64 = ssh_exec_async(&server, &cmd).await?;
+    let clean: String = b64.chars().filter(|c| !c.is_whitespace()).collect();
+    let raw = BASE64
+        .decode(clean)
+        .map_err(|e| AppError::internal("container.logs_decode_failed", "解码容器日志失败").with_source(e))?;
+    Ok(demux_log_stream(&raw))
 }
 
 fn demux_log_stream(data: &[u8]) -> String {
@@ -291,40 +270,35 @@ fn build_run_container_body(params: &RunContainer) -> ContainerCreate {
 
 pub async fn run_container(server_id: String, params: RunContainer, state: State<'_, AppState>) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let body = build_run_container_body(&params);
-        let path = match &params.name {
-            Some(n) => {
-                let t = n.trim();
-                if t.is_empty() {
-                    "/containers/create".to_string()
-                } else {
-                    format!("/containers/create?name={t}")
-                }
+    let body = build_run_container_body(&params);
+    let path = match &params.name {
+        Some(n) => {
+            let t = n.trim();
+            if t.is_empty() {
+                "/containers/create".to_string()
+            } else {
+                format!("/containers/create?name={t}")
             }
-            None => "/containers/create".to_string(),
-        };
-
-        let raw = docker_post_json_response(&server, &path, &body)?;
-
-        let created: ContainerCreateResponse =
-            serde_json::from_str(&raw).map_err(|e| {
-                AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败")
-                    .with_detail(format!("{} — {}", e, &raw.chars().take(120).collect::<String>()))
-            })?;
-
-        let id = created.id.trim();
-        if id.is_empty() {
-            return Err(AppError::internal(
-                "container.id_missing",
-                "创建容器成功但未返回容器 ID",
-            ));
         }
+        None => "/containers/create".to_string(),
+    };
 
-        docker_post(&server, &format!("/containers/{id}/start"))?;
+    let raw = docker_post_json_response_async(&server, &path, &body).await?;
 
-        Ok(id.to_string())
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "创建容器任务执行失败").with_source(e))?
+    let created: ContainerCreateResponse = serde_json::from_str(&raw).map_err(|e| {
+        AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败")
+            .with_detail(format!("{} — {}", e, &raw.chars().take(120).collect::<String>()))
+    })?;
+
+    let id = created.id.trim();
+    if id.is_empty() {
+        return Err(AppError::internal(
+            "container.id_missing",
+            "创建容器成功但未返回容器 ID",
+        ));
+    }
+
+    docker_post_async(&server, &format!("/containers/{id}/start")).await?;
+
+    Ok(id.to_string())
 }

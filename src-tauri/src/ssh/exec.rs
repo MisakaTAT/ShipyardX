@@ -3,7 +3,7 @@ use russh::ChannelMsg;
 use crate::error::{AppError, AppResult};
 use crate::models::app::server::ServerConfig;
 
-use super::client::{block_on, connect, disconnect};
+use super::client::{connect, disconnect};
 
 struct CommandResult {
     stdout: String,
@@ -75,17 +75,17 @@ fn command_error(result: &CommandResult) -> AppError {
     AppError::internal("ssh.command_failed", "远程命令执行失败").with_detail(detail)
 }
 
-pub fn ssh_exec_streaming<F>(config: &ServerConfig, command: &str, on_chunk: F) -> AppResult<String>
+pub async fn ssh_exec_streaming_async<F>(config: &ServerConfig, command: &str, on_chunk: F) -> AppResult<String>
 where
     F: FnMut(&str),
 {
-    let result = block_on(run_command(config, command, on_chunk))?;
+    let result = run_command(config, command, on_chunk).await?;
     if result.exit_code != 0 {
         return Err(command_error(&result));
     }
     Ok(result.stdout)
 }
 
-pub fn ssh_exec(config: &ServerConfig, command: &str) -> AppResult<String> {
-    ssh_exec_streaming(config, command.trim(), |_| {})
+pub async fn ssh_exec_async(config: &ServerConfig, command: &str) -> AppResult<String> {
+    ssh_exec_streaming_async(config, command.trim(), |_| {}).await
 }

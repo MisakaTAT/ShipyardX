@@ -1,9 +1,9 @@
 use tauri::State;
 
 use crate::config::store::save_servers;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::models::app::server::ServerConfig;
-use crate::ssh::exec::ssh_exec;
+use crate::ssh::exec::ssh_exec_async;
 use crate::state::{AppState, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -48,10 +48,6 @@ pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
 }
 
 async fn test_connection_with_config(server: ServerConfig) -> AppResult<String> {
-    tokio::task::spawn_blocking(move || {
-        ssh_exec(&server, "docker version --format 'Server: {{.Server.Version}}'")
-            .map(|v| format!("连接成功！Docker {}", v.trim()))
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "测试连接任务执行失败").with_source(e))?
+    let version = ssh_exec_async(&server, "docker version --format 'Server: {{.Server.Version}}'").await?;
+    Ok(format!("连接成功！Docker {}", version.trim()))
 }

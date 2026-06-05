@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::error::{AppError, AppResult};
 use crate::models::app::server::ServerConfig;
 use crate::models::docker::common::{DockerError, DockerVersion};
-use crate::ssh::exec::ssh_exec;
+use crate::ssh::exec::ssh_exec_async;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -23,12 +23,16 @@ pub fn invalidate_api_version(config: &ServerConfig) {
 }
 
 pub fn resolve_api_version(config: &ServerConfig) -> AppResult<String> {
+    crate::ssh::client::block_on(resolve_api_version_async(config))
+}
+
+pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<String> {
     let key = cache_key(config);
     if let Some(ver) = api_version_cache().lock().unwrap().get(&key) {
         return Ok(ver.clone());
     }
     let cmd = "curl -s --unix-socket /var/run/docker.sock 'http://localhost/version'";
-    let resp = ssh_exec(config, cmd)?;
+    let resp = ssh_exec_async(config, cmd).await?;
     let v: DockerVersion = serde_json::from_str(resp.trim()).map_err(|e| {
         AppError::wrap(
             "docker.version_parse_failed",
@@ -78,28 +82,28 @@ fn check_docker_error(resp: &str) -> AppResult<()> {
     Ok(())
 }
 
-fn docker_curl(config: &ServerConfig, path: &str, method: CurlMethod) -> AppResult<String> {
-    let ver = resolve_api_version(config)?;
+async fn docker_curl_async(config: &ServerConfig, path: &str, method: CurlMethod) -> AppResult<String> {
+    let ver = resolve_api_version_async(config).await?;
     let url = docker_sock_url(&ver, path);
     let cmd = format!(
         "curl -s {}--unix-socket /var/run/docker.sock '{}'",
         method.curl_flag(),
         url
     );
-    let resp = ssh_exec(config, &cmd)?;
+    let resp = ssh_exec_async(config, &cmd).await?;
     check_docker_error(&resp)?;
     Ok(resp)
 }
 
-pub fn docker_get(config: &ServerConfig, path: &str) -> AppResult<String> {
-    docker_curl(config, path, CurlMethod::Get)
+pub async fn docker_get_async(config: &ServerConfig, path: &str) -> AppResult<String> {
+    docker_curl_async(config, path, CurlMethod::Get).await
 }
 
-pub fn docker_post(config: &ServerConfig, path: &str) -> AppResult<()> {
-    docker_curl(config, path, CurlMethod::Post).map(|_| ())
+pub async fn docker_post_async(config: &ServerConfig, path: &str) -> AppResult<()> {
+    docker_curl_async(config, path, CurlMethod::Post).await.map(|_| ())
 }
 
-pub fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<()> {
+pub async fn docker_post_json_async<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<()> {
     let body_str = serde_json::to_string(body).map_err(|e| {
         AppError::wrap(
             "docker.request_body_serialize_failed",
@@ -108,18 +112,22 @@ pub fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &
             e,
         )
     })?;
-    let ver = resolve_api_version(config)?;
+    let ver = resolve_api_version_async(config).await?;
     let url = docker_sock_url(&ver, path);
     let b64 = STANDARD.encode(body_str);
     let cmd = format!(
         "printf '%s' '{}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- --unix-socket /var/run/docker.sock '{}'",
         b64, url
     );
-    let resp = ssh_exec(config, &cmd)?;
+    let resp = ssh_exec_async(config, &cmd).await?;
     check_docker_error(&resp)
 }
 
-pub fn docker_post_json_response<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<String> {
+pub async fn docker_post_json_response_async<T: Serialize>(
+    config: &ServerConfig,
+    path: &str,
+    body: &T,
+) -> AppResult<String> {
     let body_str = serde_json::to_string(body).map_err(|e| {
         AppError::wrap(
             "docker.request_body_serialize_failed",
@@ -128,20 +136,20 @@ pub fn docker_post_json_response<T: Serialize>(config: &ServerConfig, path: &str
             e,
         )
     })?;
-    let ver = resolve_api_version(config)?;
+    let ver = resolve_api_version_async(config).await?;
     let url = docker_sock_url(&ver, path);
     let b64 = STANDARD.encode(body_str);
     let cmd = format!(
         "printf '%s' '{}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- --unix-socket /var/run/docker.sock '{}'",
         b64, url
     );
-    let resp = ssh_exec(config, &cmd)?;
+    let resp = ssh_exec_async(config, &cmd).await?;
     check_docker_error(&resp)?;
     Ok(resp.trim().to_string())
 }
 
-pub fn docker_delete(config: &ServerConfig, path: &str) -> AppResult<()> {
-    docker_curl(config, path, CurlMethod::Delete).map(|_| ())
+pub async fn docker_delete_async(config: &ServerConfig, path: &str) -> AppResult<()> {
+    docker_curl_async(config, path, CurlMethod::Delete).await.map(|_| ())
 }
 
 pub fn pretty_json_response(raw: &str) -> AppResult<String> {

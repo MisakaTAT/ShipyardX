@@ -4,7 +4,7 @@ use russh::ChannelMsg;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 
-use crate::docker::client::{docker_delete, docker_get, pretty_json_response};
+use crate::docker::client::{docker_delete_async, docker_get_async, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
 use crate::models::app::events::{DockerSshStreamChunk, DockerSshStreamDone};
@@ -19,44 +19,36 @@ use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let containers_resp = docker_get(&server, "/containers/json?all=1")?;
-        let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
-            .map_err(|e| AppError::internal("image.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
+    let containers_resp = docker_get_async(&server, "/containers/json?all=1").await?;
+    let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
+        .map_err(|e| AppError::internal("image.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
 
-        let mut used_by: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-        for c in containers {
-            let id = c.image_id.trim();
-            if id.is_empty() {
-                continue;
-            }
-            *used_by.entry(id.to_string()).or_insert(0) += 1;
+    let mut used_by: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for c in containers {
+        let id = c.image_id.trim();
+        if id.is_empty() {
+            continue;
         }
+        *used_by.entry(id.to_string()).or_insert(0) += 1;
+    }
 
-        let resp = docker_get(&server, "/images/json")?;
-        let mut api: Vec<ImageSummary> = serde_json::from_str(&resp)
-            .map_err(|e| AppError::internal("image.list_parse_failed", "解析镜像列表失败").with_source(e))?;
-        sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
-        Ok(api
-            .into_iter()
-            .map(|img| {
-                let cnt = used_by.get(img.id.as_str()).copied().unwrap_or(0);
-                api_image_to_dto(img, cnt)
-            })
-            .collect())
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "加载镜像列表任务执行失败").with_source(e))?
+    let resp = docker_get_async(&server, "/images/json").await?;
+    let mut api: Vec<ImageSummary> = serde_json::from_str(&resp)
+        .map_err(|e| AppError::internal("image.list_parse_failed", "解析镜像列表失败").with_source(e))?;
+    sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
+    Ok(api
+        .into_iter()
+        .map(|img| {
+            let cnt = used_by.get(img.id.as_str()).copied().unwrap_or(0);
+            api_image_to_dto(img, cnt)
+        })
+        .collect())
 }
 
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, &format!("/images/{}/json", image_id))?;
-        pretty_json_response(&resp)
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "检查镜像详情任务执行失败").with_source(e))?
+    let resp = docker_get_async(&server, &format!("/images/{}/json", image_id)).await?;
+    pretty_json_response(&resp)
 }
 
 pub async fn get_image_history(
@@ -65,23 +57,19 @@ pub async fn get_image_history(
     state: State<'_, AppState>,
 ) -> AppResult<Vec<crate::models::app::image::ImageLayer>> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || {
-        let resp = docker_get(&server, &format!("/images/{}/history", image_id))?;
-        let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp)
-            .map_err(|e| AppError::internal("image.history_parse_failed", "解析镜像历史失败").with_source(e))?;
-        Ok(api
-            .into_iter()
-            .map(|l| crate::models::app::image::ImageLayer {
-                id: l.id,
-                created_ts: l.created,
-                size: l.size,
-                command: l.created_by,
-                comment: l.comment,
-            })
-            .collect())
-    })
-    .await
-    .map_err(|e| AppError::internal("task.join", "读取镜像历史任务执行失败").with_source(e))?
+    let resp = docker_get_async(&server, &format!("/images/{}/history", image_id)).await?;
+    let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp)
+        .map_err(|e| AppError::internal("image.history_parse_failed", "解析镜像历史失败").with_source(e))?;
+    Ok(api
+        .into_iter()
+        .map(|l| crate::models::app::image::ImageLayer {
+            id: l.id,
+            created_ts: l.created,
+            size: l.size,
+            command: l.created_by,
+            comment: l.comment,
+        })
+        .collect())
 }
 
 pub async fn remove_image(
@@ -91,9 +79,7 @@ pub async fn remove_image(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    tokio::task::spawn_blocking(move || docker_delete(&server, &format!("/images/{}?force={}", image_id, force)))
-        .await
-        .map_err(|e| AppError::internal("task.join", "删除镜像任务执行失败").with_source(e))?
+    docker_delete_async(&server, &format!("/images/{}?force={}", image_id, force)).await
 }
 
 fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mpsc::Receiver<()>, ah: AppHandle) {
