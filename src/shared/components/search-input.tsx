@@ -42,10 +42,9 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
       />
       {clearable && value ? (
         <Button
-          type="button"
           variant="ghost"
-          size="icon-sm"
-          className="absolute top-1/2 right-1 size-7 -translate-y-1/2 rounded-full text-muted-foreground"
+          size="icon"
+          className="absolute inset-y-0 right-0 cursor-pointer rounded-l-none text-muted-foreground hover:bg-transparent focus-visible:ring-ring/50"
           aria-label="清除搜索"
           onClick={() => onChange('')}
         >
