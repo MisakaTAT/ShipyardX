@@ -1,12 +1,17 @@
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
+use tokio::fs::OpenOptions;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::watch;
-use log::{debug, error, info, warn};
 
 use crate::contracts::docker_api::container::ContainerSummary;
 use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
-use crate::contracts::frontend::events::{DockerSshStreamChunk, DockerSshStreamDone};
+use crate::contracts::frontend::events::{DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress};
 use crate::contracts::frontend::image::Image;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_stream_async, pretty_json_response};
@@ -21,6 +26,7 @@ use crate::utils::sort::sort_by_created_desc_then_id;
 const PULL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
 const PULL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
 const PULL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续拉取日志已省略]\n";
+const EXPORT_PROGRESS_EMIT_BYTES: u64 = 512 * 1024;
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     debug!(target: "shipyardx_lib::services::images", "listing images; server_id={}", server_id);
@@ -93,6 +99,98 @@ pub async fn remove_image(
     info!(target: "shipyardx_lib::services::images", "removing image; server_id={} image_id={} force={}", server_id, image_id, force);
     let server = get_server_config(&state, &server_id)?;
     docker_delete_async(&server, &format!("/images/{}?force={}", image_id, force)).await
+}
+
+pub async fn export_image(
+    export_id: String,
+    server_id: String,
+    image_id: String,
+    directory: String,
+    file_name: String,
+    total_bytes: Option<u64>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    let directory = directory.trim();
+    let file_name = file_name.trim();
+    if directory.is_empty() {
+        return Err(AppError::validation("image.export_dir_required", "请选择导出目录"));
+    }
+    if file_name.is_empty() {
+        return Err(AppError::validation("image.export_name_required", "请输入导出文件名"));
+    }
+    if !is_valid_export_name(file_name) {
+        return Err(AppError::validation(
+            "image.export_name_invalid",
+            "文件名包含非法字符，请重新命名",
+        ));
+    }
+
+    let export_dir = PathBuf::from(directory);
+    ensure_export_directory(&export_dir)?;
+
+    let export_name = ensure_tar_extension(file_name);
+    let export_path = export_dir.join(&export_name);
+    info!(
+        target: "shipyardx_lib::services::images",
+        "exporting image; export_id={} server_id={} image_id={} path={}",
+        export_id,
+        server_id,
+        image_id,
+        export_path.display()
+    );
+
+    let server = get_server_config(&state, &server_id)?;
+    let result = async {
+        let mut file = create_export_file(&export_path).await?;
+        let mut stream = crate::docker::client::docker_stream_async(
+            &server,
+            &format!("/images/get?names={}", encode_query_component(&image_id)),
+        )
+        .await?;
+
+        let mut transferred_bytes = 0_u64;
+        let mut emitted_bytes = 0_u64;
+        emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
+
+        loop {
+            match stream.next_chunk().await? {
+                Some(chunk) => {
+                    file.write_all(&chunk).await.map_err(|e| {
+                        AppError::internal("image.export_write_failed", "写入镜像导出文件失败").with_source(e)
+                    })?;
+                    transferred_bytes = transferred_bytes.saturating_add(chunk.len() as u64);
+                    if transferred_bytes.saturating_sub(emitted_bytes) >= EXPORT_PROGRESS_EMIT_BYTES {
+                        emitted_bytes = transferred_bytes;
+                        emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
+                    }
+                }
+                None => break,
+            }
+        }
+
+        file.flush()
+            .await
+            .map_err(|e| AppError::internal("image.export_flush_failed", "保存镜像导出文件失败").with_source(e))?;
+        emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
+        Ok::<(), AppError>(())
+    }
+    .await;
+
+    if let Err(error) = result {
+        let _ = tokio::fs::remove_file(&export_path).await;
+        return Err(error);
+    }
+
+    info!(
+        target: "shipyardx_lib::services::images",
+        "exported image; export_id={} server_id={} image_id={} path={}",
+        export_id,
+        server_id,
+        image_id,
+        export_path.display()
+    );
+    Ok(())
 }
 
 async fn run_pull_task(
@@ -174,7 +272,9 @@ async fn run_pull_task(
     .await;
 
     match &result {
-        Ok(_) => info!(target: "shipyardx_lib::services::images", "image pull succeeded; pull_id={} server_id={} image={}", done_stream_id, config.id, image),
+        Ok(_) => {
+            info!(target: "shipyardx_lib::services::images", "image pull succeeded; pull_id={} server_id={} image={}", done_stream_id, config.id, image)
+        }
         Err(error) => warn!(
             target: "shipyardx_lib::services::images",
             "image pull finished with error; pull_id={} server_id={} image={} code={} message={} detail={:?}",
@@ -220,6 +320,66 @@ fn encode_query_component(value: &str) -> String {
             _ => format!("%{byte:02X}").chars().collect(),
         })
         .collect()
+}
+
+fn ensure_export_directory(path: &Path) -> AppResult<()> {
+    if !path.exists() {
+        return Err(AppError::validation("image.export_dir_missing", "所选目录不存在"));
+    }
+    if !path.is_dir() {
+        return Err(AppError::validation("image.export_dir_invalid", "所选路径不是文件夹"));
+    }
+    Ok(())
+}
+
+fn ensure_tar_extension(file_name: &str) -> String {
+    if file_name.to_ascii_lowercase().ends_with(".tar") {
+        file_name.to_string()
+    } else {
+        format!("{file_name}.tar")
+    }
+}
+
+fn is_valid_export_name(file_name: &str) -> bool {
+    if matches!(file_name, "." | "..") {
+        return false;
+    }
+
+    !file_name.is_empty()
+        && !file_name
+            .bytes()
+            .any(|b| b < 32 || matches!(b, b'<' | b'>' | b':' | b'"' | b'/' | b'\\' | b'|' | b'?' | b'*'))
+}
+
+async fn create_export_file(path: &Path) -> AppResult<tokio::fs::File> {
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .await
+        .map_err(|e| match e.kind() {
+            ErrorKind::AlreadyExists => AppError::conflict("image.export_exists", "目标文件已存在，请更换名称"),
+            ErrorKind::PermissionDenied => {
+                AppError::permission("image.export_permission_denied", "没有权限写入所选目录")
+            }
+            _ => AppError::internal("image.export_open_failed", "创建镜像导出文件失败").with_source(e),
+        })
+}
+
+fn emit_export_progress(
+    app_handle: &AppHandle,
+    export_id: &str,
+    image_id: &str,
+    transferred_bytes: u64,
+    total_bytes: Option<u64>,
+) {
+    let _ = ImageExportProgress {
+        export_id: export_id.to_string(),
+        image_id: image_id.to_string(),
+        transferred_bytes,
+        total_bytes,
+    }
+    .emit(app_handle);
 }
 
 fn emit_pull_lines(
@@ -326,13 +486,17 @@ pub fn start_image_pull(
     state
         .streams
         .lock()
-        .map_err(|e| AppError::internal("image.pull_streams_lock_failed", "记录镜像拉取状态失败").with_detail(e.to_string()))?
+        .map_err(|e| {
+            AppError::internal("image.pull_streams_lock_failed", "记录镜像拉取状态失败").with_detail(e.to_string())
+        })?
         .insert(pull_id.clone(), StreamHandle { stop_tx });
     Ok(pull_id)
 }
 
 pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
-    if let Some(h) = lock_mutex(&state.streams, "image.pull_streams_lock_failed", "取消镜像拉取失败")?.remove(&stream_id) {
+    if let Some(h) =
+        lock_mutex(&state.streams, "image.pull_streams_lock_failed", "取消镜像拉取失败")?.remove(&stream_id)
+    {
         info!(target: "shipyardx_lib::services::images", "cancelling image pull; pull_id={}", stream_id);
         let _ = h.stop_tx.send(true);
     } else {

@@ -18,13 +18,13 @@ use std::sync::Mutex;
 use config::store::{get_data_file, load_servers};
 use contracts::frontend::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
-    DockerStreamStatus, EventStreamStatus, InstallStepEvent,
+    DockerStreamStatus, EventStreamStatus, ImageExportProgress, InstallStepEvent,
 };
 use log::{error, info, warn};
 use specta_typescript::Typescript;
 use tauri::Manager;
-use tauri_specta::{Builder, ErrorHandlingMode, collect_commands, collect_events};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+use tauri_specta::{Builder, ErrorHandlingMode, collect_commands, collect_events};
 
 pub fn run() {
     let specta_builder = Builder::<tauri::Wry>::new()
@@ -48,6 +48,7 @@ pub fn run() {
             commands::images::inspect_image,
             commands::images::get_image_history,
             commands::images::remove_image,
+            commands::images::export_image,
             commands::images::start_image_pull,
             commands::images::cancel_stream,
             commands::networks::list_networks,
@@ -96,6 +97,7 @@ pub fn run() {
             DockerStreamError,
             DockerSshStreamChunk,
             DockerSshStreamDone,
+            ImageExportProgress,
             InstallStepEvent,
         ])
         .typ::<EventStreamStatus>()

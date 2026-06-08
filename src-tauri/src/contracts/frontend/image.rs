@@ -7,6 +7,7 @@ pub struct Image {
     pub repository: String,
     pub tag: String,
     pub size: String,
+    pub size_bytes: i64,
     pub created_ts: i64,
     pub used_by_count: u32,
 }

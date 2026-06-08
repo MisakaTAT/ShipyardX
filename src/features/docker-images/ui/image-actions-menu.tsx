@@ -1,4 +1,4 @@
-import { Layers, MoreHorizontal, ScanSearch, Trash2 } from 'lucide-react'
+import { Download, Layers, MoreHorizontal, ScanSearch, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import type { Image } from '@/types/app-bindings'
@@ -6,12 +6,20 @@ import type { Image } from '@/types/app-bindings'
 interface ImageActionsMenuProps {
   image: Image
   busy?: boolean
+  onExport: () => void
   onLayers: () => void
   onInspect: () => void
   onRemove: () => void
 }
 
-export function ImageActionsMenu({ image: _image, busy, onLayers, onInspect, onRemove }: ImageActionsMenuProps) {
+export function ImageActionsMenu({
+  image: _image,
+  busy,
+  onExport,
+  onLayers,
+  onInspect,
+  onRemove,
+}: ImageActionsMenuProps) {
   const disabled = Boolean(busy)
 
   return (
@@ -20,6 +28,10 @@ export function ImageActionsMenu({ image: _image, busy, onLayers, onInspect, onR
         <MoreHorizontal />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={onExport} disabled={disabled}>
+          <Download className="size-3.5" />
+          下载
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onLayers} disabled={disabled}>
           <Layers className="size-3.5" />
           Layers

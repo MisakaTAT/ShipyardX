@@ -41,6 +41,31 @@ pub async fn remove_image(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn export_image(
+    export_id: String,
+    server_id: String,
+    image_id: String,
+    directory: String,
+    file_name: String,
+    total_bytes: Option<u64>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    Ok(services::images::export_image(
+        export_id,
+        server_id,
+        image_id,
+        directory,
+        file_name,
+        total_bytes,
+        app_handle,
+        state,
+    )
+    .await?)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn start_image_pull(
     server_id: String,
     image: String,

@@ -23,6 +23,7 @@ export const commands = {
 	inspectImage: (serverId: string, imageId: string) => __TAURI_INVOKE<string>("inspect_image", { serverId, imageId }),
 	getImageHistory: (serverId: string, imageId: string) => __TAURI_INVOKE<ImageLayer[]>("get_image_history", { serverId, imageId }),
 	removeImage: (serverId: string, imageId: string, force: boolean) => __TAURI_INVOKE<null>("remove_image", { serverId, imageId, force }),
+	exportImage: (exportId: string, serverId: string, imageId: string, directory: string, fileName: string, totalBytes: number | null) => __TAURI_INVOKE<null>("export_image", { exportId, serverId, imageId, directory, fileName, totalBytes }),
 	startImagePull: (serverId: string, image: string) => __TAURI_INVOKE<string>("start_image_pull", { serverId, image }),
 	cancelStream: (streamId: string) => __TAURI_INVOKE<null>("cancel_stream", { streamId }),
 	listNetworks: (serverId: string) => __TAURI_INVOKE<Network[]>("list_networks", { serverId }),
@@ -73,6 +74,7 @@ export const events = {
 	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
 	dockerStreamStatus: makeEvent<DockerStreamStatus>("docker-stream-status"),
+	imageExportProgress: makeEvent<ImageExportProgress>("image-export-progress"),
 	installStepEvent: makeEvent<InstallStepEvent>("install-step-event"),
 };
 
@@ -326,8 +328,16 @@ export type Image = {
 	repository: string,
 	tag: string,
 	size: string,
+	size_bytes: number,
 	created_ts: number,
 	used_by_count: number,
+};
+
+export type ImageExportProgress = {
+	export_id: string,
+	image_id: string,
+	transferred_bytes: number,
+	total_bytes: number | null,
 };
 
 export type ImageLayer = {

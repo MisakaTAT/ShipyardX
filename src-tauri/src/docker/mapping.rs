@@ -113,6 +113,7 @@ pub fn api_image_to_dto(img: ImageSummary, used_by_count: u32) -> Image {
         repository,
         tag,
         size: format_bytes(size),
+        size_bytes: size,
         created_ts: created,
         used_by_count,
     }

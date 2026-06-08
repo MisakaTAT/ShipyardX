@@ -64,6 +64,14 @@ pub struct DockerSshStreamDone {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct ImageExportProgress {
+    pub export_id: String,
+    pub image_id: String,
+    pub transferred_bytes: u64,
+    pub total_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct InstallStepEvent {
     pub step: String,
     pub status: String,

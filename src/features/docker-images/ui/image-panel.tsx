@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react'
 import { Download, Image as ImageIcon } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
+import ImageExportDialog from '@/features/docker-images/ui/image-export-dialog'
 import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
-import { useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
+import { useExportImage, useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
 import { ImageActionsMenu } from '@/features/docker-images/ui/image-actions-menu'
 import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
 
@@ -21,9 +22,11 @@ const imageRefLabel = (img: Image) => (img.tag !== '<none>' ? `${img.repository}
 export default function ImagePanel({ serverId }: ImagePanelProps) {
   const { data: images = [], isFetching, dataUpdatedAt } = useImages(serverId)
   const removeImage = useRemoveImage(serverId)
+  const exportImage = useExportImage(serverId)
 
   const [search, setSearch] = useState('')
   const [showPull, setShowPull] = useState(false)
+  const [exportTarget, setExportTarget] = useState<Image | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Image | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Image | null>(null)
   const [layersTarget, setLayersTarget] = useState<Image | null>(null)
@@ -108,7 +111,8 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           return (
             <ImageActionsMenu
               image={img}
-              busy={removeImage.isPending}
+              busy={removeImage.isPending || exportImage.isPending}
+              onExport={() => setExportTarget(img)}
               onLayers={() => setLayersTarget(img)}
               onInspect={() => setInspectTarget(img)}
               onRemove={() => {
@@ -156,6 +160,14 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       />
 
       <ImagePullDialog serverId={serverId} open={showPull} onOpenChange={setShowPull} />
+      <ImageExportDialog
+        serverId={serverId}
+        image={exportTarget}
+        open={exportTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setExportTarget(null)
+        }}
+      />
 
       {inspectTarget ? (
         <ResourceInspectDialog
