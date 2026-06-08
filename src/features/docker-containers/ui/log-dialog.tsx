@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
 import { toastAppError } from '@/shared/lib/errors'
+import { sanitizeHtml } from '@/shared/lib/sanitize-html'
 
 interface Props {
   serverId: string
@@ -35,7 +36,7 @@ function getEventPayload(event: unknown): unknown {
 }
 
 function LogLine({ line, ansi }: { line: string; ansi: AnsiUp }) {
-  const html = useMemo(() => ansi.ansi_to_html(line.length ? line : '\u00a0'), [ansi, line])
+  const html = useMemo(() => sanitizeHtml(ansi.ansi_to_html(line.length ? line : '\u00a0')), [ansi, line])
   return (
     <div
       className="px-3 font-mono text-[13px] leading-[1.45] wrap-break-word text-[#e6edf3]"

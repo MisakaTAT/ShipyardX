@@ -156,10 +156,10 @@ export function TerminalSettingsPanel({
           title="配色"
           description="切换终端主题配色"
           control={
-            <SearchablePicker
+            <SearchablePicker<TerminalThemeName>
               value={theme}
               options={XTERM_THEME_NAMES}
-              onChange={(value) => onThemeChange(value as TerminalThemeName)}
+              onChange={onThemeChange}
               renderValue={(option) => formatThemeName(option)}
               renderOption={(option) => {
                 const themeColors = XTERM_THEME_MAP[option]
@@ -305,10 +305,10 @@ export function TerminalSettingsPanel({
 }
 
 function formatThemeName(name: string) {
-  return name.replaceAll('_', ' ')
+  return name.split('_').join(' ')
 }
 
-function SearchablePicker({
+function SearchablePicker<T extends string>({
   value,
   options,
   onChange,
@@ -316,12 +316,12 @@ function SearchablePicker({
   renderValue,
   renderOption,
 }: {
-  value: string
-  options: string[]
-  onChange: (value: string) => void
+  value: T
+  options: T[]
+  onChange: (value: T) => void
   placeholder: string
-  renderValue?: (value: string) => ReactNode
-  renderOption?: (value: string) => ReactNode
+  renderValue?: (value: T) => ReactNode
+  renderOption?: (value: T) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -381,10 +381,10 @@ function SearchablePicker({
                 key={option}
                 type="button"
                 className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => {
-                  onChange(option)
-                  setOpen(false)
-                  setQuery('')
+                    onClick={() => {
+                      onChange(option)
+                      setOpen(false)
+                      setQuery('')
                 }}
               >
                 {renderOption ? renderOption(option) : <span className="truncate">{option}</span>}

@@ -2,13 +2,14 @@ import { useMemo } from 'react'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
 import 'highlight.js/styles/atom-one-dark.css'
+import { sanitizeHtml } from '@/shared/lib/sanitize-html'
 
 hljs.registerLanguage('bash', bash)
 
 export function HighlightLog({ outputs }: { outputs: string[] }) {
   const html = useMemo(() => {
     const text = outputs.join('')
-    return hljs.highlight(text, { language: 'bash' }).value
+    return sanitizeHtml(hljs.highlight(text, { language: 'bash' }).value)
   }, [outputs])
 
   return (
