@@ -1,25 +1,22 @@
 use std::fs;
-use std::net::TcpListener;
 use std::sync::OnceLock;
-use std::sync::mpsc;
-use std::time::Duration;
 
+use futures_util::{SinkExt, StreamExt};
 use russh::ChannelMsg;
 use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
-use tungstenite::protocol::Message;
-use tungstenite::{
-    accept_hdr,
-    handshake::server::{Request, Response},
-};
+use tokio::net::TcpListener;
+use tokio::sync::mpsc as tokio_mpsc;
+use tokio_tungstenite::accept_hdr_async;
+use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+use tokio_tungstenite::tungstenite::protocol::Message;
 
 use crate::contracts::docker_api::container::{ContainerExecCreate, ContainerExecCreateResponse, ContainerExecStart};
 use crate::contracts::frontend::server::ServerConfig;
 use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::docker::client::{docker_post_async, docker_post_json_hijack_async, docker_post_json_response_async};
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::{block_on, connect, disconnect};
-use crate::ssh::limits::{TERMINAL_SSH_READ_POLL_MS, TERMINAL_WS_IDLE_SLEEP_MS};
+use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -85,7 +82,7 @@ fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) 
 fn run_terminal_thread(
     config: ServerConfig,
     session_id: String,
-    rx: mpsc::Receiver<TerminalMsg>,
+    rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
     cols: u32,
     rows: u32,
@@ -120,7 +117,7 @@ fn run_terminal_thread(
 struct ContainerExecThreadCtx {
     config: ServerConfig,
     session_id: String,
-    rx: mpsc::Receiver<TerminalMsg>,
+    rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
     cols: u32,
     rows: u32,
@@ -200,7 +197,7 @@ async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, row
 
 async fn run_docker_exec_io_loop(
     session_id: String,
-    rx: mpsc::Receiver<TerminalMsg>,
+    mut rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
     config: &ServerConfig,
     exec_id: &str,
@@ -212,6 +209,7 @@ async fn run_docker_exec_io_loop(
     let mut read_buf = [0u8; 8192];
     let mut last_cols = 0;
     let mut last_rows = 0;
+    let mut pending_resize = None;
 
     if resize_docker_exec(config, exec_id, initial_cols, initial_rows).await {
         last_cols = initial_cols;
@@ -219,30 +217,12 @@ async fn run_docker_exec_io_loop(
     }
 
     loop {
-        let mut pending_resize = None;
-
-        loop {
-            match rx.try_recv() {
-                Ok(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
-                Ok(TerminalMsg::Resize { cols, rows }) => {
-                    if cols != last_cols || rows != last_rows {
-                        pending_resize = Some((cols, rows));
-                    }
-                }
-                Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
-                    hijack.close().await;
-                    send_control(&ah, &session_id, WsServerMsg::Closed);
-                    return;
-                }
-                Err(mpsc::TryRecvError::Empty) => break,
-            }
-        }
-
         if let Some((cols, rows)) = pending_resize
             && resize_docker_exec(config, exec_id, cols, rows).await
         {
             last_cols = cols;
             last_rows = rows;
+            pending_resize = None;
         }
 
         if !input_buf.is_empty() {
@@ -254,31 +234,39 @@ async fn run_docker_exec_io_loop(
             input_buf.clear();
         }
 
-        match tokio::time::timeout(
-            Duration::from_millis(TERMINAL_SSH_READ_POLL_MS as u64),
-            hijack.read(&mut read_buf),
-        )
-        .await
-        {
-            Ok(Ok(0)) => {
-                hijack.close().await;
-                send_control(&ah, &session_id, WsServerMsg::Closed);
-                return;
+        tokio::select! {
+            maybe_msg = rx.recv() => {
+                match maybe_msg {
+                    Some(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
+                    Some(TerminalMsg::Resize { cols, rows }) => {
+                        if cols != last_cols || rows != last_rows {
+                            pending_resize = Some((cols, rows));
+                        }
+                    }
+                    Some(TerminalMsg::Close) | None => {
+                        hijack.close().await;
+                        send_control(&ah, &session_id, WsServerMsg::Closed);
+                        return;
+                    }
+                }
             }
-            Ok(Ok(n)) => send_pty_bytes(&ah, &session_id, &read_buf[..n]),
-            Ok(Err(_)) => {
-                hijack.close().await;
-                send_control(&ah, &session_id, WsServerMsg::Closed);
-                return;
+            read = hijack.read(&mut read_buf) => {
+                match read {
+                    Ok(0) | Err(_) => {
+                        hijack.close().await;
+                        send_control(&ah, &session_id, WsServerMsg::Closed);
+                        return;
+                    }
+                    Ok(n) => send_pty_bytes(&ah, &session_id, &read_buf[..n]),
+                }
             }
-            Err(_) => {}
         }
     }
 }
 
 async fn run_terminal_io_loop(
     session_id: String,
-    rx: mpsc::Receiver<TerminalMsg>,
+    mut rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
     handle: &mut russh::client::Handle<crate::ssh::client::SshClientHandler>,
     mut channel: russh::Channel<russh::client::Msg>,
@@ -291,38 +279,34 @@ async fn run_terminal_io_loop(
     let mut writer = channel.make_writer();
 
     loop {
-        loop {
-            match rx.try_recv() {
-                Ok(TerminalMsg::Data(data)) => {
-                    input_buf.extend_from_slice(&data);
-                }
-                Ok(TerminalMsg::Resize { cols, rows }) => {
-                    if cols != last_cols || rows != last_rows {
-                        if !input_buf.is_empty() {
-                            let _ = writer.write_all(&input_buf).await;
-                            input_buf.clear();
-                        }
-                        last_cols = cols;
-                        last_rows = rows;
-                        let _ = channel.window_change(cols, rows, 0, 0).await;
-                    }
-                }
-                Ok(TerminalMsg::Close) | Err(mpsc::TryRecvError::Disconnected) => {
-                    let _ = channel.close().await;
-                    disconnect(handle).await;
-                    send_control(&ah, &session_id, WsServerMsg::Closed);
-                    return;
-                }
-                Err(mpsc::TryRecvError::Empty) => break,
-            }
-        }
-
         if !input_buf.is_empty() {
             let _ = writer.write_all(&input_buf).await;
             input_buf.clear();
         }
 
         tokio::select! {
+            maybe_msg = rx.recv() => {
+                match maybe_msg {
+                    Some(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
+                    Some(TerminalMsg::Resize { cols, rows }) => {
+                        if cols != last_cols || rows != last_rows {
+                            if !input_buf.is_empty() {
+                                let _ = writer.write_all(&input_buf).await;
+                                input_buf.clear();
+                            }
+                            last_cols = cols;
+                            last_rows = rows;
+                            let _ = channel.window_change(cols, rows, 0, 0).await;
+                        }
+                    }
+                    Some(TerminalMsg::Close) | None => {
+                        let _ = channel.close().await;
+                        disconnect(handle).await;
+                        send_control(&ah, &session_id, WsServerMsg::Closed);
+                        return;
+                    }
+                }
+            }
             msg = channel.wait() => {
                 match msg {
                     Some(ChannelMsg::Data { data }) => send_pty_bytes(&ah, &session_id, &data),
@@ -336,7 +320,6 @@ async fn run_terminal_io_loop(
                     _ => {}
                 }
             }
-            _ = tokio::time::sleep(Duration::from_millis(TERMINAL_SSH_READ_POLL_MS as u64)) => {}
         }
     }
 }
@@ -375,53 +358,52 @@ fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
     }
 }
 
-fn run_ws_client(stream: std::net::TcpStream, ah: AppHandle) {
+async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     let mut req_path = String::new();
     #[allow(clippy::result_large_err)]
-    let mut ws = match accept_hdr(stream, |req: &Request, resp: Response| {
+    let mut ws = match accept_hdr_async(stream, |req: &Request, resp: Response| {
         req_path = req.uri().path().to_string();
         Ok(resp)
-    }) {
+    })
+    .await
+    {
         Ok(v) => v,
         Err(_) => return,
     };
 
     let session_id = req_path.strip_prefix("/terminal/").unwrap_or("").to_string();
     if session_id.is_empty() {
-        let _ = ws.close(None);
+        let _ = ws.close(None).await;
         return;
     }
 
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    let (tx, mut rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
     ah.state::<AppState>()
         .terminal_ws_clients
         .lock()
         .unwrap()
         .insert(session_id.clone(), tx);
 
-    let _ = ws.get_mut().set_nonblocking(true);
-
     'ws: loop {
-        while let Ok(frame) = rx.try_recv() {
-            let _ = ws.send(Message::Binary(frame));
-        }
-
-        let mut did_work = false;
-        loop {
-            match ws.read() {
-                Ok(Message::Binary(bytes)) => {
-                    did_work = true;
-                    handle_client_frame(&ah, &session_id, &bytes);
+        tokio::select! {
+            maybe_frame = rx.recv() => {
+                match maybe_frame {
+                    Some(frame) => {
+                        if ws.send(Message::Binary(frame)).await.is_err() {
+                            break 'ws;
+                        }
+                    }
+                    None => break 'ws,
                 }
-                Ok(Message::Close(_)) => break 'ws,
-                Ok(_) => did_work = true,
-                Err(tungstenite::Error::Io(e)) if e.kind() == std::io::ErrorKind::WouldBlock => break,
-                Err(_) => break 'ws,
             }
-        }
-
-        if !did_work {
-            std::thread::sleep(Duration::from_millis(TERMINAL_WS_IDLE_SLEEP_MS));
+            maybe_msg = ws.next() => {
+                match maybe_msg {
+                    Some(Ok(Message::Binary(bytes))) => handle_client_frame(&ah, &session_id, &bytes),
+                    Some(Ok(Message::Close(_))) | None => break 'ws,
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break 'ws,
+                }
+            }
         }
     }
 
@@ -434,13 +416,19 @@ fn run_ws_client(stream: std::net::TcpStream, ah: AppHandle) {
 
 fn start_terminal_ws_server_once(app_handle: AppHandle) {
     let _ = WS_PORT.get_or_init(move || {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind terminal ws server");
+        let listener = block_on(async {
+            TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("failed to bind terminal ws server")
+        });
         let port = listener.local_addr().expect("failed to read terminal ws addr").port();
 
-        std::thread::spawn(move || {
-            for stream in listener.incoming().flatten() {
+        spawn_on_runtime(async move {
+            while let Ok((stream, _addr)) = listener.accept().await {
                 let ah = app_handle.clone();
-                std::thread::spawn(move || run_ws_client(stream, ah));
+                tokio::spawn(async move {
+                    run_ws_client(stream, ah).await;
+                });
             }
         });
         port
@@ -464,11 +452,13 @@ pub fn open_terminal(
     let ws_port = terminal_ws_port();
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
-    let (tx, rx) = mpsc::channel::<TerminalMsg>();
+    let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_terminal_thread(server, sid, rx, ah, cols, rows));
+    spawn_on_runtime(async move {
+        run_terminal_thread(server, sid, rx, ah, cols, rows);
+    });
 
     state
         .terminals
@@ -488,13 +478,13 @@ pub fn open_container_exec_terminal(
     let ws_port = terminal_ws_port();
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
-    let (tx, rx) = mpsc::channel::<TerminalMsg>();
+    let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
 
     let shell = params.shell.trim().to_string();
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || {
+    spawn_on_runtime(async move {
         run_container_exec_thread(ContainerExecThreadCtx {
             config: server,
             session_id: sid,

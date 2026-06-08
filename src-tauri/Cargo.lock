@@ -4317,6 +4317,7 @@ dependencies = [
  "bytes",
  "chrono",
  "font-kit",
+ "futures-util",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -4334,6 +4335,7 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "tokio",
+ "tokio-tungstenite",
  "tungstenite",
  "uuid",
 ]
@@ -5217,6 +5219,18 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "tokio-tungstenite"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6989540ced10490aaf14e6bad2e3d33728a2813310a0c71d1574304c49631cd"
+dependencies = [
+ "futures-util",
+ "log",
+ "tokio",
+ "tungstenite",
 ]
 
 [[package]]

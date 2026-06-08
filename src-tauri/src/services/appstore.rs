@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::fs;
+use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio::process::Command;
 use uuid::Uuid;
 
@@ -15,12 +18,16 @@ use crate::contracts::frontend::events::InstallStepEvent;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
-    APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_SH,
+    APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_STREAM_SH,
     render_shell,
 };
-use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async};
+use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async, ssh_exec_with_stdin_reader_async};
+use crate::utils::output::TextOutputBuffer;
 
 const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
+const INSTALL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
+const INSTALL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
+const INSTALL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续安装日志已省略]\n";
 
 fn appstore_cache_dir(app: &AppHandle) -> PathBuf {
     let data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
@@ -283,6 +290,18 @@ fn emit_output(app: &AppHandle, step: &str, chunk: &str) {
     .emit(app);
 }
 
+fn emit_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer, chunk: &str) {
+    for flushed in buffer.push(chunk) {
+        emit_output(app, step, &flushed);
+    }
+}
+
+fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer) {
+    for flushed in buffer.finish() {
+        emit_output(app, step, &flushed);
+    }
+}
+
 pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
     let cache_dir = appstore_cache_dir(app);
     let app_dir = apps_dir(&cache_dir).join(&req.app_key);
@@ -330,20 +349,27 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         &[("__REMOTE_REL_BASE__", &remote_rel_base)],
     );
 
+    let mut deploy_output_buffer = TextOutputBuffer::new(
+        INSTALL_OUTPUT_CHUNK_BYTES,
+        Some(INSTALL_OUTPUT_MAX_BYTES),
+        INSTALL_OUTPUT_TRUNCATION_NOTICE,
+    );
     ssh_exec_streaming_async(server, &setup_cmd, |chunk| {
-        emit_output(app, "deploy", chunk);
+        emit_buffered_output(app, "deploy", &mut deploy_output_buffer, chunk);
     })
     .await
     .map_err(|e| {
+        flush_buffered_output(app, "deploy", &mut deploy_output_buffer);
         emit_step(app, "deploy", "error", &format!("部署文件失败: {}", e));
         AppError::internal("appstore.deploy_files_failed", "部署文件失败").with_detail(e.detail.unwrap_or(e.message))
     })?;
+    flush_buffered_output(app, "deploy", &mut deploy_output_buffer);
 
     let local_data_dir = version_dir.join("data");
     let local_data_meta = fs::metadata(&local_data_dir).await.ok();
     if local_data_meta.as_ref().is_some_and(|meta| meta.is_dir()) {
         emit_step(app, "deploy", "running", "正在复制数据目录...");
-        copy_data_dir_to_remote(server, &local_data_dir, &format!("{}/data", remote_rel_base))
+        copy_data_dir_to_remote(app, server, &local_data_dir, &format!("{}/data", remote_rel_base))
             .await
             .map_err(|e| {
                 emit_step(app, "deploy", "error", &format!("复制数据失败: {}", e));
@@ -371,18 +397,30 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         &[("__REMOTE_REL_BASE__", &remote_rel_base)],
     );
 
+    let mut start_output_buffer = TextOutputBuffer::new(
+        INSTALL_OUTPUT_CHUNK_BYTES,
+        Some(INSTALL_OUTPUT_MAX_BYTES),
+        INSTALL_OUTPUT_TRUNCATION_NOTICE,
+    );
     let result = ssh_exec_streaming_async(server, &up_cmd_v2, |chunk| {
-        emit_output(app, "start", chunk);
+        emit_buffered_output(app, "start", &mut start_output_buffer, chunk);
     })
     .await;
     match result {
         Ok(_) => {}
         Err(e) => {
+            flush_buffered_output(app, "start", &mut start_output_buffer);
+            let mut fallback_output_buffer = TextOutputBuffer::new(
+                INSTALL_OUTPUT_CHUNK_BYTES,
+                Some(INSTALL_OUTPUT_MAX_BYTES),
+                INSTALL_OUTPUT_TRUNCATION_NOTICE,
+            );
             ssh_exec_streaming_async(server, &up_cmd_v1, |chunk| {
-                emit_output(app, "start", chunk);
+                emit_buffered_output(app, "start", &mut fallback_output_buffer, chunk);
             })
             .await
             .map_err(|e2| {
+                flush_buffered_output(app, "start", &mut fallback_output_buffer);
                 emit_step(app, "start", "error", "容器启动失败");
                 AppError::unavailable("appstore.compose_up_failed", "容器启动失败").with_detail(format!(
                     "docker compose: {}\ndocker-compose: {}",
@@ -390,8 +428,10 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
                     e2.detail.unwrap_or(e2.message)
                 ))
             })?;
+            flush_buffered_output(app, "start", &mut fallback_output_buffer);
         }
     };
+    flush_buffered_output(app, "start", &mut start_output_buffer);
     emit_step(app, "start", "done", "容器服务已启动");
 
     Ok(())
@@ -418,9 +458,126 @@ fn build_env_file(env_values: &HashMap<String, String>) -> String {
         .join("\n")
 }
 
-async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote_rel_dir: &str) -> AppResult<()> {
+struct ProgressReader<R, F> {
+    inner: R,
+    on_progress: F,
+    transferred: u64,
+    next_report_bytes: u64,
+    report_every_bytes: u64,
+    finished: bool,
+}
+
+impl<R, F> ProgressReader<R, F> {
+    fn new(inner: R, report_every_bytes: u64, on_progress: F) -> Self {
+        Self {
+            inner,
+            on_progress,
+            transferred: 0,
+            next_report_bytes: report_every_bytes,
+            report_every_bytes,
+            finished: false,
+        }
+    }
+}
+
+impl<R, F> AsyncRead for ProgressReader<R, F>
+where
+    R: AsyncRead + Unpin,
+    F: FnMut(u64) + Unpin,
+{
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let before = buf.filled().len();
+        let poll = Pin::new(&mut self.inner).poll_read(cx, buf);
+        match poll {
+            Poll::Ready(Ok(())) => {
+                let filled = buf.filled().len();
+                let read = filled.saturating_sub(before) as u64;
+                if read == 0 {
+                    if !self.finished {
+                        self.finished = true;
+                        let transferred = self.transferred;
+                        let on_progress = &mut self.on_progress;
+                        (on_progress)(transferred);
+                    }
+                    return Poll::Ready(Ok(()));
+                }
+
+                self.transferred += read;
+                while self.transferred >= self.next_report_bytes {
+                    let transferred = self.transferred;
+                    let on_progress = &mut self.on_progress;
+                    (on_progress)(transferred);
+                    self.next_report_bytes = self.next_report_bytes.saturating_add(self.report_every_bytes);
+                }
+                Poll::Ready(Ok(()))
+            }
+            other => other,
+        }
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
+    let mut value = bytes as f64;
+    let mut unit = 0usize;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} {}", UNITS[unit])
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+async fn measure_dir_size(path: &Path) -> AppResult<u64> {
+    let mut total = 0u64;
+    let mut stack = vec![path.to_path_buf()];
+
+    while let Some(current) = stack.pop() {
+        let meta = fs::metadata(&current)
+            .await
+            .map_err(|e| AppError::internal("appstore.data_dir_stat_failed", "读取数据目录信息失败").with_source(e))?;
+        if meta.is_file() {
+            total = total.saturating_add(meta.len());
+            continue;
+        }
+
+        let mut entries = fs::read_dir(&current)
+            .await
+            .map_err(|e| AppError::internal("appstore.data_dir_read_failed", "读取数据目录失败").with_source(e))?;
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| AppError::internal("appstore.data_dir_entry_failed", "读取数据目录项失败").with_source(e))?
+        {
+            stack.push(entry.path());
+        }
+    }
+    Ok(total)
+}
+
+async fn copy_data_dir_to_remote(
+    app: &AppHandle,
+    server: &ServerConfig,
+    local_dir: &Path,
+    remote_rel_dir: &str,
+) -> AppResult<()> {
     let parent = local_dir.parent().unwrap_or(local_dir);
     let dir_name = local_dir.file_name().unwrap().to_str().unwrap();
+    let total_bytes = measure_dir_size(local_dir).await.unwrap_or(0);
+    let total_display = if total_bytes > 0 {
+        format!(" / {}", format_bytes(total_bytes))
+    } else {
+        String::new()
+    };
+    emit_step(
+        app,
+        "deploy",
+        "running",
+        &format!("正在复制数据目录... 已上传 0 B{}", total_display),
+    );
 
     let mut tar_cmd = Command::new("tar");
     tar_cmd
@@ -428,13 +585,25 @@ async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote
         .arg("-")
         .arg("-C")
         .arg(parent.to_str().unwrap())
-        .arg(dir_name);
+        .arg(dir_name)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
-    let output = tar_cmd
-        .output()
-        .await
+    let mut child = tar_cmd
+        .spawn()
         .map_err(|e| AppError::internal("appstore.tar_spawn_failed", "打包数据目录失败").with_source(e))?;
-    let tar_b64 = STANDARD.encode(&output.stdout);
+    let tar_stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| AppError::internal("appstore.tar_stdout_missing", "无法读取打包输出流"))?;
+    let mut tar_stderr = child.stderr.take();
+    let stderr_task = tokio::spawn(async move {
+        let mut stderr_buf = Vec::new();
+        if let Some(mut stderr) = tar_stderr.take() {
+            let _ = stderr.read_to_end(&mut stderr_buf).await;
+        }
+        stderr_buf
+    });
 
     let remote_parent = Path::new(remote_rel_dir)
         .parent()
@@ -443,14 +612,52 @@ async fn copy_data_dir_to_remote(server: &ServerConfig, local_dir: &Path, remote
 
     let remote_parent_str = remote_parent.to_string();
     let remote_cmd = render_shell(
-        APPSTORE_EXTRACT_DATA_SH,
-        &[("__TAR_B64__", &tar_b64)],
+        APPSTORE_EXTRACT_DATA_STREAM_SH,
+        &[],
         &[
             ("__REMOTE_REL_DIR__", remote_rel_dir),
             ("__REMOTE_REL_PARENT__", &remote_parent_str),
         ],
     );
 
-    ssh_exec_async(server, &remote_cmd).await?;
+    let mut progress_reader = ProgressReader::new(tar_stdout, 4 * 1024 * 1024, |transferred| {
+        let message = if total_bytes > 0 {
+            let percent = ((transferred as f64 / total_bytes as f64) * 100.0).clamp(0.0, 100.0);
+            format!(
+                "正在复制数据目录... 已上传 {} / {} ({percent:.0}%)",
+                format_bytes(transferred),
+                format_bytes(total_bytes)
+            )
+        } else {
+            format!("正在复制数据目录... 已上传 {}", format_bytes(transferred))
+        };
+        emit_step(app, "deploy", "running", &message);
+    });
+    let upload_result = ssh_exec_with_stdin_reader_async(server, &remote_cmd, &mut progress_reader).await;
+    let tar_status = child
+        .wait()
+        .await
+        .map_err(|e| AppError::internal("appstore.tar_wait_failed", "等待打包进程结束失败").with_source(e))?;
+    let tar_stderr = stderr_task.await.unwrap_or_default();
+
+    upload_result?;
+
+    if !tar_status.success() {
+        let detail = String::from_utf8_lossy(&tar_stderr).trim().to_string();
+        return Err(
+            AppError::internal("appstore.tar_failed", "打包数据目录失败").with_detail(if detail.is_empty() {
+                "tar 命令执行失败".to_string()
+            } else {
+                detail
+            }),
+        );
+    }
+
+    let done_message = if total_bytes > 0 {
+        format!("数据目录复制完成，共 {}", format_bytes(total_bytes))
+    } else {
+        "数据目录复制完成".to_string()
+    };
+    emit_step(app, "deploy", "running", &done_message);
     Ok(())
 }

@@ -1,8 +1,9 @@
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
+use tokio::sync::watch;
 
 use crate::contracts::docker_api::events::StreamEvent;
 use crate::contracts::frontend::events::{
@@ -11,7 +12,7 @@ use crate::contracts::frontend::events::{
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::block_on;
+use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, EventStreamHandle, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -125,24 +126,24 @@ fn emit_stream_status(
     .emit(ah);
 }
 
-fn run_event_stream_thread(
+async fn run_event_stream_task(
     config: ServerConfig,
     stream_id: String,
     status_slot: Arc<Mutex<EventStreamStatus>>,
-    rx: mpsc::Receiver<()>,
+    mut stop_rx: watch::Receiver<bool>,
     ah: AppHandle,
 ) {
     let mut attempt = 0usize;
 
     loop {
-        if rx.try_recv().is_ok() || matches!(rx.try_recv(), Err(mpsc::TryRecvError::Disconnected)) {
+        if *stop_rx.borrow() {
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
             return;
         }
 
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connecting);
 
-        let stream_result = block_on(async {
+        let stream_result = async {
             let mut stream = match docker_stream_async(&config, "/events").await {
                 Ok(stream) => stream,
                 Err(error) => {
@@ -160,14 +161,12 @@ fn run_event_stream_thread(
             let mut last_refresh: Option<Instant> = None;
 
             loop {
-                match rx.try_recv() {
-                    Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                        return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Stopped);
-                    }
-                    Err(mpsc::TryRecvError::Empty) => {}
-                }
-
                 tokio::select! {
+                    changed = stop_rx.changed() => {
+                        if changed.is_ok() && *stop_rx.borrow() {
+                            return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Stopped);
+                        }
+                    }
                     chunk = stream.next_chunk() => {
                         match chunk {
                             Ok(Some(data)) => {
@@ -212,10 +211,10 @@ fn run_event_stream_thread(
                             Err(error) => return Ok(StreamLoopExit::Reconnect(Some(error))),
                         }
                     }
-                    _ = tokio::time::sleep(Duration::from_millis(50)) => {}
                 }
             }
-        });
+        }
+        .await;
 
         match stream_result {
             Ok(StreamLoopExit::Stopped) => {
@@ -223,7 +222,7 @@ fn run_event_stream_thread(
                 return;
             }
             Ok(StreamLoopExit::Reconnect(error)) => {
-                attempt = 0;
+                attempt += 1;
                 if let Some(error) = error {
                     let _ = DockerStreamError {
                         stream_id: stream_id.clone(),
@@ -243,7 +242,12 @@ fn run_event_stream_thread(
         }
 
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Disconnected);
-        if wait_or_stop(&rx, reconnect_delay(attempt)) {
+        let stopped = tokio::time::timeout(reconnect_delay(attempt), stop_rx.changed())
+            .await
+            .ok()
+            .and_then(Result::ok)
+            .is_some_and(|_| *stop_rx.borrow());
+        if stopped {
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
             return;
         }
@@ -256,13 +260,6 @@ fn reconnect_delay(attempt: usize) -> Duration {
         .copied()
         .unwrap_or(*RECONNECT_DELAYS.last().unwrap());
     Duration::from_secs(secs)
-}
-
-fn wait_or_stop(rx: &mpsc::Receiver<()>, duration: Duration) -> bool {
-    match rx.recv_timeout(duration) {
-        Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => true,
-        Err(mpsc::RecvTimeoutError::Timeout) => false,
-    }
 }
 
 pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
@@ -282,19 +279,21 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     }
 
     let stream_id = generate_id();
-    let (tx, rx) = mpsc::channel::<()>();
+    let (stop_tx, stop_rx) = watch::channel(false);
     let status = Arc::new(Mutex::new(EventStreamStatus::Connecting));
 
     let sid = stream_id.clone();
     let status_for_thread = status.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_event_stream_thread(server, sid, status_for_thread, rx, ah));
+    spawn_on_runtime(async move {
+        run_event_stream_task(server, sid, status_for_thread, stop_rx, ah).await;
+    });
 
     state.event_streams.lock().unwrap().insert(
         server_id,
         EventStreamHandle {
             stream_id: stream_id.clone(),
-            tx,
+            stop_tx,
             status,
         },
     );
@@ -304,6 +303,6 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
 
 pub fn stop_event_stream(server_id: String, state: State<AppState>) {
     if let Some(h) = state.event_streams.lock().unwrap().remove(&server_id) {
-        let _ = h.tx.send(());
+        let _ = h.stop_tx.send(true);
     }
 }

@@ -1,11 +1,14 @@
-use std::sync::mpsc;
-
 use tauri::{AppHandle, Emitter, State};
+use tokio::sync::watch;
 
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
+use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
+use crate::utils::output::TextOutputBuffer;
+
+const LOG_CHUNK_BYTES: usize = 8 * 1024;
 
 struct LogFrameDecoder {
     buffer: Vec<u8>,
@@ -74,73 +77,89 @@ impl LogFrameDecoder {
     }
 }
 
-fn run_log_stream_thread(
+async fn run_log_stream_task(
     config: ServerConfig,
     stream_id: String,
     container_id: String,
     tail: u32,
     timestamps: bool,
-    rx: mpsc::Receiver<()>,
+    mut stop_rx: watch::Receiver<bool>,
     ah: AppHandle,
 ) {
-    crate::ssh::client::block_on(async move {
-        let ts = if timestamps { "&timestamps=1" } else { "" };
-        let path = format!(
-            "/containers/{}/logs?stdout=1&stderr=1&follow=1&tail={}{}",
-            container_id, tail, ts
-        );
+    let ts = if timestamps { "&timestamps=1" } else { "" };
+    let path = format!(
+        "/containers/{}/logs?stdout=1&stderr=1&follow=1&tail={}{}",
+        container_id, tail, ts
+    );
 
-        let mut stream = match docker_stream_async(&config, &path).await {
-            Ok(stream) => stream,
-            Err(error) => {
-                let _ = ah.emit(
-                    &format!("log-data:{}", stream_id),
-                    format!("\x1b[31m连接失败: {}\x1b[0m\r\n", error.message).into_bytes(),
-                );
-                let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                return;
-            }
-        };
+    let mut stream = match docker_stream_async(&config, &path).await {
+        Ok(stream) => stream,
+        Err(error) => {
+            let _ = ah.emit(
+                &format!("log-data:{}", stream_id),
+                format!("\x1b[31m连接失败: {}\x1b[0m\r\n", error.message).into_bytes(),
+            );
+            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+            return;
+        }
+    };
 
-        let mut decoder = LogFrameDecoder::new();
-        loop {
-            match rx.try_recv() {
-                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
+    let mut decoder = LogFrameDecoder::new();
+    let mut output_buffer = TextOutputBuffer::new(LOG_CHUNK_BYTES, None, "");
+
+    let emit_buffered = |text: &str, ah: &AppHandle, stream_id: &str, output_buffer: &mut TextOutputBuffer| {
+        for chunk in output_buffer.push(text) {
+            let _ = ah.emit(&format!("log-data:{}", stream_id), chunk.into_bytes());
+        }
+    };
+
+    let flush_buffered = |ah: &AppHandle, stream_id: &str, output_buffer: &mut TextOutputBuffer| {
+        for chunk in output_buffer.finish() {
+            let _ = ah.emit(&format!("log-data:{}", stream_id), chunk.into_bytes());
+        }
+    };
+
+    loop {
+        tokio::select! {
+            changed = stop_rx.changed() => {
+                if changed.is_ok() && *stop_rx.borrow() {
+                    flush_buffered(&ah, &stream_id, &mut output_buffer);
                     let _ = ah.emit(&format!("log-done:{}", stream_id), ());
                     return;
                 }
-                Err(mpsc::TryRecvError::Empty) => {}
             }
-
-            tokio::select! {
-                chunk = stream.next_chunk() => {
-                    match chunk {
-                        Ok(Some(bytes)) => {
-                            for frame in decoder.push(&bytes) {
-                                let _ = ah.emit(&format!("log-data:{}", stream_id), frame);
-                            }
-                        }
-                        Ok(None) => {
-                            if let Some(tail) = decoder.finish() {
-                                let _ = ah.emit(&format!("log-data:{}", stream_id), tail);
-                            }
-                            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                            return;
-                        }
-                        Err(error) => {
-                            let _ = ah.emit(
-                                &format!("log-data:{}", stream_id),
-                                format!("\x1b[31m日志流中断: {}\x1b[0m\r\n", error.message).into_bytes(),
-                            );
-                            let _ = ah.emit(&format!("log-done:{}", stream_id), ());
-                            return;
+            chunk = stream.next_chunk() => {
+                match chunk {
+                    Ok(Some(bytes)) => {
+                        for frame in decoder.push(&bytes) {
+                            let text = String::from_utf8_lossy(&frame);
+                            emit_buffered(&text, &ah, &stream_id, &mut output_buffer);
                         }
                     }
+                    Ok(None) => {
+                        if let Some(tail) = decoder.finish() {
+                            let text = String::from_utf8_lossy(&tail);
+                            emit_buffered(&text, &ah, &stream_id, &mut output_buffer);
+                        }
+                        flush_buffered(&ah, &stream_id, &mut output_buffer);
+                        let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                        return;
+                    }
+                    Err(error) => {
+                        emit_buffered(
+                            &format!("\x1b[31m日志流中断: {}\x1b[0m\r\n", error.message),
+                            &ah,
+                            &stream_id,
+                            &mut output_buffer,
+                        );
+                        flush_buffered(&ah, &stream_id, &mut output_buffer);
+                        let _ = ah.emit(&format!("log-done:{}", stream_id), ());
+                        return;
+                    }
                 }
-                _ = tokio::time::sleep(std::time::Duration::from_millis(20)) => {}
             }
         }
-    });
+    }
 }
 
 pub fn start_log_stream(
@@ -153,23 +172,25 @@ pub fn start_log_stream(
 ) -> crate::error::AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
     let stream_id = generate_id();
-    let (tx, rx) = mpsc::channel::<()>();
+    let (stop_tx, stop_rx) = watch::channel(false);
 
     let sid = stream_id.clone();
     let cid = container_id.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_log_stream_thread(server, sid, cid, tail, timestamps, rx, ah));
+    spawn_on_runtime(async move {
+        run_log_stream_task(server, sid, cid, tail, timestamps, stop_rx, ah).await;
+    });
 
     state
         .streams
         .lock()
         .unwrap()
-        .insert(stream_id.clone(), StreamHandle { tx });
+        .insert(stream_id.clone(), StreamHandle { stop_tx });
     Ok(stream_id)
 }
 
 pub fn stop_log_stream(stream_id: String, state: State<AppState>) {
     if let Some(handle) = state.streams.lock().unwrap().remove(&stream_id) {
-        let _ = handle.tx.send(());
+        let _ = handle.stop_tx.send(true);
     }
 }

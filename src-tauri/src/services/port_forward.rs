@@ -1,8 +1,7 @@
 use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::{Duration, Instant};
 
 use tauri::State;
@@ -11,12 +10,15 @@ use std::collections::BTreeSet;
 
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::TcpStream as TokioTcpStream;
+use tokio::sync::watch;
 
 use crate::contracts::frontend::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::{block_on, connect, disconnect};
+use crate::ssh::client::{block_on, spawn_on_runtime};
+use crate::ssh::pool;
 use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -26,7 +28,6 @@ struct PortForwardBridgeArgs {
     server_cfg: ServerConfig,
     remote_host: String,
     remote_port: u16,
-    shutdown: Arc<AtomicBool>,
     last_error: Arc<Mutex<Option<String>>>,
     tx_bytes: Arc<AtomicU64>,
     rx_bytes: Arc<AtomicU64>,
@@ -41,7 +42,7 @@ struct PortForwardAcceptArgs {
     server_cfg: ServerConfig,
     remote_host: String,
     remote_port: u16,
-    shutdown: Arc<AtomicBool>,
+    stop_rx: watch::Receiver<bool>,
     last_error: Arc<Mutex<Option<String>>>,
     tx_bytes: Arc<AtomicU64>,
     rx_bytes: Arc<AtomicU64>,
@@ -65,31 +66,25 @@ fn normalize_host(ip: &str) -> String {
     }
 }
 
-fn bridge_once(args: PortForwardBridgeArgs) {
+async fn bridge_once(args: PortForwardBridgeArgs) {
     let PortForwardBridgeArgs {
         local_stream,
         server_cfg,
         remote_host,
         remote_port,
-        shutdown,
         last_error,
         tx_bytes,
         rx_bytes,
     } = args;
 
-    if shutdown.load(Ordering::Relaxed) {
-        return;
-    }
-
     let _ = local_stream.set_nodelay(true);
 
-    let result = block_on(async move {
-        let mut handle = connect(&server_cfg).await.map_err(|e| {
-            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
-        })?;
-        let channel = handle
-            .channel_open_direct_tcpip(remote_host.clone(), remote_port as u32, "127.0.0.1", 0)
+    let result = async move {
+        let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
             .await
+            .map_err(|e| {
+                AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
+            })?
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
 
         local_stream.set_nonblocking(true).map_err(|e| {
@@ -110,16 +105,10 @@ fn bridge_once(args: PortForwardBridgeArgs) {
                     transfer_stream(remote_read, local_write, rx_bytes.clone())
                 )?;
                 Ok::<(), AppError>(())
-            } => {
-                disconnect(&mut handle).await;
-                res
-            }
-            _ = wait_for_shutdown(shutdown.clone()) => {
-                disconnect(&mut handle).await;
-                Ok(())
-            }
+            } => res
         }
-    });
+    }
+    .await;
 
     if let Err(e) = result {
         *last_error.lock().unwrap() = Some(error_message(e));
@@ -151,61 +140,60 @@ where
     }
 }
 
-async fn wait_for_shutdown(shutdown: Arc<AtomicBool>) {
-    while !shutdown.load(Ordering::Relaxed) {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-}
-
-fn accept_loop(args: PortForwardAcceptArgs) {
+async fn accept_loop(args: PortForwardAcceptArgs) {
     let PortForwardAcceptArgs {
         listener,
         server_cfg,
         remote_host,
         remote_port,
-        shutdown,
+        mut stop_rx,
         last_error,
         tx_bytes,
         rx_bytes,
     } = args;
 
     let _ = listener.set_nonblocking(true);
+    let listener = match TokioTcpListener::from_std(listener) {
+        Ok(listener) => listener,
+        Err(_) => return,
+    };
 
     loop {
-        if shutdown.load(Ordering::Relaxed) {
-            break;
-        }
-
-        match listener.accept() {
-            Ok((stream, _addr)) => {
-                let cfg = server_cfg.clone();
-                let rh = remote_host.clone();
-                let sd = shutdown.clone();
-                let le = last_error.clone();
-                let tx = tx_bytes.clone();
-                let rx = rx_bytes.clone();
-                let rp = remote_port;
-                thread::spawn(move || {
-                    bridge_once(PortForwardBridgeArgs {
-                        local_stream: stream,
-                        server_cfg: cfg,
-                        remote_host: rh,
-                        remote_port: rp,
-                        shutdown: sd,
-                        last_error: le,
-                        tx_bytes: tx,
-                        rx_bytes: rx,
-                    })
-                });
-            }
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(50));
-            }
-            Err(_) => {
-                if shutdown.load(Ordering::Relaxed) {
+        tokio::select! {
+            changed = stop_rx.changed() => {
+                if changed.is_ok() && *stop_rx.borrow() {
                     break;
                 }
-                thread::sleep(Duration::from_millis(100));
+            }
+            accepted = listener.accept() => match accepted {
+                Ok((stream, _addr)) => {
+                    let stream = match stream.into_std() {
+                        Ok(stream) => stream,
+                        Err(_) => continue,
+                    };
+                    let cfg = server_cfg.clone();
+                    let rh = remote_host.clone();
+                    let le = last_error.clone();
+                    let tx = tx_bytes.clone();
+                    let rx = rx_bytes.clone();
+                    let rp = remote_port;
+                    tokio::spawn(async move {
+                        bridge_once(PortForwardBridgeArgs {
+                            local_stream: stream,
+                            server_cfg: cfg,
+                            remote_host: rh,
+                            remote_port: rp,
+                            last_error: le,
+                            tx_bytes: tx,
+                            rx_bytes: rx,
+                        })
+                        .await;
+                    });
+                }
+                Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+                Err(_) => {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
             }
         }
     }
@@ -214,15 +202,13 @@ fn accept_loop(args: PortForwardAcceptArgs) {
 fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
     let start = Instant::now();
     block_on(async {
-        let mut handle = connect(server_cfg).await.map_err(|e| {
-            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
-        })?;
-        let channel = handle
-            .channel_open_direct_tcpip(remote_host, remote_port as u32, "127.0.0.1", 0)
+        let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
             .await
+            .map_err(|e| {
+                AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
+            })?
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
         drop(channel);
-        disconnect(&mut handle).await;
         Ok::<(), AppError>(())
     })?;
     let _elapsed = start.elapsed();
@@ -402,7 +388,7 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
     // 同步运行时状态：禁用即停止。
     if !enabled && let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
         if let Some(runtime) = handle.handle {
-            runtime.shutdown.store(true, Ordering::Relaxed);
+            let _ = runtime.stop_tx.send(true);
         }
     }
 
@@ -417,7 +403,7 @@ pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<
     // 先停止运行时。
     if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
         if let Some(runtime) = handle.handle {
-            runtime.shutdown.store(true, Ordering::Relaxed);
+            let _ = runtime.stop_tx.send(true);
         }
     }
 
@@ -454,13 +440,13 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     let server_cfg = get_server_config(state, &rule.server_id)?;
     probe_remote(&server_cfg, &rule.remote_host, rule.remote_port)?;
 
-    let shutdown = Arc::new(AtomicBool::new(false));
+    let (stop_tx, stop_rx) = watch::channel(false);
     let last_error = Arc::new(Mutex::new(None));
     let tx_bytes = Arc::new(AtomicU64::new(0));
     let rx_bytes = Arc::new(AtomicU64::new(0));
     let handle = PortForwardRuntimeState {
         handle: Some(PortForwardRuntimeHandle {
-            shutdown: shutdown.clone(),
+            stop_tx: stop_tx.clone(),
             server_id: rule.server_id.clone(),
             local_port: actual_local_port,
             tx_bytes: tx_bytes.clone(),
@@ -473,19 +459,19 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     let cfg = server_cfg.clone();
     let rh = rule.remote_host.clone();
     let rp = rule.remote_port;
-    let sd = shutdown.clone();
     let le = last_error.clone();
-    thread::spawn(move || {
+    spawn_on_runtime(async move {
         accept_loop(PortForwardAcceptArgs {
             listener,
             server_cfg: cfg,
             remote_host: rh,
             remote_port: rp,
-            shutdown: sd,
+            stop_rx,
             last_error: le,
             tx_bytes,
             rx_bytes,
         })
+        .await;
     });
 
     Ok(())
@@ -520,7 +506,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
         if !enabled_ids.contains(&id) {
             if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
                 if let Some(runtime) = handle.handle {
-                    runtime.shutdown.store(true, Ordering::Relaxed);
+                    let _ = runtime.stop_tx.send(true);
                 }
             }
         }
@@ -590,7 +576,7 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
         if !enabled_ids.contains(&id) {
             if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
                 if let Some(runtime) = handle.handle {
-                    runtime.shutdown.store(true, Ordering::Relaxed);
+                    let _ = runtime.stop_tx.send(true);
                 }
             }
         }
@@ -617,7 +603,7 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
         .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
 
     if let Some(runtime) = handle.handle {
-        runtime.shutdown.store(true, Ordering::Relaxed);
+        let _ = runtime.stop_tx.send(true);
     }
     Ok(())
 }
@@ -626,7 +612,7 @@ pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
     let handles: Vec<_> = state.port_forwards.lock().unwrap().drain().collect();
     for (_id, handle) in handles {
         if let Some(runtime) = handle.handle {
-            runtime.shutdown.store(true, Ordering::Relaxed);
+            let _ = runtime.stop_tx.send(true);
         }
     }
     Ok(())

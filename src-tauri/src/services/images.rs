@@ -1,9 +1,7 @@
-use std::sync::mpsc;
-use std::time::Duration;
-
 use serde::Deserialize;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
+use tokio::sync::watch;
 
 use crate::contracts::docker_api::container::ContainerSummary;
 use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
@@ -13,10 +11,15 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_stream_async, pretty_json_response};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::block_on;
+use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, StreamHandle, get_server_config};
 use crate::utils::id::generate_id;
+use crate::utils::output::TextOutputBuffer;
 use crate::utils::sort::sort_by_created_desc_then_id;
+
+const PULL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
+const PULL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
+const PULL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续拉取日志已省略]\n";
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     let server = get_server_config(&state, &server_id)?;
@@ -83,10 +86,16 @@ pub async fn remove_image(
     docker_delete_async(&server, &format!("/images/{}?force={}", image_id, force)).await
 }
 
-fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mpsc::Receiver<()>, ah: AppHandle) {
+async fn run_pull_task(
+    config: ServerConfig,
+    pull_id: String,
+    image: String,
+    mut stop_rx: watch::Receiver<bool>,
+    ah: AppHandle,
+) {
     let done_stream_id = pull_id.clone();
     let done_handle = ah.clone();
-    let result = block_on(async move {
+    let result = async {
         let path = format!("/images/create?fromImage={}", encode_query_component(&image));
         let mut stream = docker_post_stream_async(&config, &path).await.map_err(|e| {
             let _ = DockerSshStreamChunk {
@@ -98,29 +107,37 @@ fn run_pull_thread(config: ServerConfig, pull_id: String, image: String, rx: mps
         })?;
 
         let mut buffer = String::new();
+        let mut output_buffer = TextOutputBuffer::new(
+            PULL_OUTPUT_CHUNK_BYTES,
+            Some(PULL_OUTPUT_MAX_BYTES),
+            PULL_OUTPUT_TRUNCATION_NOTICE,
+        );
         loop {
-            match rx.try_recv() {
-                Ok(()) | Err(mpsc::TryRecvError::Disconnected) => {
-                    stream.close().await;
-                    return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
+            tokio::select! {
+                changed = stop_rx.changed() => {
+                    if changed.is_ok() && *stop_rx.borrow() {
+                        stream.close().await;
+                        return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
+                    }
                 }
-                Err(mpsc::TryRecvError::Empty) => {}
-            }
-
-            match tokio::time::timeout(Duration::from_millis(80), stream.next_chunk()).await {
-                Ok(Ok(Some(chunk))) => {
-                    buffer.push_str(&String::from_utf8_lossy(&chunk));
-                    emit_pull_lines(&pull_id, &ah, &mut buffer)?;
+                chunk = stream.next_chunk() => {
+                    match chunk {
+                        Ok(Some(chunk)) => {
+                            buffer.push_str(&String::from_utf8_lossy(&chunk));
+                            emit_pull_lines(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
+                        }
+                        Ok(None) => {
+                            emit_pull_tail(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
+                            flush_pull_output(&pull_id, &ah, &mut output_buffer);
+                            return Ok(());
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
-                Ok(Ok(None)) => {
-                    emit_pull_tail(&pull_id, &ah, &mut buffer)?;
-                    return Ok(());
-                }
-                Ok(Err(e)) => return Err(e),
-                Err(_) => {}
             }
         }
-    });
+    }
+    .await;
 
     let _ = DockerSshStreamDone {
         stream_id: done_stream_id,
@@ -157,25 +174,35 @@ fn encode_query_component(value: &str) -> String {
         .collect()
 }
 
-fn emit_pull_lines(stream_id: &str, app: &AppHandle, buffer: &mut String) -> AppResult<()> {
+fn emit_pull_lines(
+    stream_id: &str,
+    app: &AppHandle,
+    buffer: &mut String,
+    output_buffer: &mut TextOutputBuffer,
+) -> AppResult<()> {
     while let Some(pos) = buffer.find('\n') {
         let line = buffer[..pos].trim_end_matches('\r').to_string();
         buffer.drain(..=pos);
-        emit_pull_line(stream_id, app, &line)?;
+        emit_pull_line(stream_id, app, &line, output_buffer)?;
     }
     Ok(())
 }
 
-fn emit_pull_tail(stream_id: &str, app: &AppHandle, buffer: &mut String) -> AppResult<()> {
+fn emit_pull_tail(
+    stream_id: &str,
+    app: &AppHandle,
+    buffer: &mut String,
+    output_buffer: &mut TextOutputBuffer,
+) -> AppResult<()> {
     let line = buffer.trim();
     if !line.is_empty() {
-        emit_pull_line(stream_id, app, line)?;
+        emit_pull_line(stream_id, app, line, output_buffer)?;
     }
     buffer.clear();
     Ok(())
 }
 
-fn emit_pull_line(stream_id: &str, app: &AppHandle, line: &str) -> AppResult<()> {
+fn emit_pull_line(stream_id: &str, app: &AppHandle, line: &str, output_buffer: &mut TextOutputBuffer) -> AppResult<()> {
     if line.trim().is_empty() {
         return Ok(());
     }
@@ -195,13 +222,29 @@ fn emit_pull_line(stream_id: &str, app: &AppHandle, line: &str) -> AppResult<()>
     }
 
     if let Some(text) = format_pull_event(event) {
+        emit_pull_output(stream_id, app, output_buffer, &text);
+    }
+    Ok(())
+}
+
+fn emit_pull_output(stream_id: &str, app: &AppHandle, output_buffer: &mut TextOutputBuffer, text: &str) {
+    for chunk in output_buffer.push(text) {
         let _ = DockerSshStreamChunk {
             stream_id: stream_id.to_string(),
-            chunk: text,
+            chunk,
         }
         .emit(app);
     }
-    Ok(())
+}
+
+fn flush_pull_output(stream_id: &str, app: &AppHandle, output_buffer: &mut TextOutputBuffer) {
+    for chunk in output_buffer.finish() {
+        let _ = DockerSshStreamChunk {
+            stream_id: stream_id.to_string(),
+            chunk,
+        }
+        .emit(app);
+    }
 }
 
 fn format_pull_event(event: ImagePullEvent) -> Option<String> {
@@ -222,23 +265,25 @@ pub fn start_image_pull(
 ) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
     let pull_id = generate_id();
-    let (tx, rx) = mpsc::channel::<()>();
+    let (stop_tx, stop_rx) = watch::channel(false);
 
     let pid = pull_id.clone();
     let img = image.clone();
     let ah = app_handle.clone();
-    std::thread::spawn(move || run_pull_thread(server, pid, img, rx, ah));
+    spawn_on_runtime(async move {
+        run_pull_task(server, pid, img, stop_rx, ah).await;
+    });
 
     state
         .streams
         .lock()
         .unwrap()
-        .insert(pull_id.clone(), StreamHandle { tx });
+        .insert(pull_id.clone(), StreamHandle { stop_tx });
     Ok(pull_id)
 }
 
 pub fn cancel_stream(stream_id: String, state: State<AppState>) {
     if let Some(h) = state.streams.lock().unwrap().remove(&stream_id) {
-        let _ = h.tx.send(());
+        let _ = h.stop_tx.send(true);
     }
 }

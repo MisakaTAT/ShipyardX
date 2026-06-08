@@ -54,6 +54,14 @@ where
     }
 }
 
+pub fn spawn_on_runtime<F>(future: F) -> tokio::task::JoinHandle<F::Output>
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    ssh_runtime().handle().spawn(future)
+}
+
 pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClientHandler>> {
     let client_config = Arc::new(client::Config {
         inactivity_timeout: Some(SOCKET_IO_TIMEOUT),

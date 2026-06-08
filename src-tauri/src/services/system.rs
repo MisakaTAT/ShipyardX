@@ -19,6 +19,7 @@ use crate::scripts::{
     render, render_shell,
 };
 use crate::ssh::exec::ssh_exec_async;
+use crate::ssh::pool;
 use crate::state::{AppState, get_server_config};
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
@@ -146,7 +147,7 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
     invalidate_api_version(&server);
-    invalidate_docker_endpoint(&server);
+    invalidate_docker_endpoint(&server).await;
     match resolve_api_version_async(&server).await {
         Ok(_) => Ok(()),
         Err(e) => {
@@ -217,7 +218,10 @@ pub async fn get_container_stats(
 
 pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
     let server = get_server_config(&state, &server_id)?;
-    let raw = ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?;
+    let raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
+        Ok(raw) => raw,
+        Err(_) => ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+    };
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
 
     let mirror_url = cfg.registry_mirrors.clone().unwrap_or_default();
@@ -262,8 +266,11 @@ pub async fn update_docker_daemon_settings(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    invalidate_docker_endpoint(&server);
-    let current_raw = ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?;
+    invalidate_docker_endpoint(&server).await;
+    let current_raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
+        Ok(raw) => raw,
+        Err(_) => ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+    };
     let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
     let mirrors: Vec<String> = params

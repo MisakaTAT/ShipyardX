@@ -4,7 +4,9 @@ use crate::config::store::save_servers;
 use crate::contracts::docker_api::common::DockerVersion;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_get_async;
+use crate::docker::transport::invalidate_pooled_http_server_id;
 use crate::error::AppResult;
+use crate::ssh::{client::block_on, pool};
 use crate::state::{AppState, get_server_config};
 use crate::utils::id::generate_id;
 
@@ -22,21 +24,32 @@ pub fn add_server(mut server: ServerConfig, state: State<AppState>) -> AppResult
 }
 
 pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    let mut servers = state.servers.lock().unwrap();
-    let data_file = state.data_file.lock().unwrap();
-    if let Some(existing) = servers.iter_mut().find(|s| s.id == server.id) {
-        *existing = server;
-    }
-    save_servers(&data_file, &servers)?;
-    Ok(servers.clone())
+    let server_id = server.id.clone();
+    let updated = {
+        let mut servers = state.servers.lock().unwrap();
+        let data_file = state.data_file.lock().unwrap();
+        if let Some(existing) = servers.iter_mut().find(|s| s.id == server.id) {
+            *existing = server;
+        }
+        save_servers(&data_file, &servers)?;
+        servers.clone()
+    };
+    block_on(invalidate_pooled_http_server_id(&server_id));
+    block_on(pool::invalidate_server_id(&server_id));
+    Ok(updated)
 }
 
 pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    let mut servers = state.servers.lock().unwrap();
-    let data_file = state.data_file.lock().unwrap();
-    servers.retain(|s| s.id != id);
-    save_servers(&data_file, &servers)?;
-    Ok(servers.clone())
+    let updated = {
+        let mut servers = state.servers.lock().unwrap();
+        let data_file = state.data_file.lock().unwrap();
+        servers.retain(|s| s.id != id);
+        save_servers(&data_file, &servers)?;
+        servers.clone()
+    };
+    block_on(invalidate_pooled_http_server_id(&id));
+    block_on(pool::invalidate_server_id(&id));
+    Ok(updated)
 }
 
 pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {

@@ -1,7 +1,7 @@
 pub(crate) const APPSTORE_DEPLOY_FILES_SH: &str = include_str!("scripts/appstore_deploy_files.sh");
 pub(crate) const APPSTORE_CREATE_NETWORK_SH: &str = include_str!("scripts/appstore_create_network.sh");
 pub(crate) const APPSTORE_COMPOSE_UP_SH: &str = include_str!("scripts/appstore_compose_up.sh");
-pub(crate) const APPSTORE_EXTRACT_DATA_SH: &str = include_str!("scripts/appstore_extract_data.sh");
+pub(crate) const APPSTORE_EXTRACT_DATA_STREAM_SH: &str = include_str!("scripts/appstore_extract_data.sh");
 pub(crate) const DOCKER_READ_DAEMON_CONFIG_SH: &str = include_str!("scripts/docker_read_daemon_config.sh");
 pub(crate) const DOCKER_CHECK_SOCKET_SH: &str = include_str!("scripts/docker_check_socket.sh");
 pub(crate) const DOCKER_CHECK_TCP_SH: &str = include_str!("scripts/docker_check_tcp.sh");

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
@@ -19,9 +20,11 @@ use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::scripts::DOCKER_READ_DAEMON_CONFIG_SH;
 use crate::ssh::client::{SshClientHandler, connect, disconnect};
 use crate::ssh::exec::ssh_exec_async;
+use crate::ssh::pool;
 
 const DEFAULT_DOCKER_HOST: &str = "unix:///var/run/docker.sock";
 const ENDPOINT_CACHE_TTL: Duration = Duration::from_secs(300);
+const HTTP_POOL_SIZE: usize = 3;
 
 #[derive(Clone, Debug)]
 pub(crate) enum DockerEndpoint {
@@ -34,17 +37,76 @@ struct EndpointCacheEntry {
     fetched_at: Instant,
 }
 
+struct PooledHttpConnection {
+    sender: hyper::client::conn::http1::SendRequest<Full<Bytes>>,
+    connection_task: tokio::task::JoinHandle<()>,
+}
+
+type HttpPoolEntry = Arc<tokio::sync::Mutex<Option<PooledHttpConnection>>>;
+
+struct HttpPoolState {
+    slots: Vec<HttpPoolEntry>,
+    next: AtomicUsize,
+}
+
 fn endpoint_cache() -> &'static Mutex<HashMap<String, EndpointCacheEntry>> {
     static CACHE: OnceLock<Mutex<HashMap<String, EndpointCacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn cache_key(config: &ServerConfig) -> String {
-    format!("{}@{}:{}", config.username, config.host, config.port)
+fn http_pool() -> &'static Mutex<HashMap<String, Arc<HttpPoolState>>> {
+    static POOL: OnceLock<Mutex<HashMap<String, Arc<HttpPoolState>>>> = OnceLock::new();
+    POOL.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub(crate) fn invalidate_docker_endpoint(config: &ServerConfig) {
+fn cache_key(config: &ServerConfig) -> String {
+    format!(
+        "{}|{}@{}:{}|{}|{}",
+        config.id,
+        config.username,
+        config.host,
+        config.port,
+        config.auth_type,
+        config.key_path.as_deref().unwrap_or_default()
+    )
+}
+
+pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
     endpoint_cache().lock().unwrap().remove(&cache_key(config));
+    invalidate_pooled_http(config).await;
+}
+
+pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
+    let state = http_pool().lock().unwrap().remove(&cache_key(config));
+    if let Some(state) = state {
+        for slot in &state.slots {
+            let mut pooled = slot.lock().await;
+            if let Some(connection) = pooled.take() {
+                connection.connection_task.abort();
+            }
+        }
+    }
+}
+
+pub(crate) async fn invalidate_pooled_http_server_id(server_id: &str) {
+    let states: Vec<Arc<HttpPoolState>> = {
+        let mut guard = http_pool().lock().unwrap();
+        let keys: Vec<String> = guard
+            .keys()
+            .filter(|key| key.starts_with(&format!("{server_id}|")))
+            .cloned()
+            .collect();
+        keys.into_iter().filter_map(|key| guard.remove(&key)).collect()
+    };
+
+    for state in states {
+        for slot in &state.slots {
+            let mut pooled = slot.lock().await;
+            if let Some(connection) = pooled.take() {
+                connection.connection_task.abort();
+            }
+        }
+    }
 }
 
 fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
@@ -96,7 +158,10 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
         return Ok(entry.value.clone());
     }
 
-    let raw = ssh_exec_async(config, DOCKER_READ_DAEMON_CONFIG_SH).await?;
+    let raw = match pool::exec(config, DOCKER_READ_DAEMON_CONFIG_SH).await {
+        Ok(raw) => raw,
+        Err(_) => ssh_exec_async(config, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+    };
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
     let host = cfg
         .hosts
@@ -276,6 +341,115 @@ async fn open_http_sender(
     Ok((handle, sender, connection_task))
 }
 
+async fn open_pooled_http_sender(config: &ServerConfig) -> AppResult<PooledHttpConnection> {
+    let endpoint = resolve_docker_endpoint(config).await?;
+    let channel = match endpoint {
+        DockerEndpoint::Unix { path } => pool::open_direct_streamlocal(config, path)
+            .await?
+            .map_err(|e| map_transport_error("docker.socket_open_failed", "打开 Docker Socket 通道失败", e))?,
+        DockerEndpoint::Tcp { host, port } => pool::open_direct_tcpip(config, host, port)
+            .await?
+            .map_err(|e| map_transport_error("docker.tcp_open_failed", "打开 Docker TCP 通道失败", e))?,
+    };
+
+    let stream = TokioIo::new(channel.into_stream());
+    let (sender, connection) = http1::Builder::new()
+        .handshake(stream)
+        .await
+        .map_err(|e| map_transport_error("docker.http_handshake_failed", "建立 Docker HTTP 连接失败", e))?;
+
+    let connection_task = tokio::spawn(async move {
+        let _ = connection.await;
+    });
+
+    Ok(PooledHttpConnection {
+        sender,
+        connection_task,
+    })
+}
+
+fn get_http_pool_state(config: &ServerConfig) -> Arc<HttpPoolState> {
+    let key = cache_key(config);
+    let mut guard = http_pool().lock().unwrap();
+    guard
+        .entry(key)
+        .or_insert_with(|| {
+            Arc::new(HttpPoolState {
+                slots: (0..HTTP_POOL_SIZE)
+                    .map(|_| Arc::new(tokio::sync::Mutex::new(None)))
+                    .collect(),
+                next: AtomicUsize::new(0),
+            })
+        })
+        .clone()
+}
+
+async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>>) -> AppResult<DockerRawResponse> {
+    let state = get_http_pool_state(config);
+    let index = state.next.fetch_add(1, Ordering::Relaxed) % state.slots.len();
+    let entry = state.slots[index].clone();
+    let mut pooled = entry.lock().await;
+    let needs_connect = pooled
+        .as_ref()
+        .map(|connection| connection.sender.is_closed() || connection.connection_task.is_finished())
+        .unwrap_or(true);
+    if needs_connect {
+        if let Some(connection) = pooled.take() {
+            connection.connection_task.abort();
+        }
+        *pooled = Some(open_pooled_http_sender(config).await?);
+    }
+
+    let ready_result = {
+        let connection = pooled.as_mut().expect("pooled Docker HTTP connection must exist");
+        connection.sender.ready().await
+    };
+    if let Err(e) = ready_result {
+        if let Some(connection) = pooled.take() {
+            connection.connection_task.abort();
+        }
+        return Err(map_transport_error(
+            "docker.request_send_failed",
+            "发送 Docker HTTP 请求失败",
+            e,
+        ));
+    }
+
+    let response = {
+        let connection = pooled.as_mut().expect("pooled Docker HTTP connection must exist");
+        connection.sender.send_request(request).await
+    };
+    let response = match response {
+        Ok(response) => response,
+        Err(e) => {
+            if let Some(connection) = pooled.take() {
+                connection.connection_task.abort();
+            }
+            return Err(map_transport_error(
+                "docker.request_send_failed",
+                "发送 Docker HTTP 请求失败",
+                e,
+            ));
+        }
+    };
+
+    let status = response.status();
+    let body = match response.into_body().collect().await {
+        Ok(body) => body.to_bytes(),
+        Err(e) => {
+            if let Some(connection) = pooled.take() {
+                connection.connection_task.abort();
+            }
+            return Err(map_transport_error(
+                "docker.response_read_failed",
+                "读取 Docker HTTP 响应失败",
+                e,
+            ));
+        }
+    };
+    Ok(DockerRawResponse { status, body })
+}
+
 async fn send_request(
     config: &ServerConfig,
     method: Method,
@@ -283,7 +457,6 @@ async fn send_request(
     content_type: Option<&str>,
     body: Bytes,
 ) -> AppResult<DockerRawResponse> {
-    let (mut handle, mut sender, connection_task) = open_http_sender(config).await?;
     let mut builder = Request::builder().method(method).uri(path).header(HOST, "localhost");
     if let Some(content_type) = content_type {
         builder = builder.header(CONTENT_TYPE, content_type);
@@ -293,24 +466,7 @@ async fn send_request(
         AppError::internal("docker.request_build_failed", "构建 Docker HTTP 请求失败").with_detail(e.to_string())
     })?;
 
-    let response = sender
-        .send_request(request)
-        .await
-        .map_err(|e| map_transport_error("docker.request_send_failed", "发送 Docker HTTP 请求失败", e))?;
-
-    let status = response.status();
-    let body = response
-        .into_body()
-        .collect()
-        .await
-        .map_err(|e| map_transport_error("docker.response_read_failed", "读取 Docker HTTP 响应失败", e))?
-        .to_bytes();
-
-    drop(sender);
-    disconnect(&mut handle).await;
-    connection_task.abort();
-
-    Ok(DockerRawResponse { status, body })
+    send_pooled_request(config, request).await
 }
 
 pub async fn request_text(config: &ServerConfig, method: Method, path: &str) -> AppResult<String> {
