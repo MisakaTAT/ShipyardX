@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
-import { toast } from 'sonner'
 import {
   daemonSettingsToFormValues,
   dockerDaemonDefaultValues,
@@ -19,6 +18,7 @@ import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
 import { isPermissionRelatedError, normalizeAppError, toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 interface Props {
   serverId: string

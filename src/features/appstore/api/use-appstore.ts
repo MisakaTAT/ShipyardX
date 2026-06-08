@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { qk } from '@/shared/api/query-keys'
 import { commands, type AppListItem, type InstallApp } from '@/types/app-bindings'
 import { toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 export function useAppStoreSync() {
   const qc = useQueryClient()

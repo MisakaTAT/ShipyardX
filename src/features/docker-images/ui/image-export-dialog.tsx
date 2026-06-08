@@ -3,7 +3,6 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { Download, FolderOpen, Loader2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { toast } from 'sonner'
 import { useExportImage } from '@/features/docker-images/api/use-images'
 import {
   imageExportDefaultValues,
@@ -12,6 +11,7 @@ import {
 } from '@/features/docker-images/model/image-export-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { formatBytes } from '@/shared/lib/format'
+import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'

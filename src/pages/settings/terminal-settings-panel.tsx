@@ -17,9 +17,9 @@ const CURSOR_STYLE_OPTIONS: Array<{ value: TerminalCursorStyle; label: string }>
   { value: 'bar', label: '竖线' },
 ]
 
-const SETTINGS_CONTROL_CLASSNAME = 'h-9 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
+const SETTINGS_CONTROL_CLASSNAME = 'h-8 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
 
-const SETTINGS_TOGGLE_CLASSNAME = 'flex h-9 w-fit items-center gap-3'
+const SETTINGS_TOGGLE_CLASSNAME = 'flex h-8 w-fit items-center gap-3'
 
 interface TerminalSettingsPanelProps {
   frontend: TerminalFrontend
@@ -381,10 +381,10 @@ function SearchablePicker<T extends string>({
                 key={option}
                 type="button"
                 className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => {
-                      onChange(option)
-                      setOpen(false)
-                      setQuery('')
+                onClick={() => {
+                  onChange(option)
+                  setOpen(false)
+                  setQuery('')
                 }}
               >
                 {renderOption ? renderOption(option) : <span className="truncate">{option}</span>}

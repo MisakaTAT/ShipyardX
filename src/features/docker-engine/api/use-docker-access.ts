@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { commands } from '@/types/app-bindings'
 import { getErrorCode, toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 

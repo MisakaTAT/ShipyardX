@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from '@/shared/components/toast'
 
 export type AppErrorKind =
   | 'validation'

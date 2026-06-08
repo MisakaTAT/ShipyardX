@@ -7,7 +7,6 @@ import {
   type VolumeCreateFormValues,
 } from '@/features/docker-volumes/model/volume-create-schema'
 import { Database, Loader2, Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
@@ -15,6 +14,7 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateVolume } from '@/features/docker-volumes/api/use-volumes'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { toast } from '@/shared/components/toast'
 
 export interface VolumeCreateDialogProps {
   serverId: string

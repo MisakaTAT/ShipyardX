@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
-import { toast } from 'sonner'
 import type { ServerConfig } from '@/types/app-bindings'
 import {
   defaultServerFormValues,
@@ -17,6 +16,7 @@ import { Input } from '@/shared/ui/input'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 interface ServerDialogProps {
   open: boolean

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/shared/components/toast'
 import {
   Activity,
   Box,

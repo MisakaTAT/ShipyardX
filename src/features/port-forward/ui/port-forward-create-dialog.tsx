@@ -10,7 +10,6 @@ import {
 import { parseContainerTcpPortOptions } from '@/features/port-forward/lib/parse-container-tcp-ports'
 import type { Container, LocalAddress, ServerConfig } from '@/types/app-bindings'
 import { ArrowLeftRight, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
@@ -18,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCreatePortForwardRule } from '@/features/port-forward/api/use-port-forwards'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 interface PortForwardCreateDialogProps {
   open: boolean

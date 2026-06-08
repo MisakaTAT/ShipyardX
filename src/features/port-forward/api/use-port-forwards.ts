@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 export function usePortForwards() {
   return useQuery({

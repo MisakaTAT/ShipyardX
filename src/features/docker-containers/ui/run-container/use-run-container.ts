@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { commands, type RunContainer, type Image } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
 import { imageRefExistsOnHost } from '@/shared/lib/docker-image-ref'
 import { qk } from '@/shared/api/query-keys'
 import { getErrorMessage, toastAppError } from '@/shared/lib/errors'
+import { toast } from '@/shared/components/toast'
 
 export type Phase = 'form' | 'progress'
 export type StepState = 'pending' | 'active' | 'done' | 'error'

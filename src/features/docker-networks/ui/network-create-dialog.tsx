@@ -8,7 +8,6 @@ import {
 } from '@/features/docker-networks/model/network-create-schema'
 import type { NetworkCreate } from '@/types/app-bindings'
 import { Share2, Loader2, Plus } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
@@ -16,6 +15,7 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateNetwork } from '@/features/docker-networks/api/use-networks'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { toast } from '@/shared/components/toast'
 
 export interface NetworkCreateDialogProps {
   serverId: string

@@ -68,18 +68,6 @@ pub fn open_devtools(app: AppHandle) -> AppResult<()> {
         .get_webview_window("main")
         .ok_or_else(|| AppError::not_found("app.main_window_missing", "未找到主窗口"))?;
 
-    #[cfg(debug_assertions)]
-    {
-        webview.open_devtools();
-        Ok(())
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        let _ = webview;
-        Err(
-            AppError::unavailable("app.devtools_unavailable", "当前构建未启用 DevTools")
-                .with_action("请在 debug 构建下使用，或为 release 构建开启 tauri devtools feature"),
-        )
-    }
+    webview.open_devtools();
+    Ok(())
 }
