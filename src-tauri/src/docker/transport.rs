@@ -86,9 +86,13 @@ pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
 
 pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
     debug!(target: "shipyardx_lib::docker::transport", "invalidating pooled docker http connections; server_id={}", config.id);
-    let state = lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败")
-        .ok()
-        .and_then(|mut pool| pool.remove(&cache_key(config)));
+    let state = lock_mutex(
+        http_pool(),
+        "docker.http_pool_lock_failed",
+        "更新 Docker HTTP 连接池失败",
+    )
+    .ok()
+    .and_then(|mut pool| pool.remove(&cache_key(config)));
     if let Some(state) = state {
         for slot in &state.slots {
             let mut pooled = slot.lock().await;
@@ -102,7 +106,11 @@ pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
 pub(crate) async fn invalidate_pooled_http_server_id(server_id: &str) {
     debug!(target: "shipyardx_lib::docker::transport", "invalidating pooled docker http connections by server id; server_id={}", server_id);
     let states: Vec<Arc<HttpPoolState>> = {
-        let mut guard = match lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败") {
+        let mut guard = match lock_mutex(
+            http_pool(),
+            "docker.http_pool_lock_failed",
+            "更新 Docker HTTP 连接池失败",
+        ) {
             Ok(guard) => guard,
             Err(_) => return,
         };
@@ -400,9 +408,7 @@ async fn open_pooled_http_sender(config: &ServerConfig) -> AppResult<PooledHttpC
 
 fn get_http_pool_state(config: &ServerConfig) -> Arc<HttpPoolState> {
     let key = cache_key(config);
-    let mut guard = http_pool()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut guard = http_pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     guard
         .entry(key)
         .or_insert_with(|| {
@@ -436,8 +442,11 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
 
     let ready_result = {
         let connection = pooled.as_mut().ok_or_else(|| {
-            AppError::internal("docker.pooled_connection_missing", "Docker HTTP 连接池状态异常：连接缺失")
-                .retryable(true)
+            AppError::internal(
+                "docker.pooled_connection_missing",
+                "Docker HTTP 连接池状态异常：连接缺失",
+            )
+            .retryable(true)
         })?;
         connection.sender.ready().await
     };
@@ -455,8 +464,11 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
 
     let response = {
         let connection = pooled.as_mut().ok_or_else(|| {
-            AppError::internal("docker.pooled_connection_missing", "Docker HTTP 连接池状态异常：连接缺失")
-                .retryable(true)
+            AppError::internal(
+                "docker.pooled_connection_missing",
+                "Docker HTTP 连接池状态异常：连接缺失",
+            )
+            .retryable(true)
         })?;
         connection.sender.send_request(request).await
     };

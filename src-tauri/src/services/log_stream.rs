@@ -1,6 +1,6 @@
+use log::{debug, error, info, warn};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::watch;
-use log::{debug, error, info, warn};
 
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
@@ -217,14 +217,19 @@ pub fn start_log_stream(
     state
         .streams
         .lock()
-        .map_err(|e| crate::error::AppError::internal("log_stream.start_lock_failed", "记录日志流状态失败").with_detail(e.to_string()))?
+        .map_err(|e| {
+            crate::error::AppError::internal("log_stream.start_lock_failed", "记录日志流状态失败")
+                .with_detail(e.to_string())
+        })?
         .insert(stream_id.clone(), StreamHandle { stop_tx });
     debug!(target: "shipyardx_lib::services::log_stream", "log stream registered; stream_id={}", stream_id);
     Ok(stream_id)
 }
 
 pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> crate::error::AppResult<()> {
-    if let Some(handle) = lock_mutex(&state.streams, "log_stream.stop_lock_failed", "停止日志流失败")?.remove(&stream_id) {
+    if let Some(handle) =
+        lock_mutex(&state.streams, "log_stream.stop_lock_failed", "停止日志流失败")?.remove(&stream_id)
+    {
         info!(target: "shipyardx_lib::services::log_stream", "stopping log stream; stream_id={}", stream_id);
         let _ = handle.stop_tx.send(true);
     } else {

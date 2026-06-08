@@ -427,12 +427,13 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
     save_port_forward_rules_to_state(&state, &rules)?;
 
     // 同步运行时状态：禁用即停止。
-    if !enabled && let Some(handle) = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "更新端口转发运行时状态失败",
-    )?
-    .remove(&id)
+    if !enabled
+        && let Some(handle) = lock_mutex(
+            &state.port_forwards,
+            "port_forward.runtime_lock_failed",
+            "更新端口转发运行时状态失败",
+        )?
+        .remove(&id)
     {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);
@@ -563,7 +564,10 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
     let running_ids: Vec<String> = state
         .port_forwards
         .lock()
-        .map_err(|e| AppError::internal("port_forward.runtime_lock_failed", "读取端口转发运行时状态失败").with_detail(e.to_string()))?
+        .map_err(|e| {
+            AppError::internal("port_forward.runtime_lock_failed", "读取端口转发运行时状态失败")
+                .with_detail(e.to_string())
+        })?
         .iter()
         .filter(|(_, state)| {
             state
@@ -712,8 +716,8 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
         "port_forward.runtime_lock_failed",
         "更新端口转发运行时状态失败",
     )?
-        .remove(&id)
-        .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
+    .remove(&id)
+    .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
 
     if let Some(runtime) = handle.handle {
         let _ = runtime.stop_tx.send(true);

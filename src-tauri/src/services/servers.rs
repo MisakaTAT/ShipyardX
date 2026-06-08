@@ -21,7 +21,11 @@ pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
 pub fn add_server(mut server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     server.id = generate_id();
     let mut servers = lock_mutex(&state.servers, "servers.add_lock_failed", "写入服务器列表失败")?;
-    let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
+    let data_file = lock_mutex(
+        &state.data_file,
+        "servers.data_file_lock_failed",
+        "读取服务器配置路径失败",
+    )?;
     servers.push(server);
     info!(target: "shipyardx_lib::services::servers", "server added; count={}", servers.len());
     save_servers(&data_file, &servers)?;
@@ -32,7 +36,11 @@ pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<
     let server_id = server.id.clone();
     let updated = {
         let mut servers = lock_mutex(&state.servers, "servers.update_lock_failed", "写入服务器列表失败")?;
-        let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
+        let data_file = lock_mutex(
+            &state.data_file,
+            "servers.data_file_lock_failed",
+            "读取服务器配置路径失败",
+        )?;
         if let Some(existing) = servers.iter_mut().find(|s| s.id == server.id) {
             *existing = server;
         } else {
@@ -50,7 +58,11 @@ pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<
 pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     let updated = {
         let mut servers = lock_mutex(&state.servers, "servers.delete_lock_failed", "写入服务器列表失败")?;
-        let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
+        let data_file = lock_mutex(
+            &state.data_file,
+            "servers.data_file_lock_failed",
+            "读取服务器配置路径失败",
+        )?;
         servers.retain(|s| s.id != id);
         save_servers(&data_file, &servers)?;
         servers.clone()

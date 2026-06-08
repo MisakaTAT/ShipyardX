@@ -119,7 +119,8 @@ fn emit_stream_status(
     status_slot: &Arc<Mutex<EventStreamStatus>>,
     status: EventStreamStatus,
 ) {
-    if let Ok(mut current) = lock_mutex(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败") {
+    if let Ok(mut current) = lock_mutex(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败")
+    {
         *current = status;
     }
     let _ = DockerStreamStatus {

@@ -1,5 +1,5 @@
-use tauri::State;
 use log::{debug, info, warn};
+use tauri::State;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use font_kit::source::SystemSource;

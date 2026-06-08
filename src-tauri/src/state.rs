@@ -12,7 +12,11 @@ use tauri::State;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
-pub(crate) fn lock_mutex<'a, T>(mutex: &'a Mutex<T>, code: &'static str, message: &'static str) -> AppResult<MutexGuard<'a, T>> {
+pub(crate) fn lock_mutex<'a, T>(
+    mutex: &'a Mutex<T>,
+    code: &'static str,
+    message: &'static str,
+) -> AppResult<MutexGuard<'a, T>> {
     mutex
         .lock()
         .map_err(|e| AppError::internal(code, message).with_detail(e.to_string()))

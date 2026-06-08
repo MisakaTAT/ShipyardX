@@ -499,8 +499,9 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
         return Ok(());
     }
 
-    let listener = block_on(TcpListener::bind("127.0.0.1:0"))
-        .and_then(|result| result.map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e)))?;
+    let listener = block_on(TcpListener::bind("127.0.0.1:0")).and_then(|result| {
+        result.map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e))
+    })?;
     let port = listener
         .local_addr()
         .map_err(|e| AppError::internal("terminal.ws_addr_failed", "读取终端 WebSocket 地址失败").with_source(e))?
@@ -553,12 +554,8 @@ pub fn open_terminal(
         run_terminal_thread(server, sid, rx, ah, cols, rows);
     })?;
 
-    lock_mutex(
-        &state.terminals,
-        "terminal.sessions_lock_failed",
-        "记录终端会话失败",
-    )?
-    .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
+        .insert(session_id.clone(), TerminalHandle { tx });
     info!(
         target: "shipyardx_lib::services::terminal",
         "terminal session opened; session_id={} server_id={} ws_port={}",
@@ -600,12 +597,8 @@ pub fn open_container_exec_terminal(
         })
     })?;
 
-    lock_mutex(
-        &state.terminals,
-        "terminal.sessions_lock_failed",
-        "记录终端会话失败",
-    )?
-    .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
+        .insert(session_id.clone(), TerminalHandle { tx });
     info!(
         target: "shipyardx_lib::services::terminal",
         "container exec session opened; session_id={} server_id={} container_id={} ws_port={}",

@@ -37,9 +37,7 @@ fn pool_key(config: &ServerConfig) -> String {
 
 fn get_entry(config: &ServerConfig) -> PoolEntry {
     let key = pool_key(config);
-    let mut guard = pool()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     guard
         .entry(key)
         .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(PooledConnection { handle: None })))
@@ -49,9 +47,7 @@ fn get_entry(config: &ServerConfig) -> PoolEntry {
 pub async fn invalidate_server_id(server_id: &str) {
     debug!(target: "shipyardx_lib::ssh::pool", "invalidating ssh pool entries; server_id={}", server_id);
     let entries: Vec<PoolEntry> = {
-        let mut guard = pool()
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let keys: Vec<String> = guard
             .keys()
             .filter(|key| key.starts_with(&format!("{server_id}|")))
@@ -228,13 +224,10 @@ where
     };
     drop(pooled);
 
-    channel
-        .exec(true, command)
-        .await
-        .map_err(|e| {
-            warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);
-            AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
-        })?;
+    channel.exec(true, command).await.map_err(|e| {
+        warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);
+        AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
+    })?;
 
     collect_exec_output_with(channel, |chunk| on_chunk(chunk)).await
 }

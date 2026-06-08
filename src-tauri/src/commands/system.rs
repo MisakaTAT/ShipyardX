@@ -77,10 +77,9 @@ pub fn open_devtools(app: AppHandle) -> AppResult<()> {
     #[cfg(not(debug_assertions))]
     {
         let _ = webview;
-        Err(AppError::unavailable(
-            "app.devtools_unavailable",
-            "当前构建未启用 DevTools",
+        Err(
+            AppError::unavailable("app.devtools_unavailable", "当前构建未启用 DevTools")
+                .with_action("请在 debug 构建下使用，或为 release 构建开启 tauri devtools feature"),
         )
-        .with_action("请在 debug 构建下使用，或为 release 构建开启 tauri devtools feature"))
     }
 }
