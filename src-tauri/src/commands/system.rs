@@ -1,9 +1,9 @@
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 use crate::contracts::frontend::container::ContainerStats;
 use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
 use crate::contracts::frontend::info::DockerEngineInfo;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::services;
 use crate::state::AppState;
 
@@ -59,4 +59,28 @@ pub async fn restart_docker_daemon(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     Ok(services::system::restart_docker_daemon(server_id, sudo_password, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn open_devtools(app: AppHandle) -> AppResult<()> {
+    let webview = app
+        .get_webview_window("main")
+        .ok_or_else(|| AppError::not_found("app.main_window_missing", "未找到主窗口"))?;
+
+    #[cfg(debug_assertions)]
+    {
+        webview.open_devtools();
+        Ok(())
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = webview;
+        Err(AppError::unavailable(
+            "app.devtools_unavailable",
+            "当前构建未启用 DevTools",
+        )
+        .with_action("请在 debug 构建下使用，或为 release 构建开启 tauri devtools feature"))
+    }
 }

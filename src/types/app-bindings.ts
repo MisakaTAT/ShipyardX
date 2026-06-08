@@ -40,6 +40,7 @@ export const commands = {
 	getDockerDaemonSettings: (serverId: string) => __TAURI_INVOKE<DaemonSettings>("get_docker_daemon_settings", { serverId }),
 	updateDockerDaemonSettings: (serverId: string, params: DaemonUpdate) => __TAURI_INVOKE<null>("update_docker_daemon_settings", { serverId, params }),
 	restartDockerDaemon: (serverId: string, sudoPassword: string | null) => __TAURI_INVOKE<null>("restart_docker_daemon", { serverId, sudoPassword }),
+	openDevtools: () => __TAURI_INVOKE<null>("open_devtools"),
 	startLogStream: (serverId: string, containerId: string, tail: number, timestamps: boolean) => __TAURI_INVOKE<string>("start_log_stream", { serverId, containerId, tail, timestamps }),
 	stopLogStream: (streamId: string) => __TAURI_INVOKE<null>("stop_log_stream", { streamId }),
 	startEventStream: (serverId: string) => __TAURI_INVOKE<string>("start_event_stream", { serverId }),

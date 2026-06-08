@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { appLogDir } from '@tauri-apps/api/path'
+import { openPath } from '@tauri-apps/plugin-opener'
+import { Bug, FolderOpen } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAppSettings } from '@/app/settings-store'
 import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
+import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/settings-sections'
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
@@ -90,6 +96,8 @@ export default function SettingsPage() {
             onCursorBlinkChange={(cursorBlink) => updateTerminalSettings({ cursorBlink })}
             onLineHeightChange={(lineHeight) => updateTerminalSettings({ lineHeight })}
           />
+        ) : activeSection === 'debug' ? (
+          <DebugSettingsPanel />
         ) : (
           <AppSettingsPanel />
         )}
@@ -101,11 +109,124 @@ export default function SettingsPage() {
 function AppSettingsPanel() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-7">
-      <div className="border-b border-border/70 pb-4">
-        <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">Application</p>
-        <h2 className="mt-2 text-2xl font-semibold text-foreground">应用</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">应用级设置</p>
+      <SettingsPanelHeader eyebrow="Application" title="应用" description="应用级设置。" />
+    </div>
+  )
+}
+
+function DebugSettingsPanel() {
+  const [pendingAction, setPendingAction] = useState<'devtools' | 'logs' | null>(null)
+
+  const handleOpenDevtools = async () => {
+    setPendingAction('devtools')
+    try {
+      await invoke('open_devtools')
+      toast.success('已打开 DevTools')
+    } catch (error) {
+      toast.error(getErrorMessage(error, '打开 DevTools 失败'), {
+        description: getErrorDescription(error, '打开 DevTools 失败'),
+      })
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  const handleOpenLogDir = async () => {
+    setPendingAction('logs')
+    try {
+      const logDir = await appLogDir()
+      await openPath(logDir)
+      toast.success('已打开日志目录', {
+        description: logDir,
+      })
+    } catch (error) {
+      toast.error(getErrorMessage(error, '打开日志目录失败'), {
+        description: getErrorDescription(error, '打开日志目录失败'),
+      })
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-7">
+      <SettingsPanelHeader
+        eyebrow="Debug"
+        title="调试"
+        description="调试入口会作用于当前桌面端实例，并用于定位界面状态与后端日志。"
+      />
+
+      <div className="divide-y divide-border/70">
+        <SettingsActionRow
+          title="开发者工具"
+          description="打开当前主窗口的开发者工具"
+          action={
+            <Button
+              variant="outline"
+              className="w-full max-w-xs justify-center"
+              onClick={() => void handleOpenDevtools()}
+              disabled={pendingAction !== null}
+            >
+              <Bug className="size-4" />
+              <span>{pendingAction === 'devtools' ? '正在打开…' : '打开开发者工具'}</span>
+            </Button>
+          }
+        />
+
+        <SettingsActionRow
+          title="日志目录"
+          description="打开当前应用的日志落盘目录"
+          action={
+            <Button
+              variant="outline"
+              className="w-full max-w-xs justify-center"
+              onClick={() => void handleOpenLogDir()}
+              disabled={pendingAction !== null}
+            >
+              <FolderOpen className="size-4" />
+              <span>{pendingAction === 'logs' ? '正在打开…' : '打开日志目录'}</span>
+            </Button>
+          }
+        />
       </div>
+    </div>
+  )
+}
+
+function SettingsPanelHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string
+  title: string
+  description: string
+}) {
+  return (
+    <div className="border-b border-border/70 pb-4">
+      <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{eyebrow}</p>
+      <h2 className="mt-2 text-2xl font-semibold text-foreground">{title}</h2>
+      <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+    </div>
+  )
+}
+
+function SettingsActionRow({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description: string
+  action: React.ReactNode
+}) {
+  return (
+    <div className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">{title}</h3>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      </div>
+      <div>{action}</div>
     </div>
   )
 }

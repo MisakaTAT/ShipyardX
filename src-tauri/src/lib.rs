@@ -65,6 +65,7 @@ pub fn run() {
             commands::system::get_docker_daemon_settings,
             commands::system::update_docker_daemon_settings,
             commands::system::restart_docker_daemon,
+            commands::system::open_devtools,
             commands::log_stream::start_log_stream,
             commands::log_stream::stop_log_stream,
             commands::docker_events::start_event_stream,

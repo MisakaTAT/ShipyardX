@@ -1,6 +1,6 @@
-import { AppWindow, TerminalSquare, type LucideIcon } from 'lucide-react'
+import { AppWindow, Bug, TerminalSquare, type LucideIcon } from 'lucide-react'
 
-export type SettingsSectionKey = 'app' | 'terminal'
+export type SettingsSectionKey = 'app' | 'terminal' | 'debug'
 
 export interface SettingsSection {
   key: SettingsSectionKey
@@ -11,4 +11,5 @@ export interface SettingsSection {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'app', title: '应用', icon: AppWindow },
   { key: 'terminal', title: '终端', icon: TerminalSquare },
+  { key: 'debug', title: '调试', icon: Bug },
 ]
