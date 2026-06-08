@@ -29,9 +29,12 @@ const INSTALL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
 const INSTALL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
 const INSTALL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续安装日志已省略]\n";
 
-fn appstore_cache_dir(app: &AppHandle) -> PathBuf {
-    let data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
-    data_dir.join("appstore_cache")
+fn appstore_cache_dir(app: &AppHandle) -> AppResult<PathBuf> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::internal("appstore.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
+    Ok(data_dir.join("appstore_cache"))
 }
 
 fn apps_dir(cache_dir: &Path) -> PathBuf {
@@ -49,12 +52,13 @@ fn pick_description(desc: &crate::contracts::frontend::appstore::DescriptionI18n
 }
 
 pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
-    let cache_dir = appstore_cache_dir(app);
+    let cache_dir = appstore_cache_dir(app)?;
     let git_dir = cache_dir.join(".git");
 
     if fs::try_exists(&git_dir).await.unwrap_or(false) {
+        let cache_dir_str = cache_dir.to_string_lossy().to_string();
         let output = Command::new("git")
-            .args(["-C", cache_dir.to_str().unwrap()])
+            .args(["-C", cache_dir_str.as_str()])
             .arg("pull")
             .arg("--ff-only")
             .output()
@@ -72,9 +76,10 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
         }
     } else {
         let _ = fs::create_dir_all(&cache_dir).await;
+        let cache_dir_str = cache_dir.to_string_lossy().to_string();
         let output = Command::new("git")
             .args(["clone", "--depth", "1", APPSTORE_REPO_URL])
-            .arg(cache_dir.to_str().unwrap())
+            .arg(cache_dir_str.as_str())
             .output()
             .await
             .map_err(|e| AppError::internal("appstore.git_clone_spawn_failed", "执行 git clone 失败").with_source(e))?;
@@ -90,7 +95,7 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
 }
 
 pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
-    let cache_dir = appstore_cache_dir(app);
+    let cache_dir = appstore_cache_dir(app)?;
     let apps_dir = apps_dir(&cache_dir);
 
     if !fs::try_exists(&apps_dir).await.unwrap_or(false) {
@@ -117,7 +122,10 @@ pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
             continue;
         }
 
-        let key = app_dir.file_name().unwrap().to_string_lossy().to_string();
+        let Some(file_name) = app_dir.file_name() else {
+            continue;
+        };
+        let key = file_name.to_string_lossy().to_string();
 
         let data_yml = app_dir.join("data.yml");
         if !fs::try_exists(&data_yml).await.unwrap_or(false) {
@@ -178,7 +186,7 @@ pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
 }
 
 pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
-    let cache_dir = appstore_cache_dir(app);
+    let cache_dir = appstore_cache_dir(app)?;
     let app_dir = apps_dir(&cache_dir).join(app_key);
 
     if !fs::try_exists(&app_dir).await.unwrap_or(false) {
@@ -303,7 +311,7 @@ fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuf
 }
 
 pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
-    let cache_dir = appstore_cache_dir(app);
+    let cache_dir = appstore_cache_dir(app)?;
     let app_dir = apps_dir(&cache_dir).join(&req.app_key);
     let version_dir = app_dir.join(&req.version);
 
@@ -565,7 +573,10 @@ async fn copy_data_dir_to_remote(
     remote_rel_dir: &str,
 ) -> AppResult<()> {
     let parent = local_dir.parent().unwrap_or(local_dir);
-    let dir_name = local_dir.file_name().unwrap().to_str().unwrap();
+    let dir_name = local_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| AppError::internal("appstore.data_dir_name_invalid", "数据目录名称无效"))?;
     let total_bytes = measure_dir_size(local_dir).await.unwrap_or(0);
     let total_display = if total_bytes > 0 {
         format!(" / {}", format_bytes(total_bytes))
@@ -579,12 +590,13 @@ async fn copy_data_dir_to_remote(
         &format!("正在复制数据目录... 已上传 0 B{}", total_display),
     );
 
+    let parent_str = parent.to_string_lossy().to_string();
     let mut tar_cmd = Command::new("tar");
     tar_cmd
         .arg("-czf")
         .arg("-")
         .arg("-C")
-        .arg(parent.to_str().unwrap())
+        .arg(parent_str.as_str())
         .arg(dir_name)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());

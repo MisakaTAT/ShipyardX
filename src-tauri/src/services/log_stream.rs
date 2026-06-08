@@ -4,7 +4,7 @@ use tokio::sync::watch;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
 use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, StreamHandle, get_server_config};
+use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
 
@@ -179,18 +179,19 @@ pub fn start_log_stream(
     let ah = app_handle.clone();
     spawn_on_runtime(async move {
         run_log_stream_task(server, sid, cid, tail, timestamps, stop_rx, ah).await;
-    });
+    })?;
 
     state
         .streams
         .lock()
-        .unwrap()
+        .map_err(|e| crate::error::AppError::internal("log_stream.start_lock_failed", "记录日志流状态失败").with_detail(e.to_string()))?
         .insert(stream_id.clone(), StreamHandle { stop_tx });
     Ok(stream_id)
 }
 
-pub fn stop_log_stream(stream_id: String, state: State<AppState>) {
-    if let Some(handle) = state.streams.lock().unwrap().remove(&stream_id) {
+pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> crate::error::AppResult<()> {
+    if let Some(handle) = lock_mutex(&state.streams, "log_stream.stop_lock_failed", "停止日志流失败")?.remove(&stream_id) {
         let _ = handle.stop_tx.send(true);
     }
+    Ok(())
 }

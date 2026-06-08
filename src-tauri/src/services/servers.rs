@@ -7,17 +7,17 @@ use crate::docker::client::docker_get_async;
 use crate::docker::transport::invalidate_pooled_http_server_id;
 use crate::error::AppResult;
 use crate::ssh::{client::block_on, pool};
-use crate::state::{AppState, get_server_config};
+use crate::state::{AppState, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
-pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {
-    state.servers.lock().unwrap().clone()
+pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone())
 }
 
 pub fn add_server(mut server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     server.id = generate_id();
-    let mut servers = state.servers.lock().unwrap();
-    let data_file = state.data_file.lock().unwrap();
+    let mut servers = lock_mutex(&state.servers, "servers.add_lock_failed", "写入服务器列表失败")?;
+    let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
     servers.push(server);
     save_servers(&data_file, &servers)?;
     Ok(servers.clone())
@@ -26,29 +26,29 @@ pub fn add_server(mut server: ServerConfig, state: State<AppState>) -> AppResult
 pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     let server_id = server.id.clone();
     let updated = {
-        let mut servers = state.servers.lock().unwrap();
-        let data_file = state.data_file.lock().unwrap();
+        let mut servers = lock_mutex(&state.servers, "servers.update_lock_failed", "写入服务器列表失败")?;
+        let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
         if let Some(existing) = servers.iter_mut().find(|s| s.id == server.id) {
             *existing = server;
         }
         save_servers(&data_file, &servers)?;
         servers.clone()
     };
-    block_on(invalidate_pooled_http_server_id(&server_id));
-    block_on(pool::invalidate_server_id(&server_id));
+    block_on(invalidate_pooled_http_server_id(&server_id))?;
+    block_on(pool::invalidate_server_id(&server_id))?;
     Ok(updated)
 }
 
 pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     let updated = {
-        let mut servers = state.servers.lock().unwrap();
-        let data_file = state.data_file.lock().unwrap();
+        let mut servers = lock_mutex(&state.servers, "servers.delete_lock_failed", "写入服务器列表失败")?;
+        let data_file = lock_mutex(&state.data_file, "servers.data_file_lock_failed", "读取服务器配置路径失败")?;
         servers.retain(|s| s.id != id);
         save_servers(&data_file, &servers)?;
         servers.clone()
     };
-    block_on(invalidate_pooled_http_server_id(&id));
-    block_on(pool::invalidate_server_id(&id));
+    block_on(invalidate_pooled_http_server_id(&id))?;
+    block_on(pool::invalidate_server_id(&id))?;
     Ok(updated)
 }
 

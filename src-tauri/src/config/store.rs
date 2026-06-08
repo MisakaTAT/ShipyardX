@@ -62,10 +62,14 @@ fn decrypt(key: &[u8; 32], encoded: &str) -> AppResult<String> {
         .map_err(|e| AppError::internal("config.password_utf8_invalid", "解密后的密码数据无效").with_source(e))
 }
 
-pub fn get_data_file(app: &AppHandle) -> std::path::PathBuf {
-    let data_dir = app.path().app_data_dir().expect("无法获取应用数据目录");
-    std::fs::create_dir_all(&data_dir).ok();
-    data_dir.join("servers.json")
+pub fn get_data_file(app: &AppHandle) -> AppResult<std::path::PathBuf> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::internal("config.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
+    std::fs::create_dir_all(&data_dir)
+        .map_err(|e| AppError::internal("config.data_dir_create_failed", "创建配置目录失败").with_source(e))?;
+    Ok(data_dir.join("servers.json"))
 }
 
 pub fn data_dir_from_file(data_file: &Path) -> PathBuf {

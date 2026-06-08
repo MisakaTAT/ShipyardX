@@ -1,9 +1,9 @@
 use tauri::{AppHandle, State};
 
 use crate::contracts::frontend::appstore::{AppDetail, AppListItem, InstallApp};
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::services;
-use crate::state::AppState;
+use crate::state::{AppState, get_server_config};
 
 #[tauri::command]
 #[specta::specta]
@@ -32,12 +32,6 @@ pub async fn install_app(
     req: InstallApp,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    let server = {
-        let s = state.servers.lock().unwrap();
-        s.iter()
-            .find(|s| s.id == server_id)
-            .cloned()
-            .ok_or_else(|| AppError::not_found("server.not_found", "服务器不存在"))?
-    };
+    let server = get_server_config(&state, &server_id)?;
     Ok(services::appstore::install_app_inner(&app, &server, &req).await?)
 }

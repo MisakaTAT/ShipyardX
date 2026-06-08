@@ -52,6 +52,6 @@ pub fn start_image_pull(
 
 #[tauri::command]
 #[specta::specta]
-pub fn cancel_stream(stream_id: String, state: State<AppState>) {
-    services::images::cancel_stream(stream_id, state)
+pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
+    Ok(services::images::cancel_stream(stream_id, state)?)
 }

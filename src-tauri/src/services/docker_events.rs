@@ -13,7 +13,7 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, EventStreamHandle, get_server_config};
+use crate::state::{AppState, EventStreamHandle, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
@@ -118,7 +118,9 @@ fn emit_stream_status(
     status_slot: &Arc<Mutex<EventStreamStatus>>,
     status: EventStreamStatus,
 ) {
-    *status_slot.lock().unwrap() = status;
+    if let Ok(mut current) = lock_mutex(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败") {
+        *current = status;
+    }
     let _ = DockerStreamStatus {
         stream_id: stream_id.to_string(),
         status,
@@ -258,7 +260,7 @@ fn reconnect_delay(attempt: usize) -> Duration {
     let secs = RECONNECT_DELAYS
         .get(attempt)
         .copied()
-        .unwrap_or(*RECONNECT_DELAYS.last().unwrap());
+        .unwrap_or_else(|| RECONNECT_DELAYS.last().copied().unwrap_or(30));
     Duration::from_secs(secs)
 }
 
@@ -266,9 +268,17 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     let server = get_server_config(&state, &server_id)?;
 
     {
-        let streams = state.event_streams.lock().unwrap();
+        let streams = lock_mutex(
+            &state.event_streams,
+            "docker_events.streams_lock_failed",
+            "读取事件流状态失败",
+        )?;
         if let Some(existing) = streams.get(&server_id) {
-            let current = *existing.status.lock().unwrap();
+            let current = *lock_mutex(
+                &existing.status,
+                "docker_events.status_lock_failed",
+                "读取事件流状态失败",
+            )?;
             let _ = DockerStreamStatus {
                 stream_id: existing.stream_id.clone(),
                 status: current,
@@ -287,9 +297,14 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     let ah = app_handle.clone();
     spawn_on_runtime(async move {
         run_event_stream_task(server, sid, status_for_thread, stop_rx, ah).await;
-    });
+    })?;
 
-    state.event_streams.lock().unwrap().insert(
+    lock_mutex(
+        &state.event_streams,
+        "docker_events.streams_lock_failed",
+        "记录事件流状态失败",
+    )?
+    .insert(
         server_id,
         EventStreamHandle {
             stream_id: stream_id.clone(),
@@ -301,8 +316,15 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     Ok(stream_id)
 }
 
-pub fn stop_event_stream(server_id: String, state: State<AppState>) {
-    if let Some(h) = state.event_streams.lock().unwrap().remove(&server_id) {
+pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult<()> {
+    if let Some(h) = lock_mutex(
+        &state.event_streams,
+        "docker_events.streams_lock_failed",
+        "停止事件流失败",
+    )?
+    .remove(&server_id)
+    {
         let _ = h.stop_tx.send(true);
     }
+    Ok(())
 }

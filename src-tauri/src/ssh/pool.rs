@@ -36,7 +36,9 @@ fn pool_key(config: &ServerConfig) -> String {
 
 fn get_entry(config: &ServerConfig) -> PoolEntry {
     let key = pool_key(config);
-    let mut guard = pool().lock().unwrap();
+    let mut guard = pool()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     guard
         .entry(key)
         .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(PooledConnection { handle: None })))
@@ -45,7 +47,9 @@ fn get_entry(config: &ServerConfig) -> PoolEntry {
 
 pub async fn invalidate_server_id(server_id: &str) {
     let entries: Vec<PoolEntry> = {
-        let mut guard = pool().lock().unwrap();
+        let mut guard = pool()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let keys: Vec<String> = guard
             .keys()
             .filter(|key| key.starts_with(&format!("{server_id}|")))
@@ -62,6 +66,10 @@ pub async fn invalidate_server_id(server_id: &str) {
     }
 }
 
+fn missing_pooled_handle_error() -> AppError {
+    AppError::internal("ssh.pool_handle_missing", "SSH 连接池状态异常：连接句柄缺失").retryable(true)
+}
+
 pub async fn open_direct_streamlocal(
     config: &ServerConfig,
     path: String,
@@ -74,7 +82,7 @@ pub async fn open_direct_streamlocal(
         pooled.handle = Some(connect(config).await?);
     }
 
-    let handle = pooled.handle.as_ref().expect("pooled SSH handle must exist");
+    let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
     let result = handle.channel_open_direct_streamlocal(path).await;
     if result.is_err() {
         if let Some(mut handle) = pooled.handle.take() {
@@ -97,7 +105,7 @@ pub async fn open_direct_tcpip(
         pooled.handle = Some(connect(config).await?);
     }
 
-    let handle = pooled.handle.as_ref().expect("pooled SSH handle must exist");
+    let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
     let result = handle
         .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
         .await;
@@ -133,7 +141,7 @@ where
     }
 
     let channel = {
-        let handle = pooled.handle.as_ref().expect("pooled SSH handle must exist");
+        let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
         handle.channel_open_session().await
     };
     let channel = match channel {
@@ -191,7 +199,7 @@ where
     }
 
     let channel = {
-        let handle = pooled.handle.as_ref().expect("pooled SSH handle must exist");
+        let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
         handle.channel_open_session().await
     };
     let channel = match channel {

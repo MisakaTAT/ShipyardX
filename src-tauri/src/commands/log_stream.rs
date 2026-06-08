@@ -26,6 +26,6 @@ pub fn start_log_stream(
 
 #[tauri::command]
 #[specta::specta]
-pub fn stop_log_stream(stream_id: String, state: State<AppState>) {
-    services::log_stream::stop_log_stream(stream_id, state)
+pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
+    Ok(services::log_stream::stop_log_stream(stream_id, state)?)
 }

@@ -100,9 +100,9 @@ pub fn run() {
         .typ::<AppErrorKind>();
 
     #[cfg(debug_assertions)]
-    specta_builder
-        .export(Typescript::default(), "../src/types/app-bindings.ts")
-        .expect("导出 Tauri Specta TypeScript 绑定失败");
+    if let Err(error) = specta_builder.export(Typescript::default(), "../src/types/app-bindings.ts") {
+        eprintln!("导出 Tauri Specta TypeScript 绑定失败: {error}");
+    }
 
     let invoke_handler = specta_builder.invoke_handler();
 
@@ -112,7 +112,10 @@ pub fn run() {
         .invoke_handler(invoke_handler)
         .setup(move |app| {
             specta_builder.mount_events(app);
-            let data_file = get_data_file(app.handle());
+            let data_file = get_data_file(app.handle()).map_err(|error| {
+                let detail = error.detail.unwrap_or(error.message);
+                Box::<dyn std::error::Error>::from(detail)
+            })?;
             let servers = load_servers(&data_file);
             app.manage(AppState {
                 servers: Mutex::new(servers),
@@ -126,5 +129,7 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("运行应用时出错");
+        .unwrap_or_else(|error| {
+            eprintln!("运行应用时出错: {error}");
+        });
 }

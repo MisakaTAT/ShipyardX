@@ -7,8 +7,8 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_servers(state: State<AppState>) -> Vec<ServerConfig> {
-    services::servers::get_servers(state)
+pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(services::servers::get_servers(state)?)
 }
 
 #[tauri::command]

@@ -19,7 +19,7 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, spawn_on_runtime};
 use crate::ssh::pool;
-use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config};
+use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";
@@ -49,12 +49,17 @@ struct PortForwardAcceptArgs {
 }
 
 fn set_port_forward_error(state: &State<AppState>, id: &str, error: Option<String>) {
-    let mut runtime = state.port_forwards.lock().unwrap();
-    let entry = runtime.entry(id.to_string()).or_insert(PortForwardRuntimeState {
-        handle: None,
-        last_error: None,
-    });
-    entry.last_error = error;
+    if let Ok(mut runtime) = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "更新端口转发运行时状态失败",
+    ) {
+        let entry = runtime.entry(id.to_string()).or_insert(PortForwardRuntimeState {
+            handle: None,
+            last_error: None,
+        });
+        entry.last_error = error;
+    }
 }
 
 fn normalize_host(ip: &str) -> String {
@@ -111,7 +116,9 @@ async fn bridge_once(args: PortForwardBridgeArgs) {
     .await;
 
     if let Err(e) = result {
-        *last_error.lock().unwrap() = Some(error_message(e));
+        if let Ok(mut last_error_guard) = last_error.lock() {
+            *last_error_guard = Some(error_message(e));
+        }
     }
 }
 
@@ -210,23 +217,29 @@ fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) 
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
         drop(channel);
         Ok::<(), AppError>(())
-    })?;
+    })??;
     let _elapsed = start.elapsed();
     Ok(())
 }
 
 fn is_rule_running(state: &State<AppState>, id: &str) -> bool {
-    state
-        .port_forwards
-        .lock()
-        .unwrap()
-        .get(id)
-        .and_then(|state| state.handle.as_ref())
-        .is_some()
+    lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "读取端口转发运行时状态失败",
+    )
+    .ok()
+    .and_then(|runtime| runtime.get(id).and_then(|state| state.handle.as_ref()).map(|_| true))
+    .unwrap_or(false)
 }
 
 fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<PortForwardRule>> {
-    let data_file = state.data_file.lock().unwrap().clone();
+    let data_file = lock_mutex(
+        &state.data_file,
+        "port_forward.data_file_lock_failed",
+        "读取端口转发配置路径失败",
+    )?
+    .clone();
     let path = crate::config::store::data_dir_from_file(&data_file).join("port_forwards.json");
     let rules_raw = std::fs::read_to_string(&path).unwrap_or_default();
     if rules_raw.trim().is_empty() {
@@ -238,7 +251,12 @@ fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<
 }
 
 fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwardRule]) -> AppResult<()> {
-    let data_file = state.data_file.lock().unwrap().clone();
+    let data_file = lock_mutex(
+        &state.data_file,
+        "port_forward.data_file_lock_failed",
+        "读取端口转发配置路径失败",
+    )?
+    .clone();
     let dir = crate::config::store::data_dir_from_file(&data_file);
     std::fs::create_dir_all(&dir).map_err(|e| {
         AppError::internal("port_forward.config_dir_create_failed", "创建端口转发配置目录失败").with_source(e)
@@ -255,7 +273,11 @@ fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwar
 
 pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let runtime = state.port_forwards.lock().unwrap();
+    let runtime = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "读取端口转发运行时状态失败",
+    )?;
 
     let mut out: Vec<PortForward> = Vec::new();
     for r in rules.into_iter().filter(|x| x.server_id == server_id) {
@@ -386,7 +408,13 @@ fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: State<'_, A
     save_port_forward_rules_to_state(&state, &rules)?;
 
     // 同步运行时状态：禁用即停止。
-    if !enabled && let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
+    if !enabled && let Some(handle) = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "更新端口转发运行时状态失败",
+    )?
+    .remove(&id)
+    {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);
         }
@@ -401,7 +429,13 @@ pub fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppS
 
 pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     // 先停止运行时。
-    if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
+    if let Some(handle) = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "更新端口转发运行时状态失败",
+    )?
+    .remove(&id)
+    {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);
         }
@@ -454,7 +488,12 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
         }),
         last_error: None,
     };
-    state.port_forwards.lock().unwrap().insert(rule.id.clone(), handle);
+    lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "记录端口转发运行时状态失败",
+    )?
+    .insert(rule.id.clone(), handle);
 
     let cfg = server_cfg.clone();
     let rh = rule.remote_host.clone();
@@ -472,7 +511,7 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
             rx_bytes,
         })
         .await;
-    });
+    })?;
 
     Ok(())
 }
@@ -490,7 +529,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
     let running_ids: Vec<String> = state
         .port_forwards
         .lock()
-        .unwrap()
+        .map_err(|e| AppError::internal("port_forward.runtime_lock_failed", "读取端口转发运行时状态失败").with_detail(e.to_string()))?
         .iter()
         .filter(|(_, state)| {
             state
@@ -504,7 +543,13 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
 
     for id in running_ids {
         if !enabled_ids.contains(&id) {
-            if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
+            if let Some(handle) = lock_mutex(
+                &state.port_forwards,
+                "port_forward.runtime_lock_failed",
+                "更新端口转发运行时状态失败",
+            )?
+            .remove(&id)
+            {
                 if let Some(runtime) = handle.handle {
                     let _ = runtime.stop_tx.send(true);
                 }
@@ -526,7 +571,11 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
 
 pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let runtime = state.port_forwards.lock().unwrap();
+    let runtime = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "读取端口转发运行时状态失败",
+    )?;
 
     let mut out: Vec<PortForward> = Vec::with_capacity(rules.len());
     for r in rules.into_iter() {
@@ -571,10 +620,23 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     let enabled_ids: std::collections::HashSet<String> = enabled_rules.iter().map(|r| r.id.clone()).collect();
 
     // 停掉所有“未启用状态但正在运行”的规则
-    let running_ids: Vec<String> = state.port_forwards.lock().unwrap().keys().cloned().collect();
+    let running_ids: Vec<String> = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "读取端口转发运行时状态失败",
+    )?
+    .keys()
+    .cloned()
+    .collect();
     for id in running_ids {
         if !enabled_ids.contains(&id) {
-            if let Some(handle) = state.port_forwards.lock().unwrap().remove(&id) {
+            if let Some(handle) = lock_mutex(
+                &state.port_forwards,
+                "port_forward.runtime_lock_failed",
+                "更新端口转发运行时状态失败",
+            )?
+            .remove(&id)
+            {
                 if let Some(runtime) = handle.handle {
                     let _ = runtime.stop_tx.send(true);
                 }
@@ -595,10 +657,11 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
 }
 
 pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let handle = state
-        .port_forwards
-        .lock()
-        .unwrap()
+    let handle = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "更新端口转发运行时状态失败",
+    )?
         .remove(&id)
         .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
 
@@ -609,7 +672,13 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
 }
 
 pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
-    let handles: Vec<_> = state.port_forwards.lock().unwrap().drain().collect();
+    let handles: Vec<_> = lock_mutex(
+        &state.port_forwards,
+        "port_forward.runtime_lock_failed",
+        "更新端口转发运行时状态失败",
+    )?
+    .drain()
+    .collect();
     for (_id, handle) in handles {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);

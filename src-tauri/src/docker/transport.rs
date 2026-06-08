@@ -21,6 +21,7 @@ use crate::scripts::DOCKER_READ_DAEMON_CONFIG_SH;
 use crate::ssh::client::{SshClientHandler, connect, disconnect};
 use crate::ssh::exec::ssh_exec_async;
 use crate::ssh::pool;
+use crate::state::lock_mutex;
 
 const DEFAULT_DOCKER_HOST: &str = "unix:///var/run/docker.sock";
 const ENDPOINT_CACHE_TTL: Duration = Duration::from_secs(300);
@@ -72,12 +73,19 @@ fn cache_key(config: &ServerConfig) -> String {
 }
 
 pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
-    endpoint_cache().lock().unwrap().remove(&cache_key(config));
+    let _ = lock_mutex(
+        endpoint_cache(),
+        "docker.endpoint_cache_lock_failed",
+        "更新 Docker endpoint 缓存失败",
+    )
+    .map(|mut cache| cache.remove(&cache_key(config)));
     invalidate_pooled_http(config).await;
 }
 
 pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
-    let state = http_pool().lock().unwrap().remove(&cache_key(config));
+    let state = lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败")
+        .ok()
+        .and_then(|mut pool| pool.remove(&cache_key(config)));
     if let Some(state) = state {
         for slot in &state.slots {
             let mut pooled = slot.lock().await;
@@ -90,7 +98,10 @@ pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
 
 pub(crate) async fn invalidate_pooled_http_server_id(server_id: &str) {
     let states: Vec<Arc<HttpPoolState>> = {
-        let mut guard = http_pool().lock().unwrap();
+        let mut guard = match lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败") {
+            Ok(guard) => guard,
+            Err(_) => return,
+        };
         let keys: Vec<String> = guard
             .keys()
             .filter(|key| key.starts_with(&format!("{server_id}|")))
@@ -152,7 +163,12 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
 
 pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerEndpoint> {
     let key = cache_key(config);
-    if let Some(entry) = endpoint_cache().lock().unwrap().get(&key)
+    if let Some(entry) = lock_mutex(
+        endpoint_cache(),
+        "docker.endpoint_cache_lock_failed",
+        "读取 Docker endpoint 缓存失败",
+    )?
+    .get(&key)
         && entry.fetched_at.elapsed() < ENDPOINT_CACHE_TTL
     {
         return Ok(entry.value.clone());
@@ -170,7 +186,12 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
         .map(|host| host.as_str())
         .unwrap_or(DEFAULT_DOCKER_HOST);
     let endpoint = parse_docker_host(host)?;
-    endpoint_cache().lock().unwrap().insert(
+    lock_mutex(
+        endpoint_cache(),
+        "docker.endpoint_cache_lock_failed",
+        "更新 Docker endpoint 缓存失败",
+    )?
+    .insert(
         key,
         EndpointCacheEntry {
             value: endpoint.clone(),
@@ -370,7 +391,9 @@ async fn open_pooled_http_sender(config: &ServerConfig) -> AppResult<PooledHttpC
 
 fn get_http_pool_state(config: &ServerConfig) -> Arc<HttpPoolState> {
     let key = cache_key(config);
-    let mut guard = http_pool().lock().unwrap();
+    let mut guard = http_pool()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     guard
         .entry(key)
         .or_insert_with(|| {
@@ -401,7 +424,10 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
     }
 
     let ready_result = {
-        let connection = pooled.as_mut().expect("pooled Docker HTTP connection must exist");
+        let connection = pooled.as_mut().ok_or_else(|| {
+            AppError::internal("docker.pooled_connection_missing", "Docker HTTP 连接池状态异常：连接缺失")
+                .retryable(true)
+        })?;
         connection.sender.ready().await
     };
     if let Err(e) = ready_result {
@@ -416,7 +442,10 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
     }
 
     let response = {
-        let connection = pooled.as_mut().expect("pooled Docker HTTP connection must exist");
+        let connection = pooled.as_mut().ok_or_else(|| {
+            AppError::internal("docker.pooled_connection_missing", "Docker HTTP 连接池状态异常：连接缺失")
+                .retryable(true)
+        })?;
         connection.sender.send_request(request).await
     };
     let response = match response {

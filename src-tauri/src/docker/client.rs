@@ -9,6 +9,7 @@ use crate::contracts::docker_api::common::DockerVersion;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::transport::{open_hijack, open_stream, request_empty, request_json_body_text, request_text};
 use crate::error::{AppError, AppResult};
+use crate::state::lock_mutex;
 
 const API_VERSION_CACHE_TTL: Duration = Duration::from_secs(300);
 
@@ -27,12 +28,22 @@ fn cache_key(config: &ServerConfig) -> String {
 }
 
 pub fn invalidate_api_version(config: &ServerConfig) {
-    api_version_cache().lock().unwrap().remove(&cache_key(config));
+    let _ = lock_mutex(
+        api_version_cache(),
+        "docker.api_version_cache_lock_failed",
+        "更新 Docker API 版本缓存失败",
+    )
+    .map(|mut cache| cache.remove(&cache_key(config)));
 }
 
 pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<String> {
     let key = cache_key(config);
-    if let Some(entry) = api_version_cache().lock().unwrap().get(&key)
+    if let Some(entry) = lock_mutex(
+        api_version_cache(),
+        "docker.api_version_cache_lock_failed",
+        "读取 Docker API 版本缓存失败",
+    )?
+    .get(&key)
         && entry.fetched_at.elapsed() < API_VERSION_CACHE_TTL
     {
         return Ok(entry.value.clone());
@@ -49,7 +60,12 @@ pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<Strin
     })?;
 
     let api_ver = version.api_version;
-    api_version_cache().lock().unwrap().insert(
+    lock_mutex(
+        api_version_cache(),
+        "docker.api_version_cache_lock_failed",
+        "更新 Docker API 版本缓存失败",
+    )?
+    .insert(
         key,
         CacheEntry {
             value: api_ver.clone(),

@@ -14,6 +14,6 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
 
 #[tauri::command]
 #[specta::specta]
-pub fn stop_event_stream(server_id: String, state: State<AppState>) {
-    services::docker_events::stop_event_stream(server_id, state)
+pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult<()> {
+    Ok(services::docker_events::stop_event_stream(server_id, state)?)
 }

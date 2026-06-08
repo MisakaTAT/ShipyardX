@@ -12,7 +12,7 @@ use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_s
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, StreamHandle, get_server_config};
+use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -272,18 +272,19 @@ pub fn start_image_pull(
     let ah = app_handle.clone();
     spawn_on_runtime(async move {
         run_pull_task(server, pid, img, stop_rx, ah).await;
-    });
+    })?;
 
     state
         .streams
         .lock()
-        .unwrap()
+        .map_err(|e| AppError::internal("image.pull_streams_lock_failed", "记录镜像拉取状态失败").with_detail(e.to_string()))?
         .insert(pull_id.clone(), StreamHandle { stop_tx });
     Ok(pull_id)
 }
 
-pub fn cancel_stream(stream_id: String, state: State<AppState>) {
-    if let Some(h) = state.streams.lock().unwrap().remove(&stream_id) {
+pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
+    if let Some(h) = lock_mutex(&state.streams, "image.pull_streams_lock_failed", "取消镜像拉取失败")?.remove(&stream_id) {
         let _ = h.stop_tx.send(true);
     }
+    Ok(())
 }

@@ -32,34 +32,40 @@ fn expand_key_path(raw: &str) -> String {
     }
 }
 
-fn ssh_runtime() -> &'static Runtime {
-    static RUNTIME: OnceLock<Runtime> = OnceLock::new();
-    RUNTIME.get_or_init(|| {
+fn ssh_runtime() -> AppResult<&'static Runtime> {
+    static RUNTIME: OnceLock<AppResult<Runtime>> = OnceLock::new();
+    let runtime = RUNTIME.get_or_init(|| {
         Builder::new_multi_thread()
             .enable_all()
             .thread_name("shipyardx-russh")
             .build()
-            .expect("failed to create ssh runtime")
-    })
-}
+            .map_err(|e| AppError::internal("ssh.runtime_init_failed", "初始化 SSH 运行时失败").with_source(e))
+    });
 
-pub fn block_on<F>(future: F) -> F::Output
-where
-    F: std::future::Future,
-{
-    if tokio::runtime::Handle::try_current().is_ok() {
-        tokio::task::block_in_place(|| ssh_runtime().handle().block_on(future))
-    } else {
-        ssh_runtime().block_on(future)
+    match runtime {
+        Ok(runtime) => Ok(runtime),
+        Err(error) => Err(error.clone()),
     }
 }
 
-pub fn spawn_on_runtime<F>(future: F) -> tokio::task::JoinHandle<F::Output>
+pub fn block_on<F>(future: F) -> AppResult<F::Output>
+where
+    F: std::future::Future,
+{
+    let runtime = ssh_runtime()?;
+    if tokio::runtime::Handle::try_current().is_ok() {
+        Ok(tokio::task::block_in_place(|| runtime.handle().block_on(future)))
+    } else {
+        Ok(runtime.block_on(future))
+    }
+}
+
+pub fn spawn_on_runtime<F>(future: F) -> AppResult<tokio::task::JoinHandle<F::Output>>
 where
     F: std::future::Future + Send + 'static,
     F::Output: Send + 'static,
 {
-    ssh_runtime().handle().spawn(future)
+    Ok(ssh_runtime()?.handle().spawn(future))
 }
 
 pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClientHandler>> {

@@ -17,7 +17,7 @@ use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, Terminal
 use crate::docker::client::{docker_post_async, docker_post_json_hijack_async, docker_post_json_response_async};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
-use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config};
+use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
 /// 终端 WS 走单路二进制，首字节是 channel tag：0x00 = PTY 字节流，0x01 = 控制 JSON（UTF-8）。
@@ -55,15 +55,14 @@ fn is_safe_docker_ident(v: &str) -> bool {
 }
 
 fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
-    let tx = app
-        .state::<AppState>()
-        .terminal_ws_clients
-        .lock()
-        .unwrap()
-        .get(session_id)
-        .cloned();
-    if let Some(tx) = tx {
-        let _ = tx.send(frame);
+    if let Ok(clients) = lock_mutex(
+        &app.state::<AppState>().terminal_ws_clients,
+        "terminal.ws_clients_lock_failed",
+        "读取终端 WebSocket 客户端失败",
+    ) {
+        if let Some(tx) = clients.get(session_id).cloned() {
+            let _ = tx.send(frame);
+        }
     }
 }
 
@@ -326,9 +325,14 @@ async fn run_terminal_io_loop(
 
 fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
     let app_state = ah.state::<AppState>();
-    let terminals = app_state.terminals.lock().unwrap();
-    if let Some(handle) = terminals.get(session_id) {
-        let _ = handle.tx.send(msg);
+    if let Ok(terminals) = lock_mutex(
+        &app_state.terminals,
+        "terminal.sessions_lock_failed",
+        "读取终端会话失败",
+    ) {
+        if let Some(handle) = terminals.get(session_id) {
+            let _ = handle.tx.send(msg);
+        }
     }
 }
 
@@ -378,11 +382,16 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     }
 
     let (tx, mut rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
-    ah.state::<AppState>()
-        .terminal_ws_clients
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), tx);
+    if let Ok(mut clients) = lock_mutex(
+        &ah.state::<AppState>().terminal_ws_clients,
+        "terminal.ws_clients_lock_failed",
+        "记录终端 WebSocket 客户端失败",
+    ) {
+        clients.insert(session_id.clone(), tx);
+    } else {
+        let _ = ws.close(None).await;
+        return;
+    }
 
     'ws: loop {
         tokio::select! {
@@ -407,38 +416,48 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
         }
     }
 
-    ah.state::<AppState>()
-        .terminal_ws_clients
-        .lock()
-        .unwrap()
-        .remove(&session_id);
+    if let Ok(mut clients) = lock_mutex(
+        &ah.state::<AppState>().terminal_ws_clients,
+        "terminal.ws_clients_lock_failed",
+        "移除终端 WebSocket 客户端失败",
+    ) {
+        clients.remove(&session_id);
+    }
 }
 
-fn start_terminal_ws_server_once(app_handle: AppHandle) {
-    let _ = WS_PORT.get_or_init(move || {
-        let listener = block_on(async {
-            TcpListener::bind("127.0.0.1:0")
-                .await
-                .expect("failed to bind terminal ws server")
-        });
-        let port = listener.local_addr().expect("failed to read terminal ws addr").port();
+fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
+    if WS_PORT.get().is_some() {
+        return Ok(());
+    }
 
-        spawn_on_runtime(async move {
-            while let Ok((stream, _addr)) = listener.accept().await {
-                let ah = app_handle.clone();
-                tokio::spawn(async move {
-                    run_ws_client(stream, ah).await;
-                });
-            }
-        });
-        port
-    });
+    let listener = block_on(TcpListener::bind("127.0.0.1:0"))
+        .and_then(|result| result.map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e)))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| AppError::internal("terminal.ws_addr_failed", "读取终端 WebSocket 地址失败").with_source(e))?
+        .port();
+
+    match WS_PORT.set(port) {
+        Ok(()) => {
+            spawn_on_runtime(async move {
+                while let Ok((stream, _addr)) = listener.accept().await {
+                    let ah = app_handle.clone();
+                    tokio::spawn(async move {
+                        run_ws_client(stream, ah).await;
+                    });
+                }
+            })?;
+            Ok(())
+        }
+        Err(_) => Ok(()),
+    }
 }
 
-fn terminal_ws_port() -> u16 {
-    *WS_PORT
+fn terminal_ws_port() -> AppResult<u16> {
+    WS_PORT
         .get()
-        .expect("terminal ws server must be initialized before reading port")
+        .copied()
+        .ok_or_else(|| AppError::internal("terminal.ws_not_initialized", "终端 WebSocket 服务尚未初始化"))
 }
 
 pub fn open_terminal(
@@ -448,8 +467,8 @@ pub fn open_terminal(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    start_terminal_ws_server_once(app_handle.clone());
-    let ws_port = terminal_ws_port();
+    start_terminal_ws_server_once(app_handle.clone())?;
+    let ws_port = terminal_ws_port()?;
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
@@ -458,13 +477,14 @@ pub fn open_terminal(
     let ah = app_handle.clone();
     spawn_on_runtime(async move {
         run_terminal_thread(server, sid, rx, ah, cols, rows);
-    });
+    })?;
 
-    state
-        .terminals
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(
+        &state.terminals,
+        "terminal.sessions_lock_failed",
+        "记录终端会话失败",
+    )?
+    .insert(session_id.clone(), TerminalHandle { tx });
     Ok(TerminalSession { session_id, ws_port })
 }
 
@@ -474,8 +494,8 @@ pub fn open_container_exec_terminal(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    start_terminal_ws_server_once(app_handle.clone());
-    let ws_port = terminal_ws_port();
+    start_terminal_ws_server_once(app_handle.clone())?;
+    let ws_port = terminal_ws_port()?;
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
@@ -496,18 +516,19 @@ pub fn open_container_exec_terminal(
             user: params.user,
             shell,
         })
-    });
+    })?;
 
-    state
-        .terminals
-        .lock()
-        .unwrap()
-        .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(
+        &state.terminals,
+        "terminal.sessions_lock_failed",
+        "记录终端会话失败",
+    )?
+    .insert(session_id.clone(), TerminalHandle { tx });
     Ok(TerminalSession { session_id, ws_port })
 }
 
 pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<()> {
-    let mut terminals = state.terminals.lock().unwrap();
+    let mut terminals = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);
     }
