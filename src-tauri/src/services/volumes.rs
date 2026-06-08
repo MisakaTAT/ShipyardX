@@ -2,6 +2,8 @@ use tauri::State;
 
 use std::collections::HashMap;
 
+use log::{debug, info};
+
 use crate::contracts::docker_api::container::ContainerSummary;
 use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList};
 use crate::contracts::frontend::volume::Volume;
@@ -11,6 +13,7 @@ use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
+    debug!(target: "shipyardx_lib::services::volumes", "listing volumes; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, "/volumes").await?;
     let api: VolumeList = serde_json::from_str(&resp)
@@ -47,7 +50,7 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
         }
     }
 
-    Ok(list
+    let volumes: Vec<Volume> = list
         .into_iter()
         .map(|v| {
             let name = v.name.clone().unwrap_or_default();
@@ -72,16 +75,20 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
                 used_by: used.join(", "),
             }
         })
-        .collect())
+        .collect();
+    info!(target: "shipyardx_lib::services::volumes", "listed volumes; server_id={} count={}", server_id, volumes.len());
+    Ok(volumes)
 }
 
 pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
+    debug!(target: "shipyardx_lib::services::volumes", "inspecting volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, &format!("/volumes/{}", name)).await?;
     pretty_json_response(&resp)
 }
 
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::volumes", "removing volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
     docker_delete_async(&server, &format!("/volumes/{}", name)).await
 }
@@ -103,6 +110,7 @@ pub async fn create_volume(
         driver,
         driver_opts,
     };
+    info!(target: "shipyardx_lib::services::volumes", "creating volume; server_id={} volume={} driver={}", server_id, body.name, body.driver);
     let server = get_server_config(&state, &server_id)?;
     docker_post_json_async(&server, "/volumes/create", &body).await
 }

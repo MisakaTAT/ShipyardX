@@ -2,6 +2,7 @@ use std::fs;
 use std::sync::OnceLock;
 
 use futures_util::{SinkExt, StreamExt};
+use log::{debug, error, info, warn};
 use russh::ChannelMsg;
 use tauri::{AppHandle, Manager, State};
 use tokio::io::AsyncWriteExt;
@@ -75,7 +76,16 @@ fn send_pty_bytes(app: &AppHandle, session_id: &str, bytes: &[u8]) {
 }
 
 fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) {
-    send_control(app, session_id, WsServerMsg::Error { error: error.into() });
+    let error = error.into();
+    error!(
+        target: "shipyardx_lib::services::terminal",
+        "terminal session failed; session_id={} code={} message={} detail={:?}",
+        session_id,
+        error.code,
+        error.message,
+        error.detail
+    );
+    send_control(app, session_id, WsServerMsg::Error { error });
 }
 
 fn run_terminal_thread(
@@ -86,6 +96,14 @@ fn run_terminal_thread(
     cols: u32,
     rows: u32,
 ) {
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "starting ssh terminal session; session_id={} server_id={} cols={} rows={}",
+        session_id,
+        config.id,
+        cols,
+        rows
+    );
     let fail_session_id = session_id.clone();
     let fail_handle = ah.clone();
     let result = block_on(async move {
@@ -110,6 +128,12 @@ fn run_terminal_thread(
 
     if let Err(e) = result {
         fail_terminal(&fail_handle, &fail_session_id, e);
+    } else {
+        info!(
+            target: "shipyardx_lib::services::terminal",
+            "ssh terminal session finished; session_id={}",
+            fail_session_id
+        );
     }
 }
 
@@ -147,6 +171,15 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
         return;
     }
 
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "starting container exec terminal; session_id={} server_id={} container_id={} cols={} rows={}",
+        session_id,
+        config.id,
+        container_id,
+        cols,
+        rows
+    );
     let fail_session_id = session_id.clone();
     let fail_handle = ah.clone();
     let result = block_on(async move {
@@ -182,6 +215,12 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
 
     if let Err(e) = result {
         fail_terminal(&fail_handle, &fail_session_id, e);
+    } else {
+        info!(
+            target: "shipyardx_lib::services::terminal",
+            "container exec terminal finished; session_id={}",
+            fail_session_id
+        );
     }
 }
 
@@ -350,12 +389,31 @@ fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
             if let Ok(ctrl) = serde_json::from_slice::<WsClientCtrl>(body) {
                 match ctrl {
                     WsClientCtrl::Resize { cols, rows } => {
+                        debug!(
+                            target: "shipyardx_lib::services::terminal",
+                            "terminal resize requested; session_id={} cols={} rows={}",
+                            session_id,
+                            cols,
+                            rows
+                        );
                         dispatch_terminal_msg(ah, session_id, TerminalMsg::Resize { cols, rows });
                     }
                     WsClientCtrl::Close => {
+                        info!(
+                            target: "shipyardx_lib::services::terminal",
+                            "terminal close requested by client; session_id={}",
+                            session_id
+                        );
                         dispatch_terminal_msg(ah, session_id, TerminalMsg::Close);
                     }
                 }
+            } else {
+                warn!(
+                    target: "shipyardx_lib::services::terminal",
+                    "invalid terminal control frame; session_id={} bytes={}",
+                    session_id,
+                    body.len()
+                );
             }
         }
         _ => {}
@@ -380,6 +438,12 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
         let _ = ws.close(None).await;
         return;
     }
+
+    debug!(
+        target: "shipyardx_lib::services::terminal",
+        "websocket client connected; session_id={}",
+        session_id
+    );
 
     let (tx, mut rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
     if let Ok(mut clients) = lock_mutex(
@@ -423,6 +487,11 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     ) {
         clients.remove(&session_id);
     }
+    debug!(
+        target: "shipyardx_lib::services::terminal",
+        "websocket client disconnected; session_id={}",
+        session_id
+    );
 }
 
 fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
@@ -436,6 +505,11 @@ fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
         .local_addr()
         .map_err(|e| AppError::internal("terminal.ws_addr_failed", "读取终端 WebSocket 地址失败").with_source(e))?
         .port();
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "terminal websocket server initialized; port={}",
+        port
+    );
 
     match WS_PORT.set(port) {
         Ok(()) => {
@@ -485,6 +559,13 @@ pub fn open_terminal(
         "记录终端会话失败",
     )?
     .insert(session_id.clone(), TerminalHandle { tx });
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "terminal session opened; session_id={} server_id={} ws_port={}",
+        session_id,
+        server_id,
+        ws_port
+    );
     Ok(TerminalSession { session_id, ws_port })
 }
 
@@ -501,6 +582,7 @@ pub fn open_container_exec_terminal(
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
 
     let shell = params.shell.trim().to_string();
+    let container_id_for_log = params.container_id.clone();
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
@@ -524,6 +606,14 @@ pub fn open_container_exec_terminal(
         "记录终端会话失败",
     )?
     .insert(session_id.clone(), TerminalHandle { tx });
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "container exec session opened; session_id={} server_id={} container_id={} ws_port={}",
+        session_id,
+        server_id,
+        container_id_for_log,
+        ws_port
+    );
     Ok(TerminalSession { session_id, ws_port })
 }
 
@@ -531,6 +621,17 @@ pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<(
     let mut terminals = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);
+        info!(
+            target: "shipyardx_lib::services::terminal",
+            "terminal session closed; session_id={}",
+            session_id
+        );
+    } else {
+        warn!(
+            target: "shipyardx_lib::services::terminal",
+            "terminal close requested for missing session; session_id={}",
+            session_id
+        );
     }
     Ok(())
 }

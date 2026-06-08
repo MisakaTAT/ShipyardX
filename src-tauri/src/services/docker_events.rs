@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use log::{debug, error, info, warn};
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 use tokio::sync::watch;
@@ -136,9 +137,11 @@ async fn run_event_stream_task(
     ah: AppHandle,
 ) {
     let mut attempt = 0usize;
+    info!(target: "shipyardx_lib::services::docker_events", "event stream task started; stream_id={} server_id={}", stream_id, config.id);
 
     loop {
         if *stop_rx.borrow() {
+            info!(target: "shipyardx_lib::services::docker_events", "event stream stopped before connect; stream_id={} server_id={}", stream_id, config.id);
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
             return;
         }
@@ -149,6 +152,16 @@ async fn run_event_stream_task(
             let mut stream = match docker_stream_async(&config, "/events").await {
                 Ok(stream) => stream,
                 Err(error) => {
+                    warn!(
+                        target: "shipyardx_lib::services::docker_events",
+                        "event stream open failed; stream_id={} server_id={} attempt={} code={} message={} detail={:?}",
+                        stream_id,
+                        config.id,
+                        attempt + 1,
+                        error.code,
+                        error.message,
+                        error.detail
+                    );
                     return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Reconnect(Some(
                         AppError::unavailable("docker.events_start_failed", "启动 Docker 事件流失败")
                             .with_detail(error.detail.unwrap_or(error.message))
@@ -158,6 +171,7 @@ async fn run_event_stream_task(
             };
 
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connected);
+            info!(target: "shipyardx_lib::services::docker_events", "event stream connected; stream_id={} server_id={}", stream_id, config.id);
 
             let mut line_buf = String::new();
             let mut last_refresh: Option<Instant> = None;
@@ -166,6 +180,7 @@ async fn run_event_stream_task(
                 tokio::select! {
                     changed = stop_rx.changed() => {
                         if changed.is_ok() && *stop_rx.borrow() {
+                            info!(target: "shipyardx_lib::services::docker_events", "event stream stop requested; stream_id={} server_id={}", stream_id, config.id);
                             return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Stopped);
                         }
                     }
@@ -209,8 +224,22 @@ async fn run_event_stream_task(
                                     }
                                 }
                             }
-                            Ok(None) => return Ok(StreamLoopExit::Reconnect(None)),
-                            Err(error) => return Ok(StreamLoopExit::Reconnect(Some(error))),
+                            Ok(None) => {
+                                warn!(target: "shipyardx_lib::services::docker_events", "event stream closed by remote; stream_id={} server_id={}", stream_id, config.id);
+                                return Ok(StreamLoopExit::Reconnect(None));
+                            }
+                            Err(error) => {
+                                warn!(
+                                    target: "shipyardx_lib::services::docker_events",
+                                    "event stream interrupted; stream_id={} server_id={} code={} message={} detail={:?}",
+                                    stream_id,
+                                    config.id,
+                                    error.code,
+                                    error.message,
+                                    error.detail
+                                );
+                                return Ok(StreamLoopExit::Reconnect(Some(error)));
+                            }
                         }
                     }
                 }
@@ -220,20 +249,25 @@ async fn run_event_stream_task(
 
         match stream_result {
             Ok(StreamLoopExit::Stopped) => {
+                info!(target: "shipyardx_lib::services::docker_events", "event stream stopped; stream_id={} server_id={}", stream_id, config.id);
                 emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
                 return;
             }
             Ok(StreamLoopExit::Reconnect(error)) => {
                 attempt += 1;
                 if let Some(error) = error {
+                    warn!(target: "shipyardx_lib::services::docker_events", "event stream scheduling reconnect; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt, error.code, error.message, error.detail);
                     let _ = DockerStreamError {
                         stream_id: stream_id.clone(),
                         error,
                     }
                     .emit(&ah);
+                } else {
+                    warn!(target: "shipyardx_lib::services::docker_events", "event stream scheduling reconnect after EOF; stream_id={} server_id={} attempt={}", stream_id, config.id, attempt);
                 }
             }
             Err(error) => {
+                error!(target: "shipyardx_lib::services::docker_events", "event stream loop failed; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt + 1, error.code, error.message, error.detail);
                 let _ = DockerStreamError {
                     stream_id: stream_id.clone(),
                     error,
@@ -244,12 +278,14 @@ async fn run_event_stream_task(
         }
 
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Disconnected);
+        debug!(target: "shipyardx_lib::services::docker_events", "event stream waiting to reconnect; stream_id={} server_id={} delay_secs={}", stream_id, config.id, reconnect_delay(attempt).as_secs());
         let stopped = tokio::time::timeout(reconnect_delay(attempt), stop_rx.changed())
             .await
             .ok()
             .and_then(Result::ok)
             .is_some_and(|_| *stop_rx.borrow());
         if stopped {
+            info!(target: "shipyardx_lib::services::docker_events", "event stream stopped during reconnect wait; stream_id={} server_id={}", stream_id, config.id);
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Stopped);
             return;
         }
@@ -266,6 +302,7 @@ fn reconnect_delay(attempt: usize) -> Duration {
 
 pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
     let server = get_server_config(&state, &server_id)?;
+    info!(target: "shipyardx_lib::services::docker_events", "starting event stream; server_id={}", server_id);
 
     {
         let streams = lock_mutex(
@@ -274,6 +311,7 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
             "读取事件流状态失败",
         )?;
         if let Some(existing) = streams.get(&server_id) {
+            debug!(target: "shipyardx_lib::services::docker_events", "reusing existing event stream; server_id={} stream_id={}", server_id, existing.stream_id);
             let current = *lock_mutex(
                 &existing.status,
                 "docker_events.status_lock_failed",
@@ -305,13 +343,14 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
         "记录事件流状态失败",
     )?
     .insert(
-        server_id,
+        server_id.clone(),
         EventStreamHandle {
             stream_id: stream_id.clone(),
             stop_tx,
             status,
         },
     );
+    info!(target: "shipyardx_lib::services::docker_events", "event stream registered; server_id={} stream_id={}", server_id, stream_id);
 
     Ok(stream_id)
 }
@@ -324,7 +363,10 @@ pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult
     )?
     .remove(&server_id)
     {
+        info!(target: "shipyardx_lib::services::docker_events", "stopping event stream; server_id={} stream_id={}", server_id, h.stream_id);
         let _ = h.stop_tx.send(true);
+    } else {
+        warn!(target: "shipyardx_lib::services::docker_events", "stop requested for missing event stream; server_id={}", server_id);
     }
     Ok(())
 }

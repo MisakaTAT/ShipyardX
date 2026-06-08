@@ -1,5 +1,6 @@
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::watch;
+use log::{debug, error, info, warn};
 
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::docker_stream_async;
@@ -86,6 +87,15 @@ async fn run_log_stream_task(
     mut stop_rx: watch::Receiver<bool>,
     ah: AppHandle,
 ) {
+    info!(
+        target: "shipyardx_lib::services::log_stream",
+        "log stream task started; stream_id={} server_id={} container_id={} tail={} timestamps={}",
+        stream_id,
+        config.id,
+        container_id,
+        tail,
+        timestamps
+    );
     let ts = if timestamps { "&timestamps=1" } else { "" };
     let path = format!(
         "/containers/{}/logs?stdout=1&stderr=1&follow=1&tail={}{}",
@@ -95,6 +105,16 @@ async fn run_log_stream_task(
     let mut stream = match docker_stream_async(&config, &path).await {
         Ok(stream) => stream,
         Err(error) => {
+            error!(
+                target: "shipyardx_lib::services::log_stream",
+                "log stream open failed; stream_id={} server_id={} container_id={} code={} message={} detail={:?}",
+                stream_id,
+                config.id,
+                container_id,
+                error.code,
+                error.message,
+                error.detail
+            );
             let _ = ah.emit(
                 &format!("log-data:{}", stream_id),
                 format!("\x1b[31m连接失败: {}\x1b[0m\r\n", error.message).into_bytes(),
@@ -123,6 +143,7 @@ async fn run_log_stream_task(
         tokio::select! {
             changed = stop_rx.changed() => {
                 if changed.is_ok() && *stop_rx.borrow() {
+                    info!(target: "shipyardx_lib::services::log_stream", "log stream stopped by request; stream_id={} server_id={} container_id={}", stream_id, config.id, container_id);
                     flush_buffered(&ah, &stream_id, &mut output_buffer);
                     let _ = ah.emit(&format!("log-done:{}", stream_id), ());
                     return;
@@ -137,6 +158,7 @@ async fn run_log_stream_task(
                         }
                     }
                     Ok(None) => {
+                        info!(target: "shipyardx_lib::services::log_stream", "log stream completed; stream_id={} server_id={} container_id={}", stream_id, config.id, container_id);
                         if let Some(tail) = decoder.finish() {
                             let text = String::from_utf8_lossy(&tail);
                             emit_buffered(&text, &ah, &stream_id, &mut output_buffer);
@@ -146,6 +168,16 @@ async fn run_log_stream_task(
                         return;
                     }
                     Err(error) => {
+                        warn!(
+                            target: "shipyardx_lib::services::log_stream",
+                            "log stream interrupted; stream_id={} server_id={} container_id={} code={} message={} detail={:?}",
+                            stream_id,
+                            config.id,
+                            container_id,
+                            error.code,
+                            error.message,
+                            error.detail
+                        );
                         emit_buffered(
                             &format!("\x1b[31m日志流中断: {}\x1b[0m\r\n", error.message),
                             &ah,
@@ -173,6 +205,7 @@ pub fn start_log_stream(
     let server = get_server_config(&state, &server_id)?;
     let stream_id = generate_id();
     let (stop_tx, stop_rx) = watch::channel(false);
+    info!(target: "shipyardx_lib::services::log_stream", "starting log stream; stream_id={} server_id={} container_id={} tail={} timestamps={}", stream_id, server_id, container_id, tail, timestamps);
 
     let sid = stream_id.clone();
     let cid = container_id.clone();
@@ -186,12 +219,16 @@ pub fn start_log_stream(
         .lock()
         .map_err(|e| crate::error::AppError::internal("log_stream.start_lock_failed", "记录日志流状态失败").with_detail(e.to_string()))?
         .insert(stream_id.clone(), StreamHandle { stop_tx });
+    debug!(target: "shipyardx_lib::services::log_stream", "log stream registered; stream_id={}", stream_id);
     Ok(stream_id)
 }
 
 pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> crate::error::AppResult<()> {
     if let Some(handle) = lock_mutex(&state.streams, "log_stream.stop_lock_failed", "停止日志流失败")?.remove(&stream_id) {
+        info!(target: "shipyardx_lib::services::log_stream", "stopping log stream; stream_id={}", stream_id);
         let _ = handle.stop_tx.send(true);
+    } else {
+        warn!(target: "shipyardx_lib::services::log_stream", "stop requested for missing log stream; stream_id={}", stream_id);
     }
     Ok(())
 }

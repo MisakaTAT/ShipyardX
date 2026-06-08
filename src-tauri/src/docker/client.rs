@@ -3,6 +3,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use hyper::Method;
+use log::debug;
 use serde::Serialize;
 
 use crate::contracts::docker_api::common::DockerVersion;
@@ -28,6 +29,7 @@ fn cache_key(config: &ServerConfig) -> String {
 }
 
 pub fn invalidate_api_version(config: &ServerConfig) {
+    debug!(target: "shipyardx_lib::docker::client", "invalidating docker api version cache; server_id={} host={} port={}", config.id, config.host, config.port);
     let _ = lock_mutex(
         api_version_cache(),
         "docker.api_version_cache_lock_failed",
@@ -46,8 +48,10 @@ pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<Strin
     .get(&key)
         && entry.fetched_at.elapsed() < API_VERSION_CACHE_TTL
     {
+        debug!(target: "shipyardx_lib::docker::client", "docker api version cache hit; server_id={} api_version={}", config.id, entry.value);
         return Ok(entry.value.clone());
     }
+    debug!(target: "shipyardx_lib::docker::client", "resolving docker api version; server_id={} host={} port={}", config.id, config.host, config.port);
 
     let resp = request_text(config, Method::GET, "/version").await?;
     let version: DockerVersion = serde_json::from_str(resp.trim()).map_err(|e| {
@@ -72,6 +76,7 @@ pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<Strin
             fetched_at: Instant::now(),
         },
     );
+    debug!(target: "shipyardx_lib::docker::client", "resolved docker api version; server_id={} api_version={}", config.id, api_ver);
     Ok(api_ver)
 }
 

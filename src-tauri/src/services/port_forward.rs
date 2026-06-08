@@ -8,6 +8,7 @@ use tauri::State;
 
 use std::collections::BTreeSet;
 
+use log::{debug, error, info};
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener as TokioTcpListener;
@@ -83,6 +84,8 @@ async fn bridge_once(args: PortForwardBridgeArgs) {
     } = args;
 
     let _ = local_stream.set_nodelay(true);
+    let log_server_id = server_cfg.id.clone();
+    let log_remote_host = remote_host.clone();
 
     let result = async move {
         let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
@@ -116,6 +119,15 @@ async fn bridge_once(args: PortForwardBridgeArgs) {
     .await;
 
     if let Err(e) = result {
+        error!(
+            target: "shipyardx_lib::services::port_forward",
+            "port forward bridge failed; server_id={} remote_host={} remote_port={} message={} detail={:?}",
+            log_server_id,
+            log_remote_host,
+            remote_port,
+            e.message,
+            e.detail
+        );
         if let Ok(mut last_error_guard) = last_error.lock() {
             *last_error_guard = Some(error_message(e));
         }
@@ -208,6 +220,13 @@ async fn accept_loop(args: PortForwardAcceptArgs) {
 
 fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
     let start = Instant::now();
+    debug!(
+        target: "shipyardx_lib::services::port_forward",
+        "probing remote port; server_id={} remote_host={} remote_port={}",
+        server_cfg.id,
+        remote_host,
+        remote_port
+    );
     block_on(async {
         let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
             .await
@@ -444,6 +463,11 @@ pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<
     let mut rules = load_port_forward_rules_from_state(&state)?;
     rules.retain(|r| r.id != id);
     save_port_forward_rules_to_state(&state, &rules)?;
+    info!(
+        target: "shipyardx_lib::services::port_forward",
+        "port forward rule deleted; rule_id={}",
+        id
+    );
     Ok(())
 }
 
@@ -494,6 +518,16 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
         "记录端口转发运行时状态失败",
     )?
     .insert(rule.id.clone(), handle);
+    info!(
+        target: "shipyardx_lib::services::port_forward",
+        "port forward runtime started; rule_id={} server_id={} bind_address={} local_port={} remote_host={} remote_port={}",
+        rule.id,
+        rule.server_id,
+        bind_addr,
+        actual_local_port,
+        rule.remote_host,
+        rule.remote_port
+    );
 
     let cfg = server_cfg.clone();
     let rh = rule.remote_host.clone();
@@ -560,6 +594,14 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
     // 启动所有 enabled 规则（对失败做错误记录，不要中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
+            error!(
+                target: "shipyardx_lib::services::port_forward",
+                "failed to start enabled port forward; rule_id={} server_id={} message={} detail={:?}",
+                r.id,
+                r.server_id,
+                e.message,
+                e.detail
+            );
             set_port_forward_error(&state, &r.id, Some(error_message(e)));
         } else {
             set_port_forward_error(&state, &r.id, None);
@@ -647,6 +689,14 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     // 启动所有 enabled 规则（对失败做错误记录，不中断其他规则）。
     for r in enabled_rules {
         if let Err(e) = start_port_forward_runtime(&r, &state) {
+            error!(
+                target: "shipyardx_lib::services::port_forward",
+                "failed to start global enabled port forward; rule_id={} server_id={} message={} detail={:?}",
+                r.id,
+                r.server_id,
+                e.message,
+                e.detail
+            );
             set_port_forward_error(&state, &r.id, Some(error_message(e)));
         } else {
             set_port_forward_error(&state, &r.id, None);
@@ -667,6 +717,15 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
 
     if let Some(runtime) = handle.handle {
         let _ = runtime.stop_tx.send(true);
+        info!(
+            target: "shipyardx_lib::services::port_forward",
+            "port forward runtime stopped; rule_id={} server_id={} local_port={} tx_bytes={} rx_bytes={}",
+            id,
+            runtime.server_id,
+            runtime.local_port,
+            runtime.tx_bytes.load(Ordering::Relaxed),
+            runtime.rx_bytes.load(Ordering::Relaxed)
+        );
     }
     Ok(())
 }
@@ -679,11 +738,17 @@ pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
     )?
     .drain()
     .collect();
+    let total = handles.len();
     for (_id, handle) in handles {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);
         }
     }
+    info!(
+        target: "shipyardx_lib::services::port_forward",
+        "stopped all port forward runtimes; count={}",
+        total
+    );
     Ok(())
 }
 

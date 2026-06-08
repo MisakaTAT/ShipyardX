@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use log::{debug, info, warn};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::fs;
@@ -54,6 +55,7 @@ fn pick_description(desc: &crate::contracts::frontend::appstore::DescriptionI18n
 pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
     let cache_dir = appstore_cache_dir(app)?;
     let git_dir = cache_dir.join(".git");
+    info!(target: "shipyardx_lib::services::appstore", "syncing appstore; cache_dir={}", cache_dir.display());
 
     if fs::try_exists(&git_dir).await.unwrap_or(false) {
         let cache_dir_str = cache_dir.to_string_lossy().to_string();
@@ -67,6 +69,7 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("Not a git repository") || stderr.contains("error:") {
+                warn!(target: "shipyardx_lib::services::appstore", "appstore cache invalid, recreating; cache_dir={} stderr={}", cache_dir.display(), stderr.trim());
                 let _ = fs::remove_dir_all(&cache_dir).await;
                 return Box::pin(sync_appstore(app)).await;
             }
@@ -74,6 +77,7 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
                 AppError::unavailable("appstore.git_pull_failed", "同步应用商店失败").with_detail(stderr.trim())
             );
         }
+        info!(target: "shipyardx_lib::services::appstore", "appstore pull completed; cache_dir={}", cache_dir.display());
     } else {
         let _ = fs::create_dir_all(&cache_dir).await;
         let cache_dir_str = cache_dir.to_string_lossy().to_string();
@@ -89,6 +93,7 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
                 AppError::unavailable("appstore.git_clone_failed", "克隆应用商店失败").with_detail(stderr.trim())
             );
         }
+        info!(target: "shipyardx_lib::services::appstore", "appstore clone completed; cache_dir={}", cache_dir.display());
     }
 
     Ok(cache_dir)
@@ -97,6 +102,7 @@ pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
 pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     let cache_dir = appstore_cache_dir(app)?;
     let apps_dir = apps_dir(&cache_dir);
+    debug!(target: "shipyardx_lib::services::appstore", "listing appstore apps; apps_dir={}", apps_dir.display());
 
     if !fs::try_exists(&apps_dir).await.unwrap_or(false) {
         return Ok(vec![]);
@@ -182,10 +188,12 @@ pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     }
 
     items.sort_by(|a, b| a.name.cmp(&b.name));
+    info!(target: "shipyardx_lib::services::appstore", "listed appstore apps; count={}", items.len());
     Ok(items)
 }
 
 pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
+    debug!(target: "shipyardx_lib::services::appstore", "fetching app detail; app_key={}", app_key);
     let cache_dir = appstore_cache_dir(app)?;
     let app_dir = apps_dir(&cache_dir).join(app_key);
 
@@ -261,7 +269,7 @@ pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDeta
         }
     }
 
-    Ok(AppDetail {
+    let detail = AppDetail {
         key: app_key.to_string(),
         name: manifest.additional.name.clone(),
         tags: manifest.tags.clone(),
@@ -275,7 +283,9 @@ pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDeta
         versions: version_infos,
         readme_zh,
         readme_en,
-    })
+    };
+    info!(target: "shipyardx_lib::services::appstore", "fetched app detail; app_key={} versions={}", app_key, detail.versions.len());
+    Ok(detail)
 }
 
 fn emit_step(app: &AppHandle, step: &str, status: &str, message: &str) {
@@ -311,6 +321,7 @@ fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuf
 }
 
 pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::appstore", "installing app; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, req.env_values.len());
     let cache_dir = appstore_cache_dir(app)?;
     let app_dir = apps_dir(&cache_dir).join(&req.app_key);
     let version_dir = app_dir.join(&req.version);
@@ -340,12 +351,14 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         .or_insert_with(|| container_name);
 
     let rendered = render_compose(&compose_template, &env_values);
+    debug!(target: "shipyardx_lib::services::appstore", "app compose rendered; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, env_values.len());
     emit_step(app, "prepare", "done", "部署模板准备完成");
 
     // Step 2: 部署文件
     emit_step(app, "deploy", "running", "正在部署文件到远程服务器...");
     let install_id = Uuid::new_v4().to_string();
     let remote_rel_base = format!("shipyardx/apps/{}", install_id);
+    info!(target: "shipyardx_lib::services::appstore", "deploying app files; server_id={} app_key={} version={} install_id={}", server.id, req.app_key, req.version, install_id);
 
     let compose_b64 = STANDARD.encode(rendered.as_bytes());
     let env_content = build_env_file(&env_values);
@@ -376,6 +389,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     let local_data_dir = version_dir.join("data");
     let local_data_meta = fs::metadata(&local_data_dir).await.ok();
     if local_data_meta.as_ref().is_some_and(|meta| meta.is_dir()) {
+        info!(target: "shipyardx_lib::services::appstore", "copying app data dir; server_id={} app_key={} version={}", server.id, req.app_key, req.version);
         emit_step(app, "deploy", "running", "正在复制数据目录...");
         copy_data_dir_to_remote(app, server, &local_data_dir, &format!("{}/data", remote_rel_base))
             .await
@@ -385,12 +399,14 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
             })?;
     }
     emit_step(app, "deploy", "done", "文件部署完成");
+    info!(target: "shipyardx_lib::services::appstore", "app files deployed; server_id={} app_key={} version={} install_id={}", server.id, req.app_key, req.version, install_id);
 
     // Step 3: 创建网络
     emit_step(app, "network", "running", "正在创建 Docker 网络...");
     let net_cmd = APPSTORE_CREATE_NETWORK_SH.to_string();
     let _ = ssh_exec_async(server, &net_cmd).await;
     emit_step(app, "network", "done", "Docker 网络就绪");
+    info!(target: "shipyardx_lib::services::appstore", "app network ensured; server_id={} app_key={} version={}", server.id, req.app_key, req.version);
 
     // Step 4: 启动容器
     emit_step(app, "start", "running", "正在启动容器服务...");
@@ -417,6 +433,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     match result {
         Ok(_) => {}
         Err(e) => {
+            warn!(target: "shipyardx_lib::services::appstore", "docker compose v2 failed, falling back; server_id={} app_key={} version={} code={} message={} detail={:?}", server.id, req.app_key, req.version, e.code, e.message, e.detail);
             flush_buffered_output(app, "start", &mut start_output_buffer);
             let mut fallback_output_buffer = TextOutputBuffer::new(
                 INSTALL_OUTPUT_CHUNK_BYTES,
@@ -428,6 +445,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
             })
             .await
             .map_err(|e2| {
+                warn!(target: "shipyardx_lib::services::appstore", "docker compose fallback failed; server_id={} app_key={} version={} primary_code={} fallback_code={}", server.id, req.app_key, req.version, e.code, e2.code);
                 flush_buffered_output(app, "start", &mut fallback_output_buffer);
                 emit_step(app, "start", "error", "容器启动失败");
                 AppError::unavailable("appstore.compose_up_failed", "容器启动失败").with_detail(format!(
@@ -441,6 +459,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     };
     flush_buffered_output(app, "start", &mut start_output_buffer);
     emit_step(app, "start", "done", "容器服务已启动");
+    info!(target: "shipyardx_lib::services::appstore", "app install completed; server_id={} app_key={} version={} install_id={}", server.id, req.app_key, req.version, install_id);
 
     Ok(())
 }
@@ -572,6 +591,7 @@ async fn copy_data_dir_to_remote(
     local_dir: &Path,
     remote_rel_dir: &str,
 ) -> AppResult<()> {
+    debug!(target: "shipyardx_lib::services::appstore", "measuring data dir for upload; server_id={} local_dir={} remote_rel_dir={}", server.id, local_dir.display(), remote_rel_dir);
     let parent = local_dir.parent().unwrap_or(local_dir);
     let dir_name = local_dir
         .file_name()
@@ -653,6 +673,7 @@ async fn copy_data_dir_to_remote(
     let tar_stderr = stderr_task.await.unwrap_or_default();
 
     upload_result?;
+    info!(target: "shipyardx_lib::services::appstore", "data dir uploaded; server_id={} remote_rel_dir={} bytes={}", server.id, remote_rel_dir, total_bytes);
 
     if !tar_status.success() {
         let detail = String::from_utf8_lossy(&tar_stderr).trim().to_string();

@@ -1,5 +1,7 @@
 use tauri::State;
 
+use log::{debug, info};
+
 use crate::contracts::docker_api::network::{
     self as engine_network, NetworkCreateIpam, NetworkCreateIpamConfig, NetworkSummary,
 };
@@ -10,6 +12,7 @@ use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Network>> {
+    debug!(target: "shipyardx_lib::services::networks", "listing networks; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, "/networks").await?;
     let mut api: Vec<NetworkSummary> = serde_json::from_str(&resp)
@@ -19,7 +22,7 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> App
         |x| x.created.clone().unwrap_or_default(),
         |x| x.id.clone().unwrap_or_default(),
     );
-    Ok(api
+    let networks: Vec<Network> = api
         .into_iter()
         .map(|n| {
             let mut subnets = Vec::new();
@@ -52,16 +55,20 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> App
                 attachable: n.attachable.unwrap_or(false),
             }
         })
-        .collect())
+        .collect();
+    info!(target: "shipyardx_lib::services::networks", "listed networks; server_id={} count={}", server_id, networks.len());
+    Ok(networks)
 }
 
 pub async fn inspect_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<String> {
+    debug!(target: "shipyardx_lib::services::networks", "inspecting network; server_id={} network_id={}", server_id, network_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, &format!("/networks/{}", network_id)).await?;
     pretty_json_response(&resp)
 }
 
 pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::networks", "removing network; server_id={} network_id={}", server_id, network_id);
     let server = get_server_config(&state, &server_id)?;
     docker_delete_async(&server, &format!("/networks/{}", network_id)).await
 }
@@ -93,6 +100,7 @@ pub async fn create_network(server_id: String, params: NetworkCreate, state: Sta
         attachable: if params.attachable { Some(true) } else { None },
         ipam,
     };
+    info!(target: "shipyardx_lib::services::networks", "creating network; server_id={} name={} driver={}", server_id, body.name, body.driver);
     let server = get_server_config(&state, &server_id)?;
     docker_post_json_async(&server, "/networks/create", &body).await
 }

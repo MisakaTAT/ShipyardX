@@ -1,4 +1,5 @@
 use tauri::State;
+use log::{debug, info, warn};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use font_kit::source::SystemSource;
@@ -32,12 +33,14 @@ const ERR_SUDO_NONINTERACTIVE: &str = "__ERR_SUDO_NONINTERACTIVE__";
 const ERR_NO_SUDO: &str = "__ERR_NO_SUDO__";
 
 pub fn list_system_fonts() -> AppResult<Vec<String>> {
+    debug!(target: "shipyardx_lib::services::system", "listing system fonts");
     let source = SystemSource::new();
     let mut fonts = source
         .all_families()
         .map_err(|e| AppError::internal("system.fonts_list_failed", "读取系统字体失败").with_source(e))?;
     fonts.sort_unstable();
     fonts.dedup();
+    info!(target: "shipyardx_lib::services::system", "listed system fonts; count={}", fonts.len());
     Ok(fonts)
 }
 
@@ -88,6 +91,7 @@ fn map_restart_error(err: AppError) -> AppError {
 }
 
 async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::system", "restarting docker service; server_id={} use_sudo_password={}", server.id, sudo_password.as_ref().is_some_and(|s| !s.is_empty()));
     let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
         let pwd_b64 = STANDARD.encode(pwd);
         render(
@@ -116,15 +120,17 @@ async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<Str
         )
     };
     ssh_exec_async(server, &restart_cmd).await.map_err(map_restart_error)?;
+    info!(target: "shipyardx_lib::services::system", "docker service restarted; server_id={}", server.id);
     Ok(())
 }
 
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
+    debug!(target: "shipyardx_lib::services::system", "fetching docker info; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, "/info").await?;
     let v: SystemInfo = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("system.info_parse_failed", "解析 Docker 信息失败").with_source(e))?;
-    Ok(DockerEngineInfo {
+    let info = DockerEngineInfo {
         containers: v.containers.unwrap_or(0),
         containers_running: v.containers_running.unwrap_or(0),
         containers_paused: v.containers_paused.unwrap_or(0),
@@ -141,17 +147,24 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
         architecture: v.architecture.unwrap_or_default(),
         storage_driver: v.storage_driver.unwrap_or_default(),
         warnings: v.warnings.as_ref().map(|a| a.len() as i64).unwrap_or(0),
-    })
+    };
+    info!(target: "shipyardx_lib::services::system", "fetched docker info; server_id={} version={} containers={} images={}", server_id, info.server_version, info.containers, info.images);
+    Ok(info)
 }
 
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::system", "checking docker access; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     invalidate_api_version(&server);
     invalidate_docker_endpoint(&server).await;
     match resolve_api_version_async(&server).await {
-        Ok(_) => Ok(()),
+        Ok(api_version) => {
+            info!(target: "shipyardx_lib::services::system", "docker access check succeeded; server_id={} api_version={}", server_id, api_version);
+            Ok(())
+        }
         Err(e) => {
             let endpoint = resolve_docker_endpoint(&server).await.ok();
+            warn!(target: "shipyardx_lib::services::system", "docker access check failed; server_id={} code={} message={} detail={:?} endpoint={:?}", server_id, e.code, e.message, e.detail, endpoint);
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
                     let diag = ssh_exec_async(
@@ -205,6 +218,7 @@ pub async fn get_container_stats(
     container_id: String,
     state: State<'_, AppState>,
 ) -> AppResult<ContainerStats> {
+    debug!(target: "shipyardx_lib::services::system", "fetching container stats; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(
         &server,
@@ -213,10 +227,13 @@ pub async fn get_container_stats(
     .await?;
     let raw: DockerStats = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("container.stats_parse_failed", "解析容器统计信息失败").with_source(e))?;
-    Ok(compute_stats(raw))
+    let stats = compute_stats(raw);
+    debug!(target: "shipyardx_lib::services::system", "fetched container stats; server_id={} container_id={} cpu_percent={:.2} mem_usage={}", server_id, container_id, stats.cpu_percent, stats.mem_usage);
+    Ok(stats)
 }
 
 pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
+    debug!(target: "shipyardx_lib::services::system", "fetching docker daemon settings; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     let raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
@@ -249,7 +266,7 @@ pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppS
         .unwrap_or_else(|| "3".to_string());
     let log_rotation = cfg.log_opts.as_ref().map(|m| !m.is_empty()).unwrap_or(false);
 
-    Ok(DaemonSettings {
+    let settings = DaemonSettings {
         mirror_urls: mirror_url,
         log_rotation,
         log_max_size,
@@ -257,7 +274,9 @@ pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppS
         live_restore: cfg.live_restore.unwrap_or(false),
         cgroup_driver,
         socket_path,
-    })
+    };
+    info!(target: "shipyardx_lib::services::system", "fetched docker daemon settings; server_id={} mirrors={} live_restore={} log_rotation={} socket_path={}", server_id, settings.mirror_urls.len(), settings.live_restore, settings.log_rotation, settings.socket_path);
+    Ok(settings)
 }
 
 pub async fn update_docker_daemon_settings(
@@ -265,6 +284,17 @@ pub async fn update_docker_daemon_settings(
     params: DaemonUpdate,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
+    info!(
+        target: "shipyardx_lib::services::system",
+        "updating docker daemon settings; server_id={} mirrors={} live_restore={} log_rotation={} cgroup_driver_set={} socket_path_set={} sudo_password_provided={}",
+        server_id,
+        params.mirror_urls.iter().filter(|s| !s.trim().is_empty()).count(),
+        params.live_restore,
+        params.log_rotation,
+        !params.cgroup_driver.trim().is_empty(),
+        !params.socket_path.trim().is_empty(),
+        params.sudo_password.as_ref().is_some_and(|s| !s.is_empty())
+    );
     let server = get_server_config(&state, &server_id)?;
     invalidate_docker_endpoint(&server).await;
     let current_raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
@@ -335,6 +365,7 @@ pub async fn update_docker_daemon_settings(
         render(SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH, &[("__CFG_B64__", &b64)])
     };
     ssh_exec_async(&server, &write_cmd).await.map_err(map_restart_error)?;
+    info!(target: "shipyardx_lib::services::system", "docker daemon settings updated; server_id={}", server_id);
     Ok(())
 }
 
@@ -344,5 +375,6 @@ pub async fn restart_docker_daemon(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
+    info!(target: "shipyardx_lib::services::system", "restart docker daemon requested; server_id={}", server_id);
     restart_docker_service(&server, sudo_password).await
 }

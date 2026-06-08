@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use log::{debug, warn};
 use russh::{Channel, ChannelMsg, client};
 use tokio::io::{AsyncRead, AsyncWriteExt};
 
@@ -46,6 +47,7 @@ fn get_entry(config: &ServerConfig) -> PoolEntry {
 }
 
 pub async fn invalidate_server_id(server_id: &str) {
+    debug!(target: "shipyardx_lib::ssh::pool", "invalidating ssh pool entries; server_id={}", server_id);
     let entries: Vec<PoolEntry> = {
         let mut guard = pool()
             .lock()
@@ -79,12 +81,14 @@ pub async fn open_direct_streamlocal(
 
     let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
     if needs_connect {
+        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for streamlocal; server_id={} path={}", config.id, path);
         pooled.handle = Some(connect(config).await?);
     }
 
     let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
     let result = handle.channel_open_direct_streamlocal(path).await;
     if result.is_err() {
+        warn!(target: "shipyardx_lib::ssh::pool", "pooled streamlocal channel open failed; server_id={}", config.id);
         if let Some(mut handle) = pooled.handle.take() {
             disconnect(&mut handle).await;
         }
@@ -102,6 +106,7 @@ pub async fn open_direct_tcpip(
 
     let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
     if needs_connect {
+        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for tcpip; server_id={} host={} port={}", config.id, host, port);
         pooled.handle = Some(connect(config).await?);
     }
 
@@ -110,6 +115,7 @@ pub async fn open_direct_tcpip(
         .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
         .await;
     if result.is_err() {
+        warn!(target: "shipyardx_lib::ssh::pool", "pooled tcpip channel open failed; server_id={}", config.id);
         if let Some(mut handle) = pooled.handle.take() {
             disconnect(&mut handle).await;
         }
@@ -132,11 +138,13 @@ pub async fn exec_with_stdin_reader<R>(config: &ServerConfig, command: &str, rea
 where
     R: AsyncRead + Unpin + Send,
 {
+    debug!(target: "shipyardx_lib::ssh::pool", "executing pooled ssh command with stdin; server_id={} command_bytes={}", config.id, command.len());
     let entry = get_entry(config);
     let mut pooled = entry.lock().await;
 
     let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
     if needs_connect {
+        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for exec with stdin; server_id={}", config.id);
         pooled.handle = Some(connect(config).await?);
     }
 
@@ -147,6 +155,7 @@ where
     let channel = match channel {
         Ok(channel) => channel,
         Err(error) => {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh channel open failed for exec with stdin; server_id={} error={}", config.id, error);
             if let Some(mut handle) = pooled.handle.take() {
                 disconnect(&mut handle).await;
             }
@@ -158,7 +167,10 @@ where
     channel
         .exec(true, command)
         .await
-        .map_err(|e| AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e))?;
+        .map_err(|e| {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed for stdin command; server_id={} error={}", config.id, e);
+            AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
+        })?;
 
     {
         let mut writer = channel.make_writer();
@@ -190,11 +202,13 @@ async fn exec_internal<F>(config: &ServerConfig, command: &str, mut on_chunk: F)
 where
     F: FnMut(&str),
 {
+    debug!(target: "shipyardx_lib::ssh::pool", "executing pooled ssh command; server_id={} command_bytes={}", config.id, command.len());
     let entry = get_entry(config);
     let mut pooled = entry.lock().await;
 
     let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
     if needs_connect {
+        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for exec; server_id={}", config.id);
         pooled.handle = Some(connect(config).await?);
     }
 
@@ -205,6 +219,7 @@ where
     let channel = match channel {
         Ok(channel) => channel,
         Err(error) => {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh channel open failed for exec; server_id={} error={}", config.id, error);
             if let Some(mut handle) = pooled.handle.take() {
                 disconnect(&mut handle).await;
             }
@@ -216,7 +231,10 @@ where
     channel
         .exec(true, command)
         .await
-        .map_err(|e| AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e))?;
+        .map_err(|e| {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);
+            AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
+        })?;
 
     collect_exec_output_with(channel, |chunk| on_chunk(chunk)).await
 }
@@ -253,6 +271,7 @@ where
     }
 
     if exit_code.unwrap_or(-1) != 0 {
+        warn!(target: "shipyardx_lib::ssh::pool", "ssh command failed; exit_code={:?} stdout_bytes={} stderr_bytes={}", exit_code, stdout.len(), stderr.len());
         let detail = if !stderr.trim().is_empty() {
             stderr.trim().to_string()
         } else if !stdout.trim().is_empty() {
@@ -263,5 +282,6 @@ where
         return Err(AppError::internal("ssh.command_failed", "远程命令执行失败").with_detail(detail));
     }
 
+    debug!(target: "shipyardx_lib::ssh::pool", "ssh command completed; stdout_bytes={}", stdout.len());
     Ok(stdout)
 }

@@ -10,6 +10,7 @@ use hyper::client::conn::http1;
 use hyper::header::{CONTENT_TYPE, HOST};
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
+use log::{debug, warn};
 use russh::{ChannelStream, client};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -73,6 +74,7 @@ fn cache_key(config: &ServerConfig) -> String {
 }
 
 pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
+    debug!(target: "shipyardx_lib::docker::transport", "invalidating docker endpoint cache; server_id={} host={} port={}", config.id, config.host, config.port);
     let _ = lock_mutex(
         endpoint_cache(),
         "docker.endpoint_cache_lock_failed",
@@ -83,6 +85,7 @@ pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
 }
 
 pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
+    debug!(target: "shipyardx_lib::docker::transport", "invalidating pooled docker http connections; server_id={}", config.id);
     let state = lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败")
         .ok()
         .and_then(|mut pool| pool.remove(&cache_key(config)));
@@ -97,6 +100,7 @@ pub(crate) async fn invalidate_pooled_http(config: &ServerConfig) {
 }
 
 pub(crate) async fn invalidate_pooled_http_server_id(server_id: &str) {
+    debug!(target: "shipyardx_lib::docker::transport", "invalidating pooled docker http connections by server id; server_id={}", server_id);
     let states: Vec<Arc<HttpPoolState>> = {
         let mut guard = match lock_mutex(http_pool(), "docker.http_pool_lock_failed", "更新 Docker HTTP 连接池失败") {
             Ok(guard) => guard,
@@ -171,8 +175,10 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
     .get(&key)
         && entry.fetched_at.elapsed() < ENDPOINT_CACHE_TTL
     {
+        debug!(target: "shipyardx_lib::docker::transport", "docker endpoint cache hit; server_id={} endpoint={:?}", config.id, entry.value);
         return Ok(entry.value.clone());
     }
+    debug!(target: "shipyardx_lib::docker::transport", "resolving docker endpoint; server_id={} host={} port={}", config.id, config.host, config.port);
 
     let raw = match pool::exec(config, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
@@ -198,6 +204,7 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
             fetched_at: Instant::now(),
         },
     );
+    debug!(target: "shipyardx_lib::docker::transport", "resolved docker endpoint; server_id={} endpoint={:?}", config.id, endpoint);
     Ok(endpoint)
 }
 
@@ -336,6 +343,7 @@ async fn open_http_sender(
     hyper::client::conn::http1::SendRequest<Full<Bytes>>,
     tokio::task::JoinHandle<()>,
 )> {
+    debug!(target: "shipyardx_lib::docker::transport", "opening docker http sender; server_id={}", config.id);
     let handle = connect(config).await?;
     let endpoint = resolve_docker_endpoint(config).await?;
     let channel = match endpoint {
@@ -363,6 +371,7 @@ async fn open_http_sender(
 }
 
 async fn open_pooled_http_sender(config: &ServerConfig) -> AppResult<PooledHttpConnection> {
+    debug!(target: "shipyardx_lib::docker::transport", "opening pooled docker http sender; server_id={}", config.id);
     let endpoint = resolve_docker_endpoint(config).await?;
     let channel = match endpoint {
         DockerEndpoint::Unix { path } => pool::open_direct_streamlocal(config, path)
@@ -410,6 +419,7 @@ fn get_http_pool_state(config: &ServerConfig) -> Arc<HttpPoolState> {
 async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>>) -> AppResult<DockerRawResponse> {
     let state = get_http_pool_state(config);
     let index = state.next.fetch_add(1, Ordering::Relaxed) % state.slots.len();
+    debug!(target: "shipyardx_lib::docker::transport", "sending pooled docker request; server_id={} slot={} path={}", config.id, index, request.uri().path());
     let entry = state.slots[index].clone();
     let mut pooled = entry.lock().await;
     let needs_connect = pooled
@@ -417,6 +427,7 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
         .map(|connection| connection.sender.is_closed() || connection.connection_task.is_finished())
         .unwrap_or(true);
     if needs_connect {
+        debug!(target: "shipyardx_lib::docker::transport", "pooled docker connection refresh required; server_id={} slot={}", config.id, index);
         if let Some(connection) = pooled.take() {
             connection.connection_task.abort();
         }
@@ -431,6 +442,7 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
         connection.sender.ready().await
     };
     if let Err(e) = ready_result {
+        warn!(target: "shipyardx_lib::docker::transport", "docker pooled sender not ready; server_id={} slot={} error={}", config.id, index, e);
         if let Some(connection) = pooled.take() {
             connection.connection_task.abort();
         }
@@ -451,6 +463,7 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
     let response = match response {
         Ok(response) => response,
         Err(e) => {
+            warn!(target: "shipyardx_lib::docker::transport", "docker request send failed; server_id={} slot={} error={}", config.id, index, e);
             if let Some(connection) = pooled.take() {
                 connection.connection_task.abort();
             }
@@ -466,6 +479,7 @@ async fn send_pooled_request(config: &ServerConfig, request: Request<Full<Bytes>
     let body = match response.into_body().collect().await {
         Ok(body) => body.to_bytes(),
         Err(e) => {
+            warn!(target: "shipyardx_lib::docker::transport", "docker response read failed; server_id={} slot={} error={}", config.id, index, e);
             if let Some(connection) = pooled.take() {
                 connection.connection_task.abort();
             }
@@ -528,6 +542,7 @@ pub async fn request_empty(config: &ServerConfig, method: Method, path: &str) ->
 }
 
 pub(crate) async fn open_stream(config: &ServerConfig, method: Method, path: &str) -> AppResult<DockerStreamResponse> {
+    debug!(target: "shipyardx_lib::docker::transport", "opening docker stream; server_id={} method={} path={}", config.id, method, path);
     let (handle, mut sender, connection_task) = open_http_sender(config).await?;
     let request = Request::builder()
         .method(method)
@@ -571,6 +586,7 @@ pub(crate) async fn open_hijack(
     path: &str,
     body: Vec<u8>,
 ) -> AppResult<DockerHijackConnection> {
+    debug!(target: "shipyardx_lib::docker::transport", "opening docker hijack connection; server_id={} method={} path={} body_bytes={}", config.id, method, path, body.len());
     let mut handle = connect(config).await?;
     let endpoint = resolve_docker_endpoint(config).await?;
     let channel = match endpoint {

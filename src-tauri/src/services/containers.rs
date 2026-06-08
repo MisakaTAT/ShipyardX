@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use log::{debug, info};
 use tauri::State;
 
 use crate::contracts::docker_api::container::{
@@ -17,6 +18,7 @@ use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
+    debug!(target: "shipyardx_lib::services::containers", "listing containers; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, "/containers/json?all=1").await?;
     let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp).map_err(|e| {
@@ -27,20 +29,25 @@ pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> A
         ))
     })?;
     sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
-    Ok(api.into_iter().map(api_container_to_dto).collect())
+    let containers: Vec<Container> = api.into_iter().map(api_container_to_dto).collect();
+    info!(target: "shipyardx_lib::services::containers", "listed containers; server_id={} count={}", server_id, containers.len());
+    Ok(containers)
 }
 
 pub async fn start_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::containers", "starting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
     docker_post_async(&server, &format!("/containers/{}/start", container_id)).await
 }
 
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::containers", "stopping container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
     docker_post_async(&server, &format!("/containers/{}/stop", container_id)).await
 }
 
 pub async fn restart_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::containers", "restarting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
     docker_post_async(&server, &format!("/containers/{}/restart", container_id)).await
 }
@@ -51,6 +58,7 @@ pub async fn remove_container(
     force: bool,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
+    info!(target: "shipyardx_lib::services::containers", "removing container; server_id={} container_id={} force={}", server_id, container_id, force);
     let server = get_server_config(&state, &server_id)?;
     docker_delete_async(&server, &format!("/containers/{}?force={}", container_id, force)).await
 }
@@ -60,6 +68,7 @@ pub async fn inspect_container(
     container_id: String,
     state: State<'_, AppState>,
 ) -> AppResult<String> {
+    debug!(target: "shipyardx_lib::services::containers", "inspecting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
     let resp = docker_get_async(&server, &format!("/containers/{}/json", container_id)).await?;
     pretty_json_response(&resp)
@@ -72,6 +81,7 @@ pub async fn get_container_logs(
     timestamps: bool,
     state: State<'_, AppState>,
 ) -> AppResult<String> {
+    debug!(target: "shipyardx_lib::services::containers", "fetching container logs; server_id={} container_id={} tail={} timestamps={}", server_id, container_id, tail, timestamps);
     let server = get_server_config(&state, &server_id)?;
     let ts = if timestamps { "&timestamps=1" } else { "" };
     let path = format!(
@@ -265,6 +275,7 @@ fn build_run_container_body(params: &RunContainer) -> ContainerCreate {
 }
 
 pub async fn run_container(server_id: String, params: RunContainer, state: State<'_, AppState>) -> AppResult<String> {
+    info!(target: "shipyardx_lib::services::containers", "creating container; server_id={} image={} name={}", server_id, params.image, params.name.as_deref().unwrap_or(""));
     let server = get_server_config(&state, &server_id)?;
     let body = build_run_container_body(&params);
     let path = match &params.name {
@@ -299,5 +310,6 @@ pub async fn run_container(server_id: String, params: RunContainer, state: State
 
     docker_post_async(&server, &format!("/containers/{id}/start")).await?;
 
+    info!(target: "shipyardx_lib::services::containers", "container created and started; server_id={} container_id={}", server_id, id);
     Ok(id.to_string())
 }

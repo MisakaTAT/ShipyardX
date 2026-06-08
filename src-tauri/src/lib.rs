@@ -20,9 +20,11 @@ use contracts::frontend::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
     DockerStreamStatus, EventStreamStatus, InstallStepEvent,
 };
+use log::{error, info, warn};
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{Builder, ErrorHandlingMode, collect_commands, collect_events};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
 
 pub fn run() {
     let specta_builder = Builder::<tauri::Wry>::new()
@@ -107,6 +109,31 @@ pub fn run() {
     let invoke_handler = specta_builder.invoke_handler();
 
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir {
+                        file_name: Some("shipyardx".into()),
+                    }),
+                ])
+                .level(log::LevelFilter::Info)
+                .level_for("shipyardx_lib::services::terminal", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::services::port_forward", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::services::docker_events", log::LevelFilter::Info)
+                .level_for("shipyardx_lib::services::log_stream", log::LevelFilter::Info)
+                .level_for("shipyardx_lib::services::images", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::services::system", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::services::appstore", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::docker::client", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::docker::transport", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::ssh::client", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::ssh::exec", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::ssh::pool", log::LevelFilter::Debug)
+                .rotation_strategy(RotationStrategy::KeepAll)
+                .max_file_size(10_000_000)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(invoke_handler)
@@ -117,6 +144,20 @@ pub fn run() {
                 Box::<dyn std::error::Error>::from(detail)
             })?;
             let servers = load_servers(&data_file);
+            match app.path().app_log_dir() {
+                Ok(log_dir) => info!(target: "shipyardx_lib::app", "app log directory: {}", log_dir.display()),
+                Err(error) => warn!(
+                    target: "shipyardx_lib::app",
+                    "failed to resolve app log directory: {}",
+                    error
+                ),
+            }
+            info!(
+                target: "shipyardx_lib::app",
+                "app setup complete; server_count={} data_file={}",
+                servers.len(),
+                data_file.display()
+            );
             app.manage(AppState {
                 servers: Mutex::new(servers),
                 data_file: Mutex::new(data_file),
@@ -130,6 +171,7 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| {
+            error!(target: "shipyardx_lib::app", "app run failed: {}", error);
             eprintln!("运行应用时出错: {error}");
         });
 }
