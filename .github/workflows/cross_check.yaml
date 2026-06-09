@@ -58,13 +58,14 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.16.0'
+          cache: 'pnpm'
 
       - name: Install frontend dependencies
         run: |
           corepack enable
-          corepack prepare yarn@4.13.0 --activate
-          yarn --version
-          yarn install --immutable
+          corepack install
+          pnpm --version
+          pnpm install --frozen-lockfile
 
       - name: Cargo check
         working-directory: src-tauri

@@ -4,10 +4,11 @@
   "version": "0.1.0",
   "identifier": "com.mikuac.shipyardx",
   "build": {
-    "beforeDevCommand": "yarn dev",
+    "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "yarn build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [

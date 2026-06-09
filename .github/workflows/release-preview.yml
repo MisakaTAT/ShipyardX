@@ -1,13 +1,11 @@
-name: ShipyardX Release
+name: ShipyardX Release Preview
 
 on:
-  # 使用语义化版本 tag 触发正式发布，例如 v0.1.0
-  push:
-    tags:
-      - 'v*.*.*'
+  # 仅验证构建链路
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_INCREMENTAL: 0
@@ -15,40 +13,12 @@ env:
   HUSKY: 0
 
 concurrency:
-  # 同一个 tag 只保留一条发布流水线，避免重复创建 release 资产
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-preview
+  cancel-in-progress: true
 
 jobs:
-  validate-version:
-    name: Validate release version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Check tag and project versions
-        run: |
-          # Git tag 使用 v 前缀，项目内部版本号保持纯数字格式
-          TAG="${GITHUB_REF_NAME#v}"
-
-          PACKAGE_VERSION="$(ruby -rjson -e 'puts JSON.parse(File.read("package.json"))["version"]')"
-          CARGO_VERSION="$(ruby -e 'text=File.read("src-tauri/Cargo.toml"); puts text.lines.grep(/^version = "/).first.to_s[/\"(.*)\"/, 1]' )"
-          TAURI_VERSION="$(ruby -rjson -e 'puts JSON.parse(File.read("src-tauri/tauri.conf.json"))["version"]')"
-
-          echo "tag version:      $TAG"
-          echo "package version:  $PACKAGE_VERSION"
-          echo "cargo version:    $CARGO_VERSION"
-          echo "tauri version:    $TAURI_VERSION"
-
-          test "$TAG" = "$PACKAGE_VERSION"
-          test "$TAG" = "$CARGO_VERSION"
-          test "$TAG" = "$TAURI_VERSION"
-
   verify:
-    # 只在一个 job 里跑通用校验，避免每个平台重复执行同一套前端检查
     name: Verify project
-    needs: validate-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -72,8 +42,7 @@ jobs:
           pnpm typecheck
           pnpm test
 
-  release:
-    # 校验通过后再并行构建各平台安装包，并上传到同一个 GitHub Release
+  build:
     name: Build ${{ matrix.bundle_name }}
     needs: verify
     runs-on: ${{ matrix.os }}
@@ -101,19 +70,17 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          # 为对应平台安装目标工具链，供 Tauri/Rust 交叉编译使用
           targets: ${{ matrix.target }}
 
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
+          save-if: false
 
       - name: Install Linux build dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          # Linux 打包需要 webkit2gtk 等系统依赖
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
@@ -130,26 +97,23 @@ jobs:
           pnpm --version
           pnpm install --frozen-lockfile
 
-      - name: Build and publish release assets
-        uses: tauri-apps/tauri-action@v0.6.2
+      - name: Build preview bundles
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Tauri updater 签名密钥
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # 仅 macOS 构建会消费以下签名/公证相关 secrets
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm tauri build --target ${{ matrix.target }}
+
+      - name: Upload preview artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ShipyardX ${{ github.ref_name }}
-          releaseBody: |
-            Automated release for ShipyardX ${{ github.ref_name }}.
-          releaseDraft: false
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
-          tauriScript: pnpm
-          args: --target ${{ matrix.target }}
+          name: release-preview-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**
+            src-tauri/target/${{ matrix.target }}/release/*.sig
+          if-no-files-found: error
