@@ -63,6 +63,8 @@ jobs:
       - name: Install frontend dependencies
         run: |
           corepack enable
+          corepack prepare yarn@4.13.0 --activate
+          yarn --version
           yarn install --immutable
 
       - name: Run checks
@@ -124,6 +126,8 @@ jobs:
       - name: Install frontend dependencies
         run: |
           corepack enable
+          corepack prepare yarn@4.13.0 --activate
+          yarn --version
           yarn install --immutable
 
       - name: Build and publish release assets

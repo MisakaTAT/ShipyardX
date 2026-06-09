@@ -2,6 +2,7 @@
   "name": "shipyardx",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "yarn@4.13.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
