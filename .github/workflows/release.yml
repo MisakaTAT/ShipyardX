@@ -1,0 +1,152 @@
+name: ShipyardX Release
+
+on:
+  workflow_dispatch:
+  # 使用语义化版本 tag 触发正式发布，例如 v0.1.0
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  HUSKY: 0
+
+concurrency:
+  # 同一个 tag 只保留一条发布流水线，避免重复创建 release 资产
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-version:
+    name: Validate release version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check tag and project versions
+        run: |
+          # Git tag 使用 v 前缀，项目内部版本号保持纯数字格式
+          TAG="${GITHUB_REF_NAME#v}"
+
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          CARGO_VERSION="$(sed -n 's/^version = \"\\(.*\\)\"$/\\1/p' src-tauri/Cargo.toml | head -n 1)"
+          TAURI_VERSION="$(node -p "JSON.parse(require('fs').readFileSync('./src-tauri/tauri.conf.json', 'utf8')).version")"
+
+          echo "tag version:      $TAG"
+          echo "package version:  $PACKAGE_VERSION"
+          echo "cargo version:    $CARGO_VERSION"
+          echo "tauri version:    $TAURI_VERSION"
+
+          test "$TAG" = "$PACKAGE_VERSION"
+          test "$TAG" = "$CARGO_VERSION"
+          test "$TAG" = "$TAURI_VERSION"
+
+  verify:
+    # 只在一个 job 里跑通用校验，避免每个平台重复执行同一套前端检查
+    name: Verify project
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          cache: yarn
+
+      - name: Install frontend dependencies
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Run checks
+        run: |
+          yarn typecheck
+          yarn test
+
+  release:
+    # 校验通过后再并行构建各平台安装包，并上传到同一个 GitHub Release
+    name: Build ${{ matrix.bundle_name }}
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundle_name: Windows x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bundle_name: macOS Apple Silicon
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bundle_name: macOS Intel
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundle_name: Linux x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # 为对应平台安装目标工具链，供 Tauri/Rust 交叉编译使用
+          targets: ${{ matrix.target }}
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Install Linux build dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          # Linux 打包需要 webkit2gtk 等系统依赖
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          cache: yarn
+
+      - name: Install frontend dependencies
+        run: |
+          corepack enable
+          yarn install --immutable
+
+      - name: Build and publish release assets
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri updater 签名密钥
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # 仅 macOS 构建会消费以下签名/公证相关 secrets
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ShipyardX ${{ github.ref_name }}
+          releaseBody: |
+            Automated release for ShipyardX ${{ github.ref_name }}.
+          releaseDraft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          tauriScript: yarn
+          args: --target ${{ matrix.target }}
