@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
-use crate::contracts::frontend::image::Image;
-use crate::contracts::frontend::image::ImageLayer;
+use crate::contracts::frontend::cleanup::CleanupResult;
+use crate::contracts::frontend::image::{Image, ImageLayer};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;
@@ -37,6 +37,24 @@ pub async fn remove_image(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     Ok(services::images::remove_image(server_id, image_id, force, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_dangling_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::images::prune_dangling_images(server_id, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_unused_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::images::prune_unused_images(server_id, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::images::prune_builder_cache(server_id, state).await?)
 }
 
 #[tauri::command]

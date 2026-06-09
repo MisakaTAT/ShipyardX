@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, HeartCrack, HeartPulse, Plus } from 'lucide-react'
+import { Box, ChevronDown, HeartCrack, HeartPulse, Plus, Trash2 } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
 import LogDialog from '@/features/docker-containers/ui/log-dialog'
 import StatsDialog from '@/features/docker-containers/ui/stats-dialog'
 import ContainerExecDialog from '@/features/docker-containers/ui/container-exec-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
@@ -16,6 +17,7 @@ import { consumeNextContainerSearch } from '@/shared/lib/workspace-nav'
 import {
   useContainerAction,
   useContainers,
+  usePruneStoppedContainers,
   type ContainerAction,
 } from '@/features/docker-containers/api/use-containers'
 
@@ -33,6 +35,7 @@ function getContainerHealth(status: string): 'healthy' | 'unhealthy' | 'unknown'
 export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const { data: containers = [], isFetching, dataUpdatedAt } = useContainers(serverId)
   const action = useContainerAction(serverId)
+  const pruneStoppedContainers = usePruneStoppedContainers(serverId)
 
   const [search, setSearch] = useState('')
   const [runDialogOpen, setRunDialogOpen] = useState(false)
@@ -41,6 +44,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   const [execTarget, setExecTarget] = useState<Container | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Container | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Container | null>(null)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
 
   useEffect(() => {
     const next = consumeNextContainerSearch(serverId)
@@ -209,10 +213,22 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
-          <Button type="button" className="gap-1" onClick={() => setRunDialogOpen(true)}>
-            <Plus />
-            运行容器
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" />}>
+              操作
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem onClick={() => setRunDialogOpen(true)}>
+                <Plus className="size-3.5" />
+                运行容器
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
+                <Trash2 className="size-3.5" />
+                清理已停止容器
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -278,6 +294,18 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
           if (!removeTarget) return
           const force = removeTarget.state === 'running'
           runAction(removeTarget.id, 'remove', force)
+        }}
+      />
+
+      <ConfirmDialog
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        title="清理已停止容器"
+        description="删除当前所有已停止的容器。仍在运行的容器不会受影响，但已停止容器的元数据会被彻底移除。"
+        destructive
+        confirmText="清理已停止容器"
+        onConfirm={() => {
+          pruneStoppedContainers.mutate()
         }}
       />
     </PanelShell>

@@ -30,7 +30,7 @@ export function ImageActionsMenu({
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuItem onClick={onExport} disabled={disabled}>
           <Download className="size-3.5" />
-          下载
+          导出
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onLayers} disabled={disabled}>
           <Layers className="size-3.5" />

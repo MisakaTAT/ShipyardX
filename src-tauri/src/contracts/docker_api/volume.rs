@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::contracts::docker_api::common::null_vec_default;
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct VolumeSummary {
@@ -33,4 +35,13 @@ pub struct VolumeCreate {
     pub driver: String,
     #[serde(rename = "DriverOpts", skip_serializing_if = "Option::is_none")]
     pub driver_opts: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct VolumePruneResponse {
+    #[serde(rename = "VolumesDeleted", default, deserialize_with = "null_vec_default")]
+    pub volumes_deleted: Vec<String>,
+    #[serde(rename = "SpaceReclaimed")]
+    pub space_reclaimed: Option<u64>,
 }

@@ -5,8 +5,10 @@ use tauri::State;
 
 use crate::contracts::docker_api::container::{
     ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
-    ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerSummary, EndpointIpamConfig, EndpointSettings,
+    ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerPruneResponse, ContainerSummary,
+    EndpointIpamConfig, EndpointSettings,
 };
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::container::{Container, RunContainer};
 use crate::docker::client::{
     docker_delete, docker_get, docker_post, docker_post_json_response, docker_stream, pretty_json_response,
@@ -60,6 +62,19 @@ pub async fn remove_container(
     info!(target: "shipyardx_lib::services::containers", "removing container; server_id={} container_id={} force={}", server_id, container_id, force);
     let server = get_server_config(&state, &server_id)?;
     docker_delete(&server, &format!("/containers/{}?force={}", container_id, force)).await
+}
+
+pub async fn prune_stopped_containers(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    info!(target: "shipyardx_lib::services::containers", "pruning containers; server_id={}", server_id);
+    let server = get_server_config(&state, &server_id)?;
+    let raw = docker_post_json_response(&server, "/containers/prune", &serde_json::json!({})).await?;
+    let response: ContainerPruneResponse = serde_json::from_str(raw.trim())
+        .map_err(|e| AppError::internal("container.prune_parse_failed", "解析容器清理结果失败").with_source(e))?;
+
+    Ok(CleanupResult {
+        deleted_count: response.containers_deleted.len() as u32,
+        reclaimed_bytes: response.space_reclaimed.unwrap_or(0),
+    })
 }
 
 pub async fn inspect_container(

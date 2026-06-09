@@ -1,4 +1,5 @@
 pub mod appstore;
+pub mod cleanup;
 pub mod container;
 pub mod daemon;
 pub mod error;

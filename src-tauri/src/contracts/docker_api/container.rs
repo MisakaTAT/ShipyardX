@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::contracts::docker_api::common::null_vec_default;
+
 #[derive(Deserialize)]
 pub struct ContainerSummary {
     #[serde(rename = "Id")]
@@ -189,4 +191,13 @@ pub struct ContainerExecStart {
     pub detach: bool,
     #[serde(rename = "Tty")]
     pub tty: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct ContainerPruneResponse {
+    #[serde(rename = "ContainersDeleted", default, deserialize_with = "null_vec_default")]
+    pub containers_deleted: Vec<String>,
+    #[serde(rename = "SpaceReclaimed")]
+    pub space_reclaimed: Option<u64>,
 }

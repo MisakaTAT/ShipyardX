@@ -122,7 +122,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
         if (!next && exporting) return
         onOpenChange(next)
       }}
-      title="下载镜像"
+      title="导出镜像"
       icon={Download}
       disableClose={exporting}
       showCloseButton
@@ -135,12 +135,12 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             {exporting ? (
               <>
                 <Loader2 className="animate-spin" />
-                下载中
+                导出中
               </>
             ) : (
               <>
                 <Download />
-                下载到本地
+                导出到本地
               </>
             )}
           </Button>
@@ -199,9 +199,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
                       选择目录
                     </Button>
                   </div>
-                  <FieldDescription id={`${formId}-dir-desc`}>
-                    镜像会以 Docker `save` 导出的 tar 包形式保存到该目录。
-                  </FieldDescription>
+                  <FieldDescription id={`${formId}-dir-desc`}>镜像会以 tar 包形式保存到该目录。</FieldDescription>
                   <FieldError id={`${formId}-dir-err`} errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
@@ -212,7 +210,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
         {exporting ? (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">下载进度</span>
+              <span className="font-medium text-foreground">导出进度</span>
               <span className="text-muted-foreground">
                 {progress
                   ? progress.totalBytes && progress.totalBytes > 0

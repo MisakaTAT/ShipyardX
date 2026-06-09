@@ -5,9 +5,12 @@ use std::collections::HashMap;
 use log::{debug, info};
 
 use crate::contracts::docker_api::container::ContainerSummary;
-use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList};
+use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList, VolumePruneResponse};
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::volume::Volume;
-use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
+use crate::docker::client::{
+    docker_delete, docker_get, docker_post_json, docker_post_json_response, pretty_json_response,
+};
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -91,6 +94,19 @@ pub async fn remove_volume(server_id: String, name: String, state: State<'_, App
     info!(target: "shipyardx_lib::services::volumes", "removing volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
     docker_delete(&server, &format!("/volumes/{}", name)).await
+}
+
+pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    info!(target: "shipyardx_lib::services::volumes", "pruning volumes; server_id={}", server_id);
+    let server = get_server_config(&state, &server_id)?;
+    let raw = docker_post_json_response(&server, "/volumes/prune", &serde_json::json!({})).await?;
+    let response: VolumePruneResponse = serde_json::from_str(raw.trim())
+        .map_err(|e| AppError::internal("volume.prune_parse_failed", "解析存储卷清理结果失败").with_source(e))?;
+
+    Ok(CleanupResult {
+        deleted_count: response.volumes_deleted.len() as u32,
+        reclaimed_bytes: response.space_reclaimed.unwrap_or(0),
+    })
 }
 
 pub async fn create_volume(

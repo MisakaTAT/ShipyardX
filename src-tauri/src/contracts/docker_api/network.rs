@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::contracts::docker_api::common::null_vec_default;
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct IpamConfig {
@@ -69,4 +71,11 @@ pub struct NetworkCreate {
     pub attachable: Option<bool>,
     #[serde(rename = "IPAM", skip_serializing_if = "Option::is_none")]
     pub ipam: Option<NetworkCreateIpam>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct NetworkPruneResponse {
+    #[serde(rename = "NetworksDeleted", default, deserialize_with = "null_vec_default")]
+    pub networks_deleted: Vec<String>,
 }

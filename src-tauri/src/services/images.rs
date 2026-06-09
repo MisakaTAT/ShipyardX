@@ -12,14 +12,16 @@ use tokio::io::{AsyncRead, AsyncWriteExt, ReadBuf};
 use tokio::sync::watch;
 
 use crate::contracts::docker_api::container::ContainerSummary;
-use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
+use crate::contracts::docker_api::image::{BuilderPruneResponse, ImageHistoryItem, ImagePruneResponse, ImageSummary};
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::events::{
     DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress, ImageImportProgress,
 };
 use crate::contracts::frontend::image::Image;
 use crate::contracts::frontend::server::ServerConfig;
 use crate::docker::client::{
-    docker_delete, docker_get, docker_post_stream, docker_post_stream_body_text, pretty_json_response,
+    docker_delete, docker_get, docker_post_json_response, docker_post_stream, docker_post_stream_body_text,
+    pretty_json_response,
 };
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
@@ -105,6 +107,28 @@ pub async fn remove_image(
     info!(target: "shipyardx_lib::services::images", "removing image; server_id={} image_id={} force={}", server_id, image_id, force);
     let server = get_server_config(&state, &server_id)?;
     docker_delete(&server, &format!("/images/{}?force={}", image_id, force)).await
+}
+
+pub async fn prune_dangling_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    prune_images(server_id, true, state).await
+}
+
+pub async fn prune_unused_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    prune_images(server_id, false, state).await
+}
+
+pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    info!(target: "shipyardx_lib::services::images", "pruning builder cache; server_id={}", server_id);
+    let server = get_server_config(&state, &server_id)?;
+    let raw = docker_post_json_response(&server, "/build/prune?all=1", &serde_json::json!({})).await?;
+    let response: BuilderPruneResponse = serde_json::from_str(raw.trim()).map_err(|e| {
+        AppError::internal("image.builder_prune_parse_failed", "解析构建缓存清理结果失败").with_source(e)
+    })?;
+
+    Ok(CleanupResult {
+        deleted_count: response.caches_deleted.len() as u32,
+        reclaimed_bytes: response.space_reclaimed,
+    })
 }
 
 pub async fn export_image(
@@ -405,6 +429,30 @@ fn encode_query_component(value: &str) -> String {
             _ => format!("%{byte:02X}").chars().collect(),
         })
         .collect()
+}
+
+async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    let action = if dangling_only { "dangling" } else { "unused" };
+    info!(target: "shipyardx_lib::services::images", "pruning images; server_id={} action={}", server_id, action);
+    let server = get_server_config(&state, &server_id)?;
+    let filters = if dangling_only {
+        r#"{"dangling":{"true":true}}"#
+    } else {
+        r#"{"dangling":{"false":true}}"#
+    };
+    let path = format!("/images/prune?filters={}", encode_query_component(filters));
+    let raw = docker_post_json_response(&server, &path, &serde_json::json!({})).await?;
+    let response: ImagePruneResponse = serde_json::from_str(raw.trim())
+        .map_err(|e| AppError::internal("image.prune_parse_failed", "解析镜像清理结果失败").with_source(e))?;
+
+    Ok(CleanupResult {
+        deleted_count: response
+            .images_deleted
+            .iter()
+            .filter(|item| item.deleted.is_some() || item.untagged.is_some())
+            .count() as u32,
+        reclaimed_bytes: response.space_reclaimed,
+    })
 }
 
 fn ensure_export_directory(path: &Path) -> AppResult<()> {

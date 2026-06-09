@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Database, Plus, ScanSearch, Trash2 } from 'lucide-react'
+import { ChevronDown, Database, Plus, ScanSearch, Trash2 } from 'lucide-react'
 import type { Volume } from '@/types/app-bindings'
 import VolumeCreateDialog from '@/features/docker-volumes/ui/volume-create-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { formatDateTimeString, formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
-import { useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
+import { usePruneUnusedVolumes, useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
 import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
 
 interface VolumePanelProps {
@@ -16,11 +17,13 @@ interface VolumePanelProps {
 export default function VolumePanel({ serverId }: VolumePanelProps) {
   const { data: volumes = [], isFetching, dataUpdatedAt } = useVolumes(serverId)
   const removeVolume = useRemoveVolume(serverId)
+  const pruneUnusedVolumes = usePruneUnusedVolumes(serverId)
 
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Volume | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Volume | null>(null)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
 
   const filtered = useMemo(() => {
     if (!search.trim()) return volumes
@@ -138,10 +141,22 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
-          <Button type="button" onClick={() => setShowCreate(true)}>
-            <Plus />
-            创建存储卷
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" />}>
+              操作
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem onClick={() => setShowCreate(true)}>
+                <Plus className="size-3.5" />
+                创建存储卷
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
+                <Trash2 className="size-3.5" />
+                清理未使用存储卷
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -179,6 +194,18 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         onConfirm={() => {
           if (!removeTarget) return
           removeVolume.mutate(removeTarget.name)
+        }}
+      />
+
+      <ConfirmDialog
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        title="清理未使用存储卷"
+        description="删除当前没有被任何容器使用的本地存储卷。被清理后，其中的数据将无法恢复。"
+        destructive
+        confirmText="清理未使用存储卷"
+        onConfirm={() => {
+          pruneUnusedVolumes.mutate()
         }}
       />
     </PanelShell>

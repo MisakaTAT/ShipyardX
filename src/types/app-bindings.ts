@@ -16,6 +16,7 @@ export const commands = {
 	stopContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("stop_container", { serverId, containerId }),
 	restartContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("restart_container", { serverId, containerId }),
 	removeContainer: (serverId: string, containerId: string, force: boolean) => __TAURI_INVOKE<null>("remove_container", { serverId, containerId, force }),
+	pruneStoppedContainers: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_stopped_containers", { serverId }),
 	inspectContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<string>("inspect_container", { serverId, containerId }),
 	getContainerLogs: (serverId: string, containerId: string, tail: number, timestamps: boolean) => __TAURI_INVOKE<string>("get_container_logs", { serverId, containerId, tail, timestamps }),
 	runContainer: (serverId: string, params: RunContainer) => __TAURI_INVOKE<string>("run_container", { serverId, params }),
@@ -23,6 +24,9 @@ export const commands = {
 	inspectImage: (serverId: string, imageId: string) => __TAURI_INVOKE<string>("inspect_image", { serverId, imageId }),
 	getImageHistory: (serverId: string, imageId: string) => __TAURI_INVOKE<ImageLayer[]>("get_image_history", { serverId, imageId }),
 	removeImage: (serverId: string, imageId: string, force: boolean) => __TAURI_INVOKE<null>("remove_image", { serverId, imageId, force }),
+	pruneDanglingImages: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_dangling_images", { serverId }),
+	pruneUnusedImages: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_images", { serverId }),
+	pruneBuilderCache: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_builder_cache", { serverId }),
 	exportImage: (exportId: string, serverId: string, imageId: string, directory: string, fileName: string, totalBytes: number | null) => __TAURI_INVOKE<null>("export_image", { exportId, serverId, imageId, directory, fileName, totalBytes }),
 	importImage: (importId: string, serverId: string, filePath: string) => __TAURI_INVOKE<null>("import_image", { importId, serverId, filePath }),
 	startImagePull: (serverId: string, image: string) => __TAURI_INVOKE<string>("start_image_pull", { serverId, image }),
@@ -31,10 +35,12 @@ export const commands = {
 	createNetwork: (serverId: string, params: NetworkCreate) => __TAURI_INVOKE<null>("create_network", { serverId, params }),
 	inspectNetwork: (serverId: string, networkId: string) => __TAURI_INVOKE<string>("inspect_network", { serverId, networkId }),
 	removeNetwork: (serverId: string, networkId: string) => __TAURI_INVOKE<null>("remove_network", { serverId, networkId }),
+	pruneUnusedNetworks: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_networks", { serverId }),
 	listVolumes: (serverId: string) => __TAURI_INVOKE<Volume[]>("list_volumes", { serverId }),
 	createVolume: (serverId: string, name: string, driver: string | null, driverOpts: { [key in string]: string } | null) => __TAURI_INVOKE<null>("create_volume", { serverId, name, driver, driverOpts }),
 	inspectVolume: (serverId: string, name: string) => __TAURI_INVOKE<string>("inspect_volume", { serverId, name }),
 	removeVolume: (serverId: string, name: string) => __TAURI_INVOKE<null>("remove_volume", { serverId, name }),
+	pruneUnusedVolumes: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_volumes", { serverId }),
 	checkDockerAccess: (serverId: string) => __TAURI_INVOKE<null>("check_docker_access", { serverId }),
 	listSystemFonts: () => __TAURI_INVOKE<string[]>("list_system_fonts"),
 	getDockerInfo: (serverId: string) => __TAURI_INVOKE<DockerEngineInfo>("get_docker_info", { serverId }),
@@ -151,6 +157,11 @@ export type AppVersionInfo_Serialize = {
 	version: string,
 	form_fields: FormField_Serialize[],
 	compose_preview: string,
+};
+
+export type CleanupResult = {
+	deleted_count: number,
+	reclaimed_bytes: number,
 };
 
 export type Container = {

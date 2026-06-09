@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::volume::Volume;
 use crate::error::AppResult;
 use crate::services;
@@ -21,6 +22,12 @@ pub async fn inspect_volume(server_id: String, name: String, state: State<'_, Ap
 #[specta::specta]
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
     Ok(services::volumes::remove_volume(server_id, name, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::volumes::prune_unused_volumes(server_id, state).await?)
 }
 
 #[tauri::command]

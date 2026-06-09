@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::container::{Container, RunContainer};
 use crate::error::AppResult;
 use crate::services;
@@ -38,6 +39,12 @@ pub async fn remove_container(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     Ok(services::containers::remove_container(server_id, container_id, force, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_stopped_containers(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::containers::prune_stopped_containers(server_id, state).await?)
 }
 
 #[tauri::command]

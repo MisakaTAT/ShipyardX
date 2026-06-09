@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Download, FolderUp, Image as ImageIcon } from 'lucide-react'
+import { ChevronDown, Download, FolderUp, Image as ImageIcon, Trash2, Wrench } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
 import ImageExportDialog from '@/features/docker-images/ui/image-export-dialog'
@@ -8,9 +8,17 @@ import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
-import { useExportImage, useImages, useRemoveImage } from '@/features/docker-images/api/use-images'
+import {
+  useExportImage,
+  useImages,
+  usePruneBuilderCache,
+  usePruneDanglingImages,
+  usePruneUnusedImages,
+  useRemoveImage,
+} from '@/features/docker-images/api/use-images'
 import { ImageActionsMenu } from '@/features/docker-images/ui/image-actions-menu'
 import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
 
@@ -24,6 +32,9 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const { data: images = [], isFetching, dataUpdatedAt } = useImages(serverId)
   const removeImage = useRemoveImage(serverId)
   const exportImage = useExportImage(serverId)
+  const pruneDanglingImages = usePruneDanglingImages(serverId)
+  const pruneUnusedImages = usePruneUnusedImages(serverId)
+  const pruneBuilderCache = usePruneBuilderCache(serverId)
 
   const [search, setSearch] = useState('')
   const [showPull, setShowPull] = useState(false)
@@ -33,6 +44,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const [inspectTarget, setInspectTarget] = useState<Image | null>(null)
   const [layersTarget, setLayersTarget] = useState<Image | null>(null)
   const [removeForce, setRemoveForce] = useState(false)
+  const [cleanupTarget, setCleanupTarget] = useState<'dangling' | 'unused' | 'builder' | null>(null)
 
   const filtered = useMemo(() => {
     if (!search.trim()) return images
@@ -113,7 +125,13 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           return (
             <ImageActionsMenu
               image={img}
-              busy={removeImage.isPending || exportImage.isPending}
+              busy={
+                removeImage.isPending ||
+                exportImage.isPending ||
+                pruneDanglingImages.isPending ||
+                pruneUnusedImages.isPending ||
+                pruneBuilderCache.isPending
+              }
               onExport={() => setExportTarget(img)}
               onLayers={() => setLayersTarget(img)}
               onInspect={() => setInspectTarget(img)}
@@ -127,8 +145,34 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [removeImage.isPending]
+    [
+      exportImage.isPending,
+      pruneBuilderCache.isPending,
+      pruneDanglingImages.isPending,
+      pruneUnusedImages.isPending,
+      removeImage.isPending,
+    ]
   )
+
+  const cleanupDialog = cleanupTarget
+    ? {
+        dangling: {
+          title: '清理悬空镜像',
+          description: '仅删除没有标签且不再被引用的悬空镜像，用于回收无效层占用的空间。',
+          confirmText: '清理悬空镜像',
+        },
+        unused: {
+          title: '清理未使用镜像',
+          description: '删除当前没有被任何容器使用的镜像。若后续还需要这些镜像，需要重新拉取或重新导入。',
+          confirmText: '清理未使用镜像',
+        },
+        builder: {
+          title: '清理构建缓存',
+          description: '删除 Docker build 过程中留下的缓存层，不影响已存在的镜像和容器，但后续构建可能变慢。',
+          confirmText: '清理构建缓存',
+        },
+      }[cleanupTarget]
+    : null
 
   const removeDescription = removeTarget
     ? `确认删除镜像「${imageRefLabel(removeTarget)}」？\n\n默认情况下，若仍有容器使用该镜像，删除会失败。可勾选强制删除以解除引用并删除（可能影响运行中的容器，请谨慎）。`
@@ -143,16 +187,34 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={() => setShowImport(true)}>
-              <FolderUp />
-              导入镜像
-            </Button>
-            <Button type="button" onClick={() => setShowPull(true)}>
-              <Download />
-              拉取镜像
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" />}>
+              操作
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem onClick={() => setShowPull(true)}>
+                <Download className="size-3.5" />
+                拉取镜像
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowImport(true)}>
+                <FolderUp className="size-3.5" />
+                导入镜像
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupTarget('dangling')}>
+                <Trash2 className="size-3.5" />
+                清理悬空镜像
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupTarget('unused')}>
+                <Trash2 className="size-3.5" />
+                清理未使用镜像
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupTarget('builder')}>
+                <Wrench className="size-3.5" />
+                清理构建缓存
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -209,7 +271,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         destructive
         confirmText="删除"
         extra={
-          <label className="flex cursor-pointer items-start gap-2.5 text-left">
+          <label className="flex w-full cursor-pointer items-start gap-2.5 text-left">
             <Checkbox checked={removeForce} onCheckedChange={(c) => setRemoveForce(c === true)} className="mt-0.5" />
             <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
           </label>
@@ -219,6 +281,30 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           const target = removeTarget
           const force = removeForce
           removeImage.mutate({ imageId: target.id, force })
+        }}
+      />
+
+      <ConfirmDialog
+        open={cleanupTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCleanupTarget(null)
+        }}
+        title={cleanupDialog?.title ?? '清理'}
+        description={cleanupDialog?.description}
+        destructive
+        confirmText={cleanupDialog?.confirmText ?? '清理'}
+        onConfirm={() => {
+          if (cleanupTarget === 'dangling') {
+            pruneDanglingImages.mutate()
+            return
+          }
+          if (cleanupTarget === 'unused') {
+            pruneUnusedImages.mutate()
+            return
+          }
+          if (cleanupTarget === 'builder') {
+            pruneBuilderCache.mutate()
+          }
         }}
       />
     </PanelShell>

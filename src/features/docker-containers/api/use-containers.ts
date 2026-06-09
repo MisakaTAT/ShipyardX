@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { commands, type RunContainer } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toastAppError } from '@/shared/lib/errors'
+import { formatBytes } from '@/shared/lib/format'
+import { toast } from '@/shared/components/toast'
 
 export function useContainers(serverId: string) {
   return useQuery({
@@ -43,5 +45,19 @@ export function useRunContainer(serverId: string) {
   return useMutation({
     mutationFn: (params: RunContainer) => commands.runContainer(serverId, params),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.containers(serverId) }),
+  })
+}
+
+export function usePruneStoppedContainers(serverId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => commands.pruneStoppedContainers(serverId),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: qk.containers(serverId) })
+      toast.success('已清理已停止容器', {
+        description: `清理项 ${result.deleted_count} 个，回收 ${formatBytes(result.reclaimed_bytes)}`,
+      })
+    },
+    onError: (err) => toastAppError(err),
   })
 }

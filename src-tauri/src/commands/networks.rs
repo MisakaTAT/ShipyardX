@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::contracts::frontend::cleanup::CleanupResult;
 use crate::contracts::frontend::network::{Network, NetworkCreate};
 use crate::error::AppResult;
 use crate::services;
@@ -21,6 +22,12 @@ pub async fn inspect_network(server_id: String, network_id: String, state: State
 #[specta::specta]
 pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<()> {
     Ok(services::networks::remove_network(server_id, network_id, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn prune_unused_networks(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
+    Ok(services::networks::prune_unused_networks(server_id, state).await?)
 }
 
 #[tauri::command]

@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Plus, ScanSearch, Share2, Trash2 } from 'lucide-react'
+import { ChevronDown, Plus, ScanSearch, Share2, Trash2 } from 'lucide-react'
 import type { Network } from '@/types/app-bindings'
 import NetworkCreateDialog from '@/features/docker-networks/ui/network-create-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { TruncatedChips } from '@/shared/components/truncated-chips'
-import { useNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
+import { useNetworks, usePruneUnusedNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
 
 interface NetworkPanelProps {
   serverId: string
@@ -16,11 +17,13 @@ interface NetworkPanelProps {
 export default function NetworkPanel({ serverId }: NetworkPanelProps) {
   const { data: networks = [], isFetching, dataUpdatedAt } = useNetworks(serverId)
   const removeNetwork = useRemoveNetwork(serverId)
+  const pruneUnusedNetworks = usePruneUnusedNetworks(serverId)
 
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Network | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Network | null>(null)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
 
   const filtered = useMemo(() => {
     if (!search.trim()) return networks
@@ -123,10 +126,22 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
-          <Button type="button" onClick={() => setShowCreate(true)}>
-            <Plus />
-            创建网络
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" />}>
+              操作
+              <ChevronDown />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem onClick={() => setShowCreate(true)}>
+                <Plus className="size-3.5" />
+                创建网络
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
+                <Trash2 className="size-3.5" />
+                清理未使用网络
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -163,6 +178,18 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         onConfirm={() => {
           if (!removeTarget) return
           removeNetwork.mutate(removeTarget.id)
+        }}
+      />
+
+      <ConfirmDialog
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
+        title="清理未使用网络"
+        description="删除当前没有容器连接的网络。系统默认网络不会被清理，自定义网络若仍需使用，请不要执行该操作。"
+        destructive
+        confirmText="清理未使用网络"
+        onConfirm={() => {
+          pruneUnusedNetworks.mutate()
         }}
       />
     </PanelShell>

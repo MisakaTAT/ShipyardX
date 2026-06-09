@@ -43,7 +43,7 @@ export function ConfirmDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? (
-            <AlertDialogDescription className="whitespace-pre-line">{description}</AlertDialogDescription>
+            <AlertDialogDescription style={{ textWrap: 'wrap' }}>{description}</AlertDialogDescription>
           ) : null}
         </AlertDialogHeader>
         {extra ? <div className="mt-1">{extra}</div> : null}
