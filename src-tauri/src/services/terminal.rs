@@ -15,7 +15,7 @@ use tokio_tungstenite::tungstenite::protocol::Message;
 use crate::contracts::docker_api::container::{ContainerExecCreate, ContainerExecCreateResponse, ContainerExecStart};
 use crate::contracts::frontend::server::ServerConfig;
 use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
-use crate::docker::client::{docker_post_async, docker_post_json_hijack_async, docker_post_json_response_async};
+use crate::docker::client::{docker_post, docker_post_json_hijack, docker_post_json_response};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config, lock_mutex};
@@ -199,7 +199,7 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty()),
         };
-        let raw = docker_post_json_response_async(&config, &format!("/containers/{container_id}/exec"), &exec).await?;
+        let raw = docker_post_json_response(&config, &format!("/containers/{container_id}/exec"), &exec).await?;
         let created: ContainerExecCreateResponse = serde_json::from_str(raw.trim()).map_err(|e| {
             AppError::internal("terminal.exec_create_parse_failed", "解析容器终端创建结果失败").with_source(e)
         })?;
@@ -207,7 +207,7 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
             detach: false,
             tty: true,
         };
-        let mut hijack = docker_post_json_hijack_async(&config, &format!("/exec/{}/start", created.id), &start).await?;
+        let mut hijack = docker_post_json_hijack(&config, &format!("/exec/{}/start", created.id), &start).await?;
 
         run_docker_exec_io_loop(session_id, rx, ah, &config, &created.id, &mut hijack, cols, rows).await;
         Ok::<(), AppError>(())
@@ -228,7 +228,7 @@ async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, row
     if cols == 0 || rows == 0 {
         return false;
     }
-    docker_post_async(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}"))
+    docker_post(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}"))
         .await
         .is_ok()
 }

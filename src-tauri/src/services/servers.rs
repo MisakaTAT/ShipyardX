@@ -5,7 +5,7 @@ use log::{info, warn};
 use crate::config::store::save_servers;
 use crate::contracts::docker_api::common::DockerVersion;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::docker_get_async;
+use crate::docker::client::docker_get;
 use crate::docker::transport::invalidate_pooled_http_server_id;
 use crate::error::AppResult;
 use crate::ssh::{client::block_on, pool};
@@ -84,7 +84,7 @@ pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
 
 async fn test_connection_with_config(server: ServerConfig) -> AppResult<String> {
     info!(target: "shipyardx_lib::services::servers", "testing server connection; server_id={} host={} port={}", server.id, server.host, server.port);
-    let version = docker_get_async(&server, "/version").await?;
+    let version = docker_get(&server, "/version").await?;
     let version: DockerVersion = serde_json::from_str(version.trim())?;
     let display = if version.version.trim().is_empty() {
         version.api_version

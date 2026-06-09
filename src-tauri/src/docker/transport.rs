@@ -4,15 +4,17 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
-use hyper::body::Incoming;
+use futures_util::TryStreamExt;
+use http_body_util::{BodyExt, Full, StreamBody};
+use hyper::body::{Frame, Incoming};
 use hyper::client::conn::http1;
-use hyper::header::{CONTENT_TYPE, HOST};
+use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE, HOST};
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use log::{debug, warn};
 use russh::{ChannelStream, client};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_util::io::ReaderStream;
 
 use crate::contracts::docker_api::common::DockerError;
 use crate::contracts::docker_api::system::DaemonConfig;
@@ -20,7 +22,7 @@ use crate::contracts::frontend::server::ServerConfig;
 use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::scripts::DOCKER_READ_DAEMON_CONFIG_SH;
 use crate::ssh::client::{SshClientHandler, connect, disconnect};
-use crate::ssh::exec::ssh_exec_async;
+use crate::ssh::exec::ssh_exec;
 use crate::ssh::pool;
 use crate::state::lock_mutex;
 
@@ -190,7 +192,7 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
 
     let raw = match pool::exec(config, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
-        Err(_) => ssh_exec_async(config, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+        Err(_) => ssh_exec(config, DOCKER_READ_DAEMON_CONFIG_SH).await?,
     };
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
     let host = cfg
@@ -352,6 +354,40 @@ async fn open_http_sender(
     tokio::task::JoinHandle<()>,
 )> {
     debug!(target: "shipyardx_lib::docker::transport", "opening docker http sender; server_id={}", config.id);
+    let handle = connect(config).await?;
+    let endpoint = resolve_docker_endpoint(config).await?;
+    let channel = match endpoint {
+        DockerEndpoint::Unix { path } => handle
+            .channel_open_direct_streamlocal(path)
+            .await
+            .map_err(|e| map_transport_error("docker.socket_open_failed", "打开 Docker Socket 通道失败", e))?,
+        DockerEndpoint::Tcp { host, port } => handle
+            .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+            .await
+            .map_err(|e| map_transport_error("docker.tcp_open_failed", "打开 Docker TCP 通道失败", e))?,
+    };
+
+    let stream = TokioIo::new(channel.into_stream());
+    let (sender, connection) = http1::Builder::new()
+        .handshake(stream)
+        .await
+        .map_err(|e| map_transport_error("docker.http_handshake_failed", "建立 Docker HTTP 连接失败", e))?;
+
+    let connection_task = tokio::spawn(async move {
+        let _ = connection.await;
+    });
+
+    Ok((handle, sender, connection_task))
+}
+
+async fn open_http_sender_streaming(
+    config: &ServerConfig,
+) -> AppResult<(
+    client::Handle<SshClientHandler>,
+    hyper::client::conn::http1::SendRequest<http_body_util::combinators::BoxBody<Bytes, std::io::Error>>,
+    tokio::task::JoinHandle<()>,
+)> {
+    debug!(target: "shipyardx_lib::docker::transport", "opening docker streaming http sender; server_id={}", config.id);
     let handle = connect(config).await?;
     let endpoint = resolve_docker_endpoint(config).await?;
     let channel = match endpoint {
@@ -551,6 +587,54 @@ pub async fn request_empty(config: &ServerConfig, method: Method, path: &str) ->
         return Err(docker_api_error(response.status, &response.body));
     }
     Ok(())
+}
+
+pub async fn request_stream_body_text<R>(
+    config: &ServerConfig,
+    method: Method,
+    path: &str,
+    content_type: &str,
+    content_length: u64,
+    reader: R,
+) -> AppResult<String>
+where
+    R: tokio::io::AsyncRead + Send + Sync + Unpin + 'static,
+{
+    let (handle, mut sender, connection_task) = open_http_sender_streaming(config).await?;
+    let body_stream = ReaderStream::new(reader).map_ok(Frame::data);
+    let body = StreamBody::new(body_stream).boxed();
+    let request = Request::builder()
+        .method(method)
+        .uri(path)
+        .header(HOST, "localhost")
+        .header(CONTENT_TYPE, content_type)
+        .header(CONTENT_LENGTH, content_length)
+        .body(body)
+        .map_err(|e| {
+            AppError::internal("docker.request_build_failed", "构建 Docker HTTP 请求失败").with_detail(e.to_string())
+        })?;
+
+    let response = sender
+        .send_request(request)
+        .await
+        .map_err(|e| map_transport_error("docker.request_send_failed", "发送 Docker HTTP 请求失败", e))?;
+
+    let status = response.status();
+    let body = response
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| map_transport_error("docker.response_read_failed", "读取 Docker HTTP 响应失败", e))?
+        .to_bytes();
+    drop(sender);
+    connection_task.abort();
+    let mut handle = handle;
+    disconnect(&mut handle).await;
+
+    if !status.is_success() {
+        return Err(docker_api_error(status, &body));
+    }
+    Ok(String::from_utf8_lossy(&body).to_string())
 }
 
 pub(crate) async fn open_stream(config: &ServerConfig, method: Method, path: &str) -> AppResult<DockerStreamResponse> {

@@ -3,7 +3,7 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::watch;
 
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::docker_stream_async;
+use crate::docker::client::docker_stream;
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
@@ -102,7 +102,7 @@ async fn run_log_stream_task(
         container_id, tail, ts
     );
 
-    let mut stream = match docker_stream_async(&config, &path).await {
+    let mut stream = match docker_stream(&config, &path).await {
         Ok(stream) => stream,
         Err(error) => {
             error!(

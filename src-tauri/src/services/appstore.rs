@@ -22,7 +22,7 @@ use crate::scripts::{
     APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_STREAM_SH,
     render_shell,
 };
-use crate::ssh::exec::{ssh_exec_async, ssh_exec_streaming_async, ssh_exec_with_stdin_reader_async};
+use crate::ssh::exec::{ssh_exec, ssh_exec_streaming, ssh_exec_with_stdin_reader};
 use crate::utils::output::TextOutputBuffer;
 
 const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
@@ -375,7 +375,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         Some(INSTALL_OUTPUT_MAX_BYTES),
         INSTALL_OUTPUT_TRUNCATION_NOTICE,
     );
-    ssh_exec_streaming_async(server, &setup_cmd, |chunk| {
+    ssh_exec_streaming(server, &setup_cmd, |chunk| {
         emit_buffered_output(app, "deploy", &mut deploy_output_buffer, chunk);
     })
     .await
@@ -404,7 +404,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     // Step 3: 创建网络
     emit_step(app, "network", "running", "正在创建 Docker 网络...");
     let net_cmd = APPSTORE_CREATE_NETWORK_SH.to_string();
-    let _ = ssh_exec_async(server, &net_cmd).await;
+    let _ = ssh_exec(server, &net_cmd).await;
     emit_step(app, "network", "done", "Docker 网络就绪");
     info!(target: "shipyardx_lib::services::appstore", "app network ensured; server_id={} app_key={} version={}", server.id, req.app_key, req.version);
 
@@ -426,7 +426,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         Some(INSTALL_OUTPUT_MAX_BYTES),
         INSTALL_OUTPUT_TRUNCATION_NOTICE,
     );
-    let result = ssh_exec_streaming_async(server, &up_cmd_v2, |chunk| {
+    let result = ssh_exec_streaming(server, &up_cmd_v2, |chunk| {
         emit_buffered_output(app, "start", &mut start_output_buffer, chunk);
     })
     .await;
@@ -440,7 +440,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
                 Some(INSTALL_OUTPUT_MAX_BYTES),
                 INSTALL_OUTPUT_TRUNCATION_NOTICE,
             );
-            ssh_exec_streaming_async(server, &up_cmd_v1, |chunk| {
+            ssh_exec_streaming(server, &up_cmd_v1, |chunk| {
                 emit_buffered_output(app, "start", &mut fallback_output_buffer, chunk);
             })
             .await
@@ -665,7 +665,7 @@ async fn copy_data_dir_to_remote(
         };
         emit_step(app, "deploy", "running", &message);
     });
-    let upload_result = ssh_exec_with_stdin_reader_async(server, &remote_cmd, &mut progress_reader).await;
+    let upload_result = ssh_exec_with_stdin_reader(server, &remote_cmd, &mut progress_reader).await;
     let tar_status = child
         .wait()
         .await

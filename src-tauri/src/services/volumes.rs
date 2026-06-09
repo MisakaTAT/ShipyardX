@@ -7,7 +7,7 @@ use log::{debug, info};
 use crate::contracts::docker_api::container::ContainerSummary;
 use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList};
 use crate::contracts::frontend::volume::Volume;
-use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_json_async, pretty_json_response};
+use crate::docker::client::{docker_delete, docker_get, docker_post_json, pretty_json_response};
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -15,7 +15,7 @@ use crate::utils::sort::sort_by_created_desc_then_id;
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
     debug!(target: "shipyardx_lib::services::volumes", "listing volumes; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, "/volumes").await?;
+    let resp = docker_get(&server, "/volumes").await?;
     let api: VolumeList = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("volume.list_parse_failed", "解析存储卷列表失败").with_source(e))?;
     let mut list = api.volumes.unwrap_or_default();
@@ -25,7 +25,7 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
         |x| x.name.clone().unwrap_or_default(),
     );
 
-    let containers_resp = docker_get_async(&server, "/containers/json?all=1").await?;
+    let containers_resp = docker_get(&server, "/containers/json?all=1").await?;
     let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
         .map_err(|e| AppError::internal("volume.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
 
@@ -83,14 +83,14 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
 pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::volumes", "inspecting volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, &format!("/volumes/{}", name)).await?;
+    let resp = docker_get(&server, &format!("/volumes/{}", name)).await?;
     pretty_json_response(&resp)
 }
 
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::volumes", "removing volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete_async(&server, &format!("/volumes/{}", name)).await
+    docker_delete(&server, &format!("/volumes/{}", name)).await
 }
 
 pub async fn create_volume(
@@ -112,5 +112,5 @@ pub async fn create_volume(
     };
     info!(target: "shipyardx_lib::services::volumes", "creating volume; server_id={} volume={} driver={}", server_id, body.name, body.driver);
     let server = get_server_config(&state, &server_id)?;
-    docker_post_json_async(&server, "/volumes/create", &body).await
+    docker_post_json(&server, "/volumes/create", &body).await
 }

@@ -5,10 +5,13 @@ use std::time::{Duration, Instant};
 use hyper::Method;
 use log::debug;
 use serde::Serialize;
+use tokio::io::AsyncRead;
 
 use crate::contracts::docker_api::common::DockerVersion;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::transport::{open_hijack, open_stream, request_empty, request_json_body_text, request_text};
+use crate::docker::transport::{
+    open_hijack, open_stream, request_empty, request_json_body_text, request_stream_body_text, request_text,
+};
 use crate::error::{AppError, AppResult};
 use crate::state::lock_mutex;
 
@@ -38,7 +41,7 @@ pub fn invalidate_api_version(config: &ServerConfig) {
     .map(|mut cache| cache.remove(&cache_key(config)));
 }
 
-pub async fn resolve_api_version_async(config: &ServerConfig) -> AppResult<String> {
+pub async fn resolve_api_version(config: &ServerConfig) -> AppResult<String> {
     let key = cache_key(config);
     if let Some(entry) = lock_mutex(
         api_version_cache(),
@@ -84,18 +87,18 @@ fn docker_api_path(ver: &str, path: &str) -> String {
     format!("/v{}{}", ver, path)
 }
 
-pub async fn docker_get_async(config: &ServerConfig, path: &str) -> AppResult<String> {
-    let ver = resolve_api_version_async(config).await?;
+pub async fn docker_get(config: &ServerConfig, path: &str) -> AppResult<String> {
+    let ver = resolve_api_version(config).await?;
     request_text(config, Method::GET, &docker_api_path(&ver, path)).await
 }
 
-pub async fn docker_post_async(config: &ServerConfig, path: &str) -> AppResult<()> {
-    let ver = resolve_api_version_async(config).await?;
+pub async fn docker_post(config: &ServerConfig, path: &str) -> AppResult<()> {
+    let ver = resolve_api_version(config).await?;
     request_empty(config, Method::POST, &docker_api_path(&ver, path)).await
 }
 
-pub async fn docker_post_json_async<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<()> {
-    let ver = resolve_api_version_async(config).await?;
+pub async fn docker_post_json<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<()> {
+    let ver = resolve_api_version(config).await?;
     let body = serde_json::to_vec(body).map_err(|e| {
         AppError::wrap(
             "docker.request_body_serialize_failed",
@@ -110,12 +113,8 @@ pub async fn docker_post_json_async<T: Serialize>(config: &ServerConfig, path: &
         .map(|_| ())
 }
 
-pub async fn docker_post_json_response_async<T: Serialize>(
-    config: &ServerConfig,
-    path: &str,
-    body: &T,
-) -> AppResult<String> {
-    let ver = resolve_api_version_async(config).await?;
+pub async fn docker_post_json_response<T: Serialize>(config: &ServerConfig, path: &str, body: &T) -> AppResult<String> {
+    let ver = resolve_api_version(config).await?;
     let body = serde_json::to_vec(body).map_err(|e| {
         AppError::wrap(
             "docker.request_body_serialize_failed",
@@ -128,33 +127,55 @@ pub async fn docker_post_json_response_async<T: Serialize>(
     request_json_body_text(config, Method::POST, &docker_api_path(&ver, path), body).await
 }
 
-pub async fn docker_delete_async(config: &ServerConfig, path: &str) -> AppResult<()> {
-    let ver = resolve_api_version_async(config).await?;
+pub async fn docker_post_stream_body_text<R>(
+    config: &ServerConfig,
+    path: &str,
+    content_type: &str,
+    content_length: u64,
+    reader: R,
+) -> AppResult<String>
+where
+    R: AsyncRead + Send + Sync + Unpin + 'static,
+{
+    let ver = resolve_api_version(config).await?;
+    request_stream_body_text(
+        config,
+        Method::POST,
+        &docker_api_path(&ver, path),
+        content_type,
+        content_length,
+        reader,
+    )
+    .await
+}
+
+pub async fn docker_delete(config: &ServerConfig, path: &str) -> AppResult<()> {
+    let ver = resolve_api_version(config).await?;
     request_empty(config, Method::DELETE, &docker_api_path(&ver, path)).await
 }
 
-pub async fn docker_stream_async(
+pub async fn docker_stream(
     config: &ServerConfig,
     path: &str,
 ) -> AppResult<crate::docker::transport::DockerStreamResponse> {
-    let ver = resolve_api_version_async(config).await?;
+    let ver = resolve_api_version(config).await?;
     open_stream(config, Method::GET, &docker_api_path(&ver, path)).await
 }
 
-pub async fn docker_post_stream_async(
+pub async fn docker_post_stream(
     config: &ServerConfig,
     path: &str,
 ) -> AppResult<crate::docker::transport::DockerStreamResponse> {
-    let ver = resolve_api_version_async(config).await?;
+    let ver = resolve_api_version(config).await?;
     open_stream(config, Method::POST, &docker_api_path(&ver, path)).await
 }
 
-pub async fn docker_post_json_hijack_async<T: Serialize>(
+pub async fn docker_post_json_hijack<T: Serialize>(
     config: &ServerConfig,
     path: &str,
     body: &T,
 ) -> AppResult<crate::docker::transport::DockerHijackConnection> {
-    let ver = resolve_api_version_async(config).await?;
+    let ver = resolve_api_version(config).await?;
     let body = serde_json::to_vec(body).map_err(|e| {
         AppError::wrap(
             "docker.request_body_serialize_failed",

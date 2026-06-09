@@ -11,7 +11,7 @@ use crate::contracts::frontend::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::docker_stream_async;
+use crate::docker::client::docker_stream;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, EventStreamHandle, get_server_config, lock_mutex};
@@ -150,7 +150,7 @@ async fn run_event_stream_task(
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connecting);
 
         let stream_result = async {
-            let mut stream = match docker_stream_async(&config, "/events").await {
+            let mut stream = match docker_stream(&config, "/events").await {
                 Ok(stream) => stream,
                 Err(error) => {
                     warn!(

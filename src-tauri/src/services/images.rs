@@ -1,20 +1,26 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncRead, AsyncWriteExt, ReadBuf};
 use tokio::sync::watch;
 
 use crate::contracts::docker_api::container::ContainerSummary;
 use crate::contracts::docker_api::image::{ImageHistoryItem, ImageSummary};
-use crate::contracts::frontend::events::{DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress};
+use crate::contracts::frontend::events::{
+    DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress, ImageImportProgress,
+};
 use crate::contracts::frontend::image::Image;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::{docker_delete_async, docker_get_async, docker_post_stream_async, pretty_json_response};
+use crate::docker::client::{
+    docker_delete, docker_get, docker_post_stream, docker_post_stream_body_text, pretty_json_response,
+};
 use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
@@ -31,7 +37,7 @@ const EXPORT_PROGRESS_EMIT_BYTES: u64 = 512 * 1024;
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     debug!(target: "shipyardx_lib::services::images", "listing images; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let containers_resp = docker_get_async(&server, "/containers/json?all=1").await?;
+    let containers_resp = docker_get(&server, "/containers/json?all=1").await?;
     let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
         .map_err(|e| AppError::internal("image.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
 
@@ -44,7 +50,7 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppRe
         *used_by.entry(id.to_string()).or_insert(0) += 1;
     }
 
-    let resp = docker_get_async(&server, "/images/json").await?;
+    let resp = docker_get(&server, "/images/json").await?;
     let mut api: Vec<ImageSummary> = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("image.list_parse_failed", "解析镜像列表失败").with_source(e))?;
     sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
@@ -62,7 +68,7 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppRe
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::images", "inspecting image; server_id={} image_id={}", server_id, image_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, &format!("/images/{}/json", image_id)).await?;
+    let resp = docker_get(&server, &format!("/images/{}/json", image_id)).await?;
     pretty_json_response(&resp)
 }
 
@@ -73,7 +79,7 @@ pub async fn get_image_history(
 ) -> AppResult<Vec<crate::contracts::frontend::image::ImageLayer>> {
     debug!(target: "shipyardx_lib::services::images", "fetching image history; server_id={} image_id={}", server_id, image_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, &format!("/images/{}/history", image_id)).await?;
+    let resp = docker_get(&server, &format!("/images/{}/history", image_id)).await?;
     let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("image.history_parse_failed", "解析镜像历史失败").with_source(e))?;
     let layers: Vec<crate::contracts::frontend::image::ImageLayer> = api
@@ -98,7 +104,7 @@ pub async fn remove_image(
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::images", "removing image; server_id={} image_id={} force={}", server_id, image_id, force);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete_async(&server, &format!("/images/{}?force={}", image_id, force)).await
+    docker_delete(&server, &format!("/images/{}?force={}", image_id, force)).await
 }
 
 pub async fn export_image(
@@ -143,7 +149,7 @@ pub async fn export_image(
     let server = get_server_config(&state, &server_id)?;
     let result = async {
         let mut file = create_export_file(&export_path).await?;
-        let mut stream = crate::docker::client::docker_stream_async(
+        let mut stream = crate::docker::client::docker_stream(
             &server,
             &format!("/images/get?names={}", encode_query_component(&image_id)),
         )
@@ -193,6 +199,85 @@ pub async fn export_image(
     Ok(())
 }
 
+pub async fn import_image(
+    import_id: String,
+    server_id: String,
+    file_path: String,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    let file_path = file_path.trim();
+    if file_path.is_empty() {
+        return Err(AppError::validation("image.import_file_required", "请选择镜像文件"));
+    }
+
+    let import_path = PathBuf::from(file_path);
+    let file_name = import_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+        .filter(|name| !name.trim().is_empty())
+        .ok_or_else(|| AppError::validation("image.import_name_invalid", "无法识别镜像文件名"))?;
+
+    let total_bytes = ensure_import_file(&import_path).await?;
+    let server = get_server_config(&state, &server_id)?;
+    info!(
+        target: "shipyardx_lib::services::images",
+        "importing image; import_id={} server_id={} path={}",
+        import_id,
+        server_id,
+        import_path.display()
+    );
+
+    let file = File::open(&import_path).await.map_err(|e| match e.kind() {
+        ErrorKind::NotFound => AppError::validation("image.import_file_missing", "所选镜像文件不存在"),
+        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied", "没有权限读取所选镜像文件"),
+        _ => AppError::internal("image.import_open_failed", "打开镜像文件失败").with_source(e),
+    })?;
+
+    emit_import_progress(&app_handle, &import_id, &file_name, 0, Some(total_bytes));
+    let progress_app_handle = app_handle.clone();
+    let progress_import_id = import_id.clone();
+    let progress_file_name = file_name.clone();
+    let progress_reader = ProgressReader::new(file, EXPORT_PROGRESS_EMIT_BYTES, move |transferred| {
+        emit_import_progress(
+            &progress_app_handle,
+            &progress_import_id,
+            &progress_file_name,
+            transferred,
+            Some(total_bytes),
+        );
+    });
+
+    let output = docker_post_stream_body_text(
+        &server,
+        "/images/load?quiet=1",
+        "application/x-tar",
+        total_bytes,
+        progress_reader,
+    )
+    .await?;
+    let output = output.trim();
+    if !output.is_empty() {
+        debug!(
+            target: "shipyardx_lib::services::images",
+            "image import output; import_id={} server_id={} output={}",
+            import_id,
+            server_id,
+            output
+        );
+    }
+
+    info!(
+        target: "shipyardx_lib::services::images",
+        "imported image; import_id={} server_id={} path={}",
+        import_id,
+        server_id,
+        import_path.display()
+    );
+    Ok(())
+}
+
 async fn run_pull_task(
     config: ServerConfig,
     pull_id: String,
@@ -205,7 +290,7 @@ async fn run_pull_task(
     info!(target: "shipyardx_lib::services::images", "image pull task started; pull_id={} server_id={} image={}", pull_id, config.id, image);
     let result = async {
         let path = format!("/images/create?fromImage={}", encode_query_component(&image));
-        let mut stream = docker_post_stream_async(&config, &path).await.map_err(|e| {
+        let mut stream = docker_post_stream(&config, &path).await.map_err(|e| {
             error!(
                 target: "shipyardx_lib::services::images",
                 "image pull stream open failed; pull_id={} server_id={} image={} code={} message={} detail={:?}",
@@ -332,6 +417,18 @@ fn ensure_export_directory(path: &Path) -> AppResult<()> {
     Ok(())
 }
 
+async fn ensure_import_file(path: &Path) -> AppResult<u64> {
+    let metadata = tokio::fs::metadata(path).await.map_err(|e| match e.kind() {
+        ErrorKind::NotFound => AppError::validation("image.import_file_missing", "所选镜像文件不存在"),
+        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied", "没有权限读取所选镜像文件"),
+        _ => AppError::internal("image.import_stat_failed", "读取镜像文件信息失败").with_source(e),
+    })?;
+    if !metadata.is_file() {
+        return Err(AppError::validation("image.import_file_invalid", "所选路径不是文件"));
+    }
+    Ok(metadata.len())
+}
+
 fn ensure_tar_extension(file_name: &str) -> String {
     if file_name.to_ascii_lowercase().ends_with(".tar") {
         file_name.to_string()
@@ -380,6 +477,80 @@ fn emit_export_progress(
         total_bytes,
     }
     .emit(app_handle);
+}
+
+fn emit_import_progress(
+    app_handle: &AppHandle,
+    import_id: &str,
+    file_name: &str,
+    transferred_bytes: u64,
+    total_bytes: Option<u64>,
+) {
+    let _ = ImageImportProgress {
+        import_id: import_id.to_string(),
+        file_name: file_name.to_string(),
+        transferred_bytes,
+        total_bytes,
+    }
+    .emit(app_handle);
+}
+
+struct ProgressReader<R, F> {
+    inner: R,
+    on_progress: F,
+    transferred: u64,
+    next_report_bytes: u64,
+    report_every_bytes: u64,
+    finished: bool,
+}
+
+impl<R, F> ProgressReader<R, F> {
+    fn new(inner: R, report_every_bytes: u64, on_progress: F) -> Self {
+        Self {
+            inner,
+            on_progress,
+            transferred: 0,
+            next_report_bytes: report_every_bytes,
+            report_every_bytes,
+            finished: false,
+        }
+    }
+}
+
+impl<R, F> AsyncRead for ProgressReader<R, F>
+where
+    R: AsyncRead + Unpin,
+    F: FnMut(u64) + Unpin,
+{
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let before = buf.filled().len();
+        let poll = Pin::new(&mut self.inner).poll_read(cx, buf);
+        match poll {
+            Poll::Ready(Ok(())) => {
+                let filled = buf.filled().len();
+                let read = filled.saturating_sub(before) as u64;
+                if read == 0 {
+                    if !self.finished {
+                        self.finished = true;
+                        let transferred = self.transferred;
+                        let on_progress = &mut self.on_progress;
+                        (on_progress)(transferred);
+                    }
+                    return Poll::Ready(Ok(()));
+                }
+
+                self.transferred = self.transferred.saturating_add(read);
+                if self.transferred >= self.next_report_bytes {
+                    self.next_report_bytes = self.transferred.saturating_add(self.report_every_bytes);
+                    let transferred = self.transferred;
+                    let on_progress = &mut self.on_progress;
+                    (on_progress)(transferred);
+                }
+                Poll::Ready(Ok(()))
+            }
+            other => other,
+        }
+    }
 }
 
 fn emit_pull_lines(

@@ -9,8 +9,7 @@ use crate::contracts::docker_api::container::{
 };
 use crate::contracts::frontend::container::{Container, RunContainer};
 use crate::docker::client::{
-    docker_delete_async, docker_get_async, docker_post_async, docker_post_json_response_async, docker_stream_async,
-    pretty_json_response,
+    docker_delete, docker_get, docker_post, docker_post_json_response, docker_stream, pretty_json_response,
 };
 use crate::docker::mapping::api_container_to_dto;
 use crate::error::{AppError, AppResult};
@@ -20,7 +19,7 @@ use crate::utils::sort::sort_by_created_desc_then_id;
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
     debug!(target: "shipyardx_lib::services::containers", "listing containers; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, "/containers/json?all=1").await?;
+    let resp = docker_get(&server, "/containers/json?all=1").await?;
     let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp).map_err(|e| {
         AppError::internal("container.list_parse_failed", "解析容器列表失败").with_detail(format!(
             "{} — 原始响应: {}",
@@ -37,19 +36,19 @@ pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> A
 pub async fn start_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "starting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post_async(&server, &format!("/containers/{}/start", container_id)).await
+    docker_post(&server, &format!("/containers/{}/start", container_id)).await
 }
 
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "stopping container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post_async(&server, &format!("/containers/{}/stop", container_id)).await
+    docker_post(&server, &format!("/containers/{}/stop", container_id)).await
 }
 
 pub async fn restart_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "restarting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post_async(&server, &format!("/containers/{}/restart", container_id)).await
+    docker_post(&server, &format!("/containers/{}/restart", container_id)).await
 }
 
 pub async fn remove_container(
@@ -60,7 +59,7 @@ pub async fn remove_container(
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "removing container; server_id={} container_id={} force={}", server_id, container_id, force);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete_async(&server, &format!("/containers/{}?force={}", container_id, force)).await
+    docker_delete(&server, &format!("/containers/{}?force={}", container_id, force)).await
 }
 
 pub async fn inspect_container(
@@ -70,7 +69,7 @@ pub async fn inspect_container(
 ) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::containers", "inspecting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, &format!("/containers/{}/json", container_id)).await?;
+    let resp = docker_get(&server, &format!("/containers/{}/json", container_id)).await?;
     pretty_json_response(&resp)
 }
 
@@ -88,7 +87,7 @@ pub async fn get_container_logs(
         "/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}",
         container_id, tail, ts
     );
-    let mut stream = docker_stream_async(&server, &path).await?;
+    let mut stream = docker_stream(&server, &path).await?;
     let mut raw = Vec::new();
     while let Some(chunk) = stream.next_chunk().await? {
         raw.extend_from_slice(&chunk);
@@ -290,7 +289,7 @@ pub async fn run_container(server_id: String, params: RunContainer, state: State
         None => "/containers/create".to_string(),
     };
 
-    let raw = docker_post_json_response_async(&server, &path, &body).await?;
+    let raw = docker_post_json_response(&server, &path, &body).await?;
 
     let created: ContainerCreateResponse = serde_json::from_str(&raw).map_err(|e| {
         AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败").with_detail(format!(
@@ -308,7 +307,7 @@ pub async fn run_container(server_id: String, params: RunContainer, state: State
         ));
     }
 
-    docker_post_async(&server, &format!("/containers/{id}/start")).await?;
+    docker_post(&server, &format!("/containers/{id}/start")).await?;
 
     info!(target: "shipyardx_lib::services::containers", "container created and started; server_id={} container_id={}", server_id, id);
     Ok(id.to_string())

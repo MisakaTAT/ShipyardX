@@ -10,7 +10,7 @@ use crate::contracts::frontend::container::ContainerStats;
 use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
 use crate::contracts::frontend::info::DockerEngineInfo;
 use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::{docker_get_async, invalidate_api_version, resolve_api_version_async};
+use crate::docker::client::{docker_get, invalidate_api_version, resolve_api_version};
 use crate::docker::stats::compute_stats;
 use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
 use crate::error::{AppError, AppResult};
@@ -19,7 +19,7 @@ use crate::scripts::{
     SYSTEM_RESTART_WITHOUT_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH,
     render, render_shell,
 };
-use crate::ssh::exec::ssh_exec_async;
+use crate::ssh::exec::ssh_exec;
 use crate::ssh::pool;
 use crate::state::{AppState, get_server_config};
 
@@ -119,7 +119,7 @@ async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<Str
             ],
         )
     };
-    ssh_exec_async(server, &restart_cmd).await.map_err(map_restart_error)?;
+    ssh_exec(server, &restart_cmd).await.map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker service restarted; server_id={}", server.id);
     Ok(())
 }
@@ -127,7 +127,7 @@ async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<Str
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     debug!(target: "shipyardx_lib::services::system", "fetching docker info; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(&server, "/info").await?;
+    let resp = docker_get(&server, "/info").await?;
     let v: SystemInfo = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("system.info_parse_failed", "解析 Docker 信息失败").with_source(e))?;
     let info = DockerEngineInfo {
@@ -137,7 +137,7 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
         containers_stopped: v.containers_stopped.unwrap_or(0),
         images: v.images.unwrap_or(0),
         server_version: v.server_version.unwrap_or_default(),
-        api_version: resolve_api_version_async(&server).await.unwrap_or_default(),
+        api_version: resolve_api_version(&server).await.unwrap_or_default(),
         name: v.name.unwrap_or_default(),
         ncpu: v.ncpu.unwrap_or(0),
         mem_total: v.mem_total.unwrap_or(0),
@@ -157,7 +157,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
     let server = get_server_config(&state, &server_id)?;
     invalidate_api_version(&server);
     invalidate_docker_endpoint(&server).await;
-    match resolve_api_version_async(&server).await {
+    match resolve_api_version(&server).await {
         Ok(api_version) => {
             info!(target: "shipyardx_lib::services::system", "docker access check succeeded; server_id={} api_version={}", server_id, api_version);
             Ok(())
@@ -167,7 +167,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
             warn!(target: "shipyardx_lib::services::system", "docker access check failed; server_id={} code={} message={} detail={:?} endpoint={:?}", server_id, e.code, e.message, e.detail, endpoint);
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
-                    let diag = ssh_exec_async(
+                    let diag = ssh_exec(
                         &server,
                         &render_shell(DOCKER_CHECK_SOCKET_SH, &[], &[("__SOCKET_PATH__", &path)]),
                     )
@@ -189,7 +189,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                 }
                 Some(DockerEndpoint::Tcp { host, port }) => {
                     let port_str = port.to_string();
-                    let diag = ssh_exec_async(
+                    let diag = ssh_exec(
                         &server,
                         &render_shell(DOCKER_CHECK_TCP_SH, &[("__PORT__", &port_str)], &[("__HOST__", &host)]),
                     )
@@ -220,7 +220,7 @@ pub async fn get_container_stats(
 ) -> AppResult<ContainerStats> {
     debug!(target: "shipyardx_lib::services::system", "fetching container stats; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get_async(
+    let resp = docker_get(
         &server,
         &format!("/containers/{}/stats?stream=false&one-shot=true", container_id),
     )
@@ -237,7 +237,7 @@ pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppS
     let server = get_server_config(&state, &server_id)?;
     let raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
-        Err(_) => ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+        Err(_) => ssh_exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
     };
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
 
@@ -299,7 +299,7 @@ pub async fn update_docker_daemon_settings(
     invalidate_docker_endpoint(&server).await;
     let current_raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
-        Err(_) => ssh_exec_async(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+        Err(_) => ssh_exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
     };
     let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
@@ -364,7 +364,7 @@ pub async fn update_docker_daemon_settings(
     } else {
         render(SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH, &[("__CFG_B64__", &b64)])
     };
-    ssh_exec_async(&server, &write_cmd).await.map_err(map_restart_error)?;
+    ssh_exec(&server, &write_cmd).await.map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker daemon settings updated; server_id={}", server_id);
     Ok(())
 }
