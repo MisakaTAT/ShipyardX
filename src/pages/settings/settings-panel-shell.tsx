@@ -17,7 +17,7 @@ export function SettingsPanelHeader({
     <div className="border-b border-border/70 pb-4">
       <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-semibold text-foreground">{title}</h2>
-      <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+      {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
     </div>
   )
 }

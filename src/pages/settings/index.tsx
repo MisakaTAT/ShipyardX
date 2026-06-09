@@ -10,7 +10,7 @@ import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
 export default function SettingsPage() {
   const { settings, updateTerminalSettings, resetSettings } = useAppSettings()
-  const [activeSection, setActiveSection] = useState<SettingsSectionKey>('terminal')
+  const [activeSection, setActiveSection] = useState<SettingsSectionKey>('app')
   const [terminalFontOptions, setTerminalFontOptions] = useState<string[]>([])
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function SettingsPage() {
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-sidebar/60 px-4 py-5">
         <div>
           <h1 className="text-lg font-semibold text-foreground">设置</h1>
-          <p className="mt-1 text-xs text-muted-foreground">调整本地界面偏好与终端行为。</p>
+          <p className="mt-1 text-xs text-muted-foreground">调整应用偏好设置与行为</p>
         </div>
 
         <div className="mt-5 flex flex-col gap-1">
@@ -69,7 +69,7 @@ export default function SettingsPage() {
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-auto bg-background">
+      <section className="flex min-h-0 flex-1 flex-col overflow-y-scroll bg-background [scrollbar-gutter:stable]">
         {activeSection === 'terminal' ? (
           <TerminalSettingsPanel
             frontend={settings.terminal.frontend}

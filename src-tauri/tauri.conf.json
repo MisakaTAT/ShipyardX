@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "shipyardx",
+  "productName": "ShipyardX",
   "version": "0.1.0",
   "identifier": "com.mikuac.shipyardx",
   "build": {
@@ -27,7 +27,25 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlFQTg2RTRCMkEzQzg1QTEKUldTaGhUd3FTMjZvbmdwMDZ1WkljZyt6VDY4U3JDazFLdjFZSDZrUHpNK3NJUXNwSlZqaXVSWHEK",
+      "endpoints": [
+        "https://github.com/MisakaTAT/ShipyardX/releases/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

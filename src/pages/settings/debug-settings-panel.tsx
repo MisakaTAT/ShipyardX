@@ -44,11 +44,7 @@ export function DebugSettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader
-        eyebrow="Debug"
-        title="调试"
-        description="调试入口会作用于当前桌面端实例，并用于定位界面状态与后端日志。"
-      />
+      <SettingsPanelHeader eyebrow="Debug" title="调试" description="" />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow

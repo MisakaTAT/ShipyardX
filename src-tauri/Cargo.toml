@@ -14,6 +14,10 @@ edition = "2024"
 name = "shipyardx_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "ShipyardX"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -45,3 +49,6 @@ tauri-specta = { version = "2.0.0-rc.24", features = ["derive", "javascript", "t
 serde_yaml = "0.9"
 chrono = "0.4"
 font-kit = "0.14"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.10.1"

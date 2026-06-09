@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
+import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { XTERM_THEME_MAP, XTERM_THEME_NAMES } from '@/themes/xtermjs'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -109,20 +110,14 @@ export function TerminalSettingsPanel({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-7">
-      <div className="border-b border-border/70 pb-4">
-        <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">Terminal</p>
-        <h2 className="mt-2 text-2xl font-semibold text-foreground">终端</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          终端前端实现与滚动缓冲会保存到本机，并用于后续打开的终端会话。
-        </p>
-      </div>
+    <SettingsPanelShell>
+      <SettingsPanelHeader eyebrow="Terminal" title="终端" description="" />
 
       <div className="divide-y divide-border/70">
-        <SettingRow
+        <SettingsActionRow
           title="前端"
           description="切换终端渲染路径"
-          control={
+          action={
             <div className="w-full max-w-xs">
               <Select value={frontend} onValueChange={(value) => onFrontendChange(value as TerminalFrontend)}>
                 <SelectTrigger className={`w-full ${SETTINGS_CONTROL_CLASSNAME}`}>
@@ -142,20 +137,20 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="启用连结字"
           description="为编程字体里的 ligatures 启用合字渲染"
-          control={
+          action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch checked={ligatures} onCheckedChange={onLigaturesChange} />
             </label>
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="配色"
           description="切换终端主题配色"
-          control={
+          action={
             <SearchablePicker<TerminalThemeName>
               value={theme}
               options={XTERM_THEME_NAMES}
@@ -185,10 +180,10 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="回滚"
           description="保存在缓冲区的行数"
-          control={
+          action={
             <div className="w-full max-w-xs">
               <Input
                 type="number"
@@ -208,10 +203,10 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="终端字体"
           description="设置终端使用的等宽字体"
-          control={
+          action={
             <SearchablePicker
               value={fontFamily}
               options={fontChoices}
@@ -221,10 +216,10 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="字体大小"
           description="控制终端字符的显示尺寸"
-          control={
+          action={
             <div className="w-full max-w-xs">
               <Input
                 type="number"
@@ -244,10 +239,10 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="光标形状"
           description="设置终端光标的形态"
-          control={
+          action={
             <div className="w-full max-w-xs">
               <Select value={cursorStyle} onValueChange={(value) => onCursorStyleChange(value as TerminalCursorStyle)}>
                 <SelectTrigger className={`w-full ${SETTINGS_CONTROL_CLASSNAME}`}>
@@ -267,20 +262,20 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="光标闪烁"
           description="启用或关闭光标闪烁动画"
-          control={
+          action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch checked={cursorBlink} onCheckedChange={onCursorBlinkChange} />
             </label>
           }
         />
 
-        <SettingRow
+        <SettingsActionRow
           title="行间距"
           description="调整终端行高，影响整体纵向密度"
-          control={
+          action={
             <div className="w-full max-w-xs">
               <Input
                 type="number"
@@ -300,7 +295,7 @@ export function TerminalSettingsPanel({
           }
         />
       </div>
-    </div>
+    </SettingsPanelShell>
   )
 }
 
@@ -396,18 +391,6 @@ function SearchablePicker<T extends string>({
           </div>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function SettingRow({ title, description, control }: { title: string; description: string; control: ReactNode }) {
-  return (
-    <div className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
-      <div>
-        <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
-      </div>
-      <div>{control}</div>
     </div>
   )
 }
