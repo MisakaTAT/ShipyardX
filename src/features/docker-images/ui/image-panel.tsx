@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Download, Image as ImageIcon } from 'lucide-react'
+import { Download, FolderUp, Image as ImageIcon } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
 import ImageExportDialog from '@/features/docker-images/ui/image-export-dialog'
+import ImageImportDialog from '@/features/docker-images/ui/image-import-dialog'
 import ImageLayersDialog from '@/features/docker-images/ui/image-layers-dialog'
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
@@ -26,6 +27,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
 
   const [search, setSearch] = useState('')
   const [showPull, setShowPull] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [exportTarget, setExportTarget] = useState<Image | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Image | null>(null)
   const [inspectTarget, setInspectTarget] = useState<Image | null>(null)
@@ -141,10 +143,16 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
-          <Button type="button" onClick={() => setShowPull(true)}>
-            <Download />
-            拉取镜像
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowImport(true)}>
+              <FolderUp />
+              导入镜像
+            </Button>
+            <Button type="button" onClick={() => setShowPull(true)}>
+              <Download />
+              拉取镜像
+            </Button>
+          </div>
         }
       />
 
@@ -160,6 +168,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       />
 
       <ImagePullDialog serverId={serverId} open={showPull} onOpenChange={setShowPull} />
+      <ImageImportDialog serverId={serverId} open={showImport} onOpenChange={setShowImport} />
       <ImageExportDialog
         serverId={serverId}
         image={exportTarget}

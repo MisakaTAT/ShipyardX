@@ -66,6 +66,18 @@ pub async fn export_image(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn import_image(
+    import_id: String,
+    server_id: String,
+    file_path: String,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    Ok(services::images::import_image(import_id, server_id, file_path, app_handle, state).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn start_image_pull(
     server_id: String,
     image: String,

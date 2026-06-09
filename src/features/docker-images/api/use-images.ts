@@ -23,6 +23,11 @@ interface ExportImageVars {
   totalBytes: number | null
 }
 
+interface ImportImageVars {
+  importId: string
+  filePath: string
+}
+
 export function useRemoveImage(serverId: string) {
   const qc = useQueryClient()
   return useMutation({
@@ -36,6 +41,15 @@ export function useExportImage(serverId: string) {
   return useMutation({
     mutationFn: ({ exportId, imageId, directory, fileName, totalBytes }: ExportImageVars) =>
       commands.exportImage(exportId, serverId, imageId, directory, fileName, totalBytes),
+    onError: (err) => toastAppError(err),
+  })
+}
+
+export function useImportImage(serverId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ importId, filePath }: ImportImageVars) => commands.importImage(importId, serverId, filePath),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.images(serverId) }),
     onError: (err) => toastAppError(err),
   })
 }

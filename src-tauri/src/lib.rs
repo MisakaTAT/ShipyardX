@@ -18,7 +18,7 @@ use std::sync::Mutex;
 use config::store::{get_data_file, load_servers};
 use contracts::frontend::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
-    DockerStreamStatus, EventStreamStatus, ImageExportProgress, InstallStepEvent,
+    DockerStreamStatus, EventStreamStatus, ImageExportProgress, ImageImportProgress, InstallStepEvent,
 };
 use log::{error, info, warn};
 use specta_typescript::Typescript;
@@ -49,6 +49,7 @@ pub fn run() {
             commands::images::get_image_history,
             commands::images::remove_image,
             commands::images::export_image,
+            commands::images::import_image,
             commands::images::start_image_pull,
             commands::images::cancel_stream,
             commands::networks::list_networks,
@@ -98,6 +99,7 @@ pub fn run() {
             DockerSshStreamChunk,
             DockerSshStreamDone,
             ImageExportProgress,
+            ImageImportProgress,
             InstallStepEvent,
         ])
         .typ::<EventStreamStatus>()

@@ -4575,6 +4575,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "uuid",
 ]
 

@@ -72,6 +72,14 @@ pub struct ImageExportProgress {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct ImageImportProgress {
+    pub import_id: String,
+    pub file_name: String,
+    pub transferred_bytes: u64,
+    pub total_bytes: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct InstallStepEvent {
     pub step: String,
     pub status: String,
