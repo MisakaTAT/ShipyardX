@@ -65,10 +65,19 @@ pub async fn export_image(
     image_id: String,
     directory: String,
     file_name: String,
-    total_bytes: Option<u64>,
+    total_bytes: Option<String>,
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
+    let total_bytes = total_bytes
+        .map(|value| {
+            value.parse::<u64>().map_err(|error| {
+                crate::error::AppError::validation("image.total_bytes_invalid", "镜像大小格式无效")
+                    .with_detail(error.to_string())
+            })
+        })
+        .transpose()?;
+
     Ok(services::images::export_image(
         export_id,
         server_id,

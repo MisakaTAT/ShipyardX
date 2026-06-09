@@ -3,6 +3,7 @@ use specta::Type;
 use tauri_specta::Event;
 
 use crate::error::AppError;
+use crate::utils::serde_string::{i64_string, option_u64_string, u64_string};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
@@ -21,7 +22,11 @@ pub struct DockerEvent {
     pub actor_name: String,
     pub actor_image: String,
     pub scope: String,
+    #[serde(with = "i64_string")]
+    #[specta(type = String)]
     pub time: i64,
+    #[serde(with = "i64_string")]
+    #[specta(type = String)]
     pub time_nano: i64,
     pub detail: String,
 }
@@ -67,7 +72,11 @@ pub struct DockerSshStreamDone {
 pub struct ImageExportProgress {
     pub export_id: String,
     pub image_id: String,
+    #[serde(with = "u64_string")]
+    #[specta(type = String)]
     pub transferred_bytes: u64,
+    #[serde(with = "option_u64_string")]
+    #[specta(type = Option<String>)]
     pub total_bytes: Option<u64>,
 }
 
@@ -75,7 +84,11 @@ pub struct ImageExportProgress {
 pub struct ImageImportProgress {
     pub import_id: String,
     pub file_name: String,
+    #[serde(with = "u64_string")]
+    #[specta(type = String)]
     pub transferred_bytes: u64,
+    #[serde(with = "option_u64_string")]
+    #[specta(type = Option<String>)]
     pub total_bytes: Option<u64>,
 }
 

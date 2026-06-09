@@ -11,23 +11,23 @@ export const commands = {
 	deleteServer: (id: string) => __TAURI_INVOKE<ServerConfig[]>("delete_server", { id }),
 	testConnection: (serverId: string) => __TAURI_INVOKE<string>("test_connection", { serverId }),
 	testConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<string>("test_connection_direct", { server }),
-	listContainers: (serverId: string) => __TAURI_INVOKE<Container[]>("list_containers", { serverId }),
+	listContainers: (serverId: string) => __TAURI_INVOKE<Container_Serialize[]>("list_containers", { serverId }),
 	startContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("start_container", { serverId, containerId }),
 	stopContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("stop_container", { serverId, containerId }),
 	restartContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("restart_container", { serverId, containerId }),
 	removeContainer: (serverId: string, containerId: string, force: boolean) => __TAURI_INVOKE<null>("remove_container", { serverId, containerId, force }),
-	pruneStoppedContainers: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_stopped_containers", { serverId }),
+	pruneStoppedContainers: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_stopped_containers", { serverId }),
 	inspectContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<string>("inspect_container", { serverId, containerId }),
 	getContainerLogs: (serverId: string, containerId: string, tail: number, timestamps: boolean) => __TAURI_INVOKE<string>("get_container_logs", { serverId, containerId, tail, timestamps }),
 	runContainer: (serverId: string, params: RunContainer) => __TAURI_INVOKE<string>("run_container", { serverId, params }),
-	listImages: (serverId: string) => __TAURI_INVOKE<Image[]>("list_images", { serverId }),
+	listImages: (serverId: string) => __TAURI_INVOKE<Image_Serialize[]>("list_images", { serverId }),
 	inspectImage: (serverId: string, imageId: string) => __TAURI_INVOKE<string>("inspect_image", { serverId, imageId }),
-	getImageHistory: (serverId: string, imageId: string) => __TAURI_INVOKE<ImageLayer[]>("get_image_history", { serverId, imageId }),
+	getImageHistory: (serverId: string, imageId: string) => __TAURI_INVOKE<ImageLayer_Serialize[]>("get_image_history", { serverId, imageId }),
 	removeImage: (serverId: string, imageId: string, force: boolean) => __TAURI_INVOKE<null>("remove_image", { serverId, imageId, force }),
-	pruneDanglingImages: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_dangling_images", { serverId }),
-	pruneUnusedImages: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_images", { serverId }),
-	pruneBuilderCache: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_builder_cache", { serverId }),
-	exportImage: (exportId: string, serverId: string, imageId: string, directory: string, fileName: string, totalBytes: number | null) => __TAURI_INVOKE<null>("export_image", { exportId, serverId, imageId, directory, fileName, totalBytes }),
+	pruneDanglingImages: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_dangling_images", { serverId }),
+	pruneUnusedImages: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_unused_images", { serverId }),
+	pruneBuilderCache: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_builder_cache", { serverId }),
+	exportImage: (exportId: string, serverId: string, imageId: string, directory: string, fileName: string, totalBytes: string | null) => __TAURI_INVOKE<null>("export_image", { exportId, serverId, imageId, directory, fileName, totalBytes }),
 	importImage: (importId: string, serverId: string, filePath: string) => __TAURI_INVOKE<null>("import_image", { importId, serverId, filePath }),
 	startImagePull: (serverId: string, image: string) => __TAURI_INVOKE<string>("start_image_pull", { serverId, image }),
 	cancelStream: (streamId: string) => __TAURI_INVOKE<null>("cancel_stream", { streamId }),
@@ -35,16 +35,16 @@ export const commands = {
 	createNetwork: (serverId: string, params: NetworkCreate) => __TAURI_INVOKE<null>("create_network", { serverId, params }),
 	inspectNetwork: (serverId: string, networkId: string) => __TAURI_INVOKE<string>("inspect_network", { serverId, networkId }),
 	removeNetwork: (serverId: string, networkId: string) => __TAURI_INVOKE<null>("remove_network", { serverId, networkId }),
-	pruneUnusedNetworks: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_networks", { serverId }),
+	pruneUnusedNetworks: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_unused_networks", { serverId }),
 	listVolumes: (serverId: string) => __TAURI_INVOKE<Volume[]>("list_volumes", { serverId }),
 	createVolume: (serverId: string, name: string, driver: string | null, driverOpts: { [key in string]: string } | null) => __TAURI_INVOKE<null>("create_volume", { serverId, name, driver, driverOpts }),
 	inspectVolume: (serverId: string, name: string) => __TAURI_INVOKE<string>("inspect_volume", { serverId, name }),
 	removeVolume: (serverId: string, name: string) => __TAURI_INVOKE<null>("remove_volume", { serverId, name }),
-	pruneUnusedVolumes: (serverId: string) => __TAURI_INVOKE<CleanupResult>("prune_unused_volumes", { serverId }),
+	pruneUnusedVolumes: (serverId: string) => __TAURI_INVOKE<CleanupResult_Serialize>("prune_unused_volumes", { serverId }),
 	checkDockerAccess: (serverId: string) => __TAURI_INVOKE<null>("check_docker_access", { serverId }),
 	listSystemFonts: () => __TAURI_INVOKE<string[]>("list_system_fonts"),
-	getDockerInfo: (serverId: string) => __TAURI_INVOKE<DockerEngineInfo>("get_docker_info", { serverId }),
-	getContainerStats: (serverId: string, containerId: string) => __TAURI_INVOKE<ContainerStats>("get_container_stats", { serverId, containerId }),
+	getDockerInfo: (serverId: string) => __TAURI_INVOKE<DockerEngineInfo_Serialize>("get_docker_info", { serverId }),
+	getContainerStats: (serverId: string, containerId: string) => __TAURI_INVOKE<ContainerStats_Serialize>("get_container_stats", { serverId, containerId }),
 	getDockerDaemonSettings: (serverId: string) => __TAURI_INVOKE<DaemonSettings>("get_docker_daemon_settings", { serverId }),
 	updateDockerDaemonSettings: (serverId: string, params: DaemonUpdate) => __TAURI_INVOKE<null>("update_docker_daemon_settings", { serverId, params }),
 	restartDockerDaemon: (serverId: string, sudoPassword: string | null) => __TAURI_INVOKE<null>("restart_docker_daemon", { serverId, sudoPassword }),
@@ -54,9 +54,9 @@ export const commands = {
 	startEventStream: (serverId: string) => __TAURI_INVOKE<string>("start_event_stream", { serverId }),
 	stopEventStream: (serverId: string) => __TAURI_INVOKE<null>("stop_event_stream", { serverId }),
 	listLocalAddresses: () => __TAURI_INVOKE<LocalAddress[]>("list_local_addresses"),
-	listPortForwards: (serverId: string) => __TAURI_INVOKE<PortForward[]>("list_port_forwards", { serverId }),
-	listPortForwardsAll: () => __TAURI_INVOKE<PortForward[]>("list_port_forwards_all"),
-	createPortForwardRule: (serverId: string, params: PortForwardCreate) => __TAURI_INVOKE<PortForward>("create_port_forward_rule", { serverId, params }),
+	listPortForwards: (serverId: string) => __TAURI_INVOKE<PortForward_Serialize[]>("list_port_forwards", { serverId }),
+	listPortForwardsAll: () => __TAURI_INVOKE<PortForward_Serialize[]>("list_port_forwards_all"),
+	createPortForwardRule: (serverId: string, params: PortForwardCreate) => __TAURI_INVOKE<PortForward_Serialize>("create_port_forward_rule", { serverId, params }),
 	setPortForwardEnabled: (id: string, enabled: boolean) => __TAURI_INVOKE<null>("set_port_forward_enabled", { id, enabled }),
 	deletePortForward: (id: string) => __TAURI_INVOKE<null>("delete_port_forward", { id }),
 	startAllEnabled: (serverId: string) => __TAURI_INVOKE<null>("start_all_enabled", { serverId }),
@@ -78,11 +78,11 @@ export const events = {
 	dockerSshStreamChunk: makeEvent<DockerSshStreamChunk>("docker-ssh-stream-chunk"),
 	dockerSshStreamDone: makeEvent<DockerSshStreamDone>("docker-ssh-stream-done"),
 	dockerStreamError: makeEvent<DockerStreamError>("docker-stream-error"),
-	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
+	dockerStreamPayload: makeEvent<DockerStreamPayload_Deserialize>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
 	dockerStreamStatus: makeEvent<DockerStreamStatus>("docker-stream-status"),
-	imageExportProgress: makeEvent<ImageExportProgress>("image-export-progress"),
-	imageImportProgress: makeEvent<ImageImportProgress>("image-import-progress"),
+	imageExportProgress: makeEvent<ImageExportProgress_Deserialize>("image-export-progress"),
+	imageImportProgress: makeEvent<ImageImportProgress_Deserialize>("image-import-progress"),
 	installStepEvent: makeEvent<InstallStepEvent>("install-step-event"),
 };
 
@@ -159,23 +159,19 @@ export type AppVersionInfo_Serialize = {
 	compose_preview: string,
 };
 
-export type CleanupResult = {
+export type CleanupResult = CleanupResult_Serialize | CleanupResult_Deserialize;
+
+export type CleanupResult_Deserialize = {
 	deleted_count: number,
-	reclaimed_bytes: number,
+	reclaimed_bytes: string,
 };
 
-export type Container = {
-	id: string,
-	name: string,
-	image: string,
-	status: string,
-	state: string,
-	stack: string,
-	ip: string,
-	ports: string,
-	created_ts: number,
-	volumes: string[],
+export type CleanupResult_Serialize = {
+	deleted_count: number,
+	reclaimed_bytes: string,
 };
+
+export type Container = Container_Serialize | Container_Deserialize;
 
 export type ContainerExecTerminalParams = {
 	container_id: string,
@@ -185,15 +181,54 @@ export type ContainerExecTerminalParams = {
 	rows: number,
 };
 
-export type ContainerStats = {
-	cpu_percent: number,
-	mem_usage: number,
-	mem_limit: number,
-	mem_percent: number,
-	net_rx: number,
-	net_tx: number,
-	blk_read: number,
-	blk_write: number,
+export type ContainerStats = ContainerStats_Serialize | ContainerStats_Deserialize;
+
+export type ContainerStats_Deserialize = {
+	cpu_percent: number | null,
+	mem_usage: string,
+	mem_limit: string,
+	mem_percent: number | null,
+	net_rx: string,
+	net_tx: string,
+	blk_read: string,
+	blk_write: string,
+};
+
+export type ContainerStats_Serialize = {
+	cpu_percent: number | null,
+	mem_usage: string,
+	mem_limit: string,
+	mem_percent: number | null,
+	net_rx: string,
+	net_tx: string,
+	blk_read: string,
+	blk_write: string,
+};
+
+export type Container_Deserialize = {
+	id: string,
+	name: string,
+	image: string,
+	status: string,
+	state: string,
+	stack: string,
+	ip: string,
+	ports: string,
+	created_ts: string,
+	volumes: string[],
+};
+
+export type Container_Serialize = {
+	id: string,
+	name: string,
+	image: string,
+	status: string,
+	state: string,
+	stack: string,
+	ip: string,
+	ports: string,
+	created_ts: string,
+	volumes: string[],
 };
 
 export type DaemonSettings = {
@@ -230,34 +265,69 @@ export type DescriptionI18n = {
 	tr?: string,
 };
 
-export type DockerEngineInfo = {
-	containers: number,
-	containers_running: number,
-	containers_paused: number,
-	containers_stopped: number,
-	images: number,
+export type DockerEngineInfo = DockerEngineInfo_Serialize | DockerEngineInfo_Deserialize;
+
+export type DockerEngineInfo_Deserialize = {
+	containers: string,
+	containers_running: string,
+	containers_paused: string,
+	containers_stopped: string,
+	images: string,
 	server_version: string,
 	api_version: string,
 	name: string,
-	ncpu: number,
-	mem_total: number,
+	ncpu: string,
+	mem_total: string,
 	os: string,
 	os_version: string,
 	kernel_version: string,
 	architecture: string,
 	storage_driver: string,
-	warnings: number,
+	warnings: string,
 };
 
-export type DockerEvent = {
+export type DockerEngineInfo_Serialize = {
+	containers: string,
+	containers_running: string,
+	containers_paused: string,
+	containers_stopped: string,
+	images: string,
+	server_version: string,
+	api_version: string,
+	name: string,
+	ncpu: string,
+	mem_total: string,
+	os: string,
+	os_version: string,
+	kernel_version: string,
+	architecture: string,
+	storage_driver: string,
+	warnings: string,
+};
+
+export type DockerEvent = DockerEvent_Serialize | DockerEvent_Deserialize;
+
+export type DockerEvent_Deserialize = {
 	event_type: string,
 	action: string,
 	actor_id: string,
 	actor_name: string,
 	actor_image: string,
 	scope: string,
-	time: number,
-	time_nano: number,
+	time: string,
+	time_nano: string,
+	detail: string,
+};
+
+export type DockerEvent_Serialize = {
+	event_type: string,
+	action: string,
+	actor_id: string,
+	actor_name: string,
+	actor_image: string,
+	scope: string,
+	time: string,
+	time_nano: string,
 	detail: string,
 };
 
@@ -277,9 +347,16 @@ export type DockerStreamError = {
 	error: AppError,
 };
 
-export type DockerStreamPayload = {
+export type DockerStreamPayload = DockerStreamPayload_Serialize | DockerStreamPayload_Deserialize;
+
+export type DockerStreamPayload_Deserialize = {
 	stream_id: string,
-	event: DockerEvent,
+	event: DockerEvent_Deserialize,
+};
+
+export type DockerStreamPayload_Serialize = {
+	stream_id: string,
+	event: DockerEvent_Serialize,
 };
 
 export type DockerStreamRefresh = {
@@ -336,36 +413,76 @@ export type FormField_Serialize = {
 	rule: string,
 };
 
-export type Image = {
+export type Image = Image_Serialize | Image_Deserialize;
+
+export type ImageExportProgress = ImageExportProgress_Serialize | ImageExportProgress_Deserialize;
+
+export type ImageExportProgress_Deserialize = {
+	export_id: string,
+	image_id: string,
+	transferred_bytes: string,
+	total_bytes: string | null,
+};
+
+export type ImageExportProgress_Serialize = {
+	export_id: string,
+	image_id: string,
+	transferred_bytes: string,
+	total_bytes: string | null,
+};
+
+export type ImageImportProgress = ImageImportProgress_Serialize | ImageImportProgress_Deserialize;
+
+export type ImageImportProgress_Deserialize = {
+	import_id: string,
+	file_name: string,
+	transferred_bytes: string,
+	total_bytes: string | null,
+};
+
+export type ImageImportProgress_Serialize = {
+	import_id: string,
+	file_name: string,
+	transferred_bytes: string,
+	total_bytes: string | null,
+};
+
+export type ImageLayer = ImageLayer_Serialize | ImageLayer_Deserialize;
+
+export type ImageLayer_Deserialize = {
+	id: string,
+	created_ts: string,
+	size: string,
+	command: string,
+	comment: string,
+};
+
+export type ImageLayer_Serialize = {
+	id: string,
+	created_ts: string,
+	size: string,
+	command: string,
+	comment: string,
+};
+
+export type Image_Deserialize = {
 	id: string,
 	repository: string,
 	tag: string,
 	size: string,
-	size_bytes: number,
-	created_ts: number,
+	size_bytes: string,
+	created_ts: string,
 	used_by_count: number,
 };
 
-export type ImageExportProgress = {
-	export_id: string,
-	image_id: string,
-	transferred_bytes: number,
-	total_bytes: number | null,
-};
-
-export type ImageImportProgress = {
-	import_id: string,
-	file_name: string,
-	transferred_bytes: number,
-	total_bytes: number | null,
-};
-
-export type ImageLayer = {
+export type Image_Serialize = {
 	id: string,
-	created_ts: number,
-	size: number,
-	command: string,
-	comment: string,
+	repository: string,
+	tag: string,
+	size: string,
+	size_bytes: string,
+	created_ts: string,
+	used_by_count: number,
 };
 
 export type InstallApp = {
@@ -409,7 +526,21 @@ export type NetworkCreate = {
 	attachable: boolean,
 };
 
-export type PortForward = {
+export type PortForward = PortForward_Serialize | PortForward_Deserialize;
+
+export type PortForwardCreate = {
+	container_id: string,
+	container_name: string | null,
+	remote_host: string,
+	remote_port: number,
+	container_port: number,
+	protocol: string,
+	local_port: number,
+	bind_address: string | null,
+	enabled: boolean,
+};
+
+export type PortForward_Deserialize = {
 	id: string,
 	server_id: string,
 	container_id: string,
@@ -422,21 +553,27 @@ export type PortForward = {
 	local_port: number,
 	bind_address: string,
 	running: boolean,
-	tx_bytes: number,
-	rx_bytes: number,
+	tx_bytes: string,
+	rx_bytes: string,
 	last_error: string | null,
 };
 
-export type PortForwardCreate = {
+export type PortForward_Serialize = {
+	id: string,
+	server_id: string,
 	container_id: string,
 	container_name: string | null,
+	enabled: boolean,
+	protocol: string,
+	container_port: number,
 	remote_host: string,
 	remote_port: number,
-	container_port: number,
-	protocol: string,
 	local_port: number,
-	bind_address: string | null,
-	enabled: boolean,
+	bind_address: string,
+	running: boolean,
+	tx_bytes: string,
+	rx_bytes: string,
+	last_error: string | null,
 };
 
 export type RunContainer = {
@@ -459,7 +596,7 @@ export type RunContainer = {
 	tty?: boolean,
 	open_stdin?: boolean,
 	cpu_shares?: number,
-	cpu_quota_cores?: number,
+	cpu_quota_cores?: number | null,
 	memory_mb?: number,
 };
 
@@ -502,17 +639,22 @@ export type Volume = {
 };
 
 /* Tauri Specta runtime */
-function makeEvent<T>(name: string) {
+type EventEmit<T> = [T] extends [null] ? () => Promise<void> : (payload: T) => Promise<void>;
+
+function makeEvent<T>(name: string, serialize?: (payload: T) => unknown, deserialize?: (payload: any) => T) {
+    const mapEvent = (cb: __TAURI_EVENT.EventCallback<T>) => (event: __TAURI_EVENT.Event<any>) => cb({ ...event, payload: deserialize ? deserialize(event.payload) : event.payload });
+    const mapPayload = (payload: T) => serialize ? serialize(payload) : payload;
+
     const base = {
-        listen: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.listen(name, cb),
-        once: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.once(name, cb),
-        emit: ((payload: T) => __TAURI_EVENT.emit(name, payload) as unknown) as (T extends null ? () => Promise<void> : (payload: T) => Promise<void>)
+        listen: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.listen(name, mapEvent(cb)),
+        once: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.once(name, mapEvent(cb)),
+        emit: ((payload: T) => __TAURI_EVENT.emit(name, mapPayload(payload)) as unknown) as EventEmit<T>
     };
 
     const fn = (target: import("@tauri-apps/api/webview").Webview | import("@tauri-apps/api/window").Window) => ({
-        listen: (cb: __TAURI_EVENT.EventCallback<T>) => target.listen(name, cb),
-        once: (cb: __TAURI_EVENT.EventCallback<T>) => target.once(name, cb),
-        emit: ((payload: T) => target.emit(name, payload) as unknown) as (T extends null ? () => Promise<void> : (payload: T) => Promise<void>)
+        listen: (cb: __TAURI_EVENT.EventCallback<T>) => target.listen(name, mapEvent(cb)),
+        once: (cb: __TAURI_EVENT.EventCallback<T>) => target.once(name, mapEvent(cb)),
+        emit: ((payload: T) => target.emit(name, mapPayload(payload)) as unknown) as EventEmit<T>
     });
 
     return Object.assign(fn, base);

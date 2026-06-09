@@ -462,7 +462,7 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
             maybe_frame = rx.recv() => {
                 match maybe_frame {
                     Some(frame) => {
-                        if ws.send(Message::Binary(frame)).await.is_err() {
+                        if ws.send(Message::Binary(frame.into())).await.is_err() {
                             break 'ws;
                         }
                     }
