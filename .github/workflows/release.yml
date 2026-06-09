@@ -1,7 +1,6 @@
 name: ShipyardX Release
 
 on:
-  workflow_dispatch:
   # 使用语义化版本 tag 触发正式发布，例如 v0.1.0
   push:
     tags:
@@ -33,9 +32,9 @@ jobs:
           # Git tag 使用 v 前缀，项目内部版本号保持纯数字格式
           TAG="${GITHUB_REF_NAME#v}"
 
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          CARGO_VERSION="$(sed -n 's/^version = \"\\(.*\\)\"$/\\1/p' src-tauri/Cargo.toml | head -n 1)"
-          TAURI_VERSION="$(node -p "JSON.parse(require('fs').readFileSync('./src-tauri/tauri.conf.json', 'utf8')).version")"
+          PACKAGE_VERSION="$(ruby -rjson -e 'puts JSON.parse(File.read("package.json"))["version"]')"
+          CARGO_VERSION="$(ruby -e 'text=File.read("src-tauri/Cargo.toml"); puts text.lines.grep(/^version = "/).first.to_s[/\"(.*)\"/, 1]' )"
+          TAURI_VERSION="$(ruby -rjson -e 'puts JSON.parse(File.read("src-tauri/tauri.conf.json"))["version"]')"
 
           echo "tag version:      $TAG"
           echo "package version:  $PACKAGE_VERSION"
