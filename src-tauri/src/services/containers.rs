@@ -16,6 +16,7 @@ use crate::docker::client::{
 use crate::docker::mapping::api_container_to_dto;
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
+use crate::utils::display::format_bytes_u64;
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
@@ -73,7 +74,7 @@ pub async fn prune_stopped_containers(server_id: String, state: State<'_, AppSta
 
     Ok(CleanupResult {
         deleted_count: response.containers_deleted.len() as u32,
-        reclaimed_bytes: response.space_reclaimed.unwrap_or(0),
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0)),
     })
 }
 

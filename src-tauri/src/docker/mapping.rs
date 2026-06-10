@@ -2,6 +2,7 @@ use crate::contracts::docker_api::container::{ContainerSummary, PortBinding};
 use crate::contracts::docker_api::image::ImageSummary;
 use crate::contracts::frontend::container::Container;
 use crate::contracts::frontend::image::Image;
+use crate::utils::display::{format_bytes_i64, format_time_ago_from_unix, format_unix_seconds};
 
 fn format_ports(ports: &[PortBinding]) -> String {
     ports
@@ -14,19 +15,6 @@ fn format_ports(ports: &[PortBinding]) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-fn format_bytes(bytes: i64) -> String {
-    const MB: f64 = 1_048_576.0;
-    const GB: f64 = 1_073_741_824.0;
-    let b = bytes as f64;
-    if b >= GB {
-        format!("{:.2} GB", b / GB)
-    } else if b >= MB {
-        format!("{:.1} MB", b / MB)
-    } else {
-        format!("{:.1} KB", b / 1024.0)
-    }
 }
 
 fn short_container_id(id: &str) -> String {
@@ -86,7 +74,8 @@ pub fn api_container_to_dto(c: ContainerSummary) -> Container {
         stack,
         ip,
         ports: format_ports(&ports),
-        created_ts: created,
+        created_at: format_unix_seconds(created),
+        created_ago: format_time_ago_from_unix(created),
         volumes,
     }
 }
@@ -112,9 +101,9 @@ pub fn api_image_to_dto(img: ImageSummary, used_by_count: u32) -> Image {
         id,
         repository,
         tag,
-        size: format_bytes(size),
-        size_bytes: size,
-        created_ts: created,
+        size: format_bytes_i64(size),
+        created_at: format_unix_seconds(created),
+        created_ago: format_time_ago_from_unix(created),
         used_by_count,
     }
 }

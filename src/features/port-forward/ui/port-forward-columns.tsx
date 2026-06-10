@@ -4,22 +4,18 @@ import type { PortForward, ServerConfig } from '@/types/app-bindings'
 import { ToneBadge } from '@/shared/components/tone-badge'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { formatBytes, formatSpeed } from '@/shared/lib/format'
 import type { ColumnDef } from '@/shared/components'
 import { PortForwardStatusBadge } from '@/features/port-forward/ui/port-forward-status-badge'
 import { TrafficRow, WarnIcon } from '@/features/port-forward/ui/port-forward-cells'
-import type { SpeedMap } from '@/features/port-forward/hooks/use-speed-tracker'
 
 interface BuildColumnsParams {
   serverById: Map<string, ServerConfig>
-  speeds: SpeedMap
   onToggleEnabled: (id: string, enabled: boolean) => void
   onDelete: (id: string) => void
 }
 
 export function buildPortForwardColumns({
   serverById,
-  speeds,
   onToggleEnabled,
   onDelete,
 }: BuildColumnsParams): ColumnDef<PortForward>[] {
@@ -109,8 +105,8 @@ export function buildPortForwardColumns({
       meta: { width: '12rem' },
       cell: ({ row }) => (
         <div className="space-y-0.5">
-          <TrafficRow label="TX" tone="tx" value={formatBytes(row.original.tx_bytes)} />
-          <TrafficRow label="RX" tone="rx" value={formatBytes(row.original.rx_bytes)} />
+          <TrafficRow label="TX" tone="tx" value={row.original.tx} />
+          <TrafficRow label="RX" tone="rx" value={row.original.rx} />
         </div>
       ),
     },
@@ -120,11 +116,10 @@ export function buildPortForwardColumns({
       meta: { width: '12rem' },
       cell: ({ row }) => {
         const f = row.original
-        const sp = f.running ? speeds[f.id] : undefined
         return (
           <div className="space-y-0.5">
-            <TrafficRow label="TX" tone="tx" value={formatSpeed(sp?.txSpeed ?? 0)} />
-            <TrafficRow label="RX" tone="rx" value={formatSpeed(sp?.rxSpeed ?? 0)} />
+            <TrafficRow label="TX" tone="tx" value={f.tx_speed} />
+            <TrafficRow label="RX" tone="rx" value={f.rx_speed} />
           </div>
         )
       },

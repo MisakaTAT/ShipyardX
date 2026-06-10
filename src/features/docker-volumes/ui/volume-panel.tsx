@@ -5,7 +5,6 @@ import VolumeCreateDialog from '@/features/docker-volumes/ui/volume-create-dialo
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
-import { formatDateTimeString, formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { usePruneUnusedVolumes, useVolumes, useRemoveVolume } from '@/features/docker-volumes/api/use-volumes'
 import { navigateWorkspace, setNextContainerSearch } from '@/shared/lib/workspace-nav'
@@ -99,9 +98,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         id: 'created',
         header: '创建时间',
         meta: { width: '12rem' },
-        cell: ({ row }) => (
-          <span title={formatDateTimeString(row.original.created_at)}>{formatTimeAgo(row.original.created_at)}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',

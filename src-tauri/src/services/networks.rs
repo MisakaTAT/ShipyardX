@@ -12,6 +12,7 @@ use crate::docker::client::{
 };
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
+use crate::utils::display::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Network>> {
@@ -50,7 +51,8 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> App
                 name: n.name.unwrap_or_default(),
                 driver: n.driver.unwrap_or_default(),
                 scope: n.scope.unwrap_or_default(),
-                created_at: n.created.unwrap_or_default(),
+                created_at: format_datetime_string(&n.created.clone().unwrap_or_default()),
+                created_ago: format_time_ago_from_datetime_string(&n.created.unwrap_or_default()),
                 subnets,
                 gateways,
                 labels,
@@ -85,7 +87,7 @@ pub async fn prune_unused_networks(server_id: String, state: State<'_, AppState>
 
     Ok(CleanupResult {
         deleted_count: response.networks_deleted.len() as u32,
-        reclaimed_bytes: 0,
+        reclaimed: format_bytes_u64(0),
     })
 }
 

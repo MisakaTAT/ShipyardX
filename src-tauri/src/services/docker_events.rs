@@ -15,9 +15,49 @@ use crate::docker::client::docker_stream;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, EventStreamHandle, get_server_config, lock_mutex};
+use crate::utils::display::format_unix_seconds_time;
 use crate::utils::id::generate_id;
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
+
+fn event_type_label(event_type: &str) -> &'static str {
+    match event_type {
+        "container" => "容器",
+        "image" => "镜像",
+        "network" => "网络",
+        "volume" => "存储卷",
+        _ => "其它",
+    }
+}
+
+fn event_type_icon(event_type: &str) -> &'static str {
+    match event_type {
+        "container" => "box",
+        "image" => "layers",
+        "network" => "share-2",
+        "volume" => "database",
+        _ => "circle-dot",
+    }
+}
+
+fn action_tone(action: &str) -> &'static str {
+    if matches!(action, "start" | "create" | "pull" | "connect" | "mount") {
+        return "success";
+    }
+    if matches!(
+        action,
+        "stop" | "die" | "kill" | "destroy" | "delete" | "remove" | "disconnect" | "unmount"
+    ) {
+        return "danger";
+    }
+    if matches!(
+        action,
+        "restart" | "pause" | "unpause" | "rename" | "update" | "tag" | "untag"
+    ) {
+        return "warning";
+    }
+    "muted"
+}
 
 fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMap<String, String>) -> String {
     let mut parts: Vec<String> = Vec::new();
@@ -71,23 +111,30 @@ fn parse_docker_event(json: &str) -> Option<DockerEvent> {
     if raw.action.starts_with("exec_") {
         return None;
     }
+    let time = raw.time.unwrap_or(0);
+    let time_nano = raw.time_nano.unwrap_or(0);
     let actor_id = if raw.actor.id.len() > 12 {
         raw.actor.id[..12].to_string()
     } else {
         raw.actor.id
     };
+    let event_type = raw.event_type;
+    let action = raw.action;
     let actor_name = raw.actor.attributes.get("name").cloned().unwrap_or_default();
     let actor_image = raw.actor.attributes.get("image").cloned().unwrap_or_default();
-    let detail = build_detail(&raw.event_type, &raw.action, &raw.actor.attributes);
+    let detail = build_detail(&event_type, &action, &raw.actor.attributes);
     Some(DockerEvent {
-        event_type: raw.event_type,
-        action: raw.action,
+        event_id: format!("{}:{}:{}:{}", time_nano, event_type, action, actor_id),
+        event_type_label: event_type_label(&event_type).to_string(),
+        event_type_icon: event_type_icon(&event_type).to_string(),
+        action_tone: action_tone(&action).to_string(),
+        event_type,
+        action,
         actor_id,
         actor_name,
         actor_image,
         scope: raw.scope.unwrap_or_default(),
-        time: raw.time.unwrap_or(0),
-        time_nano: raw.time_nano.unwrap_or(0),
+        time: format_unix_seconds_time(time),
         detail,
     })
 }

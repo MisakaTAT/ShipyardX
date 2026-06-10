@@ -9,7 +9,6 @@ import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
-import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import {
   useExportImage,
@@ -112,9 +111,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       {
         id: 'created',
         header: '创建时间',
-        cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>{formatTimeAgo(row.original.created_ts)}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',

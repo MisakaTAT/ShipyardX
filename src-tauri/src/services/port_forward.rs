@@ -21,6 +21,7 @@ use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, spawn_on_runtime};
 use crate::ssh::pool;
 use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_mutex};
+use crate::utils::display::{format_bytes_u64, format_speed};
 use crate::utils::id::generate_id;
 
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";
@@ -58,9 +59,39 @@ fn set_port_forward_error(state: &State<AppState>, id: &str, error: Option<Strin
         let entry = runtime.entry(id.to_string()).or_insert(PortForwardRuntimeState {
             handle: None,
             last_error: None,
+            last_sample_at: None,
+            last_tx_bytes: 0,
+            last_rx_bytes: 0,
+            tx_speed: "0 B/s".to_string(),
+            rx_speed: "0 B/s".to_string(),
         });
         entry.last_error = error;
     }
+}
+
+fn refresh_runtime_speeds(runtime_state: &mut PortForwardRuntimeState, tx: u64, rx: u64, running: bool) {
+    if !running {
+        runtime_state.last_sample_at = None;
+        runtime_state.last_tx_bytes = tx;
+        runtime_state.last_rx_bytes = rx;
+        runtime_state.tx_speed = "0 B/s".to_string();
+        runtime_state.rx_speed = "0 B/s".to_string();
+        return;
+    }
+
+    let now = Instant::now();
+    if let Some(last_at) = runtime_state.last_sample_at {
+        let dt = now.duration_since(last_at).as_secs_f64();
+        if dt > 0.0 {
+            let tx_delta = tx.saturating_sub(runtime_state.last_tx_bytes) as f64;
+            let rx_delta = rx.saturating_sub(runtime_state.last_rx_bytes) as f64;
+            runtime_state.tx_speed = format_speed(tx_delta / dt);
+            runtime_state.rx_speed = format_speed(rx_delta / dt);
+        }
+    }
+    runtime_state.last_sample_at = Some(now);
+    runtime_state.last_tx_bytes = tx;
+    runtime_state.last_rx_bytes = rx;
 }
 
 fn normalize_host(ip: &str) -> String {
@@ -292,7 +323,7 @@ fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwar
 
 pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let runtime = lock_mutex(
+    let mut runtime = lock_mutex(
         &state.port_forwards,
         "port_forward.runtime_lock_failed",
         "读取端口转发运行时状态失败",
@@ -300,10 +331,18 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppR
 
     let mut out: Vec<PortForward> = Vec::new();
     for r in rules.into_iter().filter(|x| x.server_id == server_id) {
-        let runtime_state = runtime.get(&r.id);
-        let handle = runtime_state.and_then(|state| state.handle.as_ref());
+        let runtime_state = runtime.entry(r.id.clone()).or_insert(PortForwardRuntimeState {
+            handle: None,
+            last_error: None,
+            last_sample_at: None,
+            last_tx_bytes: 0,
+            last_rx_bytes: 0,
+            tx_speed: "0 B/s".to_string(),
+            rx_speed: "0 B/s".to_string(),
+        });
+        let handle = runtime_state.handle.as_ref();
         let running = handle.is_some();
-        let handle_last_error = runtime_state.and_then(|state| state.last_error.clone());
+        let handle_last_error = runtime_state.last_error.clone();
         let actual_port = if running {
             handle.map(|h| h.local_port).unwrap_or(r.local_port)
         } else {
@@ -311,6 +350,7 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppR
         };
         let tx = handle.map(|h| h.tx_bytes.load(Ordering::Relaxed)).unwrap_or(0);
         let rx = handle.map(|h| h.rx_bytes.load(Ordering::Relaxed)).unwrap_or(0);
+        refresh_runtime_speeds(runtime_state, tx, rx, running);
         out.push(PortForward {
             id: r.id.clone(),
             server_id: r.server_id.clone(),
@@ -324,8 +364,10 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppR
             local_port: actual_port,
             bind_address: r.bind_address.clone(),
             running,
-            tx_bytes: tx,
-            rx_bytes: rx,
+            tx: format_bytes_u64(tx),
+            rx: format_bytes_u64(rx),
+            tx_speed: runtime_state.tx_speed.clone(),
+            rx_speed: runtime_state.rx_speed.clone(),
             last_error: handle_last_error,
         });
     }
@@ -405,8 +447,10 @@ pub fn create_port_forward_rule(
         local_port: rule.local_port,
         bind_address: rule.bind_address,
         running: false,
-        tx_bytes: 0,
-        rx_bytes: 0,
+        tx: format_bytes_u64(0),
+        rx: format_bytes_u64(0),
+        tx_speed: "0 B/s".to_string(),
+        rx_speed: "0 B/s".to_string(),
         last_error: None,
     })
 }
@@ -512,6 +556,11 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
             rx_bytes: rx_bytes.clone(),
         }),
         last_error: None,
+        last_sample_at: None,
+        last_tx_bytes: 0,
+        last_rx_bytes: 0,
+        tx_speed: "0 B/s".to_string(),
+        rx_speed: "0 B/s".to_string(),
     };
     lock_mutex(
         &state.port_forwards,
@@ -617,7 +666,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
 
 pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let runtime = lock_mutex(
+    let mut runtime = lock_mutex(
         &state.port_forwards,
         "port_forward.runtime_lock_failed",
         "读取端口转发运行时状态失败",
@@ -625,10 +674,18 @@ pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortF
 
     let mut out: Vec<PortForward> = Vec::with_capacity(rules.len());
     for r in rules.into_iter() {
-        let runtime_state = runtime.get(&r.id);
-        let handle = runtime_state.and_then(|state| state.handle.as_ref());
+        let runtime_state = runtime.entry(r.id.clone()).or_insert(PortForwardRuntimeState {
+            handle: None,
+            last_error: None,
+            last_sample_at: None,
+            last_tx_bytes: 0,
+            last_rx_bytes: 0,
+            tx_speed: "0 B/s".to_string(),
+            rx_speed: "0 B/s".to_string(),
+        });
+        let handle = runtime_state.handle.as_ref();
         let running = handle.is_some();
-        let handle_last_error = runtime_state.and_then(|state| state.last_error.clone());
+        let handle_last_error = runtime_state.last_error.clone();
         let actual_port = if running {
             handle.map(|h| h.local_port).unwrap_or(r.local_port)
         } else {
@@ -636,6 +693,7 @@ pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortF
         };
         let tx = handle.map(|h| h.tx_bytes.load(Ordering::Relaxed)).unwrap_or(0);
         let rx = handle.map(|h| h.rx_bytes.load(Ordering::Relaxed)).unwrap_or(0);
+        refresh_runtime_speeds(runtime_state, tx, rx, running);
 
         out.push(PortForward {
             id: r.id.clone(),
@@ -650,8 +708,10 @@ pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortF
             local_port: actual_port,
             bind_address: r.bind_address.clone(),
             running,
-            tx_bytes: tx,
-            rx_bytes: rx,
+            tx: format_bytes_u64(tx),
+            rx: format_bytes_u64(rx),
+            tx_speed: runtime_state.tx_speed.clone(),
+            rx_speed: runtime_state.rx_speed.clone(),
             last_error: handle_last_error,
         });
     }

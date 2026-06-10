@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
 import { Cpu, HardDrive, MemoryStick, Network } from 'lucide-react'
 import type { ContainerStats } from '@/types/app-bindings'
-import { formatBytes } from '@/shared/lib/format'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toastAppError } from '@/shared/lib/errors'
@@ -138,36 +137,26 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
         {stats ? (
           <>
             <div className="flex justify-around py-2">
-              <Gauge value={stats.cpu_percent} color="blue" label="CPU 使用率" sublabel={`${stats.cpu_percent}%`} />
               <Gauge
-                value={stats.mem_percent}
-                color="green"
-                label="内存使用率"
-                sublabel={`${formatBytes(stats.mem_usage)} / ${formatBytes(stats.mem_limit)}`}
+                value={stats.cpu_percent ?? 0}
+                color="blue"
+                label="CPU 使用率"
+                sublabel={`${stats.cpu_percent ?? 0}%`}
               />
+              <Gauge value={stats.mem_percent ?? 0} color="green" label="内存使用率" sublabel={stats.mem} />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <StatRow
                 icon={<MemoryStick size={16} />}
                 label="内存使用"
-                value={formatBytes(stats.mem_usage)}
-                subvalue={`限制: ${formatBytes(stats.mem_limit)}`}
+                value={stats.mem_usage}
+                subvalue={`限制: ${stats.mem_limit}`}
                 color="green"
               />
               <StatRow icon={<Cpu size={16} />} label="CPU" value={`${stats.cpu_percent}%`} color="blue" />
-              <StatRow
-                icon={<Network size={16} />}
-                label="网络 接收 / 发送"
-                value={`${formatBytes(stats.net_rx)} / ${formatBytes(stats.net_tx)}`}
-                color="cyan"
-              />
-              <StatRow
-                icon={<HardDrive size={16} />}
-                label="磁盘 读 / 写"
-                value={`${formatBytes(stats.blk_read)} / ${formatBytes(stats.blk_write)}`}
-                color="purple"
-              />
+              <StatRow icon={<Network size={16} />} label="网络 接收 / 发送" value={stats.net} color="cyan" />
+              <StatRow icon={<HardDrive size={16} />} label="磁盘 读 / 写" value={stats.blk} color="purple" />
             </div>
 
             {lastUpdated ? <div className="text-center text-xs text-muted-foreground">更新于 {lastUpdated}</div> : null}

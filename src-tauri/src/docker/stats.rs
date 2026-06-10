@@ -1,5 +1,6 @@
 use crate::contracts::docker_api::stats::DockerStats;
 use crate::contracts::frontend::container::ContainerStats;
+use crate::utils::display::format_bytes_u64;
 
 fn cpu_percent(raw: &DockerStats) -> f64 {
     let cpu_delta = raw
@@ -77,12 +78,15 @@ pub fn compute_stats(raw: DockerStats) -> ContainerStats {
 
     ContainerStats {
         cpu_percent,
-        mem_usage,
-        mem_limit,
         mem_percent,
-        net_rx,
-        net_tx,
-        blk_read,
-        blk_write,
+        mem_usage: format_bytes_u64(mem_usage),
+        mem_limit: format_bytes_u64(mem_limit),
+        mem: format!("{} / {}", format_bytes_u64(mem_usage), format_bytes_u64(mem_limit)),
+        net_rx: format_bytes_u64(net_rx),
+        net_tx: format_bytes_u64(net_tx),
+        net: format!("{} / {}", format_bytes_u64(net_rx), format_bytes_u64(net_tx)),
+        blk_read: format_bytes_u64(blk_read),
+        blk_write: format_bytes_u64(blk_write),
+        blk: format!("{} / {}", format_bytes_u64(blk_read), format_bytes_u64(blk_write)),
     }
 }

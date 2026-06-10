@@ -27,6 +27,7 @@ use crate::docker::mapping::api_image_to_dto;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
+use crate::utils::display::{format_bytes_i64, format_bytes_u64, format_unix_seconds};
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -35,6 +36,16 @@ const PULL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
 const PULL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
 const PULL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续拉取日志已省略]\n";
 const EXPORT_PROGRESS_EMIT_BYTES: u64 = 512 * 1024;
+
+async fn resolve_image_size_hint(server: &ServerConfig, image_id: &str) -> AppResult<Option<u64>> {
+    let resp = docker_get(server, "/images/json").await?;
+    let api: Vec<ImageSummary> = serde_json::from_str(&resp)
+        .map_err(|e| AppError::internal("image.size_hint_parse_failed", "解析镜像大小信息失败").with_source(e))?;
+    Ok(api
+        .into_iter()
+        .find(|img| img.id == image_id)
+        .and_then(|img| u64::try_from(img.size).ok()))
+}
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     debug!(target: "shipyardx_lib::services::images", "listing images; server_id={}", server_id);
@@ -88,8 +99,8 @@ pub async fn get_image_history(
         .into_iter()
         .map(|l| crate::contracts::frontend::image::ImageLayer {
             id: l.id,
-            created_ts: l.created,
-            size: l.size,
+            created_at: format_unix_seconds(l.created),
+            size: format_bytes_i64(l.size),
             command: l.created_by,
             comment: l.comment,
         })
@@ -127,7 +138,7 @@ pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) 
 
     Ok(CleanupResult {
         deleted_count: response.caches_deleted.len() as u32,
-        reclaimed_bytes: response.space_reclaimed,
+        reclaimed: format_bytes_u64(response.space_reclaimed),
     })
 }
 
@@ -137,7 +148,6 @@ pub async fn export_image(
     image_id: String,
     directory: String,
     file_name: String,
-    total_bytes: Option<u64>,
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
@@ -171,6 +181,7 @@ pub async fn export_image(
     );
 
     let server = get_server_config(&state, &server_id)?;
+    let total_bytes = resolve_image_size_hint(&server, &image_id).await?;
     let result = async {
         let mut file = create_export_file(&export_path).await?;
         let mut stream = crate::docker::client::docker_stream(
@@ -451,7 +462,7 @@ async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, A
             .iter()
             .filter(|item| item.deleted.is_some() || item.untagged.is_some())
             .count() as u32,
-        reclaimed_bytes: response.space_reclaimed,
+        reclaimed: format_bytes_u64(response.space_reclaimed),
     })
 }
 
@@ -521,8 +532,15 @@ fn emit_export_progress(
     let _ = ImageExportProgress {
         export_id: export_id.to_string(),
         image_id: image_id.to_string(),
-        transferred_bytes,
-        total_bytes,
+        transferred: format_bytes_u64(transferred_bytes),
+        total: total_bytes.map(format_bytes_u64),
+        percent: total_bytes.map(|total| {
+            if total == 0 {
+                0.0
+            } else {
+                ((transferred_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+            }
+        }),
     }
     .emit(app_handle);
 }
@@ -537,8 +555,15 @@ fn emit_import_progress(
     let _ = ImageImportProgress {
         import_id: import_id.to_string(),
         file_name: file_name.to_string(),
-        transferred_bytes,
-        total_bytes,
+        transferred: format_bytes_u64(transferred_bytes),
+        total: total_bytes.map(format_bytes_u64),
+        percent: total_bytes.map(|total| {
+            if total == 0 {
+                0.0
+            } else {
+                ((transferred_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+            }
+        }),
     }
     .emit(app_handle);
 }

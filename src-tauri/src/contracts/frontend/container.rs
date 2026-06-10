@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use crate::utils::serde_string::{i64_string, u64_string};
 
 #[derive(Debug, Serialize, Clone, Type)]
 pub struct Container {
@@ -12,34 +11,24 @@ pub struct Container {
     pub stack: String,
     pub ip: String,
     pub ports: String,
-    #[serde(with = "i64_string")]
-    #[specta(type = String)]
-    pub created_ts: i64,
+    pub created_at: String,
+    pub created_ago: String,
     pub volumes: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Type)]
 pub struct ContainerStats {
     pub cpu_percent: f64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub mem_usage: u64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub mem_limit: u64,
     pub mem_percent: f64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub net_rx: u64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub net_tx: u64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub blk_read: u64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub blk_write: u64,
+    pub mem_usage: String,
+    pub mem_limit: String,
+    pub mem: String,
+    pub net_rx: String,
+    pub net_tx: String,
+    pub net: String,
+    pub blk_read: String,
+    pub blk_write: String,
+    pub blk: String,
 }
 
 #[derive(Debug, Deserialize, Type)]

@@ -10,7 +10,6 @@ import {
   type ImageExportFormValues,
 } from '@/features/docker-images/model/image-export-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
-import { formatBytes } from '@/shared/lib/format'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldTitle } from '@/shared/ui/field'
@@ -38,8 +37,9 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
   const exporting = exportImage.isPending
   const [progress, setProgress] = useState<{
     exportId: string
-    transferredBytes: number
-    totalBytes: number | null
+    transferred: string
+    total: string | null
+    percent: number | null
   } | null>(null)
 
   useEffect(() => {
@@ -63,8 +63,9 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
           if (current && payload.export_id !== current.exportId) return current
           return {
             exportId: payload.export_id,
-            transferredBytes: payload.transferred_bytes,
-            totalBytes: payload.total_bytes,
+            transferred: payload.transferred,
+            total: payload.total,
+            percent: payload.percent,
           }
         })
       })
@@ -95,25 +96,22 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
     activeExportIdRef.current = exportId
     setProgress({
       exportId,
-      transferredBytes: 0,
-      totalBytes: image.size_bytes > 0 ? image.size_bytes : null,
+      transferred: '0 B',
+      total: image.size,
+      percent: null,
     })
     await exportImage.mutateAsync({
       exportId,
       imageId: image.id,
       directory: values.directory.trim(),
       fileName: values.fileName.trim(),
-      totalBytes: image.size_bytes > 0 ? image.size_bytes : null,
     })
     toast.success('镜像已导出到本地')
     activeExportIdRef.current = null
     onOpenChange(false)
   })
 
-  const progressPercent =
-    progress && progress.totalBytes && progress.totalBytes > 0
-      ? Math.max(0, Math.min(100, (progress.transferredBytes / progress.totalBytes) * 100))
-      : null
+  const progressPercent = progress?.percent ?? null
 
   return (
     <StandardDialog
@@ -213,9 +211,9 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
               <span className="font-medium text-foreground">导出进度</span>
               <span className="text-muted-foreground">
                 {progress
-                  ? progress.totalBytes && progress.totalBytes > 0
-                    ? `${formatBytes(progress.transferredBytes)} / ${formatBytes(progress.totalBytes)}`
-                    : formatBytes(progress.transferredBytes)
+                  ? progress.total
+                    ? `${progress.transferred} / ${progress.total}`
+                    : progress.transferred
                   : '准备中...'}
               </span>
             </div>

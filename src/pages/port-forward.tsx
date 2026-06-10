@@ -13,7 +13,6 @@ import {
   useStartAllPortForwards,
   useStopAllPortForwards,
 } from '@/features/port-forward/api/use-port-forwards'
-import { useSpeedTracker } from '@/features/port-forward/hooks/use-speed-tracker'
 import { buildPortForwardColumns } from '@/features/port-forward/ui/port-forward-columns'
 
 export default function PortForwardPage() {
@@ -23,8 +22,6 @@ export default function PortForwardPage() {
   const remove = useDeletePortForward()
   const startAll = useStartAllPortForwards()
   const stopAll = useStopAllPortForwards()
-
-  const speeds = useSpeedTracker(rules)
 
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -65,11 +62,10 @@ export default function PortForwardPage() {
     () =>
       buildPortForwardColumns({
         serverById,
-        speeds,
         onToggleEnabled: (id, enabled) => setEnabled.mutate({ id, enabled }),
         onDelete: (id) => remove.mutate(id),
       }),
-    [serverById, speeds, setEnabled, remove]
+    [serverById, setEnabled, remove]
   )
 
   if (rulesLoading && rules.length === 0) {

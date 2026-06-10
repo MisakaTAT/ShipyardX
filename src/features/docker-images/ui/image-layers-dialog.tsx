@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { commands, type Image, type ImageLayer } from '@/types/app-bindings'
 import { Layers, Loader2 } from 'lucide-react'
-import { formatUnixSeconds } from '@/shared/lib/datetime'
-import { formatBytes } from '@/shared/lib/format'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { getErrorMessage } from '@/shared/lib/errors'
 
@@ -67,7 +65,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
                             <span className="font-medium">#{n}</span>
                             <span className="font-mono text-xs text-muted-foreground">{shortId}</span>
                           </div>
-                          <span className="text-xs text-muted-foreground">{formatBytes(l.size)}</span>
+                          <span className="text-xs text-muted-foreground">{l.size}</span>
                         </div>
                         <div className="mt-1 line-clamp-1 font-mono text-xs text-muted-foreground">
                           {l.command || '-'}
@@ -76,11 +74,11 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
                       <div className="mt-2 grid gap-2 text-xs">
                         <div className="grid grid-cols-[6rem_1fr] gap-2">
                           <div className="text-muted-foreground">Created</div>
-                          <div>{formatUnixSeconds(l.created_ts)}</div>
+                          <div>{l.created_at}</div>
                         </div>
                         <div className="grid grid-cols-[6rem_1fr] gap-2">
                           <div className="text-muted-foreground">Size</div>
-                          <div>{formatBytes(l.size)}</div>
+                          <div>{l.size}</div>
                         </div>
                         <div className="grid grid-cols-[6rem_1fr] gap-2">
                           <div className="text-muted-foreground">Command</div>

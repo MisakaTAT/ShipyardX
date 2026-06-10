@@ -13,6 +13,7 @@ use crate::docker::client::{
 };
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, get_server_config};
+use crate::utils::display::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
@@ -65,7 +66,8 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
                 driver: v.driver.unwrap_or_default(),
                 mountpoint: v.mountpoint.unwrap_or_default(),
                 scope: v.scope.unwrap_or_default(),
-                created_at: v.created_at.unwrap_or_default(),
+                created_at: format_datetime_string(&v.created_at.clone().unwrap_or_default()),
+                created_ago: format_time_ago_from_datetime_string(&v.created_at.unwrap_or_default()),
                 stack: v
                     .labels
                     .as_ref()
@@ -105,7 +107,7 @@ pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>)
 
     Ok(CleanupResult {
         deleted_count: response.volumes_deleted.len() as u32,
-        reclaimed_bytes: response.space_reclaimed.unwrap_or(0),
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0)),
     })
 }
 

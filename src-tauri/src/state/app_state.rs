@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, atomic::AtomicU64};
+use std::time::Instant;
 
 use crate::contracts::frontend::events::EventStreamStatus;
 use crate::contracts::frontend::server::ServerConfig;
@@ -46,4 +47,9 @@ pub(crate) struct PortForwardRuntimeHandle {
 pub(crate) struct PortForwardRuntimeState {
     pub(crate) handle: Option<PortForwardRuntimeHandle>,
     pub(crate) last_error: Option<String>,
+    pub(crate) last_sample_at: Option<Instant>,
+    pub(crate) last_tx_bytes: u64,
+    pub(crate) last_rx_bytes: u64,
+    pub(crate) tx_speed: String,
+    pub(crate) rx_speed: String,
 }

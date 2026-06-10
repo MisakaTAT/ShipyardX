@@ -3,7 +3,6 @@ import { Activity, Box, CircleDot, Database, Filter, Layers, Search, Share2, Tra
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { formatUnixSecondsTime } from '@/shared/lib/datetime'
 import { DataTable, PanelHeader, PanelShell, ToneBadge, type ColumnDef } from '@/shared/components'
 import type { BadgeTone } from '@/shared/styles/variants'
 
@@ -23,26 +22,27 @@ const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] 
   { key: 'volume', label: '存储卷', icon: <Database className="size-3.5" /> },
 ]
 
-function typeIcon(t: string) {
-  switch (t) {
+function typeIcon(icon: string) {
+  switch (icon) {
     case 'container':
+      return <Box className="size-3.5" />
+    case 'box':
       return <Box className="size-3.5" />
     case 'image':
       return <Layers className="size-3.5" />
+    case 'layers':
+      return <Layers className="size-3.5" />
     case 'network':
       return <Share2 className="size-3.5" />
+    case 'share-2':
+      return <Share2 className="size-3.5" />
     case 'volume':
+      return <Database className="size-3.5" />
+    case 'database':
       return <Database className="size-3.5" />
     default:
       return <CircleDot className="size-3.5" />
   }
-}
-
-function actionTone(action: string): BadgeTone {
-  if (['start', 'create', 'pull', 'connect', 'mount'].includes(action)) return 'success'
-  if (['stop', 'die', 'kill', 'destroy', 'delete', 'remove', 'disconnect', 'unmount'].includes(action)) return 'danger'
-  if (['restart', 'pause', 'unpause', 'rename', 'update', 'tag', 'untag'].includes(action)) return 'warning'
-  return 'muted'
 }
 
 function statusIndicator(status: EventStreamStatus) {
@@ -128,7 +128,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'time',
         header: '时间',
         meta: { width: '8rem' },
-        cell: ({ row }) => formatUnixSecondsTime(row.original.time),
+        cell: ({ row }) => row.original.time || '-',
       },
       {
         id: 'type',
@@ -136,8 +136,8 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         meta: { width: '8rem' },
         cell: ({ row }) => (
           <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
-            {typeIcon(row.original.event_type)}
-            <span className="min-w-0 truncate">{row.original.event_type}</span>
+            {typeIcon(row.original.event_type_icon)}
+            <span className="min-w-0 truncate">{row.original.event_type_label || row.original.event_type}</span>
           </span>
         ),
       },
@@ -145,7 +145,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         id: 'action',
         header: '动作',
         meta: { width: '8rem' },
-        cell: ({ row }) => <ToneBadge tone={actionTone(row.original.action)}>{row.original.action}</ToneBadge>,
+        cell: ({ row }) => <ToneBadge tone={row.original.action_tone as BadgeTone}>{row.original.action}</ToneBadge>,
       },
       {
         id: 'image',
@@ -221,7 +221,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       <DataTable<DockerEvent>
         columns={eventColumns}
         data={filtered}
-        getRowId={(ev, i) => `${ev.time_nano || ev.time}-${ev.actor_id}-${ev.action}-${i}`}
+        getRowId={(ev, i) => ev.event_id || `${ev.time}-${ev.actor_id}-${ev.action}-${i}`}
         empty={{
           icon: events.length === 0 ? Activity : Search,
           title: events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件',

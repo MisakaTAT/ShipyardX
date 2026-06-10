@@ -22,6 +22,7 @@ use crate::scripts::{
 use crate::ssh::exec::ssh_exec;
 use crate::ssh::pool;
 use crate::state::{AppState, get_server_config};
+use crate::utils::display::format_bytes_i64;
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
 const ERR_BAD_SU_PASSWORD: &str = "__ERR_BAD_SU_PASSWORD__";
@@ -130,23 +131,41 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
     let resp = docker_get(&server, "/info").await?;
     let v: SystemInfo = serde_json::from_str(&resp)
         .map_err(|e| AppError::internal("system.info_parse_failed", "解析 Docker 信息失败").with_source(e))?;
+    let containers = v.containers.unwrap_or(0);
+    let containers_running = v.containers_running.unwrap_or(0);
+    let containers_paused = v.containers_paused.unwrap_or(0);
+    let containers_stopped = v.containers_stopped.unwrap_or(0);
+    let images = v.images.unwrap_or(0);
+    let ncpu = v.ncpu.unwrap_or(0);
+    let warnings = v.warnings.as_ref().map(|a| a.len() as i64).unwrap_or(0);
+    let total = containers.max(0) as f64;
+    let pct = |value: i64| {
+        if total <= 0.0 {
+            0.0
+        } else {
+            ((value.max(0) as f64 / total) * 100.0).clamp(0.0, 100.0)
+        }
+    };
     let info = DockerEngineInfo {
-        containers: v.containers.unwrap_or(0),
-        containers_running: v.containers_running.unwrap_or(0),
-        containers_paused: v.containers_paused.unwrap_or(0),
-        containers_stopped: v.containers_stopped.unwrap_or(0),
-        images: v.images.unwrap_or(0),
+        containers: containers.to_string(),
+        containers_running: containers_running.to_string(),
+        containers_paused: containers_paused.to_string(),
+        containers_stopped: containers_stopped.to_string(),
+        images: images.to_string(),
+        containers_running_percent: pct(containers_running),
+        containers_paused_percent: pct(containers_paused),
+        containers_stopped_percent: pct(containers_stopped),
         server_version: v.server_version.unwrap_or_default(),
         api_version: resolve_api_version(&server).await.unwrap_or_default(),
         name: v.name.unwrap_or_default(),
-        ncpu: v.ncpu.unwrap_or(0),
-        mem_total: v.mem_total.unwrap_or(0),
+        ncpu: ncpu.to_string(),
+        mem_total: format_bytes_i64(v.mem_total.unwrap_or(0)),
         os: v.os.unwrap_or_default(),
         os_version: v.os_version.unwrap_or_default(),
         kernel_version: v.kernel_version.unwrap_or_default(),
         architecture: v.architecture.unwrap_or_default(),
         storage_driver: v.storage_driver.unwrap_or_default(),
-        warnings: v.warnings.as_ref().map(|a| a.len() as i64).unwrap_or(0),
+        warnings: warnings.to_string(),
     };
     info!(target: "shipyardx_lib::services::system", "fetched docker info; server_id={} version={} containers={} images={}", server_id, info.server_version, info.containers, info.images);
     Ok(info)

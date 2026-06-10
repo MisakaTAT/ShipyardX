@@ -5,7 +5,6 @@ import NetworkCreateDialog from '@/features/docker-networks/ui/network-create-di
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
-import { formatTimeAgo } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { useNetworks, usePruneUnusedNetworks, useRemoveNetwork } from '@/features/docker-networks/api/use-networks'
@@ -84,9 +83,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         id: 'created',
         header: '创建时间',
         meta: { width: '12rem' },
-        cell: ({ row }) => (
-          <span title={row.original.created_at || undefined}>{formatTimeAgo(row.original.created_at)}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',

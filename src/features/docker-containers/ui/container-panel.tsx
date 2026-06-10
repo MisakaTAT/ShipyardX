@@ -7,7 +7,6 @@ import ContainerExecDialog from '@/features/docker-containers/ui/container-exec-
 import ResourceInspectDialog from '@/features/docker-shared/ui/resource-inspect-dialog'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
-import { formatTimeAgo, formatUnixSeconds } from '@/shared/lib/datetime'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
 import { TruncatedChips } from '@/shared/components/truncated-chips'
@@ -168,9 +167,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       {
         id: 'created',
         header: '创建时间',
-        cell: ({ row }) => (
-          <span title={formatUnixSeconds(row.original.created_ts)}>{formatTimeAgo(row.original.created_ts)}</span>
-        ),
+        cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',

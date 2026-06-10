@@ -2,17 +2,11 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
 import { Box, Layers, Cpu, HardDrive } from 'lucide-react'
-import { formatBytes } from '@/shared/lib/format'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { qk } from '@/shared/api/query-keys'
 
 interface Props {
   serverId: string
-}
-
-function fmtPct(value: number, total: number): string {
-  if (total <= 0) return '0%'
-  return `${Math.round((value / total) * 100)}%`
 }
 
 export default function ServerOverview({ serverId }: Props) {
@@ -28,11 +22,6 @@ export default function ServerOverview({ serverId }: Props) {
   const lastUpdated = dataUpdatedAt ? formatNowTime(new Date(dataUpdatedAt)) : ''
 
   if (!info && !loading) return null
-  const totalContainers = info?.containers ?? 0
-  const running = info?.containers_running ?? 0
-  const paused = info?.containers_paused ?? 0
-  const stopped = info?.containers_stopped ?? 0
-  const warnings = info?.warnings ?? 0
 
   return (
     <div className="h-full overflow-auto bg-background">
@@ -53,14 +42,10 @@ export default function ServerOverview({ serverId }: Props) {
           </div>
 
           <div className="mt-3 grid grid-cols-4 gap-2">
-            <MetricCard icon={<Box size={14} />} label="容器总数" value={String(totalContainers)} />
-            <MetricCard icon={<Layers size={14} />} label="镜像数" value={String(info?.images ?? 0)} />
-            <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={String(info?.ncpu ?? '-')} />
-            <MetricCard
-              icon={<HardDrive size={14} />}
-              label="总内存"
-              value={info ? formatBytes(info.mem_total) : '-'}
-            />
+            <MetricCard icon={<Box size={14} />} label="容器总数" value={info?.containers ?? '-'} />
+            <MetricCard icon={<Layers size={14} />} label="镜像数" value={info?.images ?? '-'} />
+            <MetricCard icon={<Cpu size={14} />} label="CPU 核心" value={info?.ncpu ?? '-'} />
+            <MetricCard icon={<HardDrive size={14} />} label="总内存" value={info?.mem_total ?? '-'} />
           </div>
         </div>
 
@@ -72,16 +57,31 @@ export default function ServerOverview({ serverId }: Props) {
         ) : (
           <div className="grid grid-cols-3 gap-3">
             <InfoSection title="容器状态">
-              <StatusBar label="运行中" value={running} total={totalContainers} color="bg-green-500" />
-              <StatusBar label="已暂停" value={paused} total={totalContainers} color="bg-yellow-500" />
-              <StatusBar label="已停止" value={stopped} total={totalContainers} color="bg-slate-500" />
+              <StatusBar
+                label="运行中"
+                value={info?.containers_running ?? '0'}
+                percent={info?.containers_running_percent ?? 0}
+                color="bg-green-500"
+              />
+              <StatusBar
+                label="已暂停"
+                value={info?.containers_paused ?? '0'}
+                percent={info?.containers_paused_percent ?? 0}
+                color="bg-yellow-500"
+              />
+              <StatusBar
+                label="已停止"
+                value={info?.containers_stopped ?? '0'}
+                percent={info?.containers_stopped_percent ?? 0}
+                color="bg-slate-500"
+              />
             </InfoSection>
 
             <InfoSection title="Docker 引擎">
               <InfoRow label="引擎版本" value={info?.server_version || '-'} />
               <InfoRow label="API 版本" value={info?.api_version || '-'} />
               <InfoRow label="存储驱动" value={info?.storage_driver || '-'} />
-              <InfoRow label="警告数量" value={String(warnings)} highlight={warnings > 0} />
+              <InfoRow label="警告数量" value={info?.warnings || '0'} highlight={info?.warnings !== '0'} />
             </InfoSection>
 
             <InfoSection title="主机系统">
@@ -151,18 +151,17 @@ function InfoRow({
   )
 }
 
-function StatusBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
-  const pct = total > 0 ? (value / total) * 100 : 0
+function StatusBar({ label, value, percent, color }: { label: string; value: string; percent: number; color: string }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
         <span className="text-foreground">
-          {value} ({fmtPct(value, total)})
+          {value} ({Math.round(percent)}%)
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-muted">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ pub struct Network {
     pub driver: String,
     pub scope: String,
     pub created_at: String,
+    pub created_ago: String,
     pub subnets: Vec<String>,
     pub gateways: Vec<String>,
     pub labels: Vec<String>,

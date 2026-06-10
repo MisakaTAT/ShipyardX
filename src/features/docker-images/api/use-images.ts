@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toastAppError } from '@/shared/lib/errors'
-import { formatBytes } from '@/shared/lib/format'
 import { toast } from '@/shared/components/toast'
 
 export function useImages(serverId: string) {
@@ -22,7 +21,6 @@ interface ExportImageVars {
   imageId: string
   directory: string
   fileName: string
-  totalBytes: number | null
 }
 
 interface ImportImageVars {
@@ -34,11 +32,11 @@ function notifyCleanupSuccess(
   title: string,
   result: {
     deleted_count: number
-    reclaimed_bytes: number
+    reclaimed: string
   }
 ) {
   toast.success(title, {
-    description: `清理项 ${result.deleted_count} 个，回收 ${formatBytes(result.reclaimed_bytes)}`,
+    description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
   })
 }
 
@@ -53,8 +51,8 @@ export function useRemoveImage(serverId: string) {
 
 export function useExportImage(serverId: string) {
   return useMutation({
-    mutationFn: ({ exportId, imageId, directory, fileName, totalBytes }: ExportImageVars) =>
-      commands.exportImage(exportId, serverId, imageId, directory, fileName, totalBytes),
+    mutationFn: ({ exportId, imageId, directory, fileName }: ExportImageVars) =>
+      commands.exportImage(exportId, serverId, imageId, directory, fileName),
     onError: (err) => toastAppError(err),
   })
 }

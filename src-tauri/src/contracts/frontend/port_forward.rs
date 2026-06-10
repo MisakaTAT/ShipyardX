@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use crate::utils::serde_string::u64_string;
 
 #[derive(Debug, Serialize, Clone, Type)]
 pub struct LocalAddress {
@@ -55,11 +54,9 @@ pub struct PortForward {
     pub local_port: u16,
     pub bind_address: String,
     pub running: bool,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub tx_bytes: u64,
-    #[serde(with = "u64_string")]
-    #[specta(type = String)]
-    pub rx_bytes: u64,
+    pub tx: String,
+    pub rx: String,
+    pub tx_speed: String,
+    pub rx_speed: String,
     pub last_error: Option<String>,
 }

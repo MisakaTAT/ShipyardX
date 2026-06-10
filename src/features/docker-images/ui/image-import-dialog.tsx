@@ -11,7 +11,6 @@ import {
 } from '@/features/docker-images/model/image-import-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toast } from '@/shared/components/toast'
-import { formatBytes } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
@@ -37,8 +36,9 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
   const importing = importImage.isPending
   const [progress, setProgress] = useState<{
     importId: string
-    transferredBytes: number
-    totalBytes: number | null
+    transferred: string
+    total: string | null
+    percent: number | null
   } | null>(null)
 
   useEffect(() => {
@@ -62,8 +62,9 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
           if (current && payload.import_id !== current.importId) return current
           return {
             importId: payload.import_id,
-            transferredBytes: payload.transferred_bytes,
-            totalBytes: payload.total_bytes,
+            transferred: payload.transferred,
+            total: payload.total,
+            percent: payload.percent,
           }
         })
       })
@@ -97,8 +98,9 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
     activeImportIdRef.current = importId
     setProgress({
       importId,
-      transferredBytes: 0,
-      totalBytes: null,
+      transferred: '0 B',
+      total: null,
+      percent: null,
     })
     await importImage.mutateAsync({
       importId,
@@ -109,10 +111,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
     onOpenChange(false)
   })
 
-  const progressPercent =
-    progress && progress.totalBytes && progress.totalBytes > 0
-      ? Math.max(0, Math.min(100, (progress.transferredBytes / progress.totalBytes) * 100))
-      : null
+  const progressPercent = progress?.percent ?? null
 
   return (
     <StandardDialog
@@ -188,9 +187,9 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
               <span className="font-medium text-foreground">导入进度</span>
               <span className="text-muted-foreground">
                 {progress
-                  ? progress.totalBytes && progress.totalBytes > 0
-                    ? `${formatBytes(progress.transferredBytes)} / ${formatBytes(progress.totalBytes)}`
-                    : formatBytes(progress.transferredBytes)
+                  ? progress.total
+                    ? `${progress.transferred} / ${progress.total}`
+                    : progress.transferred
                   : '准备中...'}
               </span>
             </div>
