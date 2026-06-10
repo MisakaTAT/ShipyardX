@@ -197,8 +197,8 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
               <div
                 className={
                   progressPercent === null
-                    ? 'h-full w-1/3 animate-pulse rounded-full bg-primary'
-                    : 'h-full rounded-full bg-primary transition-[width] duration-300'
+                    ? 'h-full w-0 rounded-full bg-primary'
+                    : 'h-full rounded-full bg-primary'
                 }
                 style={progressPercent === null ? undefined : { width: `${progressPercent}%` }}
               />
