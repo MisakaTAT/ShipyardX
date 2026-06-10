@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;

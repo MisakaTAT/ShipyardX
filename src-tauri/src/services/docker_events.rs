@@ -1,32 +1,33 @@
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use bollard::models::EventMessage;
+use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
 use tokio::sync::watch;
 
-use crate::contracts::docker_api::events::StreamEvent;
-use crate::contracts::frontend::events::{
+use crate::docker::client::{docker_streaming, map_bollard_error};
+use crate::dto::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
 };
-use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::docker_stream;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, EventStreamHandle, get_server_config, lock_mutex};
-use crate::utils::display::format_unix_seconds_time;
+use crate::utils::formatting::format_unix_seconds_time;
 use crate::utils::id::generate_id;
 
 const HIDDEN_ATTR_KEYS: &[&str] = &["name", "image", "maintainer", "desktop.docker.binds"];
 
 fn event_type_label(event_type: &str) -> &'static str {
     match event_type {
-        "container" => "容器",
-        "image" => "镜像",
-        "network" => "网络",
-        "volume" => "存储卷",
-        _ => "其它",
+        "container" => "Container",
+        "image" => "Image",
+        "network" => "Network",
+        "volume" => "Volume",
+        _ => "Other",
     }
 }
 
@@ -106,23 +107,25 @@ fn build_detail(event_type: &str, action: &str, attrs: &std::collections::HashMa
     parts.join(", ")
 }
 
-fn parse_docker_event(json: &str) -> Option<DockerEvent> {
-    let raw: StreamEvent = serde_json::from_str(json).ok()?;
-    if raw.action.starts_with("exec_") {
+fn parse_docker_event(raw: EventMessage) -> Option<DockerEvent> {
+    let action = raw.action?;
+    if action.starts_with("exec_") {
         return None;
     }
     let time = raw.time.unwrap_or(0);
     let time_nano = raw.time_nano.unwrap_or(0);
-    let actor_id = if raw.actor.id.len() > 12 {
-        raw.actor.id[..12].to_string()
+    let actor = raw.actor.unwrap_or_default();
+    let actor_id_raw = actor.id.unwrap_or_default();
+    let actor_id = if actor_id_raw.len() > 12 {
+        actor_id_raw[..12].to_string()
     } else {
-        raw.actor.id
+        actor_id_raw
     };
-    let event_type = raw.event_type;
-    let action = raw.action;
-    let actor_name = raw.actor.attributes.get("name").cloned().unwrap_or_default();
-    let actor_image = raw.actor.attributes.get("image").cloned().unwrap_or_default();
-    let detail = build_detail(&event_type, &action, &raw.actor.attributes);
+    let attrs = actor.attributes.unwrap_or_default();
+    let event_type = raw.typ.map(|v| v.to_string()).unwrap_or_default();
+    let actor_name = attrs.get("name").cloned().unwrap_or_default();
+    let actor_image = attrs.get("image").cloned().unwrap_or_default();
+    let detail = build_detail(&event_type, &action, &attrs);
     Some(DockerEvent {
         event_id: format!("{}:{}:{}:{}", time_nano, event_type, action, actor_id),
         event_type_label: event_type_label(&event_type).to_string(),
@@ -133,7 +136,7 @@ fn parse_docker_event(json: &str) -> Option<DockerEvent> {
         actor_id,
         actor_name,
         actor_image,
-        scope: raw.scope.unwrap_or_default(),
+        scope: raw.scope.map(|v| v.to_string()).unwrap_or_default(),
         time: format_unix_seconds_time(time),
         detail,
     })
@@ -197,8 +200,8 @@ async fn run_event_stream_task(
         emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connecting);
 
         let stream_result = async {
-            let mut stream = match docker_stream(&config, "/events").await {
-                Ok(stream) => stream,
+            let docker = match docker_streaming(&config).await {
+                Ok(docker) => docker,
                 Err(error) => {
                     warn!(
                         target: "shipyardx_lib::services::docker_events",
@@ -217,11 +220,10 @@ async fn run_event_stream_task(
                     )));
                 }
             };
-
+            let mut stream = docker.events(None::<bollard::query_parameters::EventsOptions>);
             emit_stream_status(&ah, &stream_id, &status_slot, EventStreamStatus::Connected);
             info!(target: "shipyardx_lib::services::docker_events", "event stream connected; stream_id={} server_id={}", stream_id, config.id);
 
-            let mut line_buf = String::new();
             let mut last_refresh: Option<Instant> = None;
 
             loop {
@@ -232,51 +234,34 @@ async fn run_event_stream_task(
                             return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Stopped);
                         }
                     }
-                    chunk = stream.next_chunk() => {
-                        match chunk {
-                            Ok(Some(data)) => {
-                                let chunk = String::from_utf8_lossy(&data);
-                                line_buf.push_str(&chunk);
-
-                                while let Some(pos) = line_buf.find('\n') {
-                                    let line: String = line_buf.drain(..=pos).collect();
-                                    let trimmed = line.trim();
-                                    if trimmed.is_empty() {
-                                        continue;
-                                    }
-
-                                    if let Some(event) = parse_docker_event(trimmed) {
-                                        let event_type = event.event_type.clone();
-                                        let action = event.action.clone();
-                                        let _ = DockerStreamPayload {
-                                            stream_id: stream_id.clone(),
-                                            event,
-                                        }
-                                        .emit(&ah);
-
-                                        if is_refresh_event(&event_type, &action) {
-                                            let now = Instant::now();
-                                            let should_emit = match last_refresh {
-                                                Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
-                                                None => true,
-                                            };
-                                            if should_emit {
-                                                let _ = DockerStreamRefresh {
-                                                    stream_id: stream_id.clone(),
-                                                    resource: event_type,
-                                                }
-                                                .emit(&ah);
-                                                last_refresh = Some(now);
-                                            }
+                    item = stream.next() => {
+                        match item {
+                            Some(Ok(raw)) => {
+                                if let Some(event) = parse_docker_event(raw) {
+                                    let event_type = event.event_type.clone();
+                                    let action = event.action.clone();
+                                    let _ = DockerStreamPayload {
+                                        stream_id: stream_id.clone(),
+                                        event,
+                                    }.emit(&ah);
+                                    if is_refresh_event(&event_type, &action) {
+                                        let now = Instant::now();
+                                        let should_emit = match last_refresh {
+                                            Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
+                                            None => true,
+                                        };
+                                        if should_emit {
+                                            let _ = DockerStreamRefresh {
+                                                stream_id: stream_id.clone(),
+                                                resource: event_type,
+                                            }.emit(&ah);
+                                            last_refresh = Some(now);
                                         }
                                     }
                                 }
                             }
-                            Ok(None) => {
-                                warn!(target: "shipyardx_lib::services::docker_events", "event stream closed by remote; stream_id={} server_id={}", stream_id, config.id);
-                                return Ok(StreamLoopExit::Reconnect(None));
-                            }
-                            Err(error) => {
+                            Some(Err(error)) => {
+                                let error = map_bollard_error(error);
                                 warn!(
                                     target: "shipyardx_lib::services::docker_events",
                                     "event stream interrupted; stream_id={} server_id={} code={} message={} detail={:?}",
@@ -287,6 +272,10 @@ async fn run_event_stream_task(
                                     error.detail
                                 );
                                 return Ok(StreamLoopExit::Reconnect(Some(error)));
+                            }
+                            None => {
+                                warn!(target: "shipyardx_lib::services::docker_events", "event stream closed by remote; stream_id={} server_id={}", stream_id, config.id);
+                                return Ok(StreamLoopExit::Reconnect(None));
                             }
                         }
                     }

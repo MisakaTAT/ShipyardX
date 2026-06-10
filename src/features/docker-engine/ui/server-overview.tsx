@@ -16,7 +16,8 @@ export default function ServerOverview({ serverId }: Props) {
     dataUpdatedAt,
   } = useQuery({
     queryKey: qk.dockerInfo(serverId),
-    queryFn: () => commands.getDockerInfo(serverId),
+    queryFn: () => commands.checkDockerAccess(serverId),
+    retry: false,
   })
 
   const lastUpdated = dataUpdatedAt ? formatNowTime(new Date(dataUpdatedAt)) : ''

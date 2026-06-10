@@ -65,24 +65,24 @@ pub fn format_time_ago_from_unix(ts: i64) -> String {
     let diff = Utc::now().signed_duration_since(dt);
     let secs = diff.num_seconds().max(0);
     if secs < 60 {
-        return "刚刚".to_string();
+        return "just now".to_string();
     }
     let mins = diff.num_minutes();
     if mins < 60 {
-        return format!("{mins} 分钟前");
+        return format!("{mins} minutes ago");
     }
     let hours = diff.num_hours();
     if hours < 24 {
-        return format!("{hours} 小时前");
+        return format!("{hours} hours ago");
     }
     let days = diff.num_days();
     if days < 30 {
-        return format!("{days} 天前");
+        return format!("{days} days ago");
     }
     if days < 365 {
-        return format!("{} 个月前", days / 30);
+        return format!("{} months ago", days / 30);
     }
-    format!("{} 年前", days / 365)
+    format!("{} years ago", days / 365)
 }
 
 pub fn format_datetime_string(raw: &str) -> String {
@@ -107,24 +107,24 @@ pub fn format_time_ago_from_datetime_string(raw: &str) -> String {
     let diff = Utc::now().signed_duration_since(dt.with_timezone(&Utc));
     let secs = diff.num_seconds().max(0);
     if secs < 60 {
-        return "刚刚".to_string();
+        return "just now".to_string();
     }
     let mins = diff.num_minutes();
     if mins < 60 {
-        return format!("{mins} 分钟前");
+        return format!("{mins} minutes ago");
     }
     let hours = diff.num_hours();
     if hours < 24 {
-        return format!("{hours} 小时前");
+        return format!("{hours} hours ago");
     }
     let days = diff.num_days();
     if days < 30 {
-        return format!("{days} 天前");
+        return format!("{days} days ago");
     }
     if days < 365 {
-        return format!("{} 个月前", days / 30);
+        return format!("{} months ago", days / 30);
     }
-    format!("{} 年前", days / 365)
+    format!("{} years ago", days / 365)
 }
 
 pub fn format_speed(bytes_per_sec: f64) -> String {

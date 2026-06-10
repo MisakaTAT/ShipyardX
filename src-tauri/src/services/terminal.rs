@@ -1,6 +1,8 @@
 use std::fs;
+use std::pin::Pin;
 use std::sync::OnceLock;
 
+use bollard::exec::{CreateExecOptions, ResizeExecOptions, StartExecOptions, StartExecResults};
 use futures_util::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use russh::ChannelMsg;
@@ -11,11 +13,11 @@ use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_util::io::StreamReader;
 
-use crate::contracts::docker_api::container::{ContainerExecCreate, ContainerExecCreateResponse, ContainerExecStart};
-use crate::contracts::frontend::server::ServerConfig;
-use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
-use crate::docker::client::{docker_post, docker_post_json_hijack, docker_post_json_response};
+use crate::docker::client::{docker, docker_streaming, map_bollard_error};
+use crate::dto::server::ServerConfig;
+use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
 use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config, lock_mutex};
@@ -183,33 +185,58 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     let fail_session_id = session_id.clone();
     let fail_handle = ah.clone();
     let result = block_on(async move {
+        let docker = docker_streaming(&config).await?;
         let shell = if shell.trim().is_empty() {
             "/bin/sh".to_string()
         } else {
             shell.trim().to_string()
         };
-        let exec = ContainerExecCreate {
-            attach_stdin: true,
-            attach_stdout: true,
-            attach_stderr: true,
-            tty: true,
-            open_stdin: true,
-            cmd: vec![shell],
+        let exec = CreateExecOptions {
+            attach_stdin: Some(true),
+            attach_stdout: Some(true),
+            attach_stderr: Some(true),
+            tty: Some(true),
+            cmd: Some(vec![shell]),
             user: user
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty()),
+            ..Default::default()
         };
-        let raw = docker_post_json_response(&config, &format!("/containers/{container_id}/exec"), &exec).await?;
-        let created: ContainerExecCreateResponse = serde_json::from_str(raw.trim()).map_err(|e| {
-            AppError::internal("terminal.exec_create_parse_failed", "解析容器终端创建结果失败").with_source(e)
-        })?;
-        let start = ContainerExecStart {
+        let created = docker
+            .create_exec(&container_id, exec)
+            .await
+            .map_err(map_bollard_error)?;
+        let start = StartExecOptions {
             detach: false,
             tty: true,
+            output_capacity: None,
         };
-        let mut hijack = docker_post_json_hijack(&config, &format!("/exec/{}/start", created.id), &start).await?;
-
-        run_docker_exec_io_loop(session_id, rx, ah, &config, &created.id, &mut hijack, cols, rows).await;
+        let attached = docker
+            .start_exec(&created.id, Some(start))
+            .await
+            .map_err(map_bollard_error)?;
+        let StartExecResults::Attached { output, input } = attached else {
+            return Err(AppError::internal(
+                "terminal.exec_detached_unexpected",
+                "容器终端意外进入 detached 模式",
+            ));
+        };
+        let reader = StreamReader::new(output.map(|item| {
+            item.map(|log| log.into_bytes())
+                .map_err(|e| std::io::Error::other(map_bollard_error(e).message))
+        }));
+        run_docker_exec_io_loop(
+            session_id,
+            rx,
+            ah,
+            &config,
+            &created.id,
+            Box::pin(reader),
+            input,
+            cols,
+            rows,
+        )
+        .await;
         Ok::<(), AppError>(())
     });
 
@@ -228,7 +255,17 @@ async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, row
     if cols == 0 || rows == 0 {
         return false;
     }
-    docker_post(config, &format!("/exec/{exec_id}/resize?h={rows}&w={cols}"))
+    let Ok(width) = u16::try_from(cols) else {
+        return false;
+    };
+    let Ok(height) = u16::try_from(rows) else {
+        return false;
+    };
+    let Ok(docker) = docker(config).await else {
+        return false;
+    };
+    docker
+        .resize_exec(exec_id, ResizeExecOptions { width, height })
         .await
         .is_ok()
 }
@@ -239,7 +276,8 @@ async fn run_docker_exec_io_loop(
     ah: AppHandle,
     config: &ServerConfig,
     exec_id: &str,
-    hijack: &mut crate::docker::transport::DockerHijackConnection,
+    mut reader: Pin<Box<dyn tokio::io::AsyncRead + Send>>,
+    mut writer: Pin<Box<dyn tokio::io::AsyncWrite + Send>>,
     initial_cols: u32,
     initial_rows: u32,
 ) {
@@ -264,8 +302,8 @@ async fn run_docker_exec_io_loop(
         }
 
         if !input_buf.is_empty() {
-            if hijack.write_all(&input_buf).await.is_err() {
-                hijack.close().await;
+            if writer.write_all(&input_buf).await.is_err() {
+                let _ = writer.shutdown().await;
                 send_control(&ah, &session_id, WsServerMsg::Closed);
                 return;
             }
@@ -282,16 +320,16 @@ async fn run_docker_exec_io_loop(
                         }
                     }
                     Some(TerminalMsg::Close) | None => {
-                        hijack.close().await;
+                        let _ = writer.shutdown().await;
                         send_control(&ah, &session_id, WsServerMsg::Closed);
                         return;
                     }
                 }
             }
-            read = hijack.read(&mut read_buf) => {
+            read = tokio::io::AsyncReadExt::read(&mut reader, &mut read_buf) => {
                 match read {
                     Ok(0) | Err(_) => {
-                        hijack.close().await;
+                        let _ = writer.shutdown().await;
                         send_control(&ah, &session_id, WsServerMsg::Closed);
                         return;
                     }

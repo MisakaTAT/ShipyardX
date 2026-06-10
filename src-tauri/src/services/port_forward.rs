@@ -15,13 +15,13 @@ use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::TcpStream as TokioTcpStream;
 use tokio::sync::watch;
 
-use crate::contracts::frontend::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::port_forward::{LocalAddress, PortForward, PortForwardCreate, PortForwardRule};
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, spawn_on_runtime};
 use crate::ssh::pool;
 use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_mutex};
-use crate::utils::display::{format_bytes_u64, format_speed};
+use crate::utils::formatting::{format_bytes_u64, format_speed};
 use crate::utils::id::generate_id;
 
 const PORT_FORWARD_BIND_IP: &str = "127.0.0.1";

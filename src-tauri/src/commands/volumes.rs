@@ -1,7 +1,7 @@
 use tauri::State;
 
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::volume::Volume;
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::volume::Volume;
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;

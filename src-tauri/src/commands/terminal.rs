@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::contracts::frontend::terminal::{ContainerExecTerminalParams, TerminalSession};
+use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;

@@ -1,80 +1,91 @@
-use tauri::State;
-
 use std::collections::HashMap;
 
-use log::{debug, info};
-
-use crate::contracts::docker_api::container::ContainerSummary;
-use crate::contracts::docker_api::volume::{VolumeCreate, VolumeList, VolumePruneResponse};
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::volume::Volume;
-use crate::docker::client::{
-    docker_delete, docker_get, docker_post_json, docker_post_json_response, pretty_json_response,
+use bollard::models::{ContainerSummary, Volume, VolumeCreateRequest, VolumeListResponse, VolumePruneResponse};
+use bollard::query_parameters::{
+    ListContainersOptionsBuilder, ListVolumesOptions, PruneVolumesOptions, RemoveVolumeOptions,
 };
-use crate::error::{AppError, AppResult};
+use log::{debug, info};
+use tauri::State;
+
+use crate::docker::client::{docker, map_bollard_error, pretty_json};
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::volume::Volume as VolumeDto;
+use crate::error::AppResult;
 use crate::state::{AppState, get_server_config};
-use crate::utils::display::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
+use crate::utils::formatting::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
+pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<VolumeDto>> {
     debug!(target: "shipyardx_lib::services::volumes", "listing volumes; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, "/volumes").await?;
-    let api: VolumeList = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("volume.list_parse_failed", "解析存储卷列表失败").with_source(e))?;
+    let docker = docker(&server).await?;
+    let api: VolumeListResponse = docker
+        .list_volumes(None::<ListVolumesOptions>)
+        .await
+        .map_err(map_bollard_error)?;
     let mut list = api.volumes.unwrap_or_default();
     sort_by_created_desc_then_id(
         &mut list,
-        |x| x.created_at.clone().unwrap_or_default(),
-        |x| x.name.clone().unwrap_or_default(),
+        |x| x.created_at.clone().map(|v| v.to_string()).unwrap_or_default(),
+        |x| x.name.clone(),
     );
 
-    let containers_resp = docker_get(&server, "/containers/json?all=1").await?;
-    let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
-        .map_err(|e| AppError::internal("volume.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
+    let containers: Vec<ContainerSummary> = docker
+        .list_containers(Some(ListContainersOptionsBuilder::default().all(true).build()))
+        .await
+        .map_err(map_bollard_error)?;
 
     let mut used_by: HashMap<String, Vec<String>> = HashMap::new();
     for c in containers {
         let name = c
             .names
-            .first()
+            .as_deref()
+            .and_then(|names| names.first())
             .map(|n| n.trim_start_matches('/').to_string())
             .unwrap_or_default();
         if name.is_empty() {
             continue;
         }
-        for m in c.mounts {
-            if m.mount_type != "volume" {
+        for m in c.mounts.unwrap_or_default() {
+            if m.typ.as_deref() != Some("volume") {
                 continue;
             }
-            if m.name.is_empty() {
+            let Some(volume_name) = m.name else {
+                continue;
+            };
+            if volume_name.is_empty() {
                 continue;
             }
-            used_by.entry(m.name).or_default().push(name.clone());
+            used_by.entry(volume_name).or_default().push(name.clone());
         }
     }
 
-    let volumes: Vec<Volume> = list
+    let volumes: Vec<VolumeDto> = list
         .into_iter()
-        .map(|v| {
-            let name = v.name.clone().unwrap_or_default();
+        .map(|v: Volume| {
+            let name = v.name.clone();
             let mut used = used_by.get(&name).cloned().unwrap_or_default();
             used.sort();
             used.dedup();
-            Volume {
+            VolumeDto {
                 name: name.clone(),
-                driver: v.driver.unwrap_or_default(),
-                mountpoint: v.mountpoint.unwrap_or_default(),
-                scope: v.scope.unwrap_or_default(),
-                created_at: format_datetime_string(&v.created_at.clone().unwrap_or_default()),
-                created_ago: format_time_ago_from_datetime_string(&v.created_at.unwrap_or_default()),
+                driver: v.driver,
+                mountpoint: v.mountpoint,
+                scope: v.scope.map(|v| v.to_string()).unwrap_or_default(),
+                created_at: v
+                    .created_at
+                    .clone()
+                    .map(|v| format_datetime_string(&v.to_string()))
+                    .unwrap_or_default(),
+                created_ago: v
+                    .created_at
+                    .clone()
+                    .map(|v| format_time_ago_from_datetime_string(&v.to_string()))
+                    .unwrap_or_default(),
                 stack: v
                     .labels
-                    .as_ref()
-                    .and_then(|m| {
-                        m.get("com.docker.compose.project")
-                            .or_else(|| m.get("com.docker.stack.namespace"))
-                    })
+                    .get("com.docker.compose.project")
+                    .or_else(|| v.labels.get("com.docker.stack.namespace"))
                     .cloned()
                     .unwrap_or_default(),
                 used_by: used.join(", "),
@@ -88,26 +99,36 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
 pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::volumes", "inspecting volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, &format!("/volumes/{}", name)).await?;
-    pretty_json_response(&resp)
+    let response = docker(&server)
+        .await?
+        .inspect_volume(&name)
+        .await
+        .map_err(map_bollard_error)?;
+    pretty_json(&response)
 }
 
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::volumes", "removing volume; server_id={} volume={}", server_id, name);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete(&server, &format!("/volumes/{}", name)).await
+    docker(&server)
+        .await?
+        .remove_volume(&name, None::<RemoveVolumeOptions>)
+        .await
+        .map_err(map_bollard_error)
 }
 
 pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::volumes", "pruning volumes; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let raw = docker_post_json_response(&server, "/volumes/prune", &serde_json::json!({})).await?;
-    let response: VolumePruneResponse = serde_json::from_str(raw.trim())
-        .map_err(|e| AppError::internal("volume.prune_parse_failed", "解析存储卷清理结果失败").with_source(e))?;
+    let response: VolumePruneResponse = docker(&server)
+        .await?
+        .prune_volumes(None::<PruneVolumesOptions>)
+        .await
+        .map_err(map_bollard_error)?;
 
     Ok(CleanupResult {
-        deleted_count: response.volumes_deleted.len() as u32,
-        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0)),
+        deleted_count: response.volumes_deleted.unwrap_or_default().len() as u32,
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0) as u64),
     })
 }
 
@@ -121,14 +142,18 @@ pub async fn create_volume(
     let name = name.trim().to_string();
     let driver = driver.unwrap_or_default().trim().to_string();
     let driver = if driver.is_empty() { "local".to_string() } else { driver };
-
-    let driver_opts = driver_opts.filter(|m| !m.is_empty());
-    let body = VolumeCreate {
-        name,
-        driver,
-        driver_opts,
+    let body = VolumeCreateRequest {
+        name: Some(name.clone()),
+        driver: Some(driver.clone()),
+        driver_opts: driver_opts.filter(|m| !m.is_empty()),
+        ..Default::default()
     };
-    info!(target: "shipyardx_lib::services::volumes", "creating volume; server_id={} volume={} driver={}", server_id, body.name, body.driver);
+    info!(target: "shipyardx_lib::services::volumes", "creating volume; server_id={} volume={} driver={}", server_id, name, driver);
     let server = get_server_config(&state, &server_id)?;
-    docker_post_json(&server, "/volumes/create", &body).await
+    docker(&server)
+        .await?
+        .create_volume(body)
+        .await
+        .map_err(map_bollard_error)?;
+    Ok(())
 }

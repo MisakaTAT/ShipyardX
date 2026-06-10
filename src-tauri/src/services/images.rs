@@ -3,6 +3,14 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use bollard::models::{
+    BuildPruneResponse, ContainerSummary, ImageHistoryResponseItem, ImageInspect, ImagePruneResponse, ImageSummary,
+};
+use bollard::query_parameters::{
+    CreateImageOptionsBuilder, ImportImageOptionsBuilder, ListContainersOptionsBuilder, ListImagesOptions,
+    PruneBuildOptionsBuilder, PruneImagesOptionsBuilder, RemoveImageOptionsBuilder,
+};
+use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use tauri::{AppHandle, State};
@@ -11,23 +19,16 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncRead, AsyncWriteExt, ReadBuf};
 use tokio::sync::watch;
 
-use crate::contracts::docker_api::container::ContainerSummary;
-use crate::contracts::docker_api::image::{BuilderPruneResponse, ImageHistoryItem, ImagePruneResponse, ImageSummary};
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::events::{
-    DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress, ImageImportProgress,
-};
-use crate::contracts::frontend::image::Image;
-use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::{
-    docker_delete, docker_get, docker_post_json_response, docker_post_stream, docker_post_stream_body_text,
-    pretty_json_response,
-};
+use crate::docker::client::{docker, docker_streaming, map_bollard_error, pretty_json};
 use crate::docker::mapping::api_image_to_dto;
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::events::{DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress, ImageImportProgress};
+use crate::dto::image::Image;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
-use crate::utils::display::{format_bytes_i64, format_bytes_u64, format_unix_seconds};
+use crate::utils::formatting::{format_bytes_i64, format_bytes_u64, format_unix_seconds};
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
 use crate::utils::sort::sort_by_created_desc_then_id;
@@ -38,9 +39,11 @@ const PULL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续拉取�
 const EXPORT_PROGRESS_EMIT_BYTES: u64 = 512 * 1024;
 
 async fn resolve_image_size_hint(server: &ServerConfig, image_id: &str) -> AppResult<Option<u64>> {
-    let resp = docker_get(server, "/images/json").await?;
-    let api: Vec<ImageSummary> = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("image.size_hint_parse_failed", "解析镜像大小信息失败").with_source(e))?;
+    let api: Vec<ImageSummary> = docker(server)
+        .await?
+        .list_images(None::<ListImagesOptions>)
+        .await
+        .map_err(map_bollard_error)?;
     Ok(api
         .into_iter()
         .find(|img| img.id == image_id)
@@ -50,22 +53,25 @@ async fn resolve_image_size_hint(server: &ServerConfig, image_id: &str) -> AppRe
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     debug!(target: "shipyardx_lib::services::images", "listing images; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let containers_resp = docker_get(&server, "/containers/json?all=1").await?;
-    let containers: Vec<ContainerSummary> = serde_json::from_str(&containers_resp)
-        .map_err(|e| AppError::internal("image.container_list_parse_failed", "解析容器列表失败").with_source(e))?;
+    let docker = docker(&server).await?;
+    let containers: Vec<ContainerSummary> = docker
+        .list_containers(Some(ListContainersOptionsBuilder::default().all(true).build()))
+        .await
+        .map_err(map_bollard_error)?;
 
     let mut used_by: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     for c in containers {
-        let id = c.image_id.trim();
+        let id = c.image_id.as_deref().unwrap_or_default().trim();
         if id.is_empty() {
             continue;
         }
         *used_by.entry(id.to_string()).or_insert(0) += 1;
     }
 
-    let resp = docker_get(&server, "/images/json").await?;
-    let mut api: Vec<ImageSummary> = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("image.list_parse_failed", "解析镜像列表失败").with_source(e))?;
+    let mut api: Vec<ImageSummary> = docker
+        .list_images(None::<ListImagesOptions>)
+        .await
+        .map_err(map_bollard_error)?;
     sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
     let images: Vec<Image> = api
         .into_iter()
@@ -81,23 +87,29 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppRe
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::images", "inspecting image; server_id={} image_id={}", server_id, image_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, &format!("/images/{}/json", image_id)).await?;
-    pretty_json_response(&resp)
+    let resp: ImageInspect = docker(&server)
+        .await?
+        .inspect_image(&image_id)
+        .await
+        .map_err(map_bollard_error)?;
+    pretty_json(&resp)
 }
 
 pub async fn get_image_history(
     server_id: String,
     image_id: String,
     state: State<'_, AppState>,
-) -> AppResult<Vec<crate::contracts::frontend::image::ImageLayer>> {
+) -> AppResult<Vec<crate::dto::image::ImageLayer>> {
     debug!(target: "shipyardx_lib::services::images", "fetching image history; server_id={} image_id={}", server_id, image_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, &format!("/images/{}/history", image_id)).await?;
-    let api: Vec<ImageHistoryItem> = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("image.history_parse_failed", "解析镜像历史失败").with_source(e))?;
-    let layers: Vec<crate::contracts::frontend::image::ImageLayer> = api
+    let api: Vec<ImageHistoryResponseItem> = docker(&server)
+        .await?
+        .image_history(&image_id)
+        .await
+        .map_err(map_bollard_error)?;
+    let layers: Vec<crate::dto::image::ImageLayer> = api
         .into_iter()
-        .map(|l| crate::contracts::frontend::image::ImageLayer {
+        .map(|l| crate::dto::image::ImageLayer {
             id: l.id,
             created_at: format_unix_seconds(l.created),
             size: format_bytes_i64(l.size),
@@ -117,7 +129,16 @@ pub async fn remove_image(
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::images", "removing image; server_id={} image_id={} force={}", server_id, image_id, force);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete(&server, &format!("/images/{}?force={}", image_id, force)).await
+    docker(&server)
+        .await?
+        .remove_image(
+            &image_id,
+            Some(RemoveImageOptionsBuilder::default().force(force).build()),
+            None,
+        )
+        .await
+        .map_err(map_bollard_error)
+        .map(|_| ())
 }
 
 pub async fn prune_dangling_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
@@ -131,14 +152,15 @@ pub async fn prune_unused_images(server_id: String, state: State<'_, AppState>) 
 pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::images", "pruning builder cache; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let raw = docker_post_json_response(&server, "/build/prune?all=1", &serde_json::json!({})).await?;
-    let response: BuilderPruneResponse = serde_json::from_str(raw.trim()).map_err(|e| {
-        AppError::internal("image.builder_prune_parse_failed", "解析构建缓存清理结果失败").with_source(e)
-    })?;
+    let response: BuildPruneResponse = docker(&server)
+        .await?
+        .prune_build(Some(PruneBuildOptionsBuilder::default().all(true).build()))
+        .await
+        .map_err(map_bollard_error)?;
 
     Ok(CleanupResult {
-        deleted_count: response.caches_deleted.len() as u32,
-        reclaimed: format_bytes_u64(response.space_reclaimed),
+        deleted_count: response.caches_deleted.unwrap_or_default().len() as u32,
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0) as u64),
     })
 }
 
@@ -183,20 +205,17 @@ pub async fn export_image(
     let server = get_server_config(&state, &server_id)?;
     let total_bytes = resolve_image_size_hint(&server, &image_id).await?;
     let result = async {
+        let docker = docker_streaming(&server).await?;
         let mut file = create_export_file(&export_path).await?;
-        let mut stream = crate::docker::client::docker_stream(
-            &server,
-            &format!("/images/get?names={}", encode_query_component(&image_id)),
-        )
-        .await?;
+        let mut stream = docker.export_image(&image_id);
 
         let mut transferred_bytes = 0_u64;
         let mut emitted_bytes = 0_u64;
         emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
 
         loop {
-            match stream.next_chunk().await? {
-                Some(chunk) => {
+            match stream.next().await {
+                Some(Ok(chunk)) => {
                     file.write_all(&chunk).await.map_err(|e| {
                         AppError::internal("image.export_write_failed", "写入镜像导出文件失败").with_source(e)
                     })?;
@@ -206,6 +225,7 @@ pub async fn export_image(
                         emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
                     }
                 }
+                Some(Err(error)) => return Err(map_bollard_error(error)),
                 None => break,
             }
         }
@@ -284,14 +304,19 @@ pub async fn import_image(
         );
     });
 
-    let output = docker_post_stream_body_text(
-        &server,
-        "/images/load?quiet=1",
-        "application/x-tar",
-        total_bytes,
-        progress_reader,
-    )
-    .await?;
+    let docker = docker_streaming(&server).await?;
+    let mut stream = docker.import_image_stream(
+        ImportImageOptionsBuilder::default().quiet(true).build(),
+        tokio_util::io::ReaderStream::new(progress_reader),
+        None,
+    );
+    let mut output = String::new();
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(item) => output.push_str(&format!("{item:?}\n")),
+            Err(error) => return Err(map_bollard_error(error)),
+        }
+    }
     let output = output.trim();
     if !output.is_empty() {
         debug!(
@@ -324,8 +349,7 @@ async fn run_pull_task(
     let done_handle = ah.clone();
     info!(target: "shipyardx_lib::services::images", "image pull task started; pull_id={} server_id={} image={}", pull_id, config.id, image);
     let result = async {
-        let path = format!("/images/create?fromImage={}", encode_query_component(&image));
-        let mut stream = docker_post_stream(&config, &path).await.map_err(|e| {
+        let docker = docker_streaming(&config).await.map_err(|e| {
             error!(
                 target: "shipyardx_lib::services::images",
                 "image pull stream open failed; pull_id={} server_id={} image={} code={} message={} detail={:?}",
@@ -343,6 +367,11 @@ async fn run_pull_task(
             .emit(&ah);
             e
         })?;
+        let mut stream = docker.create_image(
+            Some(CreateImageOptionsBuilder::default().from_image(&image).build()),
+            None,
+            None,
+        );
 
         let mut buffer = String::new();
         let mut output_buffer = TextOutputBuffer::new(
@@ -355,23 +384,17 @@ async fn run_pull_task(
                 changed = stop_rx.changed() => {
                     if changed.is_ok() && *stop_rx.borrow() {
                         warn!(target: "shipyardx_lib::services::images", "image pull cancelled; pull_id={} server_id={} image={}", pull_id, config.id, image);
-                        stream.close().await;
                         return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
                     }
                 }
-                chunk = stream.next_chunk() => {
-                    match chunk {
-                        Ok(Some(chunk)) => {
-                            buffer.push_str(&String::from_utf8_lossy(&chunk));
+                item = stream.next() => {
+                    match item {
+                        Some(Ok(chunk)) => {
+                            buffer.push_str(&format!("{}\n", serde_json::to_string(&chunk)?));
                             emit_pull_lines(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
                         }
-                        Ok(None) => {
-                            emit_pull_tail(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
-                            flush_pull_output(&pull_id, &ah, &mut output_buffer);
-                            info!(target: "shipyardx_lib::services::images", "image pull stream completed; pull_id={} server_id={} image={}", pull_id, config.id, image);
-                            return Ok(());
-                        }
-                        Err(e) => {
+                        Some(Err(e)) => {
+                            let e = map_bollard_error(e);
                             error!(
                                 target: "shipyardx_lib::services::images",
                                 "image pull stream read failed; pull_id={} server_id={} image={} code={} message={} detail={:?}",
@@ -383,6 +406,12 @@ async fn run_pull_task(
                                 e.detail
                             );
                             return Err(e);
+                        }
+                        None => {
+                            emit_pull_tail(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
+                            flush_pull_output(&pull_id, &ah, &mut output_buffer);
+                            info!(target: "shipyardx_lib::services::images", "image pull stream completed; pull_id={} server_id={} image={}", pull_id, config.id, image);
+                            return Ok(());
                         }
                     }
                 }
@@ -430,39 +459,29 @@ struct ImagePullErrorDetail {
     message: Option<String>,
 }
 
-fn encode_query_component(value: &str) -> String {
-    value
-        .bytes()
-        .flat_map(|byte| match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                vec![byte as char]
-            }
-            _ => format!("%{byte:02X}").chars().collect(),
-        })
-        .collect()
-}
-
 async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     let action = if dangling_only { "dangling" } else { "unused" };
     info!(target: "shipyardx_lib::services::images", "pruning images; server_id={} action={}", server_id, action);
     let server = get_server_config(&state, &server_id)?;
+    let docker = docker(&server).await?;
     let filters = if dangling_only {
-        r#"{"dangling":{"true":true}}"#
+        std::collections::HashMap::from([(String::from("dangling"), vec![String::from("true")])])
     } else {
-        r#"{"dangling":{"false":true}}"#
+        std::collections::HashMap::from([(String::from("dangling"), vec![String::from("false")])])
     };
-    let path = format!("/images/prune?filters={}", encode_query_component(filters));
-    let raw = docker_post_json_response(&server, &path, &serde_json::json!({})).await?;
-    let response: ImagePruneResponse = serde_json::from_str(raw.trim())
-        .map_err(|e| AppError::internal("image.prune_parse_failed", "解析镜像清理结果失败").with_source(e))?;
+    let response: ImagePruneResponse = docker
+        .prune_images(Some(PruneImagesOptionsBuilder::default().filters(&filters).build()))
+        .await
+        .map_err(map_bollard_error)?;
 
     Ok(CleanupResult {
         deleted_count: response
             .images_deleted
+            .unwrap_or_default()
             .iter()
             .filter(|item| item.deleted.is_some() || item.untagged.is_some())
             .count() as u32,
-        reclaimed: format_bytes_u64(response.space_reclaimed),
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0) as u64),
     })
 }
 

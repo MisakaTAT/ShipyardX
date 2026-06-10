@@ -5,7 +5,7 @@ use log::{debug, warn};
 use russh::{Channel, ChannelMsg, client};
 use tokio::io::{AsyncRead, AsyncWriteExt};
 
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
 use super::client::{SshClientHandler, connect, disconnect};

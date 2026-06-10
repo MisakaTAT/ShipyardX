@@ -12,11 +12,9 @@ use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio::process::Command;
 use uuid::Uuid;
 
-use crate::contracts::frontend::appstore::{
-    AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest,
-};
-use crate::contracts::frontend::events::InstallStepEvent;
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::appstore::{AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest};
+use crate::dto::events::InstallStepEvent;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
     APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_STREAM_SH,
@@ -42,7 +40,7 @@ fn apps_dir(cache_dir: &Path) -> PathBuf {
     cache_dir.join("apps")
 }
 
-fn pick_description(desc: &crate::contracts::frontend::appstore::DescriptionI18n) -> String {
+fn pick_description(desc: &crate::dto::appstore::DescriptionI18n) -> String {
     if !desc.zh.is_empty() {
         return desc.zh.clone();
     }

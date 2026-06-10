@@ -1,4 +1,4 @@
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::AppResult;
 use log::debug;
 use tokio::io::AsyncRead;

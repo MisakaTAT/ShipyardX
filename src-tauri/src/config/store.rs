@@ -8,7 +8,7 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use tauri::{AppHandle, Manager};
 use tempfile::NamedTempFile;
 
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
 const KEY_FILE: &str = "encryption.key";

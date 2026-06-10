@@ -1,36 +1,40 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
+use bollard::container::LogOutput;
+use bollard::models::{
+    ContainerCreateBody, EndpointIpamConfig, EndpointSettings, HostConfig, NetworkingConfig, RestartPolicy,
+    RestartPolicyNameEnum,
+};
+use bollard::query_parameters::{
+    CreateContainerOptionsBuilder, InspectContainerOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
+    PruneContainersOptions, RemoveContainerOptions, RestartContainerOptions, StartContainerOptions,
+    StopContainerOptions,
+};
+use futures_util::StreamExt;
 use log::{debug, info};
 use tauri::State;
 
-use crate::contracts::docker_api::container::{
-    ContainerCreate, ContainerCreateHostConfig, ContainerCreatePortBinding, ContainerCreateResponse,
-    ContainerCreateRestartPolicy, ContainerNetworkingConfig, ContainerPruneResponse, ContainerSummary,
-    EndpointIpamConfig, EndpointSettings,
-};
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::container::{Container, RunContainer};
-use crate::docker::client::{
-    docker_delete, docker_get, docker_post, docker_post_json_response, docker_stream, pretty_json_response,
-};
+use crate::docker::client::{docker, docker_streaming, map_bollard_error, pretty_json};
 use crate::docker::mapping::api_container_to_dto;
-use crate::error::{AppError, AppResult};
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::container::{Container, RunContainer};
+use crate::error::AppResult;
 use crate::state::{AppState, get_server_config};
-use crate::utils::display::format_bytes_u64;
+use crate::utils::formatting::format_bytes_u64;
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
     debug!(target: "shipyardx_lib::services::containers", "listing containers; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, "/containers/json?all=1").await?;
-    let mut api: Vec<ContainerSummary> = serde_json::from_str(&resp).map_err(|e| {
-        AppError::internal("container.list_parse_failed", "解析容器列表失败").with_detail(format!(
-            "{} — 原始响应: {}",
-            e,
-            &resp[..resp.len().min(200)]
-        ))
-    })?;
-    sort_by_created_desc_then_id(&mut api, |x| x.created, |x| x.id.clone());
+    let docker = docker_streaming(&server).await?;
+    let options = ListContainersOptionsBuilder::default().all(true).build();
+    let mut api = docker.list_containers(Some(options)).await.map_err(map_bollard_error)?;
+    sort_by_created_desc_then_id(
+        &mut api,
+        |x| x.created.unwrap_or_default(),
+        |x| x.id.clone().unwrap_or_default(),
+    );
     let containers: Vec<Container> = api.into_iter().map(api_container_to_dto).collect();
     info!(target: "shipyardx_lib::services::containers", "listed containers; server_id={} count={}", server_id, containers.len());
     Ok(containers)
@@ -39,19 +43,31 @@ pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> A
 pub async fn start_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "starting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post(&server, &format!("/containers/{}/start", container_id)).await
+    docker(&server)
+        .await?
+        .start_container(&container_id, None::<StartContainerOptions>)
+        .await
+        .map_err(map_bollard_error)
 }
 
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "stopping container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post(&server, &format!("/containers/{}/stop", container_id)).await
+    docker(&server)
+        .await?
+        .stop_container(&container_id, None::<StopContainerOptions>)
+        .await
+        .map_err(map_bollard_error)
 }
 
 pub async fn restart_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "restarting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    docker_post(&server, &format!("/containers/{}/restart", container_id)).await
+    docker(&server)
+        .await?
+        .restart_container(&container_id, None::<RestartContainerOptions>)
+        .await
+        .map_err(map_bollard_error)
 }
 
 pub async fn remove_container(
@@ -62,19 +78,31 @@ pub async fn remove_container(
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "removing container; server_id={} container_id={} force={}", server_id, container_id, force);
     let server = get_server_config(&state, &server_id)?;
-    docker_delete(&server, &format!("/containers/{}?force={}", container_id, force)).await
+    docker(&server)
+        .await?
+        .remove_container(
+            &container_id,
+            Some(RemoveContainerOptions {
+                force,
+                ..Default::default()
+            }),
+        )
+        .await
+        .map_err(map_bollard_error)
 }
 
 pub async fn prune_stopped_containers(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::containers", "pruning containers; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
-    let raw = docker_post_json_response(&server, "/containers/prune", &serde_json::json!({})).await?;
-    let response: ContainerPruneResponse = serde_json::from_str(raw.trim())
-        .map_err(|e| AppError::internal("container.prune_parse_failed", "解析容器清理结果失败").with_source(e))?;
+    let response = docker(&server)
+        .await?
+        .prune_containers(None::<PruneContainersOptions>)
+        .await
+        .map_err(map_bollard_error)?;
 
     Ok(CleanupResult {
-        deleted_count: response.containers_deleted.len() as u32,
-        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0)),
+        deleted_count: response.containers_deleted.unwrap_or_default().len() as u32,
+        reclaimed: format_bytes_u64(response.space_reclaimed.unwrap_or(0) as u64),
     })
 }
 
@@ -85,8 +113,13 @@ pub async fn inspect_container(
 ) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::containers", "inspecting container; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, &format!("/containers/{}/json", container_id)).await?;
-    pretty_json_response(&resp)
+    let options = InspectContainerOptionsBuilder::default().size(false).build();
+    let response = docker(&server)
+        .await?
+        .inspect_container(&container_id, Some(options))
+        .await
+        .map_err(map_bollard_error)?;
+    pretty_json(&response)
 }
 
 pub async fn get_container_logs(
@@ -98,38 +131,26 @@ pub async fn get_container_logs(
 ) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::containers", "fetching container logs; server_id={} container_id={} tail={} timestamps={}", server_id, container_id, tail, timestamps);
     let server = get_server_config(&state, &server_id)?;
-    let ts = if timestamps { "&timestamps=1" } else { "" };
-    let path = format!(
-        "/containers/{}/logs?stdout=1&stderr=1&tail={}&follow=0{}",
-        container_id, tail, ts
-    );
-    let mut stream = docker_stream(&server, &path).await?;
-    let mut raw = Vec::new();
-    while let Some(chunk) = stream.next_chunk().await? {
-        raw.extend_from_slice(&chunk);
-    }
-    Ok(demux_log_stream(&raw))
-}
-
-fn demux_log_stream(data: &[u8]) -> String {
+    let docker = docker(&server).await?;
+    let options = LogsOptionsBuilder::default()
+        .stdout(true)
+        .stderr(true)
+        .follow(false)
+        .timestamps(timestamps)
+        .tail(&tail.to_string())
+        .build();
+    let mut stream = docker.logs(&container_id, Some(options));
     let mut out = String::new();
-    let mut i = 0usize;
-    while i + 8 <= data.len() {
-        let stream_type = data[i];
-        let size = u32::from_be_bytes([data[i + 4], data[i + 5], data[i + 6], data[i + 7]]) as usize;
-        i += 8;
-        if i + size > data.len() {
-            break;
+    while let Some(item) = stream.next().await {
+        let item = item.map_err(map_bollard_error)?;
+        match item {
+            LogOutput::StdOut { message }
+            | LogOutput::StdErr { message }
+            | LogOutput::StdIn { message }
+            | LogOutput::Console { message } => out.push_str(&String::from_utf8_lossy(&message)),
         }
-        if stream_type <= 2 {
-            out.push_str(&String::from_utf8_lossy(&data[i..i + size]));
-        }
-        i += size;
     }
-    if out.is_empty() && !data.is_empty() {
-        out = String::from_utf8_lossy(data).to_string();
-    }
-    out
+    Ok(out)
 }
 
 fn labels_lines_to_map(lines: &[String]) -> HashMap<String, String> {
@@ -151,180 +172,143 @@ fn labels_lines_to_map(lines: &[String]) -> HashMap<String, String> {
     m
 }
 
-fn build_run_container_body(params: &RunContainer) -> ContainerCreate {
+fn build_run_container_body(params: &RunContainer) -> ContainerCreateBody {
     let image = params.image.trim().to_string();
-
     let env: Vec<String> = params
         .env
         .iter()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-
     let labels = labels_lines_to_map(&params.labels);
-
     let ipv4 = params.ipv4_address.trim();
     let ipv6 = params.ipv6_address.trim();
-
     let net = params.network.trim();
     let is_user_defined_network = !net.is_empty() && !matches!(net, "bridge" | "host" | "none" | "default");
 
-    let mut exposed_ports: HashMap<String, serde_json::Value> = HashMap::new();
-    let mut port_bindings: HashMap<String, Vec<ContainerCreatePortBinding>> = HashMap::new();
-
+    let mut exposed_ports = Vec::<String>::new();
+    let mut port_bindings: HashMap<String, Option<Vec<bollard::models::PortBinding>>> = HashMap::new();
     for p in &params.ports {
         let proto = p.protocol.trim().to_lowercase();
         let key = format!("{}/{}", p.container_port, proto);
-        exposed_ports.insert(key.clone(), serde_json::json!({}));
-        let host_port_str = match p.host_port {
-            None | Some(0) => String::new(),
-            Some(hp) => hp.to_string(),
+        exposed_ports.push(key.clone());
+        let host_port = match p.host_port {
+            None | Some(0) => None,
+            Some(port) => Some(port.to_string()),
         };
         port_bindings.insert(
             key,
-            vec![ContainerCreatePortBinding {
-                host_ip: String::new(),
-                host_port: host_port_str,
-            }],
+            Some(vec![bollard::models::PortBinding {
+                host_ip: Some(String::new()),
+                host_port,
+            }]),
         );
     }
 
-    let mut binds: Vec<String> = Vec::new();
-    for v in &params.volumes {
-        let host = v.host_path.trim();
-        let ctr = v.container_path.trim();
-        let bind = if v.read_only {
-            format!("{host}:{ctr}:ro")
-        } else {
-            format!("{host}:{ctr}")
-        };
-        binds.push(bind);
-    }
+    let binds: Vec<String> = params
+        .volumes
+        .iter()
+        .map(|v| {
+            let host = v.host_path.trim();
+            let ctr = v.container_path.trim();
+            if v.read_only {
+                format!("{host}:{ctr}:ro")
+            } else {
+                format!("{host}:{ctr}")
+            }
+        })
+        .collect();
 
     let rp = params.restart_policy.trim().to_lowercase().replace('_', "-");
     let max_retry = if rp == "on-failure" {
-        params.restart_max_retry.unwrap_or(0)
+        params.restart_max_retry.unwrap_or(0) as i64
     } else {
         0
     };
-    let policy_name = if rp.is_empty() { "no".to_string() } else { rp };
+    let policy_name = if rp.is_empty() { "no" } else { rp.as_str() };
+    let policy_name = RestartPolicyNameEnum::from_str(policy_name).unwrap_or(RestartPolicyNameEnum::NO);
 
-    let cmd = if params.command.is_empty() {
-        None
-    } else {
-        Some(params.command.clone())
-    };
-    let entrypoint = if params.entrypoint.is_empty() {
-        None
-    } else {
-        Some(params.entrypoint.clone())
-    };
-
-    let mut nano_cpus: i64 = 0;
-    if params.cpu_quota_cores > 0.0 {
+    let nano_cpus = if params.cpu_quota_cores > 0.0 {
         let n = (params.cpu_quota_cores * 1_000_000_000f64).round() as i64;
-        if n > 0 {
-            nano_cpus = n;
-        }
-    }
-
-    let memory: i64 = if params.memory_mb > 0 {
-        (params.memory_mb as i64).saturating_mul(1024 * 1024)
+        (n > 0).then_some(n)
     } else {
-        0
+        None
     };
-
-    let cpu_shares: i64 = if params.cpu_shares > 0 {
-        params.cpu_shares as i64
-    } else {
-        0
-    };
+    let memory = (params.memory_mb > 0).then(|| (params.memory_mb as i64).saturating_mul(1024 * 1024));
+    let cpu_shares = (params.cpu_shares > 0).then_some(params.cpu_shares as i64);
 
     let networking_config = if is_user_defined_network {
         let ipam = if ipv4.is_empty() && ipv6.is_empty() {
             None
         } else {
             Some(EndpointIpamConfig {
-                ipv4_address: ipv4.to_string(),
-                ipv6_address: ipv6.to_string(),
+                ipv4_address: (!ipv4.is_empty()).then_some(ipv4.to_string()),
+                ipv6_address: (!ipv6.is_empty()).then_some(ipv6.to_string()),
+                ..Default::default()
             })
         };
         let mut endpoints = HashMap::new();
-        endpoints.insert(net.to_string(), EndpointSettings { ipam_config: ipam });
-        Some(ContainerNetworkingConfig {
-            endpoints_config: endpoints,
+        endpoints.insert(
+            net.to_string(),
+            EndpointSettings {
+                ipam_config: ipam,
+                ..Default::default()
+            },
+        );
+        Some(NetworkingConfig {
+            endpoints_config: Some(endpoints),
         })
     } else {
         None
     };
 
-    ContainerCreate {
-        image,
-        env,
-        cmd,
-        entrypoint,
-        tty: params.tty,
-        open_stdin: params.open_stdin,
-        attach_stdin: params.open_stdin,
-        attach_stdout: true,
-        attach_stderr: true,
-        labels,
-        exposed_ports,
-        host_config: ContainerCreateHostConfig {
-            port_bindings,
-            publish_all_ports: params.publish_all_ports,
-            binds,
-            network_mode: net.to_string(),
-            restart_policy: ContainerCreateRestartPolicy {
-                name: policy_name,
-                maximum_retry_count: max_retry,
-            },
-            auto_remove: params.auto_remove,
-            privileged: params.privileged,
+    ContainerCreateBody {
+        image: Some(image),
+        env: (!env.is_empty()).then_some(env),
+        cmd: (!params.command.is_empty()).then_some(params.command.clone()),
+        entrypoint: (!params.entrypoint.is_empty()).then_some(params.entrypoint.clone()),
+        tty: Some(params.tty),
+        open_stdin: Some(params.open_stdin),
+        attach_stdin: Some(params.open_stdin),
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        labels: (!labels.is_empty()).then_some(labels),
+        exposed_ports: (!exposed_ports.is_empty()).then_some(exposed_ports),
+        host_config: Some(HostConfig {
+            port_bindings: (!port_bindings.is_empty()).then_some(port_bindings),
+            publish_all_ports: Some(params.publish_all_ports),
+            binds: (!binds.is_empty()).then_some(binds),
+            network_mode: (!net.is_empty()).then_some(net.to_string()),
+            restart_policy: Some(RestartPolicy {
+                name: Some(policy_name),
+                maximum_retry_count: Some(max_retry),
+            }),
+            auto_remove: Some(params.auto_remove),
+            privileged: Some(params.privileged),
             cpu_shares,
             nano_cpus,
             memory,
-        },
+            ..Default::default()
+        }),
         networking_config,
+        ..Default::default()
     }
 }
 
 pub async fn run_container(server_id: String, params: RunContainer, state: State<'_, AppState>) -> AppResult<String> {
-    info!(target: "shipyardx_lib::services::containers", "creating container; server_id={} image={} name={}", server_id, params.image, params.name.as_deref().unwrap_or(""));
     let server = get_server_config(&state, &server_id)?;
+    let docker = docker(&server).await?;
+    let name = params.name.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let body = build_run_container_body(&params);
-    let path = match &params.name {
-        Some(n) => {
-            let t = n.trim();
-            if t.is_empty() {
-                "/containers/create".to_string()
-            } else {
-                format!("/containers/create?name={t}")
-            }
-        }
-        None => "/containers/create".to_string(),
-    };
-
-    let raw = docker_post_json_response(&server, &path, &body).await?;
-
-    let created: ContainerCreateResponse = serde_json::from_str(&raw).map_err(|e| {
-        AppError::internal("container.create_response_parse_failed", "解析创建容器响应失败").with_detail(format!(
-            "{} — {}",
-            e,
-            &raw.chars().take(120).collect::<String>()
-        ))
-    })?;
-
-    let id = created.id.trim();
-    if id.is_empty() {
-        return Err(AppError::internal(
-            "container.id_missing",
-            "创建容器成功但未返回容器 ID",
-        ));
-    }
-
-    docker_post(&server, &format!("/containers/{id}/start")).await?;
-
-    info!(target: "shipyardx_lib::services::containers", "container created and started; server_id={} container_id={}", server_id, id);
-    Ok(id.to_string())
+    let options = name.map(|name| CreateContainerOptionsBuilder::default().name(name).build());
+    let created = docker
+        .create_container(options, body)
+        .await
+        .map_err(map_bollard_error)?;
+    let id = created.id;
+    docker
+        .start_container(&id, None::<StartContainerOptions>)
+        .await
+        .map_err(map_bollard_error)?;
+    Ok(id)
 }

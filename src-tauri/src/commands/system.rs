@@ -1,8 +1,8 @@
 use tauri::{AppHandle, Manager, State};
 
-use crate::contracts::frontend::container::ContainerStats;
-use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
-use crate::contracts::frontend::info::DockerEngineInfo;
+use crate::dto::container::ContainerStats;
+use crate::dto::daemon::{DaemonSettings, DaemonUpdate};
+use crate::dto::info::DockerEngineInfo;
 use crate::error::{AppError, AppResult};
 use crate::services;
 use crate::state::AppState;
@@ -15,7 +15,7 @@ pub fn list_system_fonts() -> AppResult<Vec<String>> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     Ok(services::system::check_docker_access(server_id, state).await?)
 }
 

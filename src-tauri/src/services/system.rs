@@ -2,17 +2,18 @@ use log::{debug, info, warn};
 use tauri::State;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use bollard::models::{ContainerStatsResponse, SystemInfo};
+use bollard::query_parameters::StatsOptionsBuilder;
 use font_kit::source::SystemSource;
+use futures_util::StreamExt;
 
-use crate::contracts::docker_api::stats::DockerStats;
-use crate::contracts::docker_api::system::{DaemonConfig, SystemInfo};
-use crate::contracts::frontend::container::ContainerStats;
-use crate::contracts::frontend::daemon::{DaemonSettings, DaemonUpdate};
-use crate::contracts::frontend::info::DockerEngineInfo;
-use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::{docker_get, invalidate_api_version, resolve_api_version};
+use crate::docker::client::{docker, docker_streaming, invalidate_api_version, map_bollard_error};
 use crate::docker::stats::compute_stats;
 use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
+use crate::dto::container::ContainerStats;
+use crate::dto::daemon::{DaemonSettings, DaemonUpdate};
+use crate::dto::info::DockerEngineInfo;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
     DOCKER_CHECK_SOCKET_SH, DOCKER_CHECK_TCP_SH, DOCKER_READ_DAEMON_CONFIG_SH, SYSTEM_RESTART_WITH_PASSWORD_SH,
@@ -22,7 +23,7 @@ use crate::scripts::{
 use crate::ssh::exec::ssh_exec;
 use crate::ssh::pool;
 use crate::state::{AppState, get_server_config};
-use crate::utils::display::format_bytes_i64;
+use crate::utils::formatting::format_bytes_i64;
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
 const ERR_BAD_SU_PASSWORD: &str = "__ERR_BAD_SU_PASSWORD__";
@@ -32,6 +33,25 @@ const ERR_RC_SERVICE: &str = "__ERR_RC_SERVICE__";
 const ERR_SERVICE_OP: &str = "__ERR_SERVICE_OP__";
 const ERR_SUDO_NONINTERACTIVE: &str = "__ERR_SUDO_NONINTERACTIVE__";
 const ERR_NO_SUDO: &str = "__ERR_NO_SUDO__";
+
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+struct DaemonConfig {
+    #[serde(rename = "registry-mirrors", skip_serializing_if = "Option::is_none")]
+    registry_mirrors: Option<Vec<String>>,
+    #[serde(rename = "log-driver", skip_serializing_if = "Option::is_none")]
+    log_driver: Option<String>,
+    #[serde(rename = "log-opts", skip_serializing_if = "Option::is_none")]
+    log_opts: Option<std::collections::HashMap<String, String>>,
+    #[serde(rename = "live-restore", skip_serializing_if = "Option::is_none")]
+    live_restore: Option<bool>,
+    #[serde(rename = "exec-opts", skip_serializing_if = "Option::is_none")]
+    exec_opts: Option<Vec<String>>,
+    #[serde(rename = "hosts", skip_serializing_if = "Option::is_none")]
+    hosts: Option<Vec<String>>,
+    #[serde(flatten)]
+    extra: std::collections::BTreeMap<String, serde_json::Value>,
+}
 
 pub fn list_system_fonts() -> AppResult<Vec<String>> {
     debug!(target: "shipyardx_lib::services::system", "listing system fonts");
@@ -125,12 +145,11 @@ async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<Str
     Ok(())
 }
 
-pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
-    debug!(target: "shipyardx_lib::services::system", "fetching docker info; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(&server, "/info").await?;
-    let v: SystemInfo = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("system.info_parse_failed", "解析 Docker 信息失败").with_source(e))?;
+async fn fetch_docker_engine_info(server: &ServerConfig) -> AppResult<DockerEngineInfo> {
+    let docker = docker(server).await?;
+    let client_version = docker.client_version();
+    let api_version = format!("{}.{}", client_version.major_version, client_version.minor_version);
+    let v: SystemInfo = docker.info().await.map_err(map_bollard_error)?;
     let containers = v.containers.unwrap_or(0);
     let containers_running = v.containers_running.unwrap_or(0);
     let containers_paused = v.containers_paused.unwrap_or(0);
@@ -146,7 +165,7 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
             ((value.max(0) as f64 / total) * 100.0).clamp(0.0, 100.0)
         }
     };
-    let info = DockerEngineInfo {
+    Ok(DockerEngineInfo {
         containers: containers.to_string(),
         containers_running: containers_running.to_string(),
         containers_paused: containers_paused.to_string(),
@@ -156,30 +175,36 @@ pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> A
         containers_paused_percent: pct(containers_paused),
         containers_stopped_percent: pct(containers_stopped),
         server_version: v.server_version.unwrap_or_default(),
-        api_version: resolve_api_version(&server).await.unwrap_or_default(),
+        api_version,
         name: v.name.unwrap_or_default(),
         ncpu: ncpu.to_string(),
         mem_total: format_bytes_i64(v.mem_total.unwrap_or(0)),
-        os: v.os.unwrap_or_default(),
+        os: v.operating_system.unwrap_or_default(),
         os_version: v.os_version.unwrap_or_default(),
         kernel_version: v.kernel_version.unwrap_or_default(),
         architecture: v.architecture.unwrap_or_default(),
-        storage_driver: v.storage_driver.unwrap_or_default(),
+        storage_driver: v.driver.unwrap_or_default(),
         warnings: warnings.to_string(),
-    };
+    })
+}
+
+pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
+    debug!(target: "shipyardx_lib::services::system", "fetching docker info; server_id={}", server_id);
+    let server = get_server_config(&state, &server_id)?;
+    let info = fetch_docker_engine_info(&server).await?;
     info!(target: "shipyardx_lib::services::system", "fetched docker info; server_id={} version={} containers={} images={}", server_id, info.server_version, info.containers, info.images);
     Ok(info)
 }
 
-pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     info!(target: "shipyardx_lib::services::system", "checking docker access; server_id={}", server_id);
     let server = get_server_config(&state, &server_id)?;
     invalidate_api_version(&server);
     invalidate_docker_endpoint(&server).await;
-    match resolve_api_version(&server).await {
-        Ok(api_version) => {
-            info!(target: "shipyardx_lib::services::system", "docker access check succeeded; server_id={} api_version={}", server_id, api_version);
-            Ok(())
+    match fetch_docker_engine_info(&server).await {
+        Ok(info) => {
+            info!(target: "shipyardx_lib::services::system", "docker access check succeeded; server_id={} api_version={}", server_id, info.api_version);
+            Ok(info)
         }
         Err(e) => {
             let endpoint = resolve_docker_endpoint(&server).await.ok();
@@ -239,13 +264,16 @@ pub async fn get_container_stats(
 ) -> AppResult<ContainerStats> {
     debug!(target: "shipyardx_lib::services::system", "fetching container stats; server_id={} container_id={}", server_id, container_id);
     let server = get_server_config(&state, &server_id)?;
-    let resp = docker_get(
-        &server,
-        &format!("/containers/{}/stats?stream=false&one-shot=true", container_id),
-    )
-    .await?;
-    let raw: DockerStats = serde_json::from_str(&resp)
-        .map_err(|e| AppError::internal("container.stats_parse_failed", "解析容器统计信息失败").with_source(e))?;
+    let docker = docker_streaming(&server).await?;
+    let mut stream = docker.stats(
+        &container_id,
+        Some(StatsOptionsBuilder::default().stream(false).one_shot(true).build()),
+    );
+    let raw: ContainerStatsResponse = stream
+        .next()
+        .await
+        .ok_or_else(|| AppError::unavailable("container.stats_empty", "容器统计信息为空"))?
+        .map_err(map_bollard_error)?;
     let stats = compute_stats(raw);
     debug!(target: "shipyardx_lib::services::system", "fetched container stats; server_id={} container_id={} cpu_percent={:.2} mem_usage={}", server_id, container_id, stats.cpu_percent, stats.mem_usage);
     Ok(stats)
@@ -315,6 +343,7 @@ pub async fn update_docker_daemon_settings(
         params.sudo_password.as_ref().is_some_and(|s| !s.is_empty())
     );
     let server = get_server_config(&state, &server_id)?;
+    invalidate_api_version(&server);
     invalidate_docker_endpoint(&server).await;
     let current_raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,

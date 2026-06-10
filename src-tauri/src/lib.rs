@@ -1,7 +1,7 @@
 mod commands;
 mod config;
-mod contracts;
 mod docker;
+mod dto;
 mod error;
 mod scripts;
 mod services;
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
-use contracts::frontend::events::{
+use dto::events::{
     DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
     DockerStreamStatus, EventStreamStatus, ImageExportProgress, ImageImportProgress, InstallStepEvent,
 };

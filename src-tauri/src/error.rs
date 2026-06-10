@@ -1,4 +1,4 @@
-pub use crate::contracts::frontend::error::{AppError, AppErrorKind};
+pub use crate::dto::error::{AppError, AppErrorKind};
 
 pub type AppResult<T> = Result<T, AppError>;
 

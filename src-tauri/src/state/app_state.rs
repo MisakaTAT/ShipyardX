@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, atomic::AtomicU64};
 use std::time::Instant;
 
-use crate::contracts::frontend::events::EventStreamStatus;
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::events::EventStreamStatus;
+use crate::dto::server::ServerConfig;
 use tokio::sync::{mpsc as tokio_mpsc, watch};
 
 pub(crate) enum TerminalMsg {

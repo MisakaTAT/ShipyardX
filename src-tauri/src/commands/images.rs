@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::image::{Image, ImageLayer};
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::image::{Image, ImageLayer};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;

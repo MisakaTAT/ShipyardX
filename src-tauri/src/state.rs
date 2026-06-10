@@ -9,7 +9,7 @@ pub(crate) use app_state::{
 
 use tauri::State;
 
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
 pub(crate) fn lock_mutex<'a, T>(

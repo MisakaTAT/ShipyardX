@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::contracts::frontend::appstore::{AppDetail, AppListItem, InstallApp};
+use crate::dto::appstore::{AppDetail, AppListItem, InstallApp};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::{AppState, get_server_config};

@@ -6,7 +6,7 @@ use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 use russh::{Disconnect, client};
 use tokio::runtime::{Builder, Runtime};
 
-use crate::contracts::frontend::server::ServerConfig;
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
 use super::limits::{CONNECT_TIMEOUT, SOCKET_IO_TIMEOUT};

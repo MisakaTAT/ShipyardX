@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::contracts::frontend::error::AppError;
+use crate::dto::error::AppError;
 
 #[derive(Debug, Deserialize, Type)]
 pub struct ContainerExecTerminalParams {

@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::contracts::frontend::port_forward::{LocalAddress, PortForward, PortForwardCreate};
+use crate::dto::port_forward::{LocalAddress, PortForward, PortForwardCreate};
 use crate::error::AppResult;
 use crate::services::port_forward;
 use crate::state::AppState;

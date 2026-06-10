@@ -1,7 +1,7 @@
 use tauri::State;
 
-use crate::contracts::frontend::cleanup::CleanupResult;
-use crate::contracts::frontend::network::{Network, NetworkCreate};
+use crate::dto::cleanup::CleanupResult;
+use crate::dto::network::{Network, NetworkCreate};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;

@@ -1,12 +1,12 @@
 use tauri::State;
 
+use bollard::models::SystemVersion;
 use log::{info, warn};
 
 use crate::config::store::save_servers;
-use crate::contracts::docker_api::common::DockerVersion;
-use crate::contracts::frontend::server::ServerConfig;
-use crate::docker::client::docker_get;
+use crate::docker::client::{docker, invalidate_api_version_server_id, map_bollard_error};
 use crate::docker::transport::invalidate_pooled_http_server_id;
+use crate::dto::server::ServerConfig;
 use crate::error::AppResult;
 use crate::ssh::{client::block_on, pool};
 use crate::state::{AppState, get_server_config, lock_mutex};
@@ -50,6 +50,7 @@ pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<
         servers.clone()
     };
     info!(target: "shipyardx_lib::services::servers", "server updated; server_id={}", server_id);
+    invalidate_api_version_server_id(&server_id);
     block_on(invalidate_pooled_http_server_id(&server_id))?;
     block_on(pool::invalidate_server_id(&server_id))?;
     Ok(updated)
@@ -68,6 +69,7 @@ pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<Server
         servers.clone()
     };
     info!(target: "shipyardx_lib::services::servers", "server deleted; server_id={}", id);
+    invalidate_api_version_server_id(&id);
     block_on(invalidate_pooled_http_server_id(&id))?;
     block_on(pool::invalidate_server_id(&id))?;
     Ok(updated)
@@ -84,12 +86,11 @@ pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
 
 async fn test_connection_with_config(server: ServerConfig) -> AppResult<String> {
     info!(target: "shipyardx_lib::services::servers", "testing server connection; server_id={} host={} port={}", server.id, server.host, server.port);
-    let version = docker_get(&server, "/version").await?;
-    let version: DockerVersion = serde_json::from_str(version.trim())?;
-    let display = if version.version.trim().is_empty() {
-        version.api_version
+    let version: SystemVersion = docker(&server).await?.version().await.map_err(map_bollard_error)?;
+    let display = if version.version.as_deref().unwrap_or_default().trim().is_empty() {
+        version.api_version.unwrap_or_default()
     } else {
-        version.version
+        version.version.unwrap_or_default()
     };
     info!(target: "shipyardx_lib::services::servers", "server connection succeeded; server_id={}", server.id);
     Ok(format!("连接成功！Docker {}", display.trim()))
