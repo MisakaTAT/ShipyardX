@@ -16,7 +16,7 @@ export default function ServerOverview({ serverId }: Props) {
     dataUpdatedAt,
   } = useQuery({
     queryKey: qk.dockerInfo(serverId),
-    queryFn: () => commands.checkDockerAccess(serverId),
+    queryFn: () => commands.getDockerInfo(serverId),
     retry: false,
   })
 

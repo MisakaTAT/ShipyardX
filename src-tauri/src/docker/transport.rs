@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 use bollard::BollardRequest;
 use bollard::errors::Error as BollardError;
@@ -11,11 +12,13 @@ use http_body_util::{Full, StreamBody};
 use hyper::Response;
 use hyper::body::{Frame, Incoming};
 use hyper::client::conn::http1;
-use hyper::header::{HOST, HeaderValue};
+use hyper::header::{CONTENT_TYPE, HOST, HeaderValue};
 use hyper::http::uri::PathAndQuery;
+use hyper::{Method, StatusCode};
 use hyper_util::rt::TokioIo;
 use log::{debug, warn};
-use russh::ChannelStream;
+use russh::{ChannelStream, client};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
@@ -38,6 +41,12 @@ pub(crate) enum DockerEndpoint {
 struct DaemonConfig {
     #[serde(rename = "hosts", skip_serializing_if = "Option::is_none")]
     hosts: Option<Vec<String>>,
+}
+
+#[derive(Default, serde::Deserialize)]
+#[serde(default)]
+struct DockerErrorBody {
+    message: Option<String>,
 }
 
 type BollardBody = http_body_util::Either<
@@ -246,6 +255,31 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
     Ok(endpoint)
 }
 
+pub(crate) struct DockerHijackConnection {
+    io: ChannelStream<client::Msg>,
+    pending: Vec<u8>,
+}
+
+impl DockerHijackConnection {
+    pub async fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if !self.pending.is_empty() {
+            let n = self.pending.len().min(buf.len());
+            buf[..n].copy_from_slice(&self.pending[..n]);
+            self.pending.drain(..n);
+            return Ok(n);
+        }
+        self.io.read(buf).await
+    }
+
+    pub async fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.io.write_all(buf).await
+    }
+
+    pub async fn shutdown(&mut self) -> std::io::Result<()> {
+        self.io.shutdown().await
+    }
+}
+
 async fn open_direct_channel(config: &ServerConfig) -> AppResult<ChannelStream<russh::client::Msg>> {
     let endpoint = resolve_docker_endpoint(config).await?;
     match endpoint {
@@ -311,6 +345,41 @@ fn as_bollard_error(error: AppError) -> BollardError {
     std::io::Error::other(error.detail.unwrap_or(error.message)).into()
 }
 
+fn docker_api_error(status: StatusCode, body: &[u8]) -> AppError {
+    let detail_text = String::from_utf8_lossy(body).trim().to_string();
+    let docker_message = serde_json::from_slice::<DockerErrorBody>(body)
+        .ok()
+        .and_then(|error| error.message)
+        .filter(|message| !message.trim().is_empty());
+
+    AppError::new(
+        format!("docker.api_http_{}", status.as_u16()),
+        match status.as_u16() {
+            400 => crate::error::AppErrorKind::Validation,
+            401 => crate::error::AppErrorKind::Auth,
+            403 => crate::error::AppErrorKind::Permission,
+            404 => crate::error::AppErrorKind::NotFound,
+            409 => crate::error::AppErrorKind::Conflict,
+            408 | 504 => crate::error::AppErrorKind::Timeout,
+            500..=599 => crate::error::AppErrorKind::Unavailable,
+            _ => crate::error::AppErrorKind::Internal,
+        },
+        if status.is_client_error() {
+            "Docker API 请求无效"
+        } else if status.is_server_error() {
+            "Docker 服务暂时不可用"
+        } else {
+            "Docker API 请求失败"
+        },
+    )
+    .with_detail(
+        docker_message
+            .or_else(|| (!detail_text.is_empty()).then_some(detail_text))
+            .unwrap_or_else(|| format!("HTTP {}", status.as_u16())),
+    )
+    .retryable(status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS)
+}
+
 fn normalize_request(mut request: BollardRequest) -> Result<BollardRequest, BollardError> {
     let path_and_query = request
         .uri()
@@ -336,6 +405,57 @@ pub(crate) async fn send_dedicated_request(
         let _ = connection.await;
     });
     sender.send_request(request).await.map_err(Into::into)
+}
+
+pub(crate) async fn open_hijack_json<T: serde::Serialize>(
+    config: &ServerConfig,
+    method: Method,
+    path: &str,
+    body: &T,
+) -> AppResult<DockerHijackConnection> {
+    let body = serde_json::to_vec(body).map_err(|e| {
+        AppError::internal("docker.request_encode_failed", "序列化 Docker 请求体失败").with_source(e)
+    })?;
+    debug!(
+        target: "shipyardx_lib::docker::transport",
+        "opening docker hijack connection; server_id={} method={} path={} body_bytes={}",
+        config.id,
+        method,
+        path,
+        body.len()
+    );
+
+    let mut io = open_direct_channel(config).await?;
+    let request_head = format!(
+        "{} {} HTTP/1.1\r\nHost: localhost\r\n{}: application/json\r\nConnection: Upgrade\r\nUpgrade: tcp\r\nContent-Length: {}\r\n\r\n",
+        method,
+        path,
+        CONTENT_TYPE.as_str(),
+        body.len()
+    );
+    io.write_all(request_head.as_bytes()).await.map_err(|e| {
+        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+            .with_detail(e.to_string())
+            .retryable(true)
+    })?;
+    io.write_all(&body).await.map_err(|e| {
+        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+            .with_detail(e.to_string())
+            .retryable(true)
+    })?;
+    io.flush().await.map_err(|e| {
+        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+            .with_detail(e.to_string())
+            .retryable(true)
+    })?;
+
+    let (status, headers, pending) = read_hijack_response_head(&mut io).await?;
+    if !status.is_success() && status != StatusCode::SWITCHING_PROTOCOLS {
+        let body = read_hijack_error_body(&mut io, &headers, pending).await?;
+        return Err(docker_api_error(status, &body));
+    }
+
+    Ok(DockerHijackConnection { io, pending })
 }
 
 pub(crate) async fn send_pooled_request(
@@ -425,4 +545,77 @@ pub(crate) async fn send_pooled_request(
             Err(error.into())
         }
     }
+}
+
+async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppResult<(StatusCode, String, Vec<u8>)> {
+    let mut received = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let header_end = loop {
+        if let Some(pos) = find_header_end(&received) {
+            break pos;
+        }
+        let n = tokio::time::timeout(Duration::from_secs(15), io.read(&mut chunk))
+            .await
+            .map_err(|_| AppError::timeout("docker.hijack_timeout", "等待 Docker hijack 响应超时").retryable(true))?
+            .map_err(|e| {
+                AppError::unavailable("docker.response_read_failed", "读取 Docker HTTP 响应失败")
+                    .with_detail(e.to_string())
+                    .retryable(true)
+            })?;
+        if n == 0 {
+            return Err(AppError::unavailable("docker.hijack_closed", "Docker hijack 连接已关闭").retryable(true));
+        }
+        received.extend_from_slice(&chunk[..n]);
+    };
+
+    let pending = received.split_off(header_end + 4);
+    let headers = String::from_utf8_lossy(&received[..header_end]).to_string();
+    let status = headers
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .and_then(|code| StatusCode::from_u16(code).ok())
+        .ok_or_else(|| AppError::internal("docker.hijack_status_invalid", "解析 Docker hijack 状态失败"))?;
+
+    Ok((status, headers, pending))
+}
+
+async fn read_hijack_error_body(
+    io: &mut ChannelStream<client::Msg>,
+    headers: &str,
+    mut body: Vec<u8>,
+) -> AppResult<Vec<u8>> {
+    let Some(content_length) = header_value(headers, "content-length").and_then(|value| value.parse::<usize>().ok())
+    else {
+        return Ok(body);
+    };
+    let mut chunk = [0u8; 4096];
+    while body.len() < content_length {
+        let n = tokio::time::timeout(Duration::from_secs(2), io.read(&mut chunk))
+            .await
+            .map_err(|_| AppError::timeout("docker.hijack_error_timeout", "读取 Docker 错误响应超时").retryable(true))?
+            .map_err(|e| {
+                AppError::unavailable("docker.response_read_failed", "读取 Docker HTTP 响应失败")
+                    .with_detail(e.to_string())
+                    .retryable(true)
+            })?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&chunk[..n]);
+    }
+    body.truncate(content_length);
+    Ok(body)
+}
+
+fn find_header_end(buf: &[u8]) -> Option<usize> {
+    buf.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        key.eq_ignore_ascii_case(name).then_some(value.trim())
+    })
 }

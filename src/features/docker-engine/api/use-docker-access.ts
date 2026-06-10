@@ -9,7 +9,7 @@ export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | '
 
 export function useDockerAccess(serverId: string) {
   const query = useQuery({
-    queryKey: qk.dockerInfo(serverId),
+    queryKey: qk.dockerAccess(serverId),
     queryFn: () => commands.checkDockerAccess(serverId),
     retry: false,
   })
@@ -36,7 +36,7 @@ export function useDockerAccess(serverId: string) {
     [query]
   )
 
-  const status: DockerStatus = query.isFetching
+  const status: DockerStatus = query.isLoading
     ? 'checking'
     : query.error
       ? getErrorCode(query.error) === 'docker.permission_denied'

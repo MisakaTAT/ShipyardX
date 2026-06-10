@@ -1,8 +1,7 @@
 use std::fs;
-use std::pin::Pin;
 use std::sync::OnceLock;
 
-use bollard::exec::{CreateExecOptions, ResizeExecOptions, StartExecOptions, StartExecResults};
+use bollard::exec::{CreateExecOptions, ResizeExecOptions, StartExecOptions};
 use futures_util::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use russh::ChannelMsg;
@@ -13,9 +12,9 @@ use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio_util::io::StreamReader;
 
-use crate::docker::client::{docker, docker_streaming, map_bollard_error};
+use crate::docker::client::{docker, map_bollard_error};
+use crate::docker::transport::open_hijack_json;
 use crate::dto::server::ServerConfig;
 use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
@@ -185,7 +184,7 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     let fail_session_id = session_id.clone();
     let fail_handle = ah.clone();
     let result = block_on(async move {
-        let docker = docker_streaming(&config).await?;
+        let docker = docker(&config).await?;
         let shell = if shell.trim().is_empty() {
             "/bin/sh".to_string()
         } else {
@@ -211,28 +210,20 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
             tty: true,
             output_capacity: None,
         };
-        let attached = docker
-            .start_exec(&created.id, Some(start))
-            .await
-            .map_err(map_bollard_error)?;
-        let StartExecResults::Attached { output, input } = attached else {
-            return Err(AppError::internal(
-                "terminal.exec_detached_unexpected",
-                "容器终端意外进入 detached 模式",
-            ));
-        };
-        let reader = StreamReader::new(output.map(|item| {
-            item.map(|log| log.into_bytes())
-                .map_err(|e| std::io::Error::other(map_bollard_error(e).message))
-        }));
+        let mut hijack = open_hijack_json(
+            &config,
+            hyper::Method::POST,
+            &format!("/exec/{}/start", created.id),
+            &start,
+        )
+        .await?;
         run_docker_exec_io_loop(
             session_id,
             rx,
             ah,
             &config,
             &created.id,
-            Box::pin(reader),
-            input,
+            &mut hijack,
             cols,
             rows,
         )
@@ -276,8 +267,7 @@ async fn run_docker_exec_io_loop(
     ah: AppHandle,
     config: &ServerConfig,
     exec_id: &str,
-    mut reader: Pin<Box<dyn tokio::io::AsyncRead + Send>>,
-    mut writer: Pin<Box<dyn tokio::io::AsyncWrite + Send>>,
+    hijack: &mut crate::docker::transport::DockerHijackConnection,
     initial_cols: u32,
     initial_rows: u32,
 ) {
@@ -302,9 +292,24 @@ async fn run_docker_exec_io_loop(
         }
 
         if !input_buf.is_empty() {
-            if writer.write_all(&input_buf).await.is_err() {
-                let _ = writer.shutdown().await;
-                send_control(&ah, &session_id, WsServerMsg::Closed);
+            if let Err(error) = hijack.write_all(&input_buf).await {
+                let _ = hijack.shutdown().await;
+                warn!(
+                    target: "shipyardx_lib::services::terminal",
+                    "container exec writer failed; session_id={} exec_id={} error={}",
+                    session_id,
+                    exec_id,
+                    error
+                );
+                send_control(
+                    &ah,
+                    &session_id,
+                    WsServerMsg::Error {
+                        error: AppError::unavailable("terminal.exec_write_failed", "写入容器终端失败")
+                            .with_detail(error.to_string())
+                            .retryable(true),
+                    },
+                );
                 return;
             }
             input_buf.clear();
@@ -320,17 +325,37 @@ async fn run_docker_exec_io_loop(
                         }
                     }
                     Some(TerminalMsg::Close) | None => {
-                        let _ = writer.shutdown().await;
+                        let _ = hijack.shutdown().await;
                         send_control(&ah, &session_id, WsServerMsg::Closed);
                         return;
                     }
                 }
             }
-            read = tokio::io::AsyncReadExt::read(&mut reader, &mut read_buf) => {
+            read = hijack.read(&mut read_buf) => {
                 match read {
-                    Ok(0) | Err(_) => {
-                        let _ = writer.shutdown().await;
+                    Ok(0) => {
+                        let _ = hijack.shutdown().await;
                         send_control(&ah, &session_id, WsServerMsg::Closed);
+                        return;
+                    }
+                    Err(error) => {
+                        let _ = hijack.shutdown().await;
+                        warn!(
+                            target: "shipyardx_lib::services::terminal",
+                            "container exec reader failed; session_id={} exec_id={} error={}",
+                            session_id,
+                            exec_id,
+                            error
+                        );
+                        send_control(
+                            &ah,
+                            &session_id,
+                            WsServerMsg::Error {
+                                error: AppError::unavailable("terminal.exec_read_failed", "读取容器终端失败")
+                                    .with_detail(error.to_string())
+                                    .retryable(true),
+                            },
+                        );
                         return;
                     }
                     Ok(n) => send_pty_bytes(&ah, &session_id, &read_buf[..n]),

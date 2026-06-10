@@ -215,7 +215,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const connectInFlightRef = useRef(false)
   const mountAliveRef = useRef(true)
   const serverEpochRef = useRef(0)
-  const shellReadyPendingRef = useRef(false)
   const [phase, setPhase] = useState<ConnectionPhase>('disconnected')
   const [errorText, setErrorText] = useState('')
   const [wasEverConnected, setWasEverConnected] = useState(false)
@@ -327,7 +326,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   }, [phase])
 
   const endSession = useCallback((opts: EndSessionOptions) => {
-    shellReadyPendingRef.current = false
     const transport = transportRef.current
     transportRef.current = null
 
@@ -353,7 +351,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     mountAliveRef.current = true
     return () => {
       mountAliveRef.current = false
-      shellReadyPendingRef.current = false
       if (overlayFadeTimerRef.current !== null) {
         window.clearTimeout(overlayFadeTimerRef.current)
         overlayFadeTimerRef.current = null
@@ -407,18 +404,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
       const transport = await openTerminalTransport(session.session_id, session.ws_port, {
         onPty: (bytes) => {
-          if (shellReadyPendingRef.current) {
-            shellReadyPendingRef.current = false
-            if (mountAliveRef.current) {
-              setPhase('connected')
-              setWasEverConnected(true)
-            }
-            requestAnimationFrame(() => termFocus())
-          }
           termWrite(bytes)
         },
         onControl: (msg) => {
-          shellReadyPendingRef.current = false
           if (msg.type === 'error') {
             endSession({ updateUi: true, reason: 'error', errorMessage: msg.error.message })
           } else {
@@ -426,8 +414,12 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
           }
         },
         onClose: () => {
-          // 服务端或网络层断开；若我们已自行清理，transportRef 会先被置空并直接忽略
-          if (transportRef.current) endSession({ updateUi: true, reason: 'remote' })
+          if (
+            backendSessionIdRef.current === session.session_id ||
+            openedBackendSessionId === session.session_id
+          ) {
+            endSession({ updateUi: true, reason: 'remote' })
+          }
         },
       })
       if (isStale()) {
@@ -439,14 +431,17 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       }
 
       transportRef.current = transport
+      if (mountAliveRef.current) {
+        setPhase('connected')
+        setWasEverConnected(true)
+      }
       transport.send(ctrlFrame({ type: 'resize', cols, rows }))
+      requestAnimationFrame(() => termFocus())
 
       if (!mountAliveRef.current || isStale()) {
         endSession({ updateUi: false })
         return
       }
-
-      shellReadyPendingRef.current = true
     } catch (e) {
       const orphan = transportRef.current
       backendSessionIdRef.current = null

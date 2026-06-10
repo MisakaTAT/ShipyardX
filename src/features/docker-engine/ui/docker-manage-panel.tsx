@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
@@ -14,6 +15,7 @@ import { Loader2, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { qk } from '@/shared/api/query-keys'
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
@@ -25,6 +27,7 @@ interface Props {
 }
 
 export default function DockerManagePanel({ serverId }: Props) {
+  const qc = useQueryClient()
   const daemonFormId = useId()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -65,6 +68,7 @@ export default function DockerManagePanel({ serverId }: Props) {
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setPendingAction(null)
+      await qc.invalidateQueries({ queryKey: qk.dockerDaemon(serverId) })
       await load()
     } catch (e) {
       if (!password && isPermissionRelatedError(e)) {
@@ -112,6 +116,8 @@ export default function DockerManagePanel({ serverId }: Props) {
       toast.success('重启完成')
       setAuthOpen(false)
       setPendingAction(null)
+      await qc.invalidateQueries({ queryKey: qk.dockerAccess(serverId) })
+      await qc.invalidateQueries({ queryKey: qk.dockerInfo(serverId) })
       await load()
     } catch (e) {
       if (!password && isPermissionRelatedError(e)) {
