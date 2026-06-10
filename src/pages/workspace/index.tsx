@@ -39,14 +39,14 @@ export type WorkspaceTab =
   | 'terminal'
 
 const NAV_ITEMS: WorkspaceTabItem<WorkspaceTab>[] = [
-  { key: 'overview', icon: <ServerIcon className="size-[18px]" />, label: '概览' },
-  { key: 'containers', icon: <Box className="size-[18px]" />, label: '容器' },
-  { key: 'images', icon: <Layers className="size-[18px]" />, label: '镜像' },
-  { key: 'networks', icon: <Share2 className="size-[18px]" />, label: '网络' },
-  { key: 'volumes', icon: <Database className="size-[18px]" />, label: '存储卷' },
-  { key: 'events', icon: <Activity className="size-[18px]" />, label: '事件' },
-  { key: 'docker', icon: <Settings2 className="size-[18px]" />, label: '配置' },
-  { key: 'terminal', icon: <Terminal className="size-[18px]" />, label: '终端' },
+  { key: 'overview', icon: <ServerIcon className="size-4.5" />, label: '概览' },
+  { key: 'containers', icon: <Box className="size-4.5" />, label: '容器' },
+  { key: 'images', icon: <Layers className="size-4.5" />, label: '镜像' },
+  { key: 'networks', icon: <Share2 className="size-4.5" />, label: '网络' },
+  { key: 'volumes', icon: <Database className="size-4.5" />, label: '存储卷' },
+  { key: 'events', icon: <Activity className="size-4.5" />, label: '事件' },
+  { key: 'docker', icon: <Settings2 className="size-4.5" />, label: '配置' },
+  { key: 'terminal', icon: <Terminal className="size-4.5" />, label: '终端' },
 ]
 
 const TRANSPARENT_TABS = new Set<WorkspaceTab>(['overview', 'docker'])
@@ -112,7 +112,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
 
         <div
           className={cn(
-            'flex min-h-[360px] flex-1 flex-col overflow-hidden',
+            'flex min-h-90 flex-1 flex-col overflow-hidden',
             TRANSPARENT_TABS.has(activeTab) ? '' : 'rounded-xl border border-border bg-card'
           )}
           style={TRANSPARENT_TABS.has(activeTab) ? { background: 'transparent' } : undefined}
