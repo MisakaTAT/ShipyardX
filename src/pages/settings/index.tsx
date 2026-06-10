@@ -69,7 +69,7 @@ export default function SettingsPage() {
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-1 flex-col overflow-y-scroll bg-background [scrollbar-gutter:stable]">
+      <section className="flex min-h-0 flex-1 scrollbar-gutter-stable flex-col overflow-y-scroll bg-background">
         {activeSection === 'terminal' ? (
           <TerminalSettingsPanel
             frontend={settings.terminal.frontend}
