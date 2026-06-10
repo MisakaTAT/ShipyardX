@@ -204,9 +204,11 @@ pub async fn export_image(
 
     let server = get_server_config(&state, &server_id)?;
     let total_bytes = resolve_image_size_hint(&server, &image_id).await?;
+    let mut created_export_file = false;
     let result = async {
         let docker = docker_streaming(&server).await?;
         let mut file = create_export_file(&export_path).await?;
+        created_export_file = true;
         let mut stream = docker.export_image(&image_id);
 
         let mut transferred_bytes = 0_u64;
@@ -239,7 +241,9 @@ pub async fn export_image(
     .await;
 
     if let Err(error) = result {
-        let _ = tokio::fs::remove_file(&export_path).await;
+        if created_export_file {
+            let _ = tokio::fs::remove_file(&export_path).await;
+        }
         return Err(error);
     }
 

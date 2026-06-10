@@ -94,21 +94,22 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
     if (!image) return
     const exportId = crypto.randomUUID()
     activeExportIdRef.current = exportId
-    setProgress({
-      exportId,
-      transferred: '0 B',
-      total: image.size,
-      percent: null,
-    })
-    await exportImage.mutateAsync({
-      exportId,
-      imageId: image.id,
-      directory: values.directory.trim(),
-      fileName: values.fileName.trim(),
-    })
-    toast.success('镜像已导出到本地')
-    activeExportIdRef.current = null
-    onOpenChange(false)
+    setProgress(null)
+    try {
+      await exportImage.mutateAsync({
+        exportId,
+        imageId: image.id,
+        directory: values.directory.trim(),
+        fileName: values.fileName.trim(),
+      })
+      toast.success('镜像已导出到本地')
+      activeExportIdRef.current = null
+      onOpenChange(false)
+    } catch (error) {
+      activeExportIdRef.current = null
+      setProgress(null)
+      throw error
+    }
   })
 
   const progressPercent = progress?.percent ?? null
@@ -205,7 +206,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
           />
         </FieldGroup>
 
-        {exporting ? (
+        {exporting && progress ? (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="font-medium text-foreground">导出进度</span>
@@ -220,9 +221,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             <div className="h-1.5 overflow-hidden rounded-full bg-border/70">
               <div
                 className={
-                  progressPercent === null
-                    ? 'h-full w-0 rounded-full bg-primary'
-                    : 'h-full rounded-full bg-primary'
+                  progressPercent === null ? 'h-full w-0 rounded-full bg-primary' : 'h-full rounded-full bg-primary'
                 }
                 style={progressPercent === null ? undefined : { width: `${progressPercent}%` }}
               />
