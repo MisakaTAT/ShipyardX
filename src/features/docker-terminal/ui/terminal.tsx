@@ -427,10 +427,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
           }
         },
         onClose: () => {
-          if (
-            backendSessionIdRef.current === session.session_id ||
-            openedBackendSessionId === session.session_id
-          ) {
+          if (backendSessionIdRef.current === session.session_id || openedBackendSessionId === session.session_id) {
             endSession({ updateUi: true, reason: 'remote' })
           }
         },

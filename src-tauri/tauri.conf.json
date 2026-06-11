@@ -45,7 +45,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlFQTg2RTRCMkEzQzg1QTEKUldTaGhUd3FTMjZvbmdwMDZ1WkljZyt6VDY4U3JDazFLdjFZSDZrUHpNK3NJUXNwSlZqaXVSWHEK",
       "endpoints": [
-        "https://github.com/MisakaTAT/ShipyardX/releases/download/latest.json"
+        "https://github.com/MisakaTAT/ShipyardX/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
