@@ -9,9 +9,9 @@ import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { ConfirmDialog, DataTable, PanelHeader, PanelShell, type ColumnDef } from '@/shared/components'
 import { ContainerStateBadge } from '@/features/docker-containers/ui/container-state-badge'
-import { TruncatedChips } from '@/shared/components/truncated-chips'
 import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
 import RunContainerDialog from '@/features/docker-containers/ui/run-container/run-container-dialog'
+import { ContainerPortsCell } from '@/features/docker-containers/ui/container-ports-cell'
 import { consumeNextContainerSearch } from '@/shared/lib/workspace-nav'
 import {
   useContainerAction,
@@ -155,14 +155,8 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       {
         id: 'ports',
         header: '端口',
-        meta: { width: '12rem' },
-        cell: ({ row }) => (
-          <TruncatedChips
-            items={row.original.ports ? row.original.ports.split(',') : []}
-            maxVisible={2}
-            title={row.original.ports || undefined}
-          />
-        ),
+        meta: { width: '14rem' },
+        cell: ({ row }) => <ContainerPortsCell ports={row.original.ports} />,
       },
       {
         id: 'created',
@@ -235,7 +229,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         getRowId={(c) => c.id}
         loading={isFetching && containers.length === 0}
         empty={{ icon: Box, title: search ? `无匹配的容器 "${search}"` : '没有容器' }}
-        tableClassName="[&_tbody_tr]:h-16 [&_tbody_tr_td]:h-16"
+        tableClassName="[&_tbody_tr]:h-16 [&_tbody_tr_td]:py-2.5"
       />
 
       {logTarget ? (

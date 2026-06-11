@@ -3,14 +3,23 @@ use crate::dto::image::Image;
 use crate::utils::formatting::{format_bytes_i64, format_time_ago_from_unix, format_unix_seconds};
 use bollard::models::{ContainerSummary, ImageSummary, MountPoint, PortSummary};
 
+fn format_port_ip(ip: &str) -> String {
+    if ip.contains(':') && !ip.starts_with('[') {
+        format!("[{ip}]")
+    } else {
+        ip.to_string()
+    }
+}
+
 fn format_ports(ports: &[PortSummary]) -> String {
     ports
         .iter()
-        .filter_map(|p| match (p.public_port, p.private_port, p.typ) {
-            (Some(public_port), private_port, Some(port_type)) => {
-                let ip = p.ip.as_deref().unwrap_or("0.0.0.0");
-                Some(format!("{}:{}->{}/{}", ip, public_port, private_port, port_type))
+        .filter_map(|port| match (port.public_port, port.typ.clone()) {
+            (Some(public_port), Some(port_type)) => {
+                let ip = format_port_ip(port.ip.as_deref().unwrap_or("0.0.0.0"));
+                Some(format!("{}:{}->{}/{}", ip, public_port, port.private_port, port_type))
             }
+            (None, Some(port_type)) => Some(format!("{}/{}", port.private_port, port_type)),
             _ => None,
         })
         .collect::<Vec<_>>()
