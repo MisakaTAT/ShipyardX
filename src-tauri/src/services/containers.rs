@@ -15,19 +15,20 @@ use futures_util::StreamExt;
 use log::{debug, info};
 use tauri::State;
 
-use crate::docker::client::{docker, docker_streaming, map_bollard_error, pretty_json};
+use crate::docker::client::{map_bollard_error, pretty_json};
 use crate::docker::mapping::api_container_to_dto;
 use crate::dto::cleanup::CleanupResult;
 use crate::dto::container::{Container, RunContainer};
 use crate::error::AppResult;
-use crate::state::{AppState, get_server_config};
+use crate::services::support::ServerContext;
+use crate::state::AppState;
 use crate::utils::formatting::format_bytes_u64;
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Container>> {
     debug!(target: "shipyardx_lib::services::containers", "listing containers; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker_streaming(&server).await?;
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    let docker = ctx.streaming().await?;
     let options = ListContainersOptionsBuilder::default().all(true).build();
     let mut api = docker.list_containers(Some(options)).await.map_err(map_bollard_error)?;
     sort_by_created_desc_then_id(
@@ -42,8 +43,8 @@ pub async fn list_containers(server_id: String, state: State<'_, AppState>) -> A
 
 pub async fn start_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "starting container; server_id={} container_id={}", server_id, container_id);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .start_container(&container_id, None::<StartContainerOptions>)
         .await
@@ -52,8 +53,8 @@ pub async fn start_container(server_id: String, container_id: String, state: Sta
 
 pub async fn stop_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "stopping container; server_id={} container_id={}", server_id, container_id);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .stop_container(&container_id, None::<StopContainerOptions>)
         .await
@@ -62,8 +63,8 @@ pub async fn stop_container(server_id: String, container_id: String, state: Stat
 
 pub async fn restart_container(server_id: String, container_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "restarting container; server_id={} container_id={}", server_id, container_id);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .restart_container(&container_id, None::<RestartContainerOptions>)
         .await
@@ -77,8 +78,8 @@ pub async fn remove_container(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::containers", "removing container; server_id={} container_id={} force={}", server_id, container_id, force);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .remove_container(
             &container_id,
@@ -93,8 +94,8 @@ pub async fn remove_container(
 
 pub async fn prune_stopped_containers(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::containers", "pruning containers; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let response = docker(&server)
+    let response = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .prune_containers(None::<PruneContainersOptions>)
         .await
@@ -112,9 +113,9 @@ pub async fn inspect_container(
     state: State<'_, AppState>,
 ) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::containers", "inspecting container; server_id={} container_id={}", server_id, container_id);
-    let server = get_server_config(&state, &server_id)?;
     let options = InspectContainerOptionsBuilder::default().size(false).build();
-    let response = docker(&server)
+    let response = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .inspect_container(&container_id, Some(options))
         .await
@@ -130,8 +131,7 @@ pub async fn get_container_logs(
     state: State<'_, AppState>,
 ) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::containers", "fetching container logs; server_id={} container_id={} tail={} timestamps={}", server_id, container_id, tail, timestamps);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let options = LogsOptionsBuilder::default()
         .stdout(true)
         .stderr(true)
@@ -296,8 +296,7 @@ fn build_run_container_body(params: &RunContainer) -> ContainerCreateBody {
 }
 
 pub async fn run_container(server_id: String, params: RunContainer, state: State<'_, AppState>) -> AppResult<String> {
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let name = params.name.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let body = build_run_container_body(&params);
     let options = name.map(|name| CreateContainerOptionsBuilder::default().name(name).build());

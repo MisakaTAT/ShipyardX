@@ -1,11 +1,14 @@
 pub mod appstore;
+pub mod appstore_repo;
 pub mod containers;
 pub mod docker_events;
 pub mod images;
 pub mod log_stream;
 pub mod networks;
 pub mod port_forward;
+pub mod server_store;
 pub mod servers;
+pub mod support;
 pub mod system;
 pub mod terminal;
 pub mod volumes;

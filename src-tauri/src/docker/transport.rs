@@ -413,9 +413,8 @@ pub(crate) async fn open_hijack_json<T: serde::Serialize>(
     path: &str,
     body: &T,
 ) -> AppResult<DockerHijackConnection> {
-    let body = serde_json::to_vec(body).map_err(|e| {
-        AppError::internal("docker.request_encode_failed", "序列化 Docker 请求体失败").with_source(e)
-    })?;
+    let body = serde_json::to_vec(body)
+        .map_err(|e| AppError::internal("docker.request_encode_failed", "序列化 Docker 请求体失败").with_source(e))?;
     debug!(
         target: "shipyardx_lib::docker::transport",
         "opening docker hijack connection; server_id={} method={} path={} body_bytes={}",

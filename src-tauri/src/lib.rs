@@ -172,6 +172,7 @@ pub fn run() {
                 data_file.display()
             );
             app.manage(AppState {
+                server_store: Mutex::new(()),
                 servers: Mutex::new(servers),
                 data_file: Mutex::new(data_file),
                 terminals: Mutex::new(HashMap::new()),

@@ -33,6 +33,7 @@ pub(crate) struct EventStreamHandle {
 }
 
 pub struct AppState {
+    pub(crate) server_store: Mutex<()>,
     pub(crate) servers: Mutex<Vec<ServerConfig>>,
     pub(crate) data_file: Mutex<std::path::PathBuf>,
     pub(crate) terminals: Mutex<HashMap<String, TerminalHandle>>,
@@ -59,4 +60,18 @@ pub(crate) struct PortForwardRuntimeState {
     pub(crate) last_rx_bytes: u64,
     pub(crate) tx_speed: String,
     pub(crate) rx_speed: String,
+}
+
+impl Default for PortForwardRuntimeState {
+    fn default() -> Self {
+        Self {
+            handle: None,
+            last_error: None,
+            last_sample_at: None,
+            last_tx_bytes: 0,
+            last_rx_bytes: 0,
+            tx_speed: "0 B/s".to_string(),
+            rx_speed: "0 B/s".to_string(),
+        }
+    }
 }

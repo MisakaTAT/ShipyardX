@@ -3,18 +3,18 @@ use bollard::query_parameters::{InspectNetworkOptions, ListNetworksOptions, Prun
 use log::{debug, info};
 use tauri::State;
 
-use crate::docker::client::{docker, map_bollard_error, pretty_json};
+use crate::docker::client::{map_bollard_error, pretty_json};
 use crate::dto::cleanup::CleanupResult;
 use crate::dto::network::{Network, NetworkCreate};
 use crate::error::AppResult;
-use crate::state::{AppState, get_server_config};
+use crate::services::support::ServerContext;
+use crate::state::AppState;
 use crate::utils::formatting::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Network>> {
     debug!(target: "shipyardx_lib::services::networks", "listing networks; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let mut api: Vec<BollardNetwork> = docker
         .list_networks(None::<ListNetworksOptions>)
         .await
@@ -71,8 +71,8 @@ pub async fn list_networks(server_id: String, state: State<'_, AppState>) -> App
 
 pub async fn inspect_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::networks", "inspecting network; server_id={} network_id={}", server_id, network_id);
-    let server = get_server_config(&state, &server_id)?;
-    let response: NetworkInspect = docker(&server)
+    let response: NetworkInspect = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .inspect_network(&network_id, None::<InspectNetworkOptions>)
         .await
@@ -82,8 +82,8 @@ pub async fn inspect_network(server_id: String, network_id: String, state: State
 
 pub async fn remove_network(server_id: String, network_id: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::networks", "removing network; server_id={} network_id={}", server_id, network_id);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .remove_network(&network_id)
         .await
@@ -92,8 +92,8 @@ pub async fn remove_network(server_id: String, network_id: String, state: State<
 
 pub async fn prune_unused_networks(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::networks", "pruning networks; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let response = docker(&server)
+    let response = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .prune_networks(None::<PruneNetworksOptions>)
         .await
@@ -135,8 +135,8 @@ pub async fn create_network(server_id: String, params: NetworkCreate, state: Sta
         ..Default::default()
     };
     info!(target: "shipyardx_lib::services::networks", "creating network; server_id={} name={} driver={}", server_id, body.name, body.driver.as_deref().unwrap_or_default());
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .create_network(body)
         .await

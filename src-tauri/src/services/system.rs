@@ -7,7 +7,7 @@ use bollard::query_parameters::StatsOptionsBuilder;
 use font_kit::source::SystemSource;
 use futures_util::StreamExt;
 
-use crate::docker::client::{docker, docker_streaming, invalidate_api_version, map_bollard_error};
+use crate::docker::client::{docker, invalidate_api_version, map_bollard_error};
 use crate::docker::stats::compute_stats;
 use crate::docker::transport::{DockerEndpoint, invalidate_docker_endpoint, resolve_docker_endpoint};
 use crate::dto::container::ContainerStats;
@@ -20,9 +20,10 @@ use crate::scripts::{
     SYSTEM_RESTART_WITHOUT_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH, SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH,
     render, render_shell,
 };
+use crate::services::support::ServerContext;
 use crate::ssh::exec::ssh_exec;
 use crate::ssh::pool;
-use crate::state::{AppState, get_server_config};
+use crate::state::AppState;
 use crate::utils::formatting::format_bytes_i64;
 
 const ERR_BAD_SUDO_PASSWORD: &str = "__ERR_BAD_SUDO_PASSWORD__";
@@ -190,29 +191,29 @@ async fn fetch_docker_engine_info(server: &ServerConfig) -> AppResult<DockerEngi
 
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     debug!(target: "shipyardx_lib::services::system", "fetching docker info; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let info = fetch_docker_engine_info(&server).await?;
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    let info = fetch_docker_engine_info(ctx.server()).await?;
     info!(target: "shipyardx_lib::services::system", "fetched docker info; server_id={} version={} containers={} images={}", server_id, info.server_version, info.containers, info.images);
     Ok(info)
 }
 
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
     info!(target: "shipyardx_lib::services::system", "checking docker access; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    invalidate_api_version(&server);
-    invalidate_docker_endpoint(&server).await;
-    match fetch_docker_engine_info(&server).await {
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    invalidate_api_version(ctx.server());
+    invalidate_docker_endpoint(ctx.server()).await;
+    match fetch_docker_engine_info(ctx.server()).await {
         Ok(info) => {
             info!(target: "shipyardx_lib::services::system", "docker access check succeeded; server_id={} api_version={}", server_id, info.api_version);
             Ok(info)
         }
         Err(e) => {
-            let endpoint = resolve_docker_endpoint(&server).await.ok();
+            let endpoint = resolve_docker_endpoint(ctx.server()).await.ok();
             warn!(target: "shipyardx_lib::services::system", "docker access check failed; server_id={} code={} message={} detail={:?} endpoint={:?}", server_id, e.code, e.message, e.detail, endpoint);
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
                     let diag = ssh_exec(
-                        &server,
+                        ctx.server(),
                         &render_shell(DOCKER_CHECK_SOCKET_SH, &[], &[("__SOCKET_PATH__", &path)]),
                     )
                     .await
@@ -234,7 +235,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                 Some(DockerEndpoint::Tcp { host, port }) => {
                     let port_str = port.to_string();
                     let diag = ssh_exec(
-                        &server,
+                        ctx.server(),
                         &render_shell(DOCKER_CHECK_TCP_SH, &[("__PORT__", &port_str)], &[("__HOST__", &host)]),
                     )
                     .await
@@ -263,8 +264,7 @@ pub async fn get_container_stats(
     state: State<'_, AppState>,
 ) -> AppResult<ContainerStats> {
     debug!(target: "shipyardx_lib::services::system", "fetching container stats; server_id={} container_id={}", server_id, container_id);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker_streaming(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.streaming().await?;
     let mut stream = docker.stats(
         &container_id,
         Some(StatsOptionsBuilder::default().stream(false).one_shot(true).build()),
@@ -281,10 +281,10 @@ pub async fn get_container_stats(
 
 pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
     debug!(target: "shipyardx_lib::services::system", "fetching docker daemon settings; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    let raw = match pool::exec(ctx.server(), DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
-        Err(_) => ssh_exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+        Err(_) => ssh_exec(ctx.server(), DOCKER_READ_DAEMON_CONFIG_SH).await?,
     };
     let cfg: DaemonConfig = serde_json::from_str(raw.trim()).unwrap_or_default();
 
@@ -342,12 +342,12 @@ pub async fn update_docker_daemon_settings(
         !params.socket_path.trim().is_empty(),
         params.sudo_password.as_ref().is_some_and(|s| !s.is_empty())
     );
-    let server = get_server_config(&state, &server_id)?;
-    invalidate_api_version(&server);
-    invalidate_docker_endpoint(&server).await;
-    let current_raw = match pool::exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await {
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    invalidate_api_version(ctx.server());
+    invalidate_docker_endpoint(ctx.server()).await;
+    let current_raw = match pool::exec(ctx.server(), DOCKER_READ_DAEMON_CONFIG_SH).await {
         Ok(raw) => raw,
-        Err(_) => ssh_exec(&server, DOCKER_READ_DAEMON_CONFIG_SH).await?,
+        Err(_) => ssh_exec(ctx.server(), DOCKER_READ_DAEMON_CONFIG_SH).await?,
     };
     let mut cfg: DaemonConfig = serde_json::from_str(current_raw.trim()).unwrap_or_default();
 
@@ -412,7 +412,7 @@ pub async fn update_docker_daemon_settings(
     } else {
         render(SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH, &[("__CFG_B64__", &b64)])
     };
-    ssh_exec(&server, &write_cmd).await.map_err(map_restart_error)?;
+    ssh_exec(ctx.server(), &write_cmd).await.map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker daemon settings updated; server_id={}", server_id);
     Ok(())
 }
@@ -422,7 +422,7 @@ pub async fn restart_docker_daemon(
     sudo_password: Option<String>,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    let server = get_server_config(&state, &server_id)?;
     info!(target: "shipyardx_lib::services::system", "restart docker daemon requested; server_id={}", server_id);
-    restart_docker_service(&server, sudo_password).await
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    restart_docker_service(ctx.server(), sudo_password).await
 }

@@ -26,8 +26,8 @@ use crate::dto::events::{DockerSshStreamChunk, DockerSshStreamDone, ImageExportP
 use crate::dto::image::Image;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
+use crate::services::support::{ServerContext, start_managed_stream, stop_managed_stream};
+use crate::state::AppState;
 use crate::utils::formatting::{format_bytes_i64, format_bytes_u64, format_unix_seconds};
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
@@ -52,8 +52,7 @@ async fn resolve_image_size_hint(server: &ServerConfig, image_id: &str) -> AppRe
 
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
     debug!(target: "shipyardx_lib::services::images", "listing images; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let containers: Vec<ContainerSummary> = docker
         .list_containers(Some(ListContainersOptionsBuilder::default().all(true).build()))
         .await
@@ -86,8 +85,8 @@ pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppRe
 
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::images", "inspecting image; server_id={} image_id={}", server_id, image_id);
-    let server = get_server_config(&state, &server_id)?;
-    let resp: ImageInspect = docker(&server)
+    let resp: ImageInspect = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .inspect_image(&image_id)
         .await
@@ -101,8 +100,8 @@ pub async fn get_image_history(
     state: State<'_, AppState>,
 ) -> AppResult<Vec<crate::dto::image::ImageLayer>> {
     debug!(target: "shipyardx_lib::services::images", "fetching image history; server_id={} image_id={}", server_id, image_id);
-    let server = get_server_config(&state, &server_id)?;
-    let api: Vec<ImageHistoryResponseItem> = docker(&server)
+    let api: Vec<ImageHistoryResponseItem> = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .image_history(&image_id)
         .await
@@ -128,8 +127,8 @@ pub async fn remove_image(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::images", "removing image; server_id={} image_id={} force={}", server_id, image_id, force);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .remove_image(
             &image_id,
@@ -151,8 +150,8 @@ pub async fn prune_unused_images(server_id: String, state: State<'_, AppState>) 
 
 pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::images", "pruning builder cache; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let response: BuildPruneResponse = docker(&server)
+    let response: BuildPruneResponse = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .prune_build(Some(PruneBuildOptionsBuilder::default().all(true).build()))
         .await
@@ -202,11 +201,11 @@ pub async fn export_image(
         export_path.display()
     );
 
-    let server = get_server_config(&state, &server_id)?;
-    let total_bytes = resolve_image_size_hint(&server, &image_id).await?;
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    let total_bytes = resolve_image_size_hint(ctx.server(), &image_id).await?;
     let mut created_export_file = false;
     let result = async {
-        let docker = docker_streaming(&server).await?;
+        let docker = ctx.streaming().await?;
         let mut file = create_export_file(&export_path).await?;
         created_export_file = true;
         let mut stream = docker.export_image(&image_id);
@@ -279,7 +278,7 @@ pub async fn import_image(
         .ok_or_else(|| AppError::validation("image.import_name_invalid", "无法识别镜像文件名"))?;
 
     let total_bytes = ensure_import_file(&import_path).await?;
-    let server = get_server_config(&state, &server_id)?;
+    let ctx = ServerContext::from_state(&state, &server_id)?;
     info!(
         target: "shipyardx_lib::services::images",
         "importing image; import_id={} server_id={} path={}",
@@ -308,7 +307,7 @@ pub async fn import_image(
         );
     });
 
-    let docker = docker_streaming(&server).await?;
+    let docker = ctx.streaming().await?;
     let mut stream = docker.import_image_stream(
         ImportImageOptionsBuilder::default().quiet(true).build(),
         tokio_util::io::ReaderStream::new(progress_reader),
@@ -466,8 +465,7 @@ struct ImagePullErrorDetail {
 async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     let action = if dangling_only { "dangling" } else { "unused" };
     info!(target: "shipyardx_lib::services::images", "pruning images; server_id={} action={}", server_id, action);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let filters = if dangling_only {
         std::collections::HashMap::from([(String::from("dangling"), vec![String::from("true")])])
     } else {
@@ -738,7 +736,7 @@ pub fn start_image_pull(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> AppResult<String> {
-    let server = get_server_config(&state, &server_id)?;
+    let server = ServerContext::from_state(&state, &server_id)?.server().clone();
     let pull_id = generate_id();
     let (stop_tx, stop_rx) = watch::channel(false);
     info!(target: "shipyardx_lib::services::images", "starting image pull; pull_id={} server_id={} image={}", pull_id, server_id, image);
@@ -746,26 +744,21 @@ pub fn start_image_pull(
     let pid = pull_id.clone();
     let img = image.clone();
     let ah = app_handle.clone();
-    spawn_on_runtime(async move {
-        run_pull_task(server, pid, img, stop_rx, ah).await;
-    })?;
-
-    state
-        .streams
-        .lock()
-        .map_err(|e| {
-            AppError::internal("image.pull_streams_lock_failed", "记录镜像拉取状态失败").with_detail(e.to_string())
-        })?
-        .insert(pull_id.clone(), StreamHandle { stop_tx });
-    Ok(pull_id)
+    start_managed_stream(
+        &state,
+        pull_id,
+        stop_tx,
+        async move {
+            run_pull_task(server, pid, img, stop_rx, ah).await;
+        },
+        "image.pull_streams_lock_failed",
+        "记录镜像拉取状态失败",
+    )
 }
 
 pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
-    if let Some(h) =
-        lock_mutex(&state.streams, "image.pull_streams_lock_failed", "取消镜像拉取失败")?.remove(&stream_id)
-    {
+    if stop_managed_stream(&state, &stream_id, "image.pull_streams_lock_failed", "取消镜像拉取失败")? {
         info!(target: "shipyardx_lib::services::images", "cancelling image pull; pull_id={}", stream_id);
-        let _ = h.stop_tx.send(true);
     } else {
         warn!(target: "shipyardx_lib::services::images", "cancel requested for missing image pull; pull_id={}", stream_id);
     }

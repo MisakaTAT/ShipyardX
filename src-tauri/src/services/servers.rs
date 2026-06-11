@@ -1,97 +1,56 @@
 use tauri::State;
 
 use bollard::models::SystemVersion;
-use log::{info, warn};
+use log::info;
 
-use crate::config::store::save_servers;
-use crate::docker::client::{docker, invalidate_api_version_server_id, map_bollard_error};
-use crate::docker::transport::invalidate_pooled_http_server_id;
+use crate::docker::client::map_bollard_error;
 use crate::dto::server::ServerConfig;
 use crate::error::AppResult;
-use crate::ssh::{client::block_on, pool};
-use crate::state::{AppState, get_server_config, lock_mutex};
-use crate::utils::id::generate_id;
+use crate::services::{server_store, support::ServerContext};
+use crate::state::AppState;
 
 pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    let servers = lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone();
+    let servers = server_store::list_servers(&state)?;
     info!(target: "shipyardx_lib::services::servers", "listed servers; count={}", servers.len());
     Ok(servers)
 }
 
-pub fn add_server(mut server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    server.id = generate_id();
-    let mut servers = lock_mutex(&state.servers, "servers.add_lock_failed", "写入服务器列表失败")?;
-    let data_file = lock_mutex(
-        &state.data_file,
-        "servers.data_file_lock_failed",
-        "读取服务器配置路径失败",
-    )?;
-    servers.push(server);
+pub fn add_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+    let servers = server_store::add_server(&state, server)?;
     info!(target: "shipyardx_lib::services::servers", "server added; count={}", servers.len());
-    save_servers(&data_file, &servers)?;
-    Ok(servers.clone())
+    Ok(servers)
 }
 
 pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
     let server_id = server.id.clone();
-    let updated = {
-        let mut servers = lock_mutex(&state.servers, "servers.update_lock_failed", "写入服务器列表失败")?;
-        let data_file = lock_mutex(
-            &state.data_file,
-            "servers.data_file_lock_failed",
-            "读取服务器配置路径失败",
-        )?;
-        if let Some(existing) = servers.iter_mut().find(|s| s.id == server.id) {
-            *existing = server;
-        } else {
-            warn!(target: "shipyardx_lib::services::servers", "update requested for missing server; server_id={}", server_id);
-        }
-        save_servers(&data_file, &servers)?;
-        servers.clone()
-    };
+    let updated = server_store::update_server(&state, server)?;
     info!(target: "shipyardx_lib::services::servers", "server updated; server_id={}", server_id);
-    invalidate_api_version_server_id(&server_id);
-    block_on(invalidate_pooled_http_server_id(&server_id))?;
-    block_on(pool::invalidate_server_id(&server_id))?;
     Ok(updated)
 }
 
 pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    let updated = {
-        let mut servers = lock_mutex(&state.servers, "servers.delete_lock_failed", "写入服务器列表失败")?;
-        let data_file = lock_mutex(
-            &state.data_file,
-            "servers.data_file_lock_failed",
-            "读取服务器配置路径失败",
-        )?;
-        servers.retain(|s| s.id != id);
-        save_servers(&data_file, &servers)?;
-        servers.clone()
-    };
+    let updated = server_store::delete_server(&state, id.clone())?;
     info!(target: "shipyardx_lib::services::servers", "server deleted; server_id={}", id);
-    invalidate_api_version_server_id(&id);
-    block_on(invalidate_pooled_http_server_id(&id))?;
-    block_on(pool::invalidate_server_id(&id))?;
     Ok(updated)
 }
 
 pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
-    let server = get_server_config(&state, &server_id)?;
-    test_connection_with_config(server).await
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    test_connection_with_context(ctx).await
 }
 
 pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
-    test_connection_with_config(server).await
+    test_connection_with_context(ServerContext::from_server(server)).await
 }
 
-async fn test_connection_with_config(server: ServerConfig) -> AppResult<String> {
-    info!(target: "shipyardx_lib::services::servers", "testing server connection; server_id={} host={} port={}", server.id, server.host, server.port);
-    let version: SystemVersion = docker(&server).await?.version().await.map_err(map_bollard_error)?;
+async fn test_connection_with_context(ctx: ServerContext) -> AppResult<String> {
+    info!(target: "shipyardx_lib::services::servers", "testing server connection; server_id={} host={} port={}", ctx.server().id, ctx.server().host, ctx.server().port);
+    let version: SystemVersion = ctx.docker().await?.version().await.map_err(map_bollard_error)?;
     let display = if version.version.as_deref().unwrap_or_default().trim().is_empty() {
         version.api_version.unwrap_or_default()
     } else {
         version.version.unwrap_or_default()
     };
-    info!(target: "shipyardx_lib::services::servers", "server connection succeeded; server_id={}", server.id);
+    info!(target: "shipyardx_lib::services::servers", "server connection succeeded; server_id={}", ctx.server_id());
     Ok(format!("连接成功！Docker {}", display.trim()))
 }

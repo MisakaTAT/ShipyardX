@@ -7,8 +7,8 @@ use tokio::sync::watch;
 
 use crate::docker::client::{docker_streaming, map_bollard_error};
 use crate::dto::server::ServerConfig;
-use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, StreamHandle, get_server_config, lock_mutex};
+use crate::services::support::{ServerContext, start_managed_stream, stop_managed_stream};
+use crate::state::AppState;
 use crate::utils::id::generate_id;
 use crate::utils::output::TextOutputBuffer;
 
@@ -139,7 +139,7 @@ pub fn start_log_stream(
     state: State<AppState>,
     app_handle: AppHandle,
 ) -> crate::error::AppResult<String> {
-    let server = get_server_config(&state, &server_id)?;
+    let server = ServerContext::from_state(&state, &server_id)?.server().clone();
     let stream_id = generate_id();
     let (stop_tx, stop_rx) = watch::channel(false);
     info!(target: "shipyardx_lib::services::log_stream", "starting log stream; stream_id={} server_id={} container_id={} tail={} timestamps={}", stream_id, server_id, container_id, tail, timestamps);
@@ -147,28 +147,23 @@ pub fn start_log_stream(
     let sid = stream_id.clone();
     let cid = container_id.clone();
     let ah = app_handle.clone();
-    spawn_on_runtime(async move {
-        run_log_stream_task(server, sid, cid, tail, timestamps, stop_rx, ah).await;
-    })?;
-
-    state
-        .streams
-        .lock()
-        .map_err(|e| {
-            crate::error::AppError::internal("log_stream.start_lock_failed", "记录日志流状态失败")
-                .with_detail(e.to_string())
-        })?
-        .insert(stream_id.clone(), StreamHandle { stop_tx });
+    let stream_id = start_managed_stream(
+        &state,
+        stream_id,
+        stop_tx,
+        async move {
+            run_log_stream_task(server, sid, cid, tail, timestamps, stop_rx, ah).await;
+        },
+        "log_stream.start_lock_failed",
+        "记录日志流状态失败",
+    )?;
     debug!(target: "shipyardx_lib::services::log_stream", "log stream registered; stream_id={}", stream_id);
     Ok(stream_id)
 }
 
 pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> crate::error::AppResult<()> {
-    if let Some(handle) =
-        lock_mutex(&state.streams, "log_stream.stop_lock_failed", "停止日志流失败")?.remove(&stream_id)
-    {
+    if stop_managed_stream(&state, &stream_id, "log_stream.stop_lock_failed", "停止日志流失败")? {
         info!(target: "shipyardx_lib::services::log_stream", "stopping log stream; stream_id={}", stream_id);
-        let _ = handle.stop_tx.send(true);
     } else {
         warn!(target: "shipyardx_lib::services::log_stream", "stop requested for missing log stream; stream_id={}", stream_id);
     }

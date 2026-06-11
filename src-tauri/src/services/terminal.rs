@@ -266,17 +266,7 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
         )
         .await?;
         mark_backend_ready(&ah, &session_id);
-        run_docker_exec_io_loop(
-            session_id,
-            rx,
-            ah,
-            &config,
-            &created.id,
-            &mut hijack,
-            cols,
-            rows,
-        )
-        .await;
+        run_docker_exec_io_loop(session_id, rx, ah, &config, &created.id, &mut hijack, cols, rows).await;
         Ok::<(), AppError>(())
     });
 
@@ -676,8 +666,12 @@ pub fn open_terminal(
 
     lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
-    lock_mutex(&state.terminal_handshakes, "terminal.handshake_lock_failed", "记录终端握手状态失败")?
-        .insert(session_id.clone(), TerminalHandshakeState::default());
+    lock_mutex(
+        &state.terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "记录终端握手状态失败",
+    )?
+    .insert(session_id.clone(), TerminalHandshakeState::default());
     info!(
         target: "shipyardx_lib::services::terminal",
         "terminal session opened; session_id={} server_id={} ws_port={}",
@@ -721,8 +715,12 @@ pub fn open_container_exec_terminal(
 
     lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
-    lock_mutex(&state.terminal_handshakes, "terminal.handshake_lock_failed", "记录终端握手状态失败")?
-        .insert(session_id.clone(), TerminalHandshakeState::default());
+    lock_mutex(
+        &state.terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "记录终端握手状态失败",
+    )?
+    .insert(session_id.clone(), TerminalHandshakeState::default());
     info!(
         target: "shipyardx_lib::services::terminal",
         "container exec session opened; session_id={} server_id={} container_id={} ws_port={}",

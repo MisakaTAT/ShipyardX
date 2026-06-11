@@ -5,14 +5,14 @@ use std::task::{Context, Poll};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use log::{debug, info, warn};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_specta::Event;
 use tokio::fs;
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio::process::Command;
 use uuid::Uuid;
 
-use crate::dto::appstore::{AppDetail, AppListItem, AppManifest, AppVersionInfo, InstallApp, VersionManifest};
+use crate::dto::appstore::{AppDetail, AppListItem, InstallApp};
 use crate::dto::events::InstallStepEvent;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
@@ -20,268 +20,32 @@ use crate::scripts::{
     APPSTORE_COMPOSE_UP_SH, APPSTORE_CREATE_NETWORK_SH, APPSTORE_DEPLOY_FILES_SH, APPSTORE_EXTRACT_DATA_STREAM_SH,
     render_shell,
 };
+use crate::services::appstore_repo::AppstoreRepo;
 use crate::ssh::exec::{ssh_exec, ssh_exec_streaming, ssh_exec_with_stdin_reader};
 use crate::utils::output::TextOutputBuffer;
 
-const APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
 const INSTALL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
 const INSTALL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
 const INSTALL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续安装日志已省略]\n";
 
-fn appstore_cache_dir(app: &AppHandle) -> AppResult<PathBuf> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::internal("appstore.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
-    Ok(data_dir.join("appstore_cache"))
-}
-
-fn apps_dir(cache_dir: &Path) -> PathBuf {
-    cache_dir.join("apps")
-}
-
-fn pick_description(desc: &crate::dto::appstore::DescriptionI18n) -> String {
-    if !desc.zh.is_empty() {
-        return desc.zh.clone();
-    }
-    if !desc.en.is_empty() {
-        return desc.en.clone();
-    }
-    String::new()
-}
-
 pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
-    let cache_dir = appstore_cache_dir(app)?;
-    let git_dir = cache_dir.join(".git");
-    info!(target: "shipyardx_lib::services::appstore", "syncing appstore; cache_dir={}", cache_dir.display());
-
-    if fs::try_exists(&git_dir).await.unwrap_or(false) {
-        let cache_dir_str = cache_dir.to_string_lossy().to_string();
-        let output = Command::new("git")
-            .args(["-C", cache_dir_str.as_str()])
-            .arg("pull")
-            .arg("--ff-only")
-            .output()
-            .await
-            .map_err(|e| AppError::internal("appstore.git_pull_spawn_failed", "执行 git pull 失败").with_source(e))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            if stderr.contains("Not a git repository") || stderr.contains("error:") {
-                warn!(target: "shipyardx_lib::services::appstore", "appstore cache invalid, recreating; cache_dir={} stderr={}", cache_dir.display(), stderr.trim());
-                let _ = fs::remove_dir_all(&cache_dir).await;
-                return Box::pin(sync_appstore(app)).await;
-            }
-            return Err(
-                AppError::unavailable("appstore.git_pull_failed", "同步应用商店失败").with_detail(stderr.trim())
-            );
-        }
-        info!(target: "shipyardx_lib::services::appstore", "appstore pull completed; cache_dir={}", cache_dir.display());
-    } else {
-        let _ = fs::create_dir_all(&cache_dir).await;
-        let cache_dir_str = cache_dir.to_string_lossy().to_string();
-        let output = Command::new("git")
-            .args(["clone", "--depth", "1", APPSTORE_REPO_URL])
-            .arg(cache_dir_str.as_str())
-            .output()
-            .await
-            .map_err(|e| AppError::internal("appstore.git_clone_spawn_failed", "执行 git clone 失败").with_source(e))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(
-                AppError::unavailable("appstore.git_clone_failed", "克隆应用商店失败").with_detail(stderr.trim())
-            );
-        }
-        info!(target: "shipyardx_lib::services::appstore", "appstore clone completed; cache_dir={}", cache_dir.display());
-    }
-
+    let repo = AppstoreRepo::new(app)?;
+    let cache_dir = repo.sync().await?;
+    info!(target: "shipyardx_lib::services::appstore", "appstore synced; cache_dir={}", cache_dir.display());
     Ok(cache_dir)
 }
 
 pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
-    let cache_dir = appstore_cache_dir(app)?;
-    let apps_dir = apps_dir(&cache_dir);
-    debug!(target: "shipyardx_lib::services::appstore", "listing appstore apps; apps_dir={}", apps_dir.display());
-
-    if !fs::try_exists(&apps_dir).await.unwrap_or(false) {
-        return Ok(vec![]);
-    }
-
-    let mut items: Vec<AppListItem> = Vec::new();
-
-    let mut entries = fs::read_dir(&apps_dir)
-        .await
-        .map_err(|e| AppError::internal("appstore.apps_dir_read_failed", "读取 apps 目录失败").with_source(e))?;
-    while let Some(entry) = entries
-        .next_entry()
-        .await
-        .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录项失败").with_source(e))?
-    {
-        let app_dir = entry.path();
-        if !entry
-            .file_type()
-            .await
-            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录类型失败").with_source(e))?
-            .is_dir()
-        {
-            continue;
-        }
-
-        let Some(file_name) = app_dir.file_name() else {
-            continue;
-        };
-        let key = file_name.to_string_lossy().to_string();
-
-        let data_yml = app_dir.join("data.yml");
-        if !fs::try_exists(&data_yml).await.unwrap_or(false) {
-            continue;
-        }
-
-        let yaml_str = fs::read_to_string(&data_yml).await.unwrap_or_default();
-        let manifest: AppManifest = match serde_yaml::from_str(&yaml_str) {
-            Ok(m) => m,
-            Err(_) => continue,
-        };
-
-        let logo_path = app_dir.join("logo.png");
-        let icon = if fs::try_exists(&logo_path).await.unwrap_or(false) {
-            let bytes = fs::read(&logo_path).await.unwrap_or_default();
-            STANDARD.encode(&bytes)
-        } else {
-            String::new()
-        };
-
-        let mut versions: Vec<String> = Vec::new();
-        if let Ok(mut version_entries) = fs::read_dir(&app_dir).await {
-            while let Ok(Some(ver_entry)) = version_entries.next_entry().await {
-                let ver_dir = ver_entry.path();
-                let Ok(file_type) = ver_entry.file_type().await else {
-                    continue;
-                };
-                if !file_type.is_dir() {
-                    continue;
-                }
-                let ver_name = ver_entry.file_name().to_string_lossy().to_string();
-                if ver_name == "latest"
-                    || fs::try_exists(ver_dir.join("docker-compose.yml"))
-                        .await
-                        .unwrap_or(false)
-                {
-                    versions.push(ver_name);
-                }
-            }
-        }
-
-        items.push(AppListItem {
-            key: key.clone(),
-            name: manifest.additional.name.clone(),
-            app_type: manifest.additional.app_type.clone(),
-            tags: manifest.tags.clone(),
-            description: pick_description(&manifest.additional.description),
-            short_desc_zh: manifest.additional.short_desc_zh.clone(),
-            short_desc_en: manifest.additional.short_desc_en.clone(),
-            website: manifest.additional.website.clone().unwrap_or_default(),
-            icon,
-            versions,
-        });
-    }
-
-    items.sort_by(|a, b| a.name.cmp(&b.name));
+    let repo = AppstoreRepo::new(app)?;
+    let items = repo.list_apps().await?;
     info!(target: "shipyardx_lib::services::appstore", "listed appstore apps; count={}", items.len());
     Ok(items)
 }
 
 pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
     debug!(target: "shipyardx_lib::services::appstore", "fetching app detail; app_key={}", app_key);
-    let cache_dir = appstore_cache_dir(app)?;
-    let app_dir = apps_dir(&cache_dir).join(app_key);
-
-    if !fs::try_exists(&app_dir).await.unwrap_or(false) {
-        return Err(AppError::not_found(
-            "appstore.app_not_found",
-            format!("应用 {} 不存在", app_key),
-        ));
-    }
-
-    let data_yml = app_dir.join("data.yml");
-    if !fs::try_exists(&data_yml).await.unwrap_or(false) {
-        return Err(AppError::not_found(
-            "appstore.manifest_not_found",
-            format!("应用 {} 的 data.yml 不存在", app_key),
-        ));
-    }
-
-    let yaml_str = fs::read_to_string(&data_yml)
-        .await
-        .map_err(|e| AppError::internal("appstore.manifest_read_failed", "读取 data.yml 失败").with_source(e))?;
-    let manifest: AppManifest = serde_yaml::from_str(&yaml_str)
-        .map_err(|e| AppError::internal("appstore.manifest_parse_failed", "解析 data.yml 失败").with_source(e))?;
-
-    let logo_path = app_dir.join("logo.png");
-    let icon = if fs::try_exists(&logo_path).await.unwrap_or(false) {
-        let bytes = fs::read(&logo_path).await.unwrap_or_default();
-        STANDARD.encode(&bytes)
-    } else {
-        String::new()
-    };
-
-    let readme_zh = fs::read_to_string(app_dir.join("README.md")).await.unwrap_or_default();
-    let readme_en = fs::read_to_string(app_dir.join("README_en.md"))
-        .await
-        .unwrap_or_default();
-
-    let mut version_infos: Vec<AppVersionInfo> = Vec::new();
-    if let Ok(mut entries) = fs::read_dir(&app_dir).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let ver_dir = entry.path();
-            let Ok(file_type) = entry.file_type().await else {
-                continue;
-            };
-            if !file_type.is_dir() {
-                continue;
-            }
-            let ver_name = entry.file_name().to_string_lossy().to_string();
-
-            let compose_path = ver_dir.join("docker-compose.yml");
-            if !fs::try_exists(&compose_path).await.unwrap_or(false) {
-                continue;
-            }
-
-            let compose_preview = fs::read_to_string(&compose_path).await.unwrap_or_default();
-
-            let ver_data = ver_dir.join("data.yml");
-            let form_fields = if fs::try_exists(&ver_data).await.unwrap_or(false) {
-                let ver_yaml = fs::read_to_string(&ver_data).await.unwrap_or_default();
-                match serde_yaml::from_str::<VersionManifest>(&ver_yaml) {
-                    Ok(vm) => vm.additional.form_fields,
-                    Err(_) => vec![],
-                }
-            } else {
-                vec![]
-            };
-
-            version_infos.push(AppVersionInfo {
-                version: ver_name,
-                form_fields,
-                compose_preview,
-            });
-        }
-    }
-
-    let detail = AppDetail {
-        key: app_key.to_string(),
-        name: manifest.additional.name.clone(),
-        tags: manifest.tags.clone(),
-        description: manifest.additional.description.clone(),
-        short_desc_zh: manifest.additional.short_desc_zh,
-        short_desc_en: manifest.additional.short_desc_en,
-        website: manifest.additional.website.clone().unwrap_or_default(),
-        github: manifest.additional.github.clone().unwrap_or_default(),
-        document: manifest.additional.document.clone().unwrap_or_default(),
-        icon,
-        versions: version_infos,
-        readme_zh,
-        readme_en,
-    };
+    let repo = AppstoreRepo::new(app)?;
+    let detail = repo.get_app_detail(app_key).await?;
     info!(target: "shipyardx_lib::services::appstore", "fetched app detail; app_key={} versions={}", app_key, detail.versions.len());
     Ok(detail)
 }
@@ -320,9 +84,8 @@ fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuf
 
 pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::appstore", "installing app; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, req.env_values.len());
-    let cache_dir = appstore_cache_dir(app)?;
-    let app_dir = apps_dir(&cache_dir).join(&req.app_key);
-    let version_dir = app_dir.join(&req.version);
+    let repo = AppstoreRepo::new(app)?;
+    let version_dir = repo.version_dir(&req.app_key, &req.version);
 
     if !fs::try_exists(&version_dir).await.unwrap_or(false) {
         return Err(AppError::not_found(

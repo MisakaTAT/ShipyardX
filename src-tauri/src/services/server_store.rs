@@ -1,0 +1,102 @@
+use std::path::PathBuf;
+
+use log::warn;
+use tauri::State;
+
+use crate::config::store::save_servers;
+use crate::docker::client::invalidate_api_version_server_id;
+use crate::docker::transport::invalidate_pooled_http_server_id;
+use crate::dto::server::ServerConfig;
+use crate::error::{AppError, AppResult};
+use crate::ssh::{client::block_on, pool};
+use crate::state::{AppState, lock_mutex};
+use crate::utils::id::generate_id;
+
+fn current_servers_and_data_file(state: &State<'_, AppState>) -> AppResult<(Vec<ServerConfig>, PathBuf)> {
+    let data_file = lock_mutex(
+        &state.data_file,
+        "servers.data_file_lock_failed",
+        "读取服务器配置路径失败",
+    )?
+    .clone();
+    let servers = lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone();
+    Ok((servers, data_file))
+}
+
+fn save_and_replace(
+    state: &State<'_, AppState>,
+    data_file: PathBuf,
+    servers: Vec<ServerConfig>,
+    code: &'static str,
+    message: &'static str,
+) -> AppResult<Vec<ServerConfig>> {
+    save_servers(&data_file, &servers)?;
+    *lock_mutex(&state.servers, code, message)? = servers.clone();
+    Ok(servers)
+}
+
+fn invalidate_server(server_id: &str) -> AppResult<()> {
+    invalidate_api_version_server_id(server_id);
+    block_on(invalidate_pooled_http_server_id(server_id))?;
+    block_on(pool::invalidate_server_id(server_id))?;
+    Ok(())
+}
+
+pub(crate) fn list_servers(state: &State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone())
+}
+
+pub(crate) fn add_server(state: &State<'_, AppState>, mut server: ServerConfig) -> AppResult<Vec<ServerConfig>> {
+    let _store_guard = lock_mutex(&state.server_store, "servers.store_lock_failed", "更新服务器配置失败")?;
+    let (mut servers, data_file) = current_servers_and_data_file(state)?;
+    server.id = generate_id();
+    servers.push(server);
+    save_and_replace(
+        state,
+        data_file,
+        servers,
+        "servers.add_lock_failed",
+        "写入服务器列表失败",
+    )
+}
+
+pub(crate) fn update_server(state: &State<'_, AppState>, server: ServerConfig) -> AppResult<Vec<ServerConfig>> {
+    let _store_guard = lock_mutex(&state.server_store, "servers.store_lock_failed", "更新服务器配置失败")?;
+    let server_id = server.id.clone();
+    let (mut servers, data_file) = current_servers_and_data_file(state)?;
+    let existing = servers
+        .iter_mut()
+        .find(|item| item.id == server_id)
+        .ok_or_else(|| AppError::not_found("server.not_found", "服务器不存在"))?;
+    *existing = server;
+    let updated = save_and_replace(
+        state,
+        data_file,
+        servers,
+        "servers.update_lock_failed",
+        "写入服务器列表失败",
+    )?;
+    drop(_store_guard);
+    invalidate_server(&server_id)?;
+    Ok(updated)
+}
+
+pub(crate) fn delete_server(state: &State<'_, AppState>, server_id: String) -> AppResult<Vec<ServerConfig>> {
+    let _store_guard = lock_mutex(&state.server_store, "servers.store_lock_failed", "更新服务器配置失败")?;
+    let (servers, data_file) = current_servers_and_data_file(state)?;
+    if !servers.iter().any(|server| server.id == server_id) {
+        warn!(target: "shipyardx_lib::services::server_store", "delete requested for missing server; server_id={}", server_id);
+        return Err(AppError::not_found("server.not_found", "服务器不存在"));
+    }
+    let updated_servers: Vec<ServerConfig> = servers.into_iter().filter(|server| server.id != server_id).collect();
+    let updated = save_and_replace(
+        state,
+        data_file,
+        updated_servers,
+        "servers.delete_lock_failed",
+        "写入服务器列表失败",
+    )?;
+    drop(_store_guard);
+    invalidate_server(&server_id)?;
+    Ok(updated)
+}

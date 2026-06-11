@@ -14,8 +14,8 @@ use crate::dto::events::{
 };
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, EventStreamHandle, get_server_config, lock_mutex};
+use crate::services::support::{ServerContext, start_managed_event_stream, stop_managed_event_stream};
+use crate::state::{AppState, EventStreamHandle, lock_mutex};
 use crate::utils::formatting::format_unix_seconds_time;
 use crate::utils::id::generate_id;
 
@@ -338,7 +338,7 @@ fn reconnect_delay(attempt: usize) -> Duration {
 }
 
 pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
-    let server = get_server_config(&state, &server_id)?;
+    let server = ServerContext::from_state(&state, &server_id)?.server().clone();
     info!(target: "shipyardx_lib::services::docker_events", "starting event stream; server_id={}", server_id);
 
     {
@@ -370,36 +370,32 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     let sid = stream_id.clone();
     let status_for_thread = status.clone();
     let ah = app_handle.clone();
-    spawn_on_runtime(async move {
-        run_event_stream_task(server, sid, status_for_thread, stop_rx, ah).await;
-    })?;
-
-    lock_mutex(
-        &state.event_streams,
-        "docker_events.streams_lock_failed",
-        "记录事件流状态失败",
-    )?
-    .insert(
+    start_managed_event_stream(
+        &state,
         server_id.clone(),
         EventStreamHandle {
             stream_id: stream_id.clone(),
             stop_tx,
             status,
         },
-    );
+        async move {
+            run_event_stream_task(server, sid, status_for_thread, stop_rx, ah).await;
+        },
+        "docker_events.streams_lock_failed",
+        "记录事件流状态失败",
+    )?;
     info!(target: "shipyardx_lib::services::docker_events", "event stream registered; server_id={} stream_id={}", server_id, stream_id);
 
     Ok(stream_id)
 }
 
 pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult<()> {
-    if let Some(h) = lock_mutex(
-        &state.event_streams,
+    if let Some(h) = stop_managed_event_stream(
+        &state,
+        &server_id,
         "docker_events.streams_lock_failed",
         "停止事件流失败",
-    )?
-    .remove(&server_id)
-    {
+    )? {
         info!(target: "shipyardx_lib::services::docker_events", "stopping event stream; server_id={} stream_id={}", server_id, h.stream_id);
         let _ = h.stop_tx.send(true);
     } else {

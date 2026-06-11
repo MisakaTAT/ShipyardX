@@ -7,18 +7,18 @@ use bollard::query_parameters::{
 use log::{debug, info};
 use tauri::State;
 
-use crate::docker::client::{docker, map_bollard_error, pretty_json};
+use crate::docker::client::{map_bollard_error, pretty_json};
 use crate::dto::cleanup::CleanupResult;
 use crate::dto::volume::Volume as VolumeDto;
 use crate::error::AppResult;
-use crate::state::{AppState, get_server_config};
+use crate::services::support::ServerContext;
+use crate::state::AppState;
 use crate::utils::formatting::{format_bytes_u64, format_datetime_string, format_time_ago_from_datetime_string};
 use crate::utils::sort::sort_by_created_desc_then_id;
 
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<VolumeDto>> {
     debug!(target: "shipyardx_lib::services::volumes", "listing volumes; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let docker = docker(&server).await?;
+    let docker = ServerContext::from_state(&state, &server_id)?.docker().await?;
     let api: VolumeListResponse = docker
         .list_volumes(None::<ListVolumesOptions>)
         .await
@@ -98,8 +98,8 @@ pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppR
 
 pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
     debug!(target: "shipyardx_lib::services::volumes", "inspecting volume; server_id={} volume={}", server_id, name);
-    let server = get_server_config(&state, &server_id)?;
-    let response = docker(&server)
+    let response = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .inspect_volume(&name)
         .await
@@ -109,8 +109,8 @@ pub async fn inspect_volume(server_id: String, name: String, state: State<'_, Ap
 
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::volumes", "removing volume; server_id={} volume={}", server_id, name);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .remove_volume(&name, None::<RemoveVolumeOptions>)
         .await
@@ -119,8 +119,8 @@ pub async fn remove_volume(server_id: String, name: String, state: State<'_, App
 
 pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
     info!(target: "shipyardx_lib::services::volumes", "pruning volumes; server_id={}", server_id);
-    let server = get_server_config(&state, &server_id)?;
-    let response: VolumePruneResponse = docker(&server)
+    let response: VolumePruneResponse = ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .prune_volumes(None::<PruneVolumesOptions>)
         .await
@@ -149,8 +149,8 @@ pub async fn create_volume(
         ..Default::default()
     };
     info!(target: "shipyardx_lib::services::volumes", "creating volume; server_id={} volume={} driver={}", server_id, name, driver);
-    let server = get_server_config(&state, &server_id)?;
-    docker(&server)
+    ServerContext::from_state(&state, &server_id)?
+        .docker()
         .await?
         .create_volume(body)
         .await
