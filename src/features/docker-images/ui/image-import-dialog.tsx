@@ -172,7 +172,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
                     </Button>
                   </div>
                   <FieldDescription id={`${formId}-file-desc`}>
-                    支持导入 Docker `save` 导出的镜像包，文件会直接上传到远程 Docker 执行 `load`。
+                    支持上传 Docker 镜像包，系统会自动完成远程导入。
                   </FieldDescription>
                   <FieldError id={`${formId}-file-err`} errors={[fieldState.error]} />
                 </FieldContent>
@@ -196,9 +196,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
             <div className="h-1.5 overflow-hidden rounded-full bg-border/70">
               <div
                 className={
-                  progressPercent === null
-                    ? 'h-full w-0 rounded-full bg-primary'
-                    : 'h-full rounded-full bg-primary'
+                  progressPercent === null ? 'h-full w-0 rounded-full bg-primary' : 'h-full rounded-full bg-primary'
                 }
                 style={progressPercent === null ? undefined : { width: `${progressPercent}%` }}
               />

@@ -176,6 +176,7 @@ pub fn run() {
                 terminals: Mutex::new(HashMap::new()),
                 streams: Mutex::new(HashMap::new()),
                 terminal_ws_clients: Mutex::new(HashMap::new()),
+                terminal_handshakes: Mutex::new(HashMap::new()),
                 event_streams: Mutex::new(HashMap::new()),
                 port_forwards: Mutex::new(HashMap::new()),
             });

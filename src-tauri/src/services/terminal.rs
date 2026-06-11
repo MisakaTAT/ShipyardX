@@ -19,7 +19,7 @@ use crate::dto::server::ServerConfig;
 use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
-use crate::state::{AppState, TerminalHandle, TerminalMsg, get_server_config, lock_mutex};
+use crate::state::{AppState, TerminalHandle, TerminalHandshakeState, TerminalMsg, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
 /// 终端 WS 走单路二进制，首字节是 channel tag：0x00 = PTY 字节流，0x01 = 控制 JSON（UTF-8）。
@@ -76,6 +76,53 @@ fn send_pty_bytes(app: &AppHandle, session_id: &str, bytes: &[u8]) {
     terminal_ws_send(app, session_id, pty_frame(bytes));
 }
 
+fn maybe_send_ready(app: &AppHandle, session_id: &str) {
+    let should_send = lock_mutex(
+        &app.state::<AppState>().terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "读取终端握手状态失败",
+    )
+    .ok()
+    .and_then(|handshakes| {
+        handshakes
+            .get(session_id)
+            .map(|state| state.backend_ready && state.client_ready)
+    })
+    .unwrap_or(false);
+
+    if should_send {
+        send_control(app, session_id, WsServerMsg::Ready);
+    }
+}
+
+fn mark_backend_ready(app: &AppHandle, session_id: &str) {
+    if let Ok(mut handshakes) = lock_mutex(
+        &app.state::<AppState>().terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "更新终端握手状态失败",
+    ) {
+        handshakes
+            .entry(session_id.to_string())
+            .or_insert_with(TerminalHandshakeState::default)
+            .backend_ready = true;
+    }
+    maybe_send_ready(app, session_id);
+}
+
+fn mark_client_ready(app: &AppHandle, session_id: &str) {
+    if let Ok(mut handshakes) = lock_mutex(
+        &app.state::<AppState>().terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "更新终端握手状态失败",
+    ) {
+        handshakes
+            .entry(session_id.to_string())
+            .or_insert_with(TerminalHandshakeState::default)
+            .client_ready = true;
+    }
+    maybe_send_ready(app, session_id);
+}
+
 fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) {
     let error = error.into();
     error!(
@@ -123,6 +170,7 @@ fn run_terminal_thread(
             .await
             .map_err(|e| AppError::internal("terminal.shell_start_failed", "启动远程 Shell 失败").with_source(e))?;
 
+        mark_backend_ready(&ah, &session_id);
         run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
         Ok::<(), AppError>(())
     });
@@ -217,6 +265,7 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
             &start,
         )
         .await?;
+        mark_backend_ready(&ah, &session_id);
         run_docker_exec_io_loop(
             session_id,
             rx,
@@ -451,6 +500,14 @@ fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
         TAG_CTRL => {
             if let Ok(ctrl) = serde_json::from_slice::<WsClientCtrl>(body) {
                 match ctrl {
+                    WsClientCtrl::ClientReady => {
+                        debug!(
+                            target: "shipyardx_lib::services::terminal",
+                            "terminal client ready received; session_id={}",
+                            session_id
+                        );
+                        mark_client_ready(ah, session_id);
+                    }
                     WsClientCtrl::Resize { cols, rows } => {
                         debug!(
                             target: "shipyardx_lib::services::terminal",
@@ -619,6 +676,8 @@ pub fn open_terminal(
 
     lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(&state.terminal_handshakes, "terminal.handshake_lock_failed", "记录终端握手状态失败")?
+        .insert(session_id.clone(), TerminalHandshakeState::default());
     info!(
         target: "shipyardx_lib::services::terminal",
         "terminal session opened; session_id={} server_id={} ws_port={}",
@@ -662,6 +721,8 @@ pub fn open_container_exec_terminal(
 
     lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(&state.terminal_handshakes, "terminal.handshake_lock_failed", "记录终端握手状态失败")?
+        .insert(session_id.clone(), TerminalHandshakeState::default());
     info!(
         target: "shipyardx_lib::services::terminal",
         "container exec session opened; session_id={} server_id={} container_id={} ws_port={}",
@@ -677,6 +738,13 @@ pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<(
     let mut terminals = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);
+        if let Ok(mut handshakes) = lock_mutex(
+            &state.terminal_handshakes,
+            "terminal.handshake_lock_failed",
+            "移除终端握手状态失败",
+        ) {
+            handshakes.remove(&session_id);
+        }
         info!(
             target: "shipyardx_lib::services::terminal",
             "terminal session closed; session_id={}",

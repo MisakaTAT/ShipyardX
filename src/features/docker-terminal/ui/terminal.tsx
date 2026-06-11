@@ -42,8 +42,8 @@ const TERMINAL_SURFACE_BG = '#1e1e1e'
  * 终端 WebSocket 协议（单路二进制 + 首字节 channel tag）：
  *   tag 0x00 + payload = PTY 字节流（双向）
  *   tag 0x01 + payload = 控制 JSON（UTF-8，双向）
- *     下行：{ type: 'closed' } | { type: 'error', error }
- *     上行：{ type: 'resize', cols, rows } | { type: 'close' }
+ *     下行：{ type: 'ready' } | { type: 'closed' } | { type: 'error', error }
+ *     上行：{ type: 'client_ready' } | { type: 'resize', cols, rows } | { type: 'close' }
  */
 const TAG_DATA = 0x00
 const TAG_CTRL = 0x01
@@ -67,11 +67,12 @@ function ctrlFrame(payload: Record<string, unknown>): ArrayBuffer {
   return out.buffer
 }
 
-type ControlInbound = { type: 'closed' } | { type: 'error'; error: AppErrorLike }
+type ControlInbound = { type: 'ready' } | { type: 'closed' } | { type: 'error'; error: AppErrorLike }
 
 function parseControlInbound(bytes: Uint8Array): ControlInbound | null {
   try {
     const o = JSON.parse(textDecoder.decode(bytes)) as { type?: string; error?: unknown }
+    if (o.type === 'ready') return { type: 'ready' }
     if (o.type === 'closed') return { type: 'closed' }
     if (o.type === 'error' && o.error) return { type: 'error', error: normalizeAppError(o.error) }
   } catch {
@@ -114,6 +115,7 @@ function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<
       }
     }
     transport.onopen = () => {
+      transport.send(ctrlFrame({ type: 'client_ready' }))
       settled = true
       resolve(transport)
     }
@@ -407,6 +409,17 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
           termWrite(bytes)
         },
         onControl: (msg) => {
+          if (msg.type === 'ready') {
+            if (mountAliveRef.current) {
+              setPhase('connected')
+              setWasEverConnected(true)
+            }
+            requestAnimationFrame(() => {
+              syncTerminalSize(sizeRef.current.cols, sizeRef.current.rows, true)
+              termFocus()
+            })
+            return
+          }
           if (msg.type === 'error') {
             endSession({ updateUi: true, reason: 'error', errorMessage: msg.error.message })
           } else {
@@ -431,12 +444,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       }
 
       transportRef.current = transport
-      if (mountAliveRef.current) {
-        setPhase('connected')
-        setWasEverConnected(true)
-      }
-      transport.send(ctrlFrame({ type: 'resize', cols, rows }))
-      requestAnimationFrame(() => termFocus())
 
       if (!mountAliveRef.current || isStale()) {
         endSession({ updateUi: false })

@@ -4,7 +4,8 @@ use std::sync::{Mutex, MutexGuard};
 
 pub use app_state::AppState;
 pub(crate) use app_state::{
-    EventStreamHandle, PortForwardRuntimeHandle, PortForwardRuntimeState, StreamHandle, TerminalHandle, TerminalMsg,
+    EventStreamHandle, PortForwardRuntimeHandle, PortForwardRuntimeState, StreamHandle, TerminalHandle,
+    TerminalHandshakeState, TerminalMsg,
 };
 
 use tauri::State;

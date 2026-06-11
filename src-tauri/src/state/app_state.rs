@@ -16,6 +16,12 @@ pub(crate) struct TerminalHandle {
     pub(crate) tx: tokio_mpsc::UnboundedSender<TerminalMsg>,
 }
 
+#[derive(Default)]
+pub(crate) struct TerminalHandshakeState {
+    pub(crate) backend_ready: bool,
+    pub(crate) client_ready: bool,
+}
+
 pub(crate) struct StreamHandle {
     pub(crate) stop_tx: watch::Sender<bool>,
 }
@@ -32,6 +38,7 @@ pub struct AppState {
     pub(crate) terminals: Mutex<HashMap<String, TerminalHandle>>,
     pub(crate) streams: Mutex<HashMap<String, StreamHandle>>,
     pub(crate) terminal_ws_clients: Mutex<HashMap<String, tokio_mpsc::UnboundedSender<Vec<u8>>>>,
+    pub(crate) terminal_handshakes: Mutex<HashMap<String, TerminalHandshakeState>>,
     pub(crate) event_streams: Mutex<HashMap<String, EventStreamHandle>>,
     pub(crate) port_forwards: Mutex<HashMap<String, PortForwardRuntimeState>>,
 }

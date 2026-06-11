@@ -15,6 +15,8 @@ pub struct ContainerExecTerminalParams {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum WsServerMsg {
+    #[serde(rename = "ready")]
+    Ready,
     #[serde(rename = "closed")]
     Closed,
     #[serde(rename = "error")]
@@ -24,6 +26,8 @@ pub enum WsServerMsg {
 #[derive(Debug, Deserialize, Type)]
 #[serde(tag = "type")]
 pub enum WsClientCtrl {
+    #[serde(rename = "client_ready")]
+    ClientReady,
     #[serde(rename = "resize")]
     Resize { cols: u32, rows: u32 },
     #[serde(rename = "close")]
