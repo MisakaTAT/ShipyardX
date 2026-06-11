@@ -229,7 +229,6 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         getRowId={(c) => c.id}
         loading={isFetching && containers.length === 0}
         empty={{ icon: Box, title: search ? `无匹配的容器 "${search}"` : '没有容器' }}
-        tableClassName="[&_tbody_tr]:h-16 [&_tbody_tr_td]:py-2.5"
       />
 
       {logTarget ? (
