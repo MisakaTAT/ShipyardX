@@ -157,5 +157,5 @@ jobs:
             Automated release for ShipyardX ${{ github.ref_name }}.
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-rc') }}
-          tauriScript: pnpm
+          tauriScript: pnpm tauri
           args: --target ${{ matrix.target }}
