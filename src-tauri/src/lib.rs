@@ -21,6 +21,7 @@ use dto::events::{
     DockerStreamStatus, EventStreamStatus, ImageExportProgress, ImageImportProgress, InstallStepEvent,
 };
 use log::{error, info, warn};
+#[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
