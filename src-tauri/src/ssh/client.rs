@@ -50,18 +50,6 @@ fn ssh_runtime() -> AppResult<&'static Runtime> {
     }
 }
 
-pub fn block_on<F>(future: F) -> AppResult<F::Output>
-where
-    F: std::future::Future,
-{
-    let runtime = ssh_runtime()?;
-    if tokio::runtime::Handle::try_current().is_ok() {
-        Ok(tokio::task::block_in_place(|| runtime.handle().block_on(future)))
-    } else {
-        Ok(runtime.block_on(future))
-    }
-}
-
 pub fn spawn_on_runtime<F>(future: F) -> AppResult<tokio::task::JoinHandle<F::Output>>
 where
     F: std::future::Future + Send + 'static,

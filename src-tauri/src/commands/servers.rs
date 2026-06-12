@@ -19,14 +19,14 @@ pub fn add_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec
 
 #[tauri::command]
 #[specta::specta]
-pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    Ok(services::servers::update_server(server, state)?)
+pub async fn update_server(server: ServerConfig, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(services::servers::update_server(server, state).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    Ok(services::servers::delete_server(id, state)?)
+pub async fn delete_server(id: String, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(services::servers::delete_server(id, state).await?)
 }
 
 #[tauri::command]

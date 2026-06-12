@@ -41,8 +41,8 @@ pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    Ok(port_forward::start_all_enabled(server_id, state)?)
+pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    Ok(port_forward::start_all_enabled(server_id, state).await?)
 }
 
 #[tauri::command]
@@ -59,8 +59,8 @@ pub fn list_port_forwards_all(state: State<'_, AppState>) -> AppResult<Vec<PortF
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
-    Ok(port_forward::start_all_enabled_global(state)?)
+pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
+    Ok(port_forward::start_all_enabled_global(state).await?)
 }
 
 #[tauri::command]

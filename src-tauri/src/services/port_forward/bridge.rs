@@ -12,7 +12,6 @@ use tokio::sync::watch;
 
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::block_on;
 use crate::ssh::pool;
 
 pub(super) struct PortForwardBridgeArgs {
@@ -195,7 +194,7 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
     }
 }
 
-pub(super) fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
+pub(super) async fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
     let _start = Instant::now();
     debug!(
         target: "shipyardx_lib::services::port_forward",
@@ -204,15 +203,12 @@ pub(super) fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_
         remote_host,
         remote_port
     );
-    block_on(async {
-        let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
-            .await
-            .map_err(|e| {
-                AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
-            })?
-            .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
-        drop(channel);
-        Ok::<(), AppError>(())
-    })??;
+    let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
+        .await
+        .map_err(|e| {
+            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
+        })?
+        .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
+    drop(channel);
     Ok(())
 }

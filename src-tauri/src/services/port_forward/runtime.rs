@@ -60,7 +60,7 @@ pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: 
     Ok(())
 }
 
-fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -> AppResult<()> {
+async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, AppState>) -> AppResult<()> {
     if !rule.enabled {
         return Err(AppError::validation("port_forward.rule_disabled", "该规则已被禁用"));
     }
@@ -82,7 +82,7 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
         .port();
 
     let server_cfg = ServerContext::from_state(state, &rule.server_id)?.server().clone();
-    probe_remote(&server_cfg, &rule.remote_host, rule.remote_port)?;
+    probe_remote(&server_cfg, &rule.remote_host, rule.remote_port).await?;
 
     let (stop_tx, stop_rx) = watch::channel(false);
     let last_error = Arc::new(Mutex::new(None));
@@ -136,7 +136,7 @@ fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<AppState>) -
     Ok(())
 }
 
-pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let enabled_rules: Vec<PortForwardRule> = rules
         .into_iter()
@@ -163,7 +163,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
     stop_disabled_rules(&state, running_ids, &enabled_ids)?;
 
     for rule in enabled_rules {
-        if let Err(error) = start_port_forward_runtime(&rule, &state) {
+        if let Err(error) = start_port_forward_runtime(&rule, &state).await {
             error!(
                 target: "shipyardx_lib::services::port_forward",
                 "failed to start enabled port forward; rule_id={} server_id={} message={} detail={:?}",
@@ -181,7 +181,7 @@ pub fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppRe
     Ok(())
 }
 
-pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
+pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let enabled_rules: Vec<PortForwardRule> = rules.into_iter().filter(|rule| rule.enabled).collect();
     let enabled_ids: HashSet<String> = enabled_rules.iter().map(|rule| rule.id.clone()).collect();
@@ -197,7 +197,7 @@ pub fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
     stop_disabled_rules(&state, running_ids, &enabled_ids)?;
 
     for rule in enabled_rules {
-        if let Err(error) = start_port_forward_runtime(&rule, &state) {
+        if let Err(error) = start_port_forward_runtime(&rule, &state).await {
             error!(
                 target: "shipyardx_lib::services::port_forward",
                 "failed to start global enabled port forward; rule_id={} server_id={} message={} detail={:?}",

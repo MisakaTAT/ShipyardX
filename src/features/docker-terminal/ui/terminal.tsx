@@ -85,6 +85,16 @@ type TransportCallbacks = {
   onClose: () => void
 }
 
+function formatTerminalError(error: AppErrorLike) {
+  const lines = [error.message]
+  const detail = error.detail?.trim()
+  const action = error.action?.trim()
+  if (detail && detail !== error.message) lines.push(detail)
+  if (action) lines.push(action)
+  if (error.code) lines.push(`code: ${error.code}`)
+  return lines.join('\n')
+}
+
 function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     let settled = false
@@ -522,9 +532,11 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       backendSessionIdRef.current = session.session_id
       clearBackendResizeSync()
 
+      let backendSettled = false
       const transport = await openTerminalTransport(session.session_id, session.ws_port, {
         onPty: termWrite,
         onControl: (msg) => {
+          backendSettled = true
           if (msg.type === 'ready') {
             if (mountAliveRef.current) {
               setPhase('connected')
@@ -537,12 +549,13 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
             return
           }
           if (msg.type === 'error') {
-            endSession({ updateUi: true, reason: 'error', errorMessage: msg.error.message })
+            endSession({ updateUi: true, reason: 'error', errorMessage: formatTerminalError(msg.error) })
           } else {
             endSession({ updateUi: true, reason: 'remote' })
           }
         },
         onClose: () => {
+          if (backendSettled) return
           if (backendSessionIdRef.current === session.session_id || openedBackendSessionId === session.session_id) {
             endSession({ updateUi: true, reason: 'remote' })
           }

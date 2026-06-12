@@ -8,7 +8,7 @@ use crate::docker::client::invalidate_api_version_server_id;
 use crate::docker::transport::invalidate_pooled_http_server_id;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::ssh::{client::block_on, pool};
+use crate::ssh::pool;
 use crate::state::{AppState, lock_mutex};
 use crate::utils::id::generate_id;
 
@@ -35,10 +35,10 @@ fn save_and_replace(
     Ok(servers)
 }
 
-fn invalidate_server(server_id: &str) -> AppResult<()> {
+async fn invalidate_server(server_id: &str) -> AppResult<()> {
     invalidate_api_version_server_id(server_id);
-    block_on(invalidate_pooled_http_server_id(server_id))?;
-    block_on(pool::invalidate_server_id(server_id))?;
+    invalidate_pooled_http_server_id(server_id).await;
+    pool::invalidate_server_id(server_id).await;
     Ok(())
 }
 
@@ -60,7 +60,7 @@ pub(crate) fn add_server(state: &State<'_, AppState>, mut server: ServerConfig) 
     )
 }
 
-pub(crate) fn update_server(state: &State<'_, AppState>, server: ServerConfig) -> AppResult<Vec<ServerConfig>> {
+pub(crate) async fn update_server(state: &State<'_, AppState>, server: ServerConfig) -> AppResult<Vec<ServerConfig>> {
     let _store_guard = lock_mutex(&state.server_store, "servers.store_lock_failed", "更新服务器配置失败")?;
     let server_id = server.id.clone();
     let (mut servers, data_file) = current_servers_and_data_file(state)?;
@@ -77,11 +77,11 @@ pub(crate) fn update_server(state: &State<'_, AppState>, server: ServerConfig) -
         "写入服务器列表失败",
     )?;
     drop(_store_guard);
-    invalidate_server(&server_id)?;
+    invalidate_server(&server_id).await?;
     Ok(updated)
 }
 
-pub(crate) fn delete_server(state: &State<'_, AppState>, server_id: String) -> AppResult<Vec<ServerConfig>> {
+pub(crate) async fn delete_server(state: &State<'_, AppState>, server_id: String) -> AppResult<Vec<ServerConfig>> {
     let _store_guard = lock_mutex(&state.server_store, "servers.store_lock_failed", "更新服务器配置失败")?;
     let (servers, data_file) = current_servers_and_data_file(state)?;
     if !servers.iter().any(|server| server.id == server_id) {
@@ -97,6 +97,6 @@ pub(crate) fn delete_server(state: &State<'_, AppState>, server_id: String) -> A
         "写入服务器列表失败",
     )?;
     drop(_store_guard);
-    invalidate_server(&server_id)?;
+    invalidate_server(&server_id).await?;
     Ok(updated)
 }

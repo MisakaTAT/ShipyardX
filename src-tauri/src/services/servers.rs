@@ -21,15 +21,15 @@ pub fn add_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec
     Ok(servers)
 }
 
-pub fn update_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+pub async fn update_server(server: ServerConfig, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
     let server_id = server.id.clone();
-    let updated = server_store::update_server(&state, server)?;
+    let updated = server_store::update_server(&state, server).await?;
     info!(target: "shipyardx_lib::services::servers", "server updated; server_id={}", server_id);
     Ok(updated)
 }
 
-pub fn delete_server(id: String, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    let updated = server_store::delete_server(&state, id.clone())?;
+pub async fn delete_server(id: String, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    let updated = server_store::delete_server(&state, id.clone()).await?;
     info!(target: "shipyardx_lib::services::servers", "server deleted; server_id={}", id);
     Ok(updated)
 }

@@ -7,6 +7,7 @@ use crate::dto::server::ServerConfig;
 use tokio::sync::{mpsc as tokio_mpsc, watch};
 
 pub(crate) enum TerminalMsg {
+    ClientReady,
     Data(Vec<u8>),
     Resize { cols: u32, rows: u32 },
     Close,

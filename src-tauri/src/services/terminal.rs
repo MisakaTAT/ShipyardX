@@ -18,7 +18,7 @@ use crate::docker::transport::open_hijack_json;
 use crate::dto::server::ServerConfig;
 use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
-use crate::ssh::client::{block_on, connect, disconnect, spawn_on_runtime};
+use crate::ssh::client::{connect, disconnect, spawn_on_runtime};
 use crate::state::{AppState, TerminalHandle, TerminalHandshakeState, TerminalMsg, get_server_config, lock_mutex};
 use crate::utils::id::generate_id;
 
@@ -136,14 +136,32 @@ fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) 
     send_control(app, session_id, WsServerMsg::Error { error });
 }
 
-fn run_terminal_thread(
+async fn wait_for_client_ready(
+    session_id: &str,
+    rx: &mut tokio_mpsc::UnboundedReceiver<TerminalMsg>,
+    ah: &AppHandle,
+) -> bool {
+    while let Some(msg) = rx.recv().await {
+        match msg {
+            TerminalMsg::ClientReady => return true,
+            TerminalMsg::Close => {
+                send_control(ah, session_id, WsServerMsg::Closed);
+                return false;
+            }
+            TerminalMsg::Data(_) | TerminalMsg::Resize { .. } => {}
+        }
+    }
+    false
+}
+
+async fn run_terminal_thread(
     config: ServerConfig,
     session_id: String,
-    rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
+    mut rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
     cols: u32,
     rows: u32,
-) {
+) -> AppResult<()> {
     info!(
         target: "shipyardx_lib::services::terminal",
         "starting ssh terminal session; session_id={} server_id={} cols={} rows={}",
@@ -152,38 +170,33 @@ fn run_terminal_thread(
         cols,
         rows
     );
-    let fail_session_id = session_id.clone();
-    let fail_handle = ah.clone();
-    let result = block_on(async move {
-        let mut handle = connect(&config).await?;
-        let channel = handle
-            .channel_open_session()
-            .await
-            .map_err(|e| AppError::internal("terminal.channel_open_failed", "终端通道创建失败").with_source(e))?;
-
-        channel
-            .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
-            .await
-            .map_err(|e| AppError::internal("terminal.pty_request_failed", "请求终端 PTY 失败").with_source(e))?;
-        channel
-            .request_shell(true)
-            .await
-            .map_err(|e| AppError::internal("terminal.shell_start_failed", "启动远程 Shell 失败").with_source(e))?;
-
-        mark_backend_ready(&ah, &session_id);
-        run_terminal_io_loop(session_id, rx, ah, &mut handle, channel, cols, rows).await;
-        Ok::<(), AppError>(())
-    });
-
-    if let Err(e) = result {
-        fail_terminal(&fail_handle, &fail_session_id, e);
-    } else {
-        info!(
-            target: "shipyardx_lib::services::terminal",
-            "ssh terminal session finished; session_id={}",
-            fail_session_id
-        );
+    if !wait_for_client_ready(&session_id, &mut rx, &ah).await {
+        return Ok(());
     }
+
+    let mut handle = connect(&config).await?;
+    let channel = handle
+        .channel_open_session()
+        .await
+        .map_err(|e| AppError::internal("terminal.channel_open_failed", "终端通道创建失败").with_source(e))?;
+
+    channel
+        .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
+        .await
+        .map_err(|e| AppError::internal("terminal.pty_request_failed", "请求终端 PTY 失败").with_source(e))?;
+    channel
+        .request_shell(true)
+        .await
+        .map_err(|e| AppError::internal("terminal.shell_start_failed", "启动远程 Shell 失败").with_source(e))?;
+
+    mark_backend_ready(&ah, &session_id);
+    run_terminal_io_loop(session_id.clone(), rx, ah, &mut handle, channel, cols, rows).await;
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "ssh terminal session finished; session_id={}",
+        session_id
+    );
+    Ok(())
 }
 
 struct ContainerExecThreadCtx {
@@ -198,11 +211,11 @@ struct ContainerExecThreadCtx {
     shell: String,
 }
 
-fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
+async fn run_container_exec_thread(ctx: ContainerExecThreadCtx) -> AppResult<()> {
     let ContainerExecThreadCtx {
         config,
         session_id,
-        rx,
+        mut rx,
         ah,
         cols,
         rows,
@@ -212,12 +225,10 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
     } = ctx;
 
     if !is_safe_docker_ident(&container_id) {
-        fail_terminal(
-            &ah,
-            &session_id,
-            AppError::validation("terminal.container_id_invalid", "容器 ID/名称包含非法字符"),
-        );
-        return;
+        return Err(AppError::validation(
+            "terminal.container_id_invalid",
+            "容器 ID/名称包含非法字符",
+        ));
     }
 
     info!(
@@ -229,56 +240,61 @@ fn run_container_exec_thread(ctx: ContainerExecThreadCtx) {
         cols,
         rows
     );
-    let fail_session_id = session_id.clone();
-    let fail_handle = ah.clone();
-    let result = block_on(async move {
-        let docker = docker(&config).await?;
-        let shell = if shell.trim().is_empty() {
-            "/bin/sh".to_string()
-        } else {
-            shell.trim().to_string()
-        };
-        let exec = CreateExecOptions {
-            attach_stdin: Some(true),
-            attach_stdout: Some(true),
-            attach_stderr: Some(true),
-            tty: Some(true),
-            cmd: Some(vec![shell]),
-            user: user
-                .map(|value| value.trim().to_string())
-                .filter(|value| !value.is_empty()),
-            ..Default::default()
-        };
-        let created = docker
-            .create_exec(&container_id, exec)
-            .await
-            .map_err(map_bollard_error)?;
-        let start = StartExecOptions {
-            detach: false,
-            tty: true,
-            output_capacity: None,
-        };
-        let mut hijack = open_hijack_json(
-            &config,
-            hyper::Method::POST,
-            &format!("/exec/{}/start", created.id),
-            &start,
-        )
-        .await?;
-        mark_backend_ready(&ah, &session_id);
-        run_docker_exec_io_loop(session_id, rx, ah, &config, &created.id, &mut hijack, cols, rows).await;
-        Ok::<(), AppError>(())
-    });
-
-    if let Err(e) = result {
-        fail_terminal(&fail_handle, &fail_session_id, e);
-    } else {
-        info!(
-            target: "shipyardx_lib::services::terminal",
-            "container exec terminal finished; session_id={}",
-            fail_session_id
-        );
+    if !wait_for_client_ready(&session_id, &mut rx, &ah).await {
+        return Ok(());
     }
+
+    let docker = docker(&config).await?;
+    let shell = if shell.trim().is_empty() {
+        "/bin/sh".to_string()
+    } else {
+        shell.trim().to_string()
+    };
+    let exec = CreateExecOptions {
+        attach_stdin: Some(true),
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        tty: Some(true),
+        cmd: Some(vec![shell]),
+        user: user
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
+        ..Default::default()
+    };
+    let created = docker
+        .create_exec(&container_id, exec)
+        .await
+        .map_err(map_bollard_error)?;
+    let start = StartExecOptions {
+        detach: false,
+        tty: true,
+        output_capacity: None,
+    };
+    let mut hijack = open_hijack_json(
+        &config,
+        hyper::Method::POST,
+        &format!("/exec/{}/start", created.id),
+        &start,
+    )
+    .await?;
+    mark_backend_ready(&ah, &session_id);
+    run_docker_exec_io_loop(
+        session_id.clone(),
+        rx,
+        ah,
+        &config,
+        &created.id,
+        &mut hijack,
+        cols,
+        rows,
+    )
+    .await;
+    info!(
+        target: "shipyardx_lib::services::terminal",
+        "container exec terminal finished; session_id={}",
+        session_id
+    );
+    Ok(())
 }
 
 async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, rows: u32) -> bool {
@@ -357,6 +373,7 @@ async fn run_docker_exec_io_loop(
         tokio::select! {
             maybe_msg = rx.recv() => {
                 match maybe_msg {
+                    Some(TerminalMsg::ClientReady) => {}
                     Some(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
                     Some(TerminalMsg::Resize { cols, rows }) => {
                         if cols != last_cols || rows != last_rows {
@@ -427,6 +444,7 @@ async fn run_terminal_io_loop(
         tokio::select! {
             maybe_msg = rx.recv() => {
                 match maybe_msg {
+                    Some(TerminalMsg::ClientReady) => {}
                     Some(TerminalMsg::Data(data)) => input_buf.extend_from_slice(&data),
                     Some(TerminalMsg::Resize { cols, rows }) => {
                         if cols != last_cols || rows != last_rows {
@@ -497,6 +515,7 @@ fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
                             session_id
                         );
                         mark_client_ready(ah, session_id);
+                        dispatch_terminal_msg(ah, session_id, TerminalMsg::ClientReady);
                     }
                     WsClientCtrl::Resize { cols, rows } => {
                         debug!(
@@ -566,6 +585,8 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
         let _ = ws.close(None).await;
         return;
     }
+    mark_client_ready(&ah, &session_id);
+    dispatch_terminal_msg(&ah, &session_id, TerminalMsg::ClientReady);
 
     'ws: loop {
         tokio::select! {
@@ -604,14 +625,14 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     );
 }
 
-fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
+async fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
     if WS_PORT.get().is_some() {
         return Ok(());
     }
 
-    let listener = block_on(TcpListener::bind("127.0.0.1:0")).and_then(|result| {
-        result.map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e))
-    })?;
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e))?;
     let port = listener
         .local_addr()
         .map_err(|e| AppError::internal("terminal.ws_addr_failed", "读取终端 WebSocket 地址失败").with_source(e))?
@@ -645,24 +666,18 @@ fn terminal_ws_port() -> AppResult<u16> {
         .ok_or_else(|| AppError::internal("terminal.ws_not_initialized", "终端 WebSocket 服务尚未初始化"))
 }
 
-pub fn open_terminal(
+pub async fn open_terminal(
     server_id: String,
     cols: u32,
     rows: u32,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    start_terminal_ws_server_once(app_handle.clone())?;
+    start_terminal_ws_server_once(app_handle.clone()).await?;
     let ws_port = terminal_ws_port()?;
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
-
-    let sid = session_id.clone();
-    let ah = app_handle.clone();
-    spawn_on_runtime(async move {
-        run_terminal_thread(server, sid, rx, ah, cols, rows);
-    })?;
 
     lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
@@ -672,6 +687,26 @@ pub fn open_terminal(
         "记录终端握手状态失败",
     )?
     .insert(session_id.clone(), TerminalHandshakeState::default());
+
+    let sid = session_id.clone();
+    let ah = app_handle.clone();
+    if let Err(error) = spawn_on_runtime(async move {
+        let fail_session_id = sid.clone();
+        let fail_handle = ah.clone();
+        if let Err(error) = run_terminal_thread(server, sid, rx, ah, cols, rows).await {
+            fail_terminal(&fail_handle, &fail_session_id, error);
+        }
+    }) {
+        let _ = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+            .map(|mut terminals| terminals.remove(&session_id));
+        let _ = lock_mutex(
+            &state.terminal_handshakes,
+            "terminal.handshake_lock_failed",
+            "移除终端握手状态失败",
+        )
+        .map(|mut handshakes| handshakes.remove(&session_id));
+        return Err(error);
+    }
     info!(
         target: "shipyardx_lib::services::terminal",
         "terminal session opened; session_id={} server_id={} ws_port={}",
@@ -682,13 +717,13 @@ pub fn open_terminal(
     Ok(TerminalSession { session_id, ws_port })
 }
 
-pub fn open_container_exec_terminal(
+pub async fn open_container_exec_terminal(
     server_id: String,
     params: ContainerExecTerminalParams,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    start_terminal_ws_server_once(app_handle.clone())?;
+    start_terminal_ws_server_once(app_handle.clone()).await?;
     let ws_port = terminal_ws_port()?;
     let server = get_server_config(&state, &server_id)?;
     let session_id = generate_id();
@@ -699,8 +734,19 @@ pub fn open_container_exec_terminal(
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    spawn_on_runtime(async move {
-        run_container_exec_thread(ContainerExecThreadCtx {
+    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
+        .insert(session_id.clone(), TerminalHandle { tx });
+    lock_mutex(
+        &state.terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "记录终端握手状态失败",
+    )?
+    .insert(session_id.clone(), TerminalHandshakeState::default());
+
+    if let Err(error) = spawn_on_runtime(async move {
+        let fail_session_id = sid.clone();
+        let fail_handle = ah.clone();
+        if let Err(error) = run_container_exec_thread(ContainerExecThreadCtx {
             config: server,
             session_id: sid,
             rx,
@@ -711,16 +757,21 @@ pub fn open_container_exec_terminal(
             user: params.user,
             shell,
         })
-    })?;
-
-    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
-        .insert(session_id.clone(), TerminalHandle { tx });
-    lock_mutex(
-        &state.terminal_handshakes,
-        "terminal.handshake_lock_failed",
-        "记录终端握手状态失败",
-    )?
-    .insert(session_id.clone(), TerminalHandshakeState::default());
+        .await
+        {
+            fail_terminal(&fail_handle, &fail_session_id, error);
+        }
+    }) {
+        let _ = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+            .map(|mut terminals| terminals.remove(&session_id));
+        let _ = lock_mutex(
+            &state.terminal_handshakes,
+            "terminal.handshake_lock_failed",
+            "移除终端握手状态失败",
+        )
+        .map(|mut handshakes| handshakes.remove(&session_id));
+        return Err(error);
+    }
     info!(
         target: "shipyardx_lib::services::terminal",
         "container exec session opened; session_id={} server_id={} container_id={} ws_port={}",
