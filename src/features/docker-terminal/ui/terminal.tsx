@@ -35,6 +35,7 @@ import { cn } from '@/shared/lib/utils'
 const WS_OPEN_RETRIES = 20
 const WS_OPEN_RETRY_DELAY_MS = 100
 const OVERLAY_FADE_OUT_MS = 220
+const BACKEND_RESIZE_THROTTLE_MS = 120
 const TERMINAL_VIEW_PADDING_PX = 8
 const TERMINAL_SURFACE_BG = '#1e1e1e'
 
@@ -208,6 +209,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const serializeAddonRef = useRef<SerializeAddon | null>(null)
   const fitFrameRef = useRef<number | null>(null)
   const sizeRef = useRef({ cols: 80, rows: 24 })
+  const backendSentSizeRef = useRef<{ cols: number; rows: number } | null>(null)
+  const pendingBackendSizeRef = useRef<{ cols: number; rows: number } | null>(null)
+  const backendResizeTimerRef = useRef<number | null>(null)
   const backendSessionIdRef = useRef<string | null>(null)
   const transportRef = useRef<WebSocket | null>(null)
   const overlayFadeTimerRef = useRef<number | null>(null)
@@ -327,7 +331,18 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     setOverlayMounted(true)
   }, [phase])
 
-  const endSession = useCallback((opts: EndSessionOptions) => {
+  const clearBackendResizeSync = useCallback(() => {
+    if (backendResizeTimerRef.current !== null) {
+      window.clearTimeout(backendResizeTimerRef.current)
+      backendResizeTimerRef.current = null
+    }
+    pendingBackendSizeRef.current = null
+    backendSentSizeRef.current = null
+  }, [])
+
+  const releaseSessionResources = useCallback((closeBackendSession: boolean) => {
+    clearBackendResizeSync()
+
     const transport = transportRef.current
     transportRef.current = null
 
@@ -335,7 +350,72 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     backendSessionIdRef.current = null
 
     if (transport) closeTerminalTransport(transport)
-    if (sid) void commands.closeTerminal(sid).catch(console.error)
+    if (closeBackendSession && sid) void commands.closeTerminal(sid).catch(console.error)
+  }, [clearBackendResizeSync])
+
+  const updateFrontendTerminalSize = useCallback((cols: number, rows: number) => {
+    if (cols <= 0 || rows <= 0) return
+    sizeRef.current = { cols, rows }
+  }, [])
+
+  const flushBackendResize = useCallback((force = false) => {
+    const transport = transportRef.current
+    const nextSize = pendingBackendSizeRef.current
+    if (!nextSize || transport?.readyState !== WebSocket.OPEN) return
+
+    const lastSent = backendSentSizeRef.current
+    const changed = !lastSent || lastSent.cols !== nextSize.cols || lastSent.rows !== nextSize.rows
+    if (!force && !changed) return
+
+    transport.send(ctrlFrame({ type: 'resize', cols: nextSize.cols, rows: nextSize.rows }))
+    backendSentSizeRef.current = nextSize
+  }, [])
+
+  const sendBackendResize = useCallback((cols: number, rows: number, force = false) => {
+    if (cols <= 0 || rows <= 0) return
+
+    pendingBackendSizeRef.current = { cols, rows }
+    if (backendResizeTimerRef.current !== null) {
+      window.clearTimeout(backendResizeTimerRef.current)
+      backendResizeTimerRef.current = null
+    }
+
+    if (force) {
+      flushBackendResize(true)
+      return
+    }
+
+    backendResizeTimerRef.current = window.setTimeout(() => {
+      backendResizeTimerRef.current = null
+      flushBackendResize(false)
+    }, BACKEND_RESIZE_THROTTLE_MS)
+  }, [flushBackendResize])
+
+  const fitTerminalNow = useCallback(() => {
+    const terminal = xtermRef.current
+    const fitAddon = fitAddonRef.current
+    if (!terminal || !fitAddon) return
+
+    fitAddon.fit()
+    updateFrontendTerminalSize(terminal.cols, terminal.rows)
+    sendBackendResize(terminal.cols, terminal.rows)
+  }, [sendBackendResize, updateFrontendTerminalSize])
+
+  const fitTerminal = useCallback(() => {
+    if (fitFrameRef.current !== null) window.cancelAnimationFrame(fitFrameRef.current)
+    fitFrameRef.current = window.requestAnimationFrame(() => {
+      fitFrameRef.current = null
+      fitTerminalNow()
+    })
+  }, [fitTerminalNow])
+
+  const handleTerminalResize = useCallback(({ cols, rows }: { cols: number; rows: number }) => {
+    updateFrontendTerminalSize(cols, rows)
+    sendBackendResize(cols, rows)
+  }, [sendBackendResize, updateFrontendTerminalSize])
+
+  const endSession = useCallback((opts: EndSessionOptions) => {
+    releaseSessionResources(true)
 
     if (opts.updateUi && mountAliveRef.current) {
       if (opts.reason === 'error' && opts.errorMessage !== undefined) {
@@ -347,7 +427,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
         if (opts.reason === 'remote') setWasEverConnected(true)
       }
     }
-  }, [])
+  }, [releaseSessionResources])
 
   useEffect(() => {
     mountAliveRef.current = true
@@ -357,17 +437,20 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
         window.clearTimeout(overlayFadeTimerRef.current)
         overlayFadeTimerRef.current = null
       }
-
-      const transport = transportRef.current
-      transportRef.current = null
-
-      const sid = backendSessionIdRef.current
-      backendSessionIdRef.current = null
-      if (sid) {
-        if (transport) closeTerminalTransport(transport)
-        void commands.closeTerminal(sid).catch(console.error)
-      }
+      releaseSessionResources(true)
     }
+  }, [releaseSessionResources])
+
+  const handleTerminalData = useCallback((data: string) => {
+    const transport = transportRef.current
+    if (transport?.readyState === WebSocket.OPEN) transport.send(ptyFrame(data))
+  }, [])
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('')
+    searchAddonRef.current?.clearDecorations()
+    setSearchResultIndex(0)
+    setSearchResultCount(0)
   }, [])
 
   const connect = useCallback(async () => {
@@ -403,11 +486,10 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       }
       openedBackendSessionId = session.session_id
       backendSessionIdRef.current = session.session_id
+      clearBackendResizeSync()
 
       const transport = await openTerminalTransport(session.session_id, session.ws_port, {
-        onPty: (bytes) => {
-          termWrite(bytes)
-        },
+        onPty: termWrite,
         onControl: (msg) => {
           if (msg.type === 'ready') {
             if (mountAliveRef.current) {
@@ -415,7 +497,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
               setWasEverConnected(true)
             }
             requestAnimationFrame(() => {
-              syncTerminalSize(sizeRef.current.cols, sizeRef.current.rows, true)
+              sendBackendResize(sizeRef.current.cols, sizeRef.current.rows, true)
               termFocus()
             })
             return
@@ -444,7 +526,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
       if (!mountAliveRef.current || isStale()) {
         endSession({ updateUi: false })
-        return
       }
     } catch (e) {
       const orphan = transportRef.current
@@ -461,52 +542,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     } finally {
       connectInFlightRef.current = false
     }
-  }, [endSession, termFocus, termWrite, execCustomShell, execShellPreset, execUser])
-
-  const handleTerminalData = useCallback((data: string) => {
-    const transport = transportRef.current
-    if (transport?.readyState === WebSocket.OPEN) transport.send(ptyFrame(data))
-  }, [])
-
-  const clearSearch = useCallback(() => {
-    setSearchQuery('')
-    searchAddonRef.current?.clearDecorations()
-    setSearchResultIndex(0)
-    setSearchResultCount(0)
-  }, [])
-
-  const syncTerminalSize = useCallback((cols: number, rows: number, force = false) => {
-    if (cols <= 0 || rows <= 0) return
-    const changed = cols !== sizeRef.current.cols || rows !== sizeRef.current.rows
-    sizeRef.current = { cols, rows }
-    const transport = transportRef.current
-    if ((force || changed) && transport?.readyState === WebSocket.OPEN) {
-      transport.send(ctrlFrame({ type: 'resize', cols, rows }))
-    }
-  }, [])
-
-  const fitTerminalNow = useCallback(
-    (forceResize = false) => {
-      const terminal = xtermRef.current
-      const fitAddon = fitAddonRef.current
-      if (!terminal || !fitAddon) return
-
-      fitAddon.fit()
-      syncTerminalSize(terminal.cols, terminal.rows, forceResize)
-    },
-    [syncTerminalSize]
-  )
-
-  const fitTerminal = useCallback(
-    (forceResize = false) => {
-      if (fitFrameRef.current !== null) window.cancelAnimationFrame(fitFrameRef.current)
-      fitFrameRef.current = window.requestAnimationFrame(() => {
-        fitFrameRef.current = null
-        fitTerminalNow(forceResize)
-      })
-    },
-    [fitTerminalNow]
-  )
+  }, [clearBackendResizeSync, endSession, execCustomShell, execShellPreset, execUser, sendBackendResize, termFocus, termWrite])
 
   useEffect(() => {
     const mount = terminalMountRef.current
@@ -549,7 +585,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     terminal.loadAddon(webLinksAddon)
     const rendererAddon = attachRendererAddon(terminal, terminalFrontend)
     const dataDisposable = terminal.onData(handleTerminalData)
-    const resizeDisposable = terminal.onResize(({ cols, rows }) => syncTerminalSize(cols, rows))
+    const resizeDisposable = terminal.onResize(handleTerminalResize)
     const searchResultsDisposable = searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
       setSearchResultIndex(resultCount > 0 ? resultIndex + 1 : 0)
       setSearchResultCount(resultCount)
@@ -559,8 +595,8 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     fitAddonRef.current = fitAddon
     fitTerminal()
 
-    const handleWindowResize = () => fitTerminal(true)
-    const ro = new ResizeObserver(() => fitTerminal(true))
+    const handleWindowResize = () => fitTerminal()
+    const ro = new ResizeObserver(() => fitTerminal())
     ro.observe(mount)
     window.addEventListener('resize', handleWindowResize)
 
@@ -597,14 +633,14 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     ligatures,
     lineHeight,
     scrollback,
-    syncTerminalSize,
+    handleTerminalResize,
     terminalThemeName,
     terminalFrontend,
   ])
 
   useEffect(() => {
     if (phase !== 'connected') return
-    fitTerminal(true)
+    fitTerminal()
   }, [fitTerminal, phase])
 
   const overlayVisible = phase !== 'connected'
