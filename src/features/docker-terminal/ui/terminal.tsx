@@ -340,18 +340,21 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     backendSentSizeRef.current = null
   }, [])
 
-  const releaseSessionResources = useCallback((closeBackendSession: boolean) => {
-    clearBackendResizeSync()
+  const releaseSessionResources = useCallback(
+    (closeBackendSession: boolean) => {
+      clearBackendResizeSync()
 
-    const transport = transportRef.current
-    transportRef.current = null
+      const transport = transportRef.current
+      transportRef.current = null
 
-    const sid = backendSessionIdRef.current
-    backendSessionIdRef.current = null
+      const sid = backendSessionIdRef.current
+      backendSessionIdRef.current = null
 
-    if (transport) closeTerminalTransport(transport)
-    if (closeBackendSession && sid) void commands.closeTerminal(sid).catch(console.error)
-  }, [clearBackendResizeSync])
+      if (transport) closeTerminalTransport(transport)
+      if (closeBackendSession && sid) void commands.closeTerminal(sid).catch(console.error)
+    },
+    [clearBackendResizeSync]
+  )
 
   const updateFrontendTerminalSize = useCallback((cols: number, rows: number) => {
     if (cols <= 0 || rows <= 0) return
@@ -371,25 +374,28 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     backendSentSizeRef.current = nextSize
   }, [])
 
-  const sendBackendResize = useCallback((cols: number, rows: number, force = false) => {
-    if (cols <= 0 || rows <= 0) return
+  const sendBackendResize = useCallback(
+    (cols: number, rows: number, force = false) => {
+      if (cols <= 0 || rows <= 0) return
 
-    pendingBackendSizeRef.current = { cols, rows }
-    if (backendResizeTimerRef.current !== null) {
-      window.clearTimeout(backendResizeTimerRef.current)
-      backendResizeTimerRef.current = null
-    }
+      pendingBackendSizeRef.current = { cols, rows }
+      if (backendResizeTimerRef.current !== null) {
+        window.clearTimeout(backendResizeTimerRef.current)
+        backendResizeTimerRef.current = null
+      }
 
-    if (force) {
-      flushBackendResize(true)
-      return
-    }
+      if (force) {
+        flushBackendResize(true)
+        return
+      }
 
-    backendResizeTimerRef.current = window.setTimeout(() => {
-      backendResizeTimerRef.current = null
-      flushBackendResize(false)
-    }, BACKEND_RESIZE_THROTTLE_MS)
-  }, [flushBackendResize])
+      backendResizeTimerRef.current = window.setTimeout(() => {
+        backendResizeTimerRef.current = null
+        flushBackendResize(false)
+      }, BACKEND_RESIZE_THROTTLE_MS)
+    },
+    [flushBackendResize]
+  )
 
   const fitTerminalNow = useCallback(() => {
     const terminal = xtermRef.current
@@ -409,25 +415,31 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     })
   }, [fitTerminalNow])
 
-  const handleTerminalResize = useCallback(({ cols, rows }: { cols: number; rows: number }) => {
-    updateFrontendTerminalSize(cols, rows)
-    sendBackendResize(cols, rows)
-  }, [sendBackendResize, updateFrontendTerminalSize])
+  const handleTerminalResize = useCallback(
+    ({ cols, rows }: { cols: number; rows: number }) => {
+      updateFrontendTerminalSize(cols, rows)
+      sendBackendResize(cols, rows)
+    },
+    [sendBackendResize, updateFrontendTerminalSize]
+  )
 
-  const endSession = useCallback((opts: EndSessionOptions) => {
-    releaseSessionResources(true)
+  const endSession = useCallback(
+    (opts: EndSessionOptions) => {
+      releaseSessionResources(true)
 
-    if (opts.updateUi && mountAliveRef.current) {
-      if (opts.reason === 'error' && opts.errorMessage !== undefined) {
-        setPhase('error')
-        setErrorText(opts.errorMessage)
-        setWasEverConnected(true)
-      } else {
-        setPhase('disconnected')
-        if (opts.reason === 'remote') setWasEverConnected(true)
+      if (opts.updateUi && mountAliveRef.current) {
+        if (opts.reason === 'error' && opts.errorMessage !== undefined) {
+          setPhase('error')
+          setErrorText(opts.errorMessage)
+          setWasEverConnected(true)
+        } else {
+          setPhase('disconnected')
+          if (opts.reason === 'remote') setWasEverConnected(true)
+        }
       }
-    }
-  }, [releaseSessionResources])
+    },
+    [releaseSessionResources]
+  )
 
   useEffect(() => {
     mountAliveRef.current = true
@@ -542,7 +554,16 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     } finally {
       connectInFlightRef.current = false
     }
-  }, [clearBackendResizeSync, endSession, execCustomShell, execShellPreset, execUser, sendBackendResize, termFocus, termWrite])
+  }, [
+    clearBackendResizeSync,
+    endSession,
+    execCustomShell,
+    execShellPreset,
+    execUser,
+    sendBackendResize,
+    termFocus,
+    termWrite,
+  ])
 
   useEffect(() => {
     const mount = terminalMountRef.current

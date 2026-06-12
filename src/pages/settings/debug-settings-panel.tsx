@@ -44,7 +44,7 @@ export function DebugSettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Debug" title="调试" description="" />
+      <SettingsPanelHeader eyebrow="Debug" title="调试" />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow

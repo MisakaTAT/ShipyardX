@@ -39,6 +39,7 @@ export interface AppSettingsContextValue {
   settings: AppSettings
   updateTerminalSettings: (patch: Partial<AppSettings['terminal']>) => void
   resetSettings: () => void
+  resetTerminalSettings: () => void
 }
 
 export const AppSettingsContext = createContext<AppSettingsContextValue | null>(null)

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, RotateCcw } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { XTERM_THEME_MAP, XTERM_THEME_NAMES } from '@/themes/xtermjs'
+import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
@@ -42,6 +43,7 @@ interface TerminalSettingsPanelProps {
   onCursorStyleChange: (value: TerminalCursorStyle) => void
   onCursorBlinkChange: (value: boolean) => void
   onLineHeightChange: (value: number) => void
+  onReset: () => void
 }
 
 export function TerminalSettingsPanel({
@@ -64,6 +66,7 @@ export function TerminalSettingsPanel({
   onCursorStyleChange,
   onCursorBlinkChange,
   onLineHeightChange,
+  onReset,
 }: TerminalSettingsPanelProps) {
   const [scrollbackDraft, setScrollbackDraft] = useState(String(scrollback))
   const [fontSizeDraft, setFontSizeDraft] = useState(String(fontSize))
@@ -111,7 +114,16 @@ export function TerminalSettingsPanel({
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Terminal" title="终端" description="" />
+      <SettingsPanelHeader
+        eyebrow="Terminal"
+        title="终端"
+        actions={
+          <Button type="button" size="sm" onClick={onReset}>
+            <RotateCcw className="size-3.5" />
+            恢复默认
+          </Button>
+        }
+      />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow

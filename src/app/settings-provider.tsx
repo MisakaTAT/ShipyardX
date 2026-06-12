@@ -32,8 +32,15 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings(DEFAULT_SETTINGS)
   }
 
+  const resetTerminalSettings: AppSettingsContextValue['resetTerminalSettings'] = () => {
+    setSettings((current) => ({
+      ...current,
+      terminal: DEFAULT_SETTINGS.terminal,
+    }))
+  }
+
   return (
-    <AppSettingsContext.Provider value={{ settings, updateTerminalSettings, resetSettings }}>
+    <AppSettingsContext.Provider value={{ settings, updateTerminalSettings, resetSettings, resetTerminalSettings }}>
       {children}
     </AppSettingsContext.Provider>
   )

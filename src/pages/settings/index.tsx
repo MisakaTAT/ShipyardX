@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAppSettings } from '@/app/settings-store'
 import { commands } from '@/types/app-bindings'
-import { Button } from '@/shared/ui/button'
+import { toast } from '@/shared/components/toast'
 import { cn } from '@/shared/lib/utils'
 import { AppSettingsPanel } from '@/pages/settings/app-settings-panel'
 import { DebugSettingsPanel } from '@/pages/settings/debug-settings-panel'
@@ -9,7 +9,7 @@ import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/set
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
 export default function SettingsPage() {
-  const { settings, updateTerminalSettings, resetSettings } = useAppSettings()
+  const { settings, updateTerminalSettings, resetTerminalSettings } = useAppSettings()
   const [activeSection, setActiveSection] = useState<SettingsSectionKey>('app')
   const [terminalFontOptions, setTerminalFontOptions] = useState<string[]>([])
 
@@ -30,6 +30,11 @@ export default function SettingsPage() {
       cancelled = true
     }
   }, [])
+
+  const handleResetTerminalSettings = () => {
+    resetTerminalSettings()
+    toast.success('终端设置已恢复默认')
+  }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -61,12 +66,6 @@ export default function SettingsPage() {
             )
           })}
         </div>
-
-        <div className="mt-auto pt-4">
-          <Button variant="outline" className="w-full justify-center" onClick={resetSettings}>
-            恢复默认
-          </Button>
-        </div>
       </aside>
 
       <section className="flex min-h-0 flex-1 scrollbar-gutter-stable flex-col overflow-y-scroll bg-background">
@@ -91,6 +90,7 @@ export default function SettingsPage() {
             onCursorStyleChange={(cursorStyle) => updateTerminalSettings({ cursorStyle })}
             onCursorBlinkChange={(cursorBlink) => updateTerminalSettings({ cursorBlink })}
             onLineHeightChange={(lineHeight) => updateTerminalSettings({ lineHeight })}
+            onReset={handleResetTerminalSettings}
           />
         ) : activeSection === 'debug' ? (
           <DebugSettingsPanel />

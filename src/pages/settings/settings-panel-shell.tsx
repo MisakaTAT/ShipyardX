@@ -8,15 +8,20 @@ export function SettingsPanelHeader({
   eyebrow,
   title,
   description,
+  actions,
 }: {
   eyebrow: string
   title: string
-  description: string
+  description?: string
+  actions?: ReactNode
 }) {
   return (
     <div className="border-b border-border/70 pb-4">
       <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-semibold text-foreground">{title}</h2>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
+        {actions ? <div className="shrink-0">{actions}</div> : null}
+      </div>
       {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
     </div>
   )

@@ -178,7 +178,7 @@ export function AppSettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Application" title="应用" description="" />
+      <SettingsPanelHeader eyebrow="Application" title="应用" />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow
