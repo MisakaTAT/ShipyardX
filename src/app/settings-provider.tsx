@@ -15,6 +15,18 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   }, [settings])
 
+  const updateHotkeySettings: AppSettingsContextValue['updateHotkeySettings'] = (patch) => {
+    setSettings((current) =>
+      normalizeSettings({
+        ...current,
+        hotkeys: {
+          ...current.hotkeys,
+          ...patch,
+        },
+      })
+    )
+  }
+
   const updateTerminalSettings: AppSettingsContextValue['updateTerminalSettings'] = (patch) => {
     setSettings((current) => ({
       ...current,
@@ -32,6 +44,13 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings(DEFAULT_SETTINGS)
   }
 
+  const resetHotkeySettings: AppSettingsContextValue['resetHotkeySettings'] = () => {
+    setSettings((current) => ({
+      ...current,
+      hotkeys: DEFAULT_SETTINGS.hotkeys,
+    }))
+  }
+
   const resetTerminalSettings: AppSettingsContextValue['resetTerminalSettings'] = () => {
     setSettings((current) => ({
       ...current,
@@ -40,7 +59,16 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppSettingsContext.Provider value={{ settings, updateTerminalSettings, resetSettings, resetTerminalSettings }}>
+    <AppSettingsContext.Provider
+      value={{
+        settings,
+        updateHotkeySettings,
+        updateTerminalSettings,
+        resetSettings,
+        resetHotkeySettings,
+        resetTerminalSettings,
+      }}
+    >
       {children}
     </AppSettingsContext.Provider>
   )

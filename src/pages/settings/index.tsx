@@ -5,6 +5,7 @@ import { toast } from '@/shared/components/toast'
 import { cn } from '@/shared/lib/utils'
 import { AppSettingsPanel } from '@/pages/settings/app-settings-panel'
 import { DebugSettingsPanel } from '@/pages/settings/debug-settings-panel'
+import { HotkeySettingsPanel } from '@/pages/settings/hotkey-settings-panel'
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/settings-sections'
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
@@ -92,6 +93,8 @@ export default function SettingsPage() {
             onLineHeightChange={(lineHeight) => updateTerminalSettings({ lineHeight })}
             onReset={handleResetTerminalSettings}
           />
+        ) : activeSection === 'hotkeys' ? (
+          <HotkeySettingsPanel />
         ) : activeSection === 'debug' ? (
           <DebugSettingsPanel />
         ) : (

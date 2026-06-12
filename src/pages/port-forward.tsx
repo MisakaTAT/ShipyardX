@@ -116,7 +116,7 @@ export default function PortForwardPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder='搜索主机、容器、端口或错误信息… ("/" 快速聚焦)'
+                placeholder="搜索主机、容器、端口或错误信息…"
                 className="mt-3 w-full"
               />
             </div>

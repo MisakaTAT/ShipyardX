@@ -1,14 +1,15 @@
 import { useEffect, type RefObject } from 'react'
+import { matchHotkey } from '@/shared/lib/hotkeys'
 
 export function useSearchHotkey(
   ref: RefObject<HTMLInputElement | null>,
-  options: { enabled?: boolean; key?: string } = {}
+  options: { enabled?: boolean; hotkey?: string | null } = {}
 ) {
-  const { enabled = true, key = '/' } = options
+  const { enabled = true, hotkey = '/' } = options
   useEffect(() => {
     if (!enabled) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== key) return
+      if (!matchHotkey(e, hotkey)) return
       const active = document.activeElement
       const tag = active?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (active as HTMLElement | null)?.isContentEditable) return
@@ -18,5 +19,5 @@ export function useSearchHotkey(
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [ref, enabled, key])
+  }, [ref, enabled, hotkey])
 }

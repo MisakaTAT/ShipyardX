@@ -58,7 +58,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder='搜索服务器名称或地址… ("/" 快速聚焦)'
+                placeholder="搜索服务器名称或地址"
                 className="mt-3 w-full"
               />
             </div>

@@ -44,7 +44,7 @@ export function PanelHeader({ icon: Icon, title, stats, search, lastUpdated, act
         <SearchInput
           value={search.value}
           onChange={search.onChange}
-          placeholder={search.placeholder ?? '搜索… ("/" 快速聚焦)'}
+          placeholder={search.placeholder}
           hotkey={search.hotkey}
           className={search.className ?? 'w-56'}
         />

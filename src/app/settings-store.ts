@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
+import { normalizeHotkey } from '@/shared/lib/hotkeys'
 
 export const APP_SETTINGS_STORAGE_KEY = 'shipyardx-settings'
 
@@ -8,6 +9,10 @@ export type TerminalCursorStyle = 'block' | 'underline' | 'bar'
 export type TerminalThemeName = keyof typeof XTERM_THEME_MAP
 
 export interface AppSettings {
+  hotkeys: {
+    focusSearch: string | null
+    openTerminalSearch: string | null
+  }
   terminal: {
     frontend: TerminalFrontend
     theme: TerminalThemeName
@@ -22,6 +27,10 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  hotkeys: {
+    focusSearch: '/',
+    openTerminalSearch: 'Mod+F',
+  },
   terminal: {
     frontend: 'xterm-webgl',
     theme: 'Dracula',
@@ -37,8 +46,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export interface AppSettingsContextValue {
   settings: AppSettings
+  updateHotkeySettings: (patch: Partial<AppSettings['hotkeys']>) => void
   updateTerminalSettings: (patch: Partial<AppSettings['terminal']>) => void
   resetSettings: () => void
+  resetHotkeySettings: () => void
   resetTerminalSettings: () => void
 }
 
@@ -77,6 +88,10 @@ export function normalizeSettings(input: unknown): AppSettings {
   if (!input || typeof input !== 'object') return DEFAULT_SETTINGS
 
   const raw = input as {
+    hotkeys?: {
+      focusSearch?: unknown
+      openTerminalSearch?: unknown
+    }
     terminal?: {
       frontend?: unknown
       theme?: unknown
@@ -102,6 +117,11 @@ export function normalizeSettings(input: unknown): AppSettings {
       : DEFAULT_SETTINGS.terminal.cursorStyle
 
   return {
+    hotkeys: {
+      focusSearch: normalizeHotkey(raw.hotkeys?.focusSearch) ?? DEFAULT_SETTINGS.hotkeys.focusSearch,
+      openTerminalSearch:
+        normalizeHotkey(raw.hotkeys?.openTerminalSearch) ?? DEFAULT_SETTINGS.hotkeys.openTerminalSearch,
+    },
     terminal: {
       frontend,
       theme: normalizeTerminalTheme(raw.terminal?.theme),

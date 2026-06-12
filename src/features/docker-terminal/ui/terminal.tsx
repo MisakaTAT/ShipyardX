@@ -12,21 +12,14 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import {
-  ChevronDown,
-  Download,
-  Loader2,
-  RefreshCw,
-  Search,
-  ShieldAlert,
-  Terminal as TerminalIcon,
-  X,
-} from 'lucide-react'
+import { ChevronDown, Download, Loader2, RefreshCw, ShieldAlert, Terminal as TerminalIcon, X } from 'lucide-react'
 import { useAppSettings } from '@/app/settings-store'
+import { SearchInput } from '@/shared/components/search-input'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { commands } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { getErrorMessage, normalizeAppError, type AppErrorLike } from '@/shared/lib/errors'
+import { matchHotkey } from '@/shared/lib/hotkeys'
 import { Input } from '@/shared/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -190,6 +183,7 @@ type EndSessionOptions = {
 export default function Terminal({ serverId, containerId }: TerminalProps) {
   const {
     settings: {
+      hotkeys,
       terminal: {
         frontend: terminalFrontend,
         theme: terminalThemeName,
@@ -216,6 +210,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const transportRef = useRef<WebSocket | null>(null)
   const overlayFadeTimerRef = useRef<number | null>(null)
   const terminalMountRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const serverIdLiveRef = useRef(serverId)
   const containerIdLiveRef = useRef<string | undefined>(containerId)
   const connectInFlightRef = useRef(false)
@@ -247,6 +242,33 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     const timer = window.setTimeout(() => setToolStatus(''), 1800)
     return () => window.clearTimeout(timer)
   }, [toolStatus])
+
+  useEffect(() => {
+    if (!searchToolbarOpen) return
+    const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus())
+    return () => window.cancelAnimationFrame(frame)
+  }, [searchToolbarOpen])
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (phase !== 'connected') return
+      if (!matchHotkey(event, hotkeys.openTerminalSearch)) return
+
+      const active = document.activeElement
+      const tag = active?.tagName
+      const isEditable = tag === 'INPUT' || tag === 'TEXTAREA' || (active as HTMLElement | null)?.isContentEditable
+      const isTerminalInput =
+        active instanceof HTMLElement &&
+        (active.classList.contains('xterm-helper-textarea') || Boolean(active.closest('.xterm')))
+      if (isEditable && active !== searchInputRef.current && !isTerminalInput) return
+
+      event.preventDefault()
+      setSearchToolbarOpen(true)
+    }
+
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [hotkeys.openTerminalSearch, phase])
 
   const termWrite = useCallback((data: string | Uint8Array) => {
     xtermRef.current?.write(data)
@@ -664,6 +686,8 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     fitTerminal()
   }, [fitTerminal, phase])
 
+  const terminalThemeBackground =
+    (XTERM_THEME_MAP[terminalThemeName] ?? XTERM_THEME_MAP.Dracula).background ?? TERMINAL_SURFACE_BG
   const overlayVisible = phase !== 'connected'
   const terminalVisible = phase === 'connected'
   const isContainerExec = Boolean(containerId)
@@ -672,29 +696,39 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
     <div
       className="relative h-full w-full overflow-hidden select-text"
       style={{
-        background: (XTERM_THEME_MAP[terminalThemeName] ?? XTERM_THEME_MAP.Dracula).background ?? TERMINAL_SURFACE_BG,
+        background: terminalVisible ? terminalThemeBackground : undefined,
       }}
     >
       <div
         className="absolute inset-0 box-border"
         style={{
+          background: terminalThemeBackground,
           padding: TERMINAL_VIEW_PADDING_PX,
           visibility: terminalVisible ? 'visible' : 'hidden',
         }}
       >
         <div className="pointer-events-none absolute top-2 right-2 left-2 z-10 flex justify-end">
           {searchToolbarOpen ? (
-            <div className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border/70 bg-background/85 p-2 shadow-sm backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <Search className="size-4 text-muted-foreground" />
-                <Input
-                  type="text"
+            <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/85 px-1.5 py-1 shadow-sm backdrop-blur-sm">
+              <div className="flex items-center gap-1.5">
+                <SearchInput
+                  ref={searchInputRef}
                   value={searchQuery}
-                  onChange={(event) => {
-                    const nextQuery = event.target.value
+                  onChange={(nextQuery) => {
+                    if (!nextQuery) {
+                      clearSearch()
+                      return
+                    }
                     setSearchQuery(nextQuery)
                     runSearch(nextQuery)
                   }}
+                  hotkey={false}
+                  clearable
+                  placeholder="搜索终端内容"
+                  className="w-48"
+                  inputClassName="h-7 rounded-md border-border bg-card/80 py-0 text-sm"
+                  clearButtonClassName="inset-y-auto top-1/2 right-0.5 size-6 -translate-y-1/2 rounded-md"
+                  name="terminal-search"
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       runSearch(searchQuery, event.shiftKey ? 'previous' : 'next')
@@ -704,32 +738,35 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                       setSearchToolbarOpen(false)
                     }
                   }}
-                  placeholder="搜索终端内容"
-                  className="h-8 w-52 rounded-md border-border bg-card/80 px-2.5 py-0 text-sm"
                 />
-                <span className="min-w-12 text-center text-xs text-muted-foreground">
+                <span className="min-w-10 text-center text-[11px] text-muted-foreground">
                   {searchResultCount > 0 ? `${searchResultIndex}/${searchResultCount}` : '0/0'}
                 </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="icon-xs"
+                  className="size-7"
                   onClick={() => runSearch(searchQuery, 'previous')}
                 >
                   <ChevronDown className="rotate-180" />
                 </Button>
-                <Button type="button" variant="outline" size="icon-xs" onClick={() => runSearch(searchQuery, 'next')}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-xs"
+                  className="size-7"
+                  onClick={() => runSearch(searchQuery, 'next')}
+                >
                   <ChevronDown />
-                </Button>
-                <Button type="button" variant="outline" size="icon-xs" onClick={clearSearch}>
-                  <X />
                 </Button>
               </div>
 
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" />}>
+                <DropdownMenuTrigger
+                  render={<Button type="button" variant="outline" size="icon-xs" className="size-7" />}
+                >
                   <Download />
-                  导出
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
                   <DropdownMenuItem
@@ -757,23 +794,15 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 type="button"
                 variant="outline"
                 size="icon-xs"
-                onClick={() => {
-                  clearSearch()
-                  setSearchToolbarOpen(false)
-                }}
+                className="size-7"
+                onClick={() => setSearchToolbarOpen(false)}
               >
-                <Search />
+                <X />
               </Button>
 
               {toolStatus ? <span className="text-xs text-muted-foreground">{toolStatus}</span> : null}
             </div>
-          ) : (
-            <div className="pointer-events-auto">
-              <Button type="button" variant="outline" size="icon-sm" onClick={() => setSearchToolbarOpen(true)}>
-                <Search />
-              </Button>
-            </div>
-          )}
+          ) : null}
         </div>
         <div ref={terminalMountRef} className="h-full w-full overflow-hidden" />
       </div>
