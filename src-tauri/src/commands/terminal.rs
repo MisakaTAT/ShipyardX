@@ -14,7 +14,7 @@ pub async fn open_terminal(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    Ok(services::terminal::open_terminal(server_id, cols, rows, state, app_handle).await?)
+    services::terminal::open_terminal(server_id, cols, rows, state, app_handle).await
 }
 
 #[tauri::command]
@@ -25,17 +25,17 @@ pub async fn open_container_exec_terminal(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<TerminalSession> {
-    Ok(services::terminal::open_container_exec_terminal(server_id, params, state, app_handle).await?)
+    services::terminal::open_container_exec_terminal(server_id, params, state, app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    Ok(services::terminal::close_terminal(session_id, state).await?)
+    services::terminal::close_terminal(session_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn save_terminal_export(path: String, content: String) -> AppResult<()> {
-    Ok(services::terminal::save_terminal_export(path, content).await?)
+    services::terminal::save_terminal_export(path, content).await
 }

@@ -16,13 +16,13 @@ pub async fn list_system_fonts() -> AppResult<Vec<String>> {
 #[tauri::command]
 #[specta::specta]
 pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
-    Ok(services::system::check_docker_access(server_id, state).await?)
+    services::system::check_docker_access(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn get_docker_info(server_id: String, state: State<'_, AppState>) -> AppResult<DockerEngineInfo> {
-    Ok(services::system::get_docker_info(server_id, state).await?)
+    services::system::get_docker_info(server_id, state).await
 }
 
 #[tauri::command]
@@ -32,13 +32,13 @@ pub async fn get_container_stats(
     container_id: String,
     state: State<'_, AppState>,
 ) -> AppResult<ContainerStats> {
-    Ok(services::system::get_container_stats(server_id, container_id, state).await?)
+    services::system::get_container_stats(server_id, container_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn get_docker_daemon_settings(server_id: String, state: State<'_, AppState>) -> AppResult<DaemonSettings> {
-    Ok(services::system::get_docker_daemon_settings(server_id, state).await?)
+    services::system::get_docker_daemon_settings(server_id, state).await
 }
 
 #[tauri::command]
@@ -48,7 +48,7 @@ pub async fn update_docker_daemon_settings(
     params: DaemonUpdate,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::system::update_docker_daemon_settings(server_id, params, state).await?)
+    services::system::update_docker_daemon_settings(server_id, params, state).await
 }
 
 #[tauri::command]
@@ -58,7 +58,7 @@ pub async fn restart_docker_daemon(
     sudo_password: Option<String>,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::system::restart_docker_daemon(server_id, sudo_password, state).await?)
+    services::system::restart_docker_daemon(server_id, sudo_password, state).await
 }
 
 #[tauri::command]

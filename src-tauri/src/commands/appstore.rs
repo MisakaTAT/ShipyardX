@@ -15,13 +15,13 @@ pub async fn sync_appstore(app: AppHandle) -> AppResult<String> {
 #[tauri::command]
 #[specta::specta]
 pub async fn list_apps(app: AppHandle) -> AppResult<Vec<AppListItem>> {
-    Ok(services::appstore::list_apps(&app).await?)
+    services::appstore::list_apps(&app).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn get_app_detail(app: AppHandle, app_key: String) -> AppResult<AppDetail> {
-    Ok(services::appstore::get_app_detail(&app, &app_key).await?)
+    services::appstore::get_app_detail(&app, &app_key).await
 }
 
 #[tauri::command]
@@ -33,5 +33,5 @@ pub async fn install_app(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let server = get_server_config(&state, &server_id)?;
-    Ok(services::appstore::install_app_inner(&app, &server, &req).await?)
+    services::appstore::install_app_inner(&app, &server, &req).await
 }

@@ -14,11 +14,11 @@ pub async fn start_log_stream(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<String> {
-    Ok(services::log_stream::start_log_stream(server_id, container_id, tail, timestamps, state, app_handle).await?)
+    services::log_stream::start_log_stream(server_id, container_id, tail, timestamps, state, app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn stop_log_stream(stream_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    Ok(services::log_stream::stop_log_stream(stream_id, state).await?)
+    services::log_stream::stop_log_stream(stream_id, state).await
 }

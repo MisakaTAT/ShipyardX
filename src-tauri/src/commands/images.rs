@@ -9,13 +9,13 @@ use crate::state::AppState;
 #[tauri::command]
 #[specta::specta]
 pub async fn list_images(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Image>> {
-    Ok(services::images::list_images(server_id, state).await?)
+    services::images::list_images(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn inspect_image(server_id: String, image_id: String, state: State<'_, AppState>) -> AppResult<String> {
-    Ok(services::images::inspect_image(server_id, image_id, state).await?)
+    services::images::inspect_image(server_id, image_id, state).await
 }
 
 #[tauri::command]
@@ -25,7 +25,7 @@ pub async fn get_image_history(
     image_id: String,
     state: State<'_, AppState>,
 ) -> AppResult<Vec<ImageLayer>> {
-    Ok(services::images::get_image_history(server_id, image_id, state).await?)
+    services::images::get_image_history(server_id, image_id, state).await
 }
 
 #[tauri::command]
@@ -36,25 +36,25 @@ pub async fn remove_image(
     force: bool,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::images::remove_image(server_id, image_id, force, state).await?)
+    services::images::remove_image(server_id, image_id, force, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn prune_dangling_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
-    Ok(services::images::prune_dangling_images(server_id, state).await?)
+    services::images::prune_dangling_images(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn prune_unused_images(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
-    Ok(services::images::prune_unused_images(server_id, state).await?)
+    services::images::prune_unused_images(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn prune_builder_cache(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
-    Ok(services::images::prune_builder_cache(server_id, state).await?)
+    services::images::prune_builder_cache(server_id, state).await
 }
 
 #[tauri::command]
@@ -68,7 +68,7 @@ pub async fn export_image(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::images::export_image(export_id, server_id, image_id, directory, file_name, app_handle, state).await?)
+    services::images::export_image(export_id, server_id, image_id, directory, file_name, app_handle, state).await
 }
 
 #[tauri::command]
@@ -80,7 +80,7 @@ pub async fn import_image(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::images::import_image(import_id, server_id, file_path, app_handle, state).await?)
+    services::images::import_image(import_id, server_id, file_path, app_handle, state).await
 }
 
 #[tauri::command]
@@ -91,11 +91,11 @@ pub async fn start_image_pull(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<String> {
-    Ok(services::images::start_image_pull(server_id, image, state, app_handle).await?)
+    services::images::start_image_pull(server_id, image, state, app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn cancel_stream(stream_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    Ok(services::images::cancel_stream(stream_id, state).await?)
+    services::images::cancel_stream(stream_id, state).await
 }

@@ -9,25 +9,25 @@ use crate::state::AppState;
 #[tauri::command]
 #[specta::specta]
 pub async fn list_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<Volume>> {
-    Ok(services::volumes::list_volumes(server_id, state).await?)
+    services::volumes::list_volumes(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn inspect_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<String> {
-    Ok(services::volumes::inspect_volume(server_id, name, state).await?)
+    services::volumes::inspect_volume(server_id, name, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn remove_volume(server_id: String, name: String, state: State<'_, AppState>) -> AppResult<()> {
-    Ok(services::volumes::remove_volume(server_id, name, state).await?)
+    services::volumes::remove_volume(server_id, name, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn prune_unused_volumes(server_id: String, state: State<'_, AppState>) -> AppResult<CleanupResult> {
-    Ok(services::volumes::prune_unused_volumes(server_id, state).await?)
+    services::volumes::prune_unused_volumes(server_id, state).await
 }
 
 #[tauri::command]
@@ -39,5 +39,5 @@ pub async fn create_volume(
     driver_opts: Option<std::collections::HashMap<String, String>>,
     state: State<'_, AppState>,
 ) -> AppResult<()> {
-    Ok(services::volumes::create_volume(server_id, name, driver, driver_opts, state).await?)
+    services::volumes::create_volume(server_id, name, driver, driver_opts, state).await
 }
