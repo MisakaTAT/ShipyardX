@@ -202,7 +202,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         }
       }}
     >
-      <DialogContent className={cn(modalDialogContent, 'max-h-[720px] w-[680px] max-w-none!')} showCloseButton={false}>
+      <DialogContent className={cn(modalDialogContent, 'max-h-180 w-170 max-w-none!')} showCloseButton={false}>
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3">
           <span className="flex shrink-0 text-primary [&_svg]:size-4">
             <Box />

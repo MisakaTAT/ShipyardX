@@ -333,9 +333,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       })
       if (!path) return
       await commands.saveTerminalExport(path, content)
-      setToolStatus('已导出文件')
+      setToolStatus('导出完成')
     } catch {
-      setToolStatus('导出失败')
+      setToolStatus('导出未完成')
     }
   }, [])
 
@@ -709,9 +709,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const overlayVisible = phase !== 'connected'
   const terminalVisible = phase === 'connected'
   const isContainerExec = Boolean(containerId)
-  const errorDetails = [terminalError?.detail?.trim(), terminalError?.action?.trim()].filter((line): line is string =>
-    Boolean(line && line !== terminalError?.message)
-  )
 
   return (
     <div
@@ -843,21 +840,21 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     <TerminalIcon className="size-7 text-primary" />
                   </div>
                   <h2 className="text-lg font-semibold text-foreground">
-                    {wasEverConnected ? '连接已断开' : '远程终端未连接'}
+                    {wasEverConnected ? '连接已断开' : '尚未连接终端'}
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {wasEverConnected
-                      ? '与远程主机的会话已结束，可重新建立连接。'
+                      ? '当前会话已结束，你可以重新发起连接'
                       : isContainerExec
-                        ? '将通过 Docker API 创建 exec 会话并接入容器交互终端。'
-                        : '通过 SSH 登录当前服务器，连接后即可在此输入命令。'}
+                        ? '将为当前容器创建 exec 会话，并连接到交互式终端'
+                        : '将连接到当前服务器的远程终端，连接后即可开始输入命令'}
                   </p>
                 </div>
                 {isContainerExec && (
                   <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <p className="text-xs text-muted-foreground">用户（可选）</p>
+                        <p className="text-xs text-muted-foreground">执行用户（可选）</p>
                         <Input
                           value={execUser}
                           onChange={(e) => setExecUser(e.target.value)}
@@ -884,7 +881,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     </div>
                     {execShellPreset === 'custom' ? (
                       <div className="mt-3 space-y-1.5">
-                        <p className="text-xs text-muted-foreground">自定义 shell 命令</p>
+                        <p className="text-xs text-muted-foreground">自定义 Shell</p>
                         <Input
                           value={execCustomShell}
                           onChange={(e) => setExecCustomShell(e.target.value)}
@@ -901,7 +898,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
                   >
                     <TerminalIcon />
-                    {wasEverConnected ? '重新连接' : '开始连接'}
+                    {wasEverConnected ? '重新连接' : '连接终端'}
                   </Button>
                 </div>
               </>
@@ -914,9 +911,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 </div>
                 <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
                 <p className="text-sm text-muted-foreground">
-                  {isContainerExec
-                    ? '正在通过 Docker API 启动容器终端，请稍候。'
-                    : '正在通过 SSH 登录远程主机并启动终端，请稍候。'}
+                  {isContainerExec ? '正在启动容器终端并建立连接，请稍候' : '正在连接远程终端，请稍候'}
                 </p>
               </div>
             )}
@@ -950,7 +945,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     </button>
                     {errorDetailsExpanded ? (
                       <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center text-[12px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
-                        {errorDetails.join('\n')}
+                        {terminalError.detail}
                       </pre>
                     ) : null}
                   </div>

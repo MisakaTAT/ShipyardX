@@ -3,7 +3,7 @@ use std::sync::{Arc, OnceLock};
 
 use log::{debug, info, warn};
 use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
-use russh::{Disconnect, client};
+use russh::{Disconnect, Error as RusshError, client};
 use tokio::runtime::{Builder, Runtime};
 
 use crate::dto::server::ServerConfig;
@@ -58,6 +58,84 @@ where
     Ok(ssh_runtime()?.handle().spawn(future))
 }
 
+fn map_ssh_connect_error(config: &ServerConfig, error: RusshError) -> AppError {
+    use std::io::ErrorKind;
+
+    match error {
+        RusshError::ConnectionTimeout => AppError::timeout(
+            "ssh.connect_timeout",
+            format!("连接 {}:{} 超时", config.host, config.port),
+        )
+        .retryable(true),
+        RusshError::KeepaliveTimeout | RusshError::InactivityTimeout => {
+            AppError::timeout("ssh.connection_lost", "连接已超时中断")
+                .with_action("请检查网络连通性后重试")
+                .retryable(true)
+        }
+        RusshError::NoCommonAlgo { kind, ours, theirs } => AppError::unavailable("ssh.no_common_algo", "算法不兼容")
+            .with_detail(format!(
+                "协商类型：{kind:?}；客户端：{}；服务端：{}",
+                ours.join(", "),
+                theirs.join(", ")
+            ))
+            .with_action("请调整 SSH 服务端或客户端支持的算法后重试"),
+        RusshError::WrongServerSig | RusshError::KeyChanged { .. } | RusshError::UnknownKey => {
+            AppError::auth("ssh.host_key_verification_failed", "主机身份校验失败")
+                .with_detail(error.to_string())
+                .with_action("请确认连接到的是正确的服务器，并检查主机密钥是否发生变化")
+        }
+        RusshError::NoAuthMethod | RusshError::UnsupportedAuthMethod => {
+            AppError::auth("ssh.auth_method_unsupported", "认证方式不受支持")
+                .with_detail(error.to_string())
+                .with_action("请切换为服务端支持的认证方式")
+        }
+        RusshError::CouldNotReadKey => AppError::validation("ssh.key_parse_failed", "密钥无法解析")
+            .with_action("请检查私钥格式是否正确，或重新选择密钥文件"),
+        RusshError::InvalidConfig(_) => {
+            AppError::validation("ssh.config_invalid", "配置无效").with_detail(error.to_string())
+        }
+        RusshError::Kex
+        | RusshError::KexInit
+        | RusshError::PacketAuth
+        | RusshError::DecryptionError
+        | RusshError::StrictKeyExchangeViolation { .. } => AppError::unavailable("ssh.handshake_failed", "握手失败")
+            .with_detail(error.to_string())
+            .with_action("请检查 SSH 服务端配置和协议兼容性")
+            .retryable(true),
+        RusshError::Disconnect | RusshError::HUP => AppError::unavailable("ssh.disconnected", "连接被远端关闭")
+            .with_detail(error.to_string())
+            .retryable(true),
+        RusshError::NotAuthenticated => {
+            AppError::auth("ssh.not_authenticated", "尚未完成认证").with_action("请检查用户名、密码或密钥配置")
+        }
+        RusshError::IO(io_error) => {
+            let base = match io_error.kind() {
+                ErrorKind::ConnectionRefused => AppError::unavailable("ssh.connection_refused", "服务器拒绝连接")
+                    .with_action("请确认目标主机 SSH 服务已启动，端口配置正确"),
+                ErrorKind::TimedOut => AppError::timeout(
+                    "ssh.connect_timeout",
+                    format!("连接 {}:{} 超时", config.host, config.port),
+                )
+                .with_action("请检查目标主机是否可达，以及安全组或防火墙设置")
+                .retryable(true),
+                ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
+                    AppError::unavailable("ssh.connection_interrupted", "连接已中断")
+                        .with_action("请检查网络连通性后重试")
+                        .retryable(true)
+                }
+                ErrorKind::AddrNotAvailable | ErrorKind::AddrInUse => {
+                    AppError::validation("ssh.address_invalid", "地址或端口无效")
+                }
+                _ => AppError::unavailable("ssh.connect_failed", "连接失败").retryable(true),
+            };
+            base.with_detail(io_error.to_string())
+        }
+        other => AppError::unavailable("ssh.connect_failed", "连接失败")
+            .with_detail(other.to_string())
+            .retryable(true),
+    }
+}
+
 pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClientHandler>> {
     info!(target: "shipyardx_lib::ssh::client", "opening ssh connection; server_id={} host={} port={} auth_type={}", config.id, config.host, config.port, config.auth_type);
     let client_config = Arc::new(client::Config {
@@ -79,11 +157,7 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
         )
         .retryable(true)
     })?
-    .map_err(|e| {
-        AppError::unavailable("ssh.connect_failed", "SSH 连接失败")
-            .with_detail(e.to_string())
-            .retryable(true)
-    })?;
+    .map_err(|e| map_ssh_connect_error(config, e))?;
 
     let auth = match config.auth_type.as_str() {
         "password" => {
@@ -102,7 +176,7 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
             if !key_path.is_file() {
                 return Err(AppError::validation(
                     "ssh.key_not_found",
-                    format!("密钥文件不存在或不可读: {}", expanded),
+                    format!("密钥文件不存在或不可读：{}", expanded),
                 ));
             }
 
@@ -128,7 +202,7 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
             warn!(target: "shipyardx_lib::ssh::client", "unsupported ssh auth type; server_id={} auth_type={}", config.id, other);
             return Err(AppError::validation(
                 "ssh.auth_type_invalid",
-                format!("不支持的认证类型: {}", other),
+                format!("不支持的认证类型：{}", other),
             ));
         }
     };
