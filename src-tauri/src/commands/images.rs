@@ -85,17 +85,17 @@ pub async fn import_image(
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_image_pull(
+pub async fn start_image_pull(
     server_id: String,
     image: String,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<String> {
-    Ok(services::images::start_image_pull(server_id, image, state, app_handle)?)
+    Ok(services::images::start_image_pull(server_id, image, state, app_handle).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
-    Ok(services::images::cancel_stream(stream_id, state)?)
+pub async fn cancel_stream(stream_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    Ok(services::images::cancel_stream(stream_id, state).await?)
 }

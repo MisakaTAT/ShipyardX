@@ -30,12 +30,12 @@ pub async fn open_container_exec_terminal(
 
 #[tauri::command]
 #[specta::specta]
-pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<()> {
-    Ok(services::terminal::close_terminal(session_id, state)?)
+pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    Ok(services::terminal::close_terminal(session_id, state).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn save_terminal_export(path: String, content: String) -> AppResult<()> {
-    Ok(services::terminal::save_terminal_export(path, content)?)
+pub async fn save_terminal_export(path: String, content: String) -> AppResult<()> {
+    Ok(services::terminal::save_terminal_export(path, content).await?)
 }

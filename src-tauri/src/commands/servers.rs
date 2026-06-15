@@ -7,14 +7,14 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    Ok(services::servers::get_servers(state)?)
+pub async fn get_servers(state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(services::servers::get_servers(state).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn add_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
-    Ok(services::servers::add_server(server, state)?)
+pub async fn add_server(server: ServerConfig, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
+    Ok(services::servers::add_server(server, state).await?)
 }
 
 #[tauri::command]

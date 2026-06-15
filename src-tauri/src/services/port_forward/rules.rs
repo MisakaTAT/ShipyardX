@@ -49,7 +49,7 @@ pub(super) fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &
     })
 }
 
-pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
+pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let mut runtime = lock_mutex(
         &state.port_forwards,
@@ -69,7 +69,7 @@ pub fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppR
         .collect())
 }
 
-pub fn create_port_forward_rule(
+pub async fn create_port_forward_rule(
     server_id: String,
     params: PortForwardCreate,
     state: State<'_, AppState>,
@@ -144,11 +144,11 @@ pub fn create_port_forward_rule(
     })
 }
 
-pub fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
     super::runtime::update_rule_enabled_and_runtime(id, enabled, &state)
 }
 
-pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     if let Some(handle) = lock_mutex(
         &state.port_forwards,
         "port_forward.runtime_lock_failed",
@@ -168,7 +168,7 @@ pub fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<
     Ok(())
 }
 
-pub fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
+pub async fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
     let mut runtime = lock_mutex(
         &state.port_forwards,

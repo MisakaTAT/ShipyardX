@@ -42,7 +42,7 @@ fn ctrl_frame(json: &str) -> Vec<u8> {
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
 
-pub fn save_terminal_export(path: String, content: String) -> AppResult<()> {
+pub async fn save_terminal_export(path: String, content: String) -> AppResult<()> {
     fs::write(&path, content)
         .map_err(|e| AppError::internal("terminal.export_write_failed", "写入终端导出文件失败").with_source(e))?;
     Ok(())
@@ -783,7 +783,7 @@ pub async fn open_container_exec_terminal(
     Ok(TerminalSession { session_id, ws_port })
 }
 
-pub fn close_terminal(session_id: String, state: State<AppState>) -> AppResult<()> {
+pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let mut terminals = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);

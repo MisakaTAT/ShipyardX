@@ -337,7 +337,11 @@ fn reconnect_delay(attempt: usize) -> Duration {
     Duration::from_secs(secs)
 }
 
-pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
+pub async fn start_event_stream(
+    server_id: String,
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> AppResult<String> {
     let server = ServerContext::from_state(&state, &server_id)?.server().clone();
     info!(target: "shipyardx_lib::services::docker_events", "starting event stream; server_id={}", server_id);
 
@@ -389,7 +393,7 @@ pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle:
     Ok(stream_id)
 }
 
-pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult<()> {
+pub async fn stop_event_stream(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     if let Some(h) = stop_managed_event_stream(
         &state,
         &server_id,

@@ -6,14 +6,16 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
-pub fn start_event_stream(server_id: String, state: State<AppState>, app_handle: AppHandle) -> AppResult<String> {
-    Ok(services::docker_events::start_event_stream(
-        server_id, state, app_handle,
-    )?)
+pub async fn start_event_stream(
+    server_id: String,
+    state: State<'_, AppState>,
+    app_handle: AppHandle,
+) -> AppResult<String> {
+    Ok(services::docker_events::start_event_stream(server_id, state, app_handle).await?)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn stop_event_stream(server_id: String, state: State<AppState>) -> AppResult<()> {
-    Ok(services::docker_events::stop_event_stream(server_id, state)?)
+pub async fn stop_event_stream(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
+    Ok(services::docker_events::stop_event_stream(server_id, state).await?)
 }

@@ -215,7 +215,7 @@ pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<(
     Ok(())
 }
 
-pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
+pub async fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     let handle = lock_mutex(
         &state.port_forwards,
         "port_forward.runtime_lock_failed",
@@ -239,7 +239,7 @@ pub fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()
     Ok(())
 }
 
-pub fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
+pub async fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
     let handles: Vec<_> = lock_mutex(
         &state.port_forwards,
         "port_forward.runtime_lock_failed",

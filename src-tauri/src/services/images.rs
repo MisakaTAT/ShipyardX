@@ -730,10 +730,10 @@ fn format_pull_event(event: ImagePullEvent) -> Option<String> {
     })
 }
 
-pub fn start_image_pull(
+pub async fn start_image_pull(
     server_id: String,
     image: String,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> AppResult<String> {
     let server = ServerContext::from_state(&state, &server_id)?.server().clone();
@@ -756,7 +756,7 @@ pub fn start_image_pull(
     )
 }
 
-pub fn cancel_stream(stream_id: String, state: State<AppState>) -> AppResult<()> {
+pub async fn cancel_stream(stream_id: String, state: State<'_, AppState>) -> AppResult<()> {
     if stop_managed_stream(&state, &stream_id, "image.pull_streams_lock_failed", "取消镜像拉取失败")? {
         info!(target: "shipyardx_lib::services::images", "cancelling image pull; pull_id={}", stream_id);
     } else {

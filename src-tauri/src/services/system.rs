@@ -54,7 +54,7 @@ struct DaemonConfig {
     extra: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
-pub fn list_system_fonts() -> AppResult<Vec<String>> {
+pub async fn list_system_fonts() -> AppResult<Vec<String>> {
     debug!(target: "shipyardx_lib::services::system", "listing system fonts");
     let source = SystemSource::new();
     let mut fonts = source

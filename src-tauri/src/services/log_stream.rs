@@ -131,12 +131,12 @@ async fn run_log_stream_task(
     }
 }
 
-pub fn start_log_stream(
+pub async fn start_log_stream(
     server_id: String,
     container_id: String,
     tail: u32,
     timestamps: bool,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> crate::error::AppResult<String> {
     let server = ServerContext::from_state(&state, &server_id)?.server().clone();
@@ -161,7 +161,7 @@ pub fn start_log_stream(
     Ok(stream_id)
 }
 
-pub fn stop_log_stream(stream_id: String, state: State<AppState>) -> crate::error::AppResult<()> {
+pub async fn stop_log_stream(stream_id: String, state: State<'_, AppState>) -> crate::error::AppResult<()> {
     if stop_managed_stream(&state, &stream_id, "log_stream.stop_lock_failed", "停止日志流失败")? {
         info!(target: "shipyardx_lib::services::log_stream", "stopping log stream; stream_id={}", stream_id);
     } else {

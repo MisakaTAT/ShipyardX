@@ -9,13 +9,13 @@ use crate::error::AppResult;
 use crate::services::{server_store, support::ServerContext};
 use crate::state::AppState;
 
-pub fn get_servers(state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+pub async fn get_servers(state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
     let servers = server_store::list_servers(&state)?;
     info!(target: "shipyardx_lib::services::servers", "listed servers; count={}", servers.len());
     Ok(servers)
 }
 
-pub fn add_server(server: ServerConfig, state: State<AppState>) -> AppResult<Vec<ServerConfig>> {
+pub async fn add_server(server: ServerConfig, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
     let servers = server_store::add_server(&state, server)?;
     info!(target: "shipyardx_lib::services::servers", "server added; count={}", servers.len());
     Ok(servers)

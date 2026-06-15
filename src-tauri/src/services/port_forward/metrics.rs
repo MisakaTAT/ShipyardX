@@ -70,7 +70,7 @@ pub(super) fn runtime_state_to_port_forward(
     }
 }
 
-pub fn list_local_addresses() -> AppResult<Vec<LocalAddress>> {
+pub async fn list_local_addresses() -> AppResult<Vec<LocalAddress>> {
     let interfaces = NetworkInterface::show().map_err(|e| {
         AppError::internal("port_forward.interfaces_list_failed", "读取本地网卡地址失败").with_source(e)
     })?;
