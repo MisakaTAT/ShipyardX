@@ -1,29 +1,13 @@
 import { toast } from '@/shared/components/toast'
+import type { AppError, AppErrorKind } from '@/types/app-bindings'
 
-export type AppErrorKind =
-  | 'validation'
-  | 'auth'
-  | 'permission'
-  | 'not_found'
-  | 'conflict'
-  | 'unavailable'
-  | 'timeout'
-  | 'internal'
-
-export interface AppErrorLike {
-  code: string
-  kind: AppErrorKind
-  message: string
-  detail?: string | null
-  retryable?: boolean
-  action?: string | null
-}
+export type { AppErrorKind }
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isAppErrorLike(value: unknown): value is AppErrorLike {
+function isAppError(value: unknown): value is AppError {
   return (
     isObject(value) &&
     typeof value.code === 'string' &&
@@ -32,8 +16,8 @@ function isAppErrorLike(value: unknown): value is AppErrorLike {
   )
 }
 
-export function normalizeAppError(error: unknown, fallback = '操作失败'): AppErrorLike {
-  if (isAppErrorLike(error)) {
+export function normalizeAppError(error: unknown, fallback = '操作失败'): AppError {
+  if (isAppError(error)) {
     return {
       code: error.code,
       kind: error.kind,
@@ -46,7 +30,7 @@ export function normalizeAppError(error: unknown, fallback = '操作失败'): Ap
 
   if (error instanceof Error) {
     const cause = 'cause' in error ? (error as Error & { cause?: unknown }).cause : undefined
-    if (isAppErrorLike(cause)) {
+    if (isAppError(cause)) {
       return normalizeAppError(cause, fallback)
     }
     return normalizeAppError(error.message, fallback)

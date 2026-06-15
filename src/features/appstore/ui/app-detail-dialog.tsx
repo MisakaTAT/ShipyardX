@@ -4,18 +4,16 @@ import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstor
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
-import type { AppVersionInfo_Serialize, FormField_Serialize, ServerConfig } from '@/types/app-bindings'
+import type {
+  AppVersionInfo_Serialize,
+  FormField_Serialize,
+  InstallStepEvent,
+  ServerConfig,
+} from '@/types/app-bindings'
 import { listen } from '@tauri-apps/api/event'
 import Editor from '@monaco-editor/react'
 import { HighlightLog } from '@/features/appstore/ui/highlight-log'
 import { MarkdownViewer } from '@/features/appstore/ui/markdown-viewer'
-
-interface InstallStep {
-  step: string
-  status: string
-  message: string
-  output_chunk?: string
-}
 
 const STEP_LABELS: Record<string, string> = {
   prepare: '准备部署模板',
@@ -37,12 +35,12 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
   const [selectedVersion, setSelectedVersion] = useState<AppVersionInfo_Serialize | null>(null)
   const [selectedServerId, setSelectedServerId] = useState<string>('')
   const [formValues, setFormValues] = useState<Record<string, string>>({})
-  const [installSteps, setInstallSteps] = useState<Map<string, InstallStep>>(new Map())
+  const [installSteps, setInstallSteps] = useState<Map<string, InstallStepEvent>>(new Map())
   const [stepOutputs, setStepOutputs] = useState<Map<string, string[]>>(new Map())
 
   // 监听安装步骤事件
   useEffect(() => {
-    const unlisten = listen<InstallStep>('install-step-event', (event) => {
+    const unlisten = listen<InstallStepEvent>('install-step-event', (event) => {
       const payload = event.payload
       if (payload.output_chunk) {
         // 流式输出片段
@@ -238,7 +236,7 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
                   )}
                   <span>{label}</span>
                   {step?.message && !hasOutput && (
-                    <span className="ml-auto max-w-[200px] truncate text-[11px]">{step.message}</span>
+                    <span className="ml-auto max-w-50 truncate text-[11px]">{step.message}</span>
                   )}
                 </div>
                 {/* 实时输出日志 */}

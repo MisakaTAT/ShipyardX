@@ -1,6 +1,5 @@
-import { commands } from '@/types/app-bindings'
+import { commands, type AppError } from '@/types/app-bindings'
 import { appendSshStreamChunkToLines, subscribeDockerSshStream } from '@/features/docker-terminal/lib/docker-ssh-stream'
-import { normalizeAppError } from '@/shared/lib/errors'
 
 export async function pullImage(
   serverId: string,
@@ -14,8 +13,8 @@ export async function pullImage(
   const streamId = await commands.startImagePull(serverId, image)
   options?.onStreamId?.(streamId)
 
-  let resolveDone!: (v: { success: boolean; error?: ReturnType<typeof normalizeAppError> }) => void
-  const donePromise = new Promise<{ success: boolean; error?: ReturnType<typeof normalizeAppError> }>((r) => {
+  let resolveDone!: (v: { success: boolean; error?: AppError }) => void
+  const donePromise = new Promise<{ success: boolean; error?: AppError }>((r) => {
     resolveDone = r
   })
 
@@ -28,7 +27,7 @@ export async function pullImage(
     (payload) => {
       resolveDone({
         success: payload.success,
-        error: payload.error ? normalizeAppError(payload.error) : undefined,
+        error: payload.error ?? undefined,
       })
     }
   )

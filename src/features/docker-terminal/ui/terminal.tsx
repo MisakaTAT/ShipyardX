@@ -16,9 +16,9 @@ import { ChevronDown, Download, Loader2, RefreshCw, ShieldAlert, Terminal as Ter
 import { useAppSettings } from '@/app/settings-store'
 import { SearchInput } from '@/shared/components/search-input'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
-import { commands } from '@/types/app-bindings'
+import { commands, type AppError } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
-import { getErrorMessage, normalizeAppError, type AppErrorLike } from '@/shared/lib/errors'
+import { normalizeAppError } from '@/shared/lib/errors'
 import { matchHotkey } from '@/shared/lib/hotkeys'
 import { Input } from '@/shared/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
@@ -61,14 +61,14 @@ function ctrlFrame(payload: Record<string, unknown>): ArrayBuffer {
   return out.buffer
 }
 
-type ControlInbound = { type: 'ready' } | { type: 'closed' } | { type: 'error'; error: AppErrorLike }
+type ControlInbound = { type: 'ready' } | { type: 'closed' } | { type: 'error'; error: AppError }
 
 function parseControlInbound(bytes: Uint8Array): ControlInbound | null {
   try {
     const o = JSON.parse(textDecoder.decode(bytes)) as { type?: string; error?: unknown }
     if (o.type === 'ready') return { type: 'ready' }
     if (o.type === 'closed') return { type: 'closed' }
-    if (o.type === 'error' && o.error) return { type: 'error', error: normalizeAppError(o.error) }
+    if (o.type === 'error' && o.error) return { type: 'error', error: o.error as AppError }
   } catch {
     return null
   }
@@ -85,14 +85,18 @@ type TransportCallbacks = {
   onClose: () => void
 }
 
-function formatTerminalError(error: AppErrorLike) {
-  const lines = [error.message]
-  const detail = error.detail?.trim()
-  const action = error.action?.trim()
-  if (detail && detail !== error.message) lines.push(detail)
-  if (action) lines.push(action)
-  if (error.code) lines.push(`code: ${error.code}`)
-  return lines.join('\n')
+function normalizeTerminalError(error: unknown): AppError | null {
+  const normalized = normalizeAppError(error, '')
+  const message = normalized.message.trim()
+  const detail = normalized.detail?.trim()
+  const action = normalized.action?.trim()
+  if (!message && !detail && !action) return null
+  return {
+    ...normalized,
+    message,
+    detail: detail || null,
+    action: action || null,
+  }
 }
 
 function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<WebSocket> {
@@ -127,7 +131,7 @@ function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<
       if (settled) cb.onClose()
     }
     transport.onerror = () => {
-      if (!settled) reject(new Error('WebSocket 连接失败'))
+      if (!settled) reject(new Error())
     }
   })
 }
@@ -143,7 +147,7 @@ async function openTerminalTransport(sessionId: string, wsPort: number, cb: Tran
       await new Promise((r) => setTimeout(r, WS_OPEN_RETRY_DELAY_MS))
     }
   }
-  throw lastError ?? new Error('WebSocket 多次重试仍无法连接')
+  throw lastError ?? new Error()
 }
 
 function closeTerminalTransport(transport: WebSocket) {
@@ -187,7 +191,7 @@ type ConnectionPhase = 'disconnected' | 'connecting' | 'connected' | 'error'
 type EndSessionOptions = {
   updateUi: boolean
   reason?: 'remote' | 'error'
-  errorMessage?: string
+  error?: AppError | null
 }
 
 export default function Terminal({ serverId, containerId }: TerminalProps) {
@@ -227,7 +231,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const mountAliveRef = useRef(true)
   const serverEpochRef = useRef(0)
   const [phase, setPhase] = useState<ConnectionPhase>('disconnected')
-  const [errorText, setErrorText] = useState('')
+  const [terminalError, setTerminalError] = useState<AppError | null>(null)
   const [wasEverConnected, setWasEverConnected] = useState(false)
   const [errorDetailsExpanded, setErrorDetailsExpanded] = useState(false)
   const [overlayMounted, setOverlayMounted] = useState(true)
@@ -245,7 +249,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
   useEffect(() => {
     if (phase === 'error') setErrorDetailsExpanded(false)
-  }, [phase, errorText])
+  }, [phase, terminalError])
 
   useEffect(() => {
     if (!toolStatus) return
@@ -338,7 +342,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   useEffect(() => {
     serverEpochRef.current += 1
     setPhase('disconnected')
-    setErrorText('')
+    setTerminalError(null)
     setWasEverConnected(false)
     setOverlayMounted(true)
     setSearchToolbarOpen(false)
@@ -460,9 +464,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       releaseSessionResources(true)
 
       if (opts.updateUi && mountAliveRef.current) {
-        if (opts.reason === 'error' && opts.errorMessage !== undefined) {
+        if (opts.reason === 'error') {
           setPhase('error')
-          setErrorText(opts.errorMessage)
+          setTerminalError(opts.error ?? null)
           setWasEverConnected(true)
         } else {
           setPhase('disconnected')
@@ -502,7 +506,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
     connectInFlightRef.current = true
     setPhase('connecting')
-    setErrorText('')
+    setTerminalError(null)
 
     const epochAtStart = serverEpochRef.current
     const isStale = () => epochAtStart !== serverEpochRef.current
@@ -549,7 +553,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
             return
           }
           if (msg.type === 'error') {
-            endSession({ updateUi: true, reason: 'error', errorMessage: formatTerminalError(msg.error) })
+            endSession({ updateUi: true, reason: 'error', error: msg.error })
           } else {
             endSession({ updateUi: true, reason: 'remote' })
           }
@@ -583,8 +587,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
         void commands.closeTerminal(openedBackendSessionId).catch(console.error)
       }
       if (mountAliveRef.current && epochAtStart === serverEpochRef.current) {
+        const normalizedError = normalizeTerminalError(e)
         setPhase('error')
-        setErrorText(getErrorMessage(e))
+        setTerminalError(normalizedError)
       }
     } finally {
       connectInFlightRef.current = false
@@ -704,6 +709,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const overlayVisible = phase !== 'connected'
   const terminalVisible = phase === 'connected'
   const isContainerExec = Boolean(containerId)
+  const errorDetails = [terminalError?.detail?.trim(), terminalError?.action?.trim()].filter((line): line is string =>
+    Boolean(line && line !== terminalError?.message)
+  )
 
   return (
     <div
@@ -919,34 +927,34 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                   <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
                     <ShieldAlert className="size-7 text-amber-500" />
                   </div>
-                  <h2 className="text-lg font-semibold text-foreground">
-                    {isContainerExec ? '无法连接容器终端' : '无法建立 SSH 连接'}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {isContainerExec
-                      ? '请确认容器仍在运行，并检查当前连接是否有 Docker API 访问权限。'
-                      : '请检查网络是否可达，并确认地址、端口、用户名及密钥或密码是否正确。'}
-                  </p>
-                </div>
-
-                <div className="flex w-full flex-col items-center">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    onClick={() => setErrorDetailsExpanded((v) => !v)}
-                    aria-expanded={errorDetailsExpanded}
-                  >
-                    查看详情
-                    <ChevronDown
-                      className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
-                    />
-                  </button>
-                  {errorDetailsExpanded ? (
-                    <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center text-[12px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
-                      {errorText}
-                    </pre>
+                  {terminalError?.message ? (
+                    <h2 className="text-lg font-semibold text-foreground">{terminalError.message}</h2>
+                  ) : null}
+                  {terminalError?.action ? (
+                    <p className="text-sm text-muted-foreground">{terminalError.action}</p>
                   ) : null}
                 </div>
+
+                {terminalError ? (
+                  <div className="flex w-full flex-col items-center">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setErrorDetailsExpanded((v) => !v)}
+                      aria-expanded={errorDetailsExpanded}
+                    >
+                      查看详情
+                      <ChevronDown
+                        className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
+                      />
+                    </button>
+                    {errorDetailsExpanded ? (
+                      <pre className="mt-3 max-h-36 w-full overflow-y-auto text-center text-[12px] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted-foreground">
+                        {errorDetails.join('\n')}
+                      </pre>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="flex items-center justify-center gap-3">
                   <Button
@@ -954,7 +962,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     variant="outline"
                     onClick={() => {
                       setPhase('disconnected')
-                      setErrorText('')
+                      setTerminalError(null)
                     }}
                   >
                     返回
