@@ -151,13 +151,29 @@ async fn fetch_docker_engine_info(server: &ServerConfig) -> AppResult<DockerEngi
     let client_version = docker.client_version();
     let api_version = format!("{}.{}", client_version.major_version, client_version.minor_version);
     let v: SystemInfo = docker.info().await.map_err(map_bollard_error)?;
+    let flatten_pairs = |pairs: Option<Vec<Vec<String>>>| -> Vec<String> {
+        pairs
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|pair| {
+                if pair.is_empty() {
+                    None
+                } else if pair.len() == 1 {
+                    Some(pair[0].clone())
+                } else {
+                    Some(format!("{}: {}", pair[0], pair[1]))
+                }
+            })
+            .collect()
+    };
     let containers = v.containers.unwrap_or(0);
     let containers_running = v.containers_running.unwrap_or(0);
     let containers_paused = v.containers_paused.unwrap_or(0);
     let containers_stopped = v.containers_stopped.unwrap_or(0);
     let images = v.images.unwrap_or(0);
     let ncpu = v.ncpu.unwrap_or(0);
-    let warnings = v.warnings.as_ref().map(|a| a.len() as i64).unwrap_or(0);
+    let warning_details = v.warnings.clone().unwrap_or_default();
+    let warnings = warning_details.len() as i64;
     let total = containers.max(0) as f64;
     let pct = |value: i64| {
         if total <= 0.0 {
@@ -186,6 +202,39 @@ async fn fetch_docker_engine_info(server: &ServerConfig) -> AppResult<DockerEngi
         architecture: v.architecture.unwrap_or_default(),
         storage_driver: v.driver.unwrap_or_default(),
         warnings: warnings.to_string(),
+        warning_details,
+        docker_root_dir: v.docker_root_dir.unwrap_or_default(),
+        logging_driver: v.logging_driver.unwrap_or_default(),
+        cgroup_driver: v.cgroup_driver.map(|value| value.to_string()).unwrap_or_default(),
+        cgroup_version: v.cgroup_version.map(|value| value.to_string()).unwrap_or_default(),
+        os_type: v.os_type.unwrap_or_default(),
+        system_time: v.system_time.unwrap_or_default(),
+        default_runtime: v.default_runtime.unwrap_or_default(),
+        runtimes: v.runtimes.map(|value| value.into_keys().collect()).unwrap_or_default(),
+        security_options: v.security_options.unwrap_or_default(),
+        live_restore_enabled: v.live_restore_enabled.unwrap_or(false),
+        experimental_build: v.experimental_build.unwrap_or(false),
+        debug: v.debug.unwrap_or(false),
+        ipv4_forwarding: v.ipv4_forwarding.unwrap_or(false),
+        http_proxy: v.http_proxy.unwrap_or_default(),
+        https_proxy: v.https_proxy.unwrap_or_default(),
+        no_proxy: v.no_proxy.unwrap_or_default(),
+        memory_limit: v.memory_limit.unwrap_or(false),
+        swap_limit: v.swap_limit.unwrap_or(false),
+        cpu_cfs_period: v.cpu_cfs_period.unwrap_or(false),
+        cpu_cfs_quota: v.cpu_cfs_quota.unwrap_or(false),
+        cpu_shares: v.cpu_shares.unwrap_or(false),
+        cpu_set: v.cpu_set.unwrap_or(false),
+        pids_limit: v.pids_limit.unwrap_or(false),
+        oom_kill_disable: v.oom_kill_disable.unwrap_or(false),
+        labels: v.labels.unwrap_or_default(),
+        storage_driver_status: flatten_pairs(v.driver_status),
+        volume_plugins: v.plugins.as_ref().and_then(|value| value.volume.clone()).unwrap_or_default(),
+        network_plugins: v.plugins.as_ref().and_then(|value| value.network.clone()).unwrap_or_default(),
+        authorization_plugins: v.plugins.as_ref().and_then(|value| value.authorization.clone()).unwrap_or_default(),
+        log_plugins: v.plugins.as_ref().and_then(|value| value.log.clone()).unwrap_or_default(),
+        firewall_driver: v.firewall_backend.as_ref().and_then(|value| value.driver.clone()).unwrap_or_default(),
+        firewall_info: flatten_pairs(v.firewall_backend.and_then(|value| value.info)),
     })
 }
 
