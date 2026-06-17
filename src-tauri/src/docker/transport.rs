@@ -1,9 +1,3 @@
-use std::collections::HashMap;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
-
 use bollard::BollardRequest;
 use bollard::errors::Error as BollardError;
 use bytes::Bytes;
@@ -18,8 +12,13 @@ use hyper::{Method, StatusCode};
 use hyper_util::rt::TokioIo;
 use log::{debug, warn};
 use russh::{ChannelStream, client};
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use crate::config::timeouts::{DOCKER_HIJACK_ERROR_READ_TIMEOUT, DOCKER_HIJACK_HEAD_READ_TIMEOUT};
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::DOCKER_READ_DAEMON_CONFIG_SH;
@@ -553,7 +552,7 @@ async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppRe
         if let Some(pos) = find_header_end(&received) {
             break pos;
         }
-        let n = tokio::time::timeout(Duration::from_secs(15), io.read(&mut chunk))
+        let n = tokio::time::timeout(DOCKER_HIJACK_HEAD_READ_TIMEOUT, io.read(&mut chunk))
             .await
             .map_err(|_| AppError::timeout("docker.hijack_timeout", "等待 Docker hijack 响应超时").retryable(true))?
             .map_err(|e| {
@@ -591,7 +590,7 @@ async fn read_hijack_error_body(
     };
     let mut chunk = [0u8; 4096];
     while body.len() < content_length {
-        let n = tokio::time::timeout(Duration::from_secs(2), io.read(&mut chunk))
+        let n = tokio::time::timeout(DOCKER_HIJACK_ERROR_READ_TIMEOUT, io.read(&mut chunk))
             .await
             .map_err(|_| AppError::timeout("docker.hijack_error_timeout", "读取 Docker 错误响应超时").retryable(true))?
             .map_err(|e| {

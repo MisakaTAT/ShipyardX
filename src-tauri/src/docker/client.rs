@@ -6,13 +6,12 @@ use bollard::{API_DEFAULT_VERSION, ClientVersion, Docker};
 use log::debug;
 use serde::Serialize;
 
+use crate::config::timeouts::DOCKER_HTTP_REQUEST_TIMEOUT_SECS;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::state::lock_mutex;
 
 use super::transport;
-
-const CLIENT_TIMEOUT_SECS: u64 = 120;
 
 fn api_version_cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -77,7 +76,7 @@ fn build_docker(config: &ServerConfig, client_version: &ClientVersion) -> AppRes
             async move { transport::send_pooled_request(&config, req).await }
         },
         Some("http://localhost"),
-        CLIENT_TIMEOUT_SECS,
+        DOCKER_HTTP_REQUEST_TIMEOUT_SECS,
         client_version,
     )
     .map_err(map_bollard_error)
@@ -91,7 +90,7 @@ fn build_dedicated_docker(config: &ServerConfig, client_version: &ClientVersion)
             async move { transport::send_dedicated_request(&config, req).await }
         },
         Some("http://localhost"),
-        CLIENT_TIMEOUT_SECS,
+        DOCKER_HTTP_REQUEST_TIMEOUT_SECS,
         client_version,
     )
     .map_err(map_bollard_error)

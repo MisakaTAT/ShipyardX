@@ -2,7 +2,7 @@ use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use log::{debug, error};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -10,6 +10,7 @@ use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::TcpStream as TokioTcpStream;
 use tokio::sync::watch;
 
+use crate::config::timeouts::PORT_FORWARD_ACCEPT_RETRY_DELAY;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::pool;
@@ -187,7 +188,7 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {}
                 Err(_) => {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    tokio::time::sleep(PORT_FORWARD_ACCEPT_RETRY_DELAY).await;
                 }
             }
         }

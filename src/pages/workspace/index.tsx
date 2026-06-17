@@ -21,6 +21,7 @@ import ServerOverview from '@/features/docker-engine/ui/server-overview'
 import DockerManagePanel from '@/features/docker-engine/ui/docker-manage-panel'
 import EventPanel from '@/features/docker-events/ui/event-panel'
 import { useDockerAccess } from '@/features/docker-engine/api/use-docker-access'
+import { useServerConnection } from '@/features/servers/api/use-server-connection'
 import { useDockerEventInvalidation } from '@/shared/api/events'
 import { DockerAccessGuide } from '@/pages/workspace/docker-access-guide'
 import { WorkspaceTabs, type WorkspaceTabItem } from '@/pages/workspace/workspace-tabs'
@@ -59,7 +60,8 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ selectedServer, onDisconnect, activeTab, onActiveTabChange }: WorkspaceProps) {
-  const { status: dockerStatus, ok: dockerOk, recheck } = useDockerAccess(selectedServer.id)
+  const { status: serverStatus, ok: serverOk, recheck: recheckServer } = useServerConnection(selectedServer.id)
+  const { status: dockerStatus, ok: dockerOk, recheck: recheckDocker } = useDockerAccess(selectedServer.id, serverOk)
 
   const { events, status: eventStatus, clearEvents } = useDockerEventInvalidation(selectedServer.id, dockerOk)
 
@@ -76,7 +78,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     toast.success(`连接 ${label} 已断开`)
   }
 
-  if (dockerStatus === 'checking') {
+  if (serverStatus === 'checking' || (serverOk && dockerStatus === 'checking')) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -84,13 +86,13 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
     )
   }
 
-  const showGuide = !dockerOk && activeTab !== 'terminal'
+  const showGuide = (!serverOk || !dockerOk) && activeTab !== 'terminal'
   if (showGuide) {
     return (
       <DockerAccessGuide
-        status={dockerStatus as 'no_permission' | 'no_docker' | 'error'}
+        status={serverOk ? (dockerStatus as 'no_permission' | 'no_docker' | 'error') : 'server_error'}
         username={selectedServer.username}
-        onRetry={() => void recheck(true)}
+        onRetry={() => void (serverOk ? recheckDocker(true) : recheckServer(true))}
         onDisconnect={handleDisconnect}
         onOpenTerminal={() => onActiveTabChange('terminal')}
       />
@@ -104,9 +106,9 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
           items={NAV_ITEMS}
           activeKey={activeTab}
           onChange={onActiveTabChange}
-          dockerOk={dockerOk}
+          dockerOk={serverOk && dockerOk}
           alwaysEnabledKeys={['terminal']}
-          onDockerRetry={() => void recheck(true)}
+          onDockerRetry={() => void (serverOk ? recheckDocker(true) : recheckServer(true))}
           onDisconnect={handleDisconnect}
         />
 

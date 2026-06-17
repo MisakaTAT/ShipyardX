@@ -229,11 +229,31 @@ async fn fetch_docker_engine_info(server: &ServerConfig) -> AppResult<DockerEngi
         oom_kill_disable: v.oom_kill_disable.unwrap_or(false),
         labels: v.labels.unwrap_or_default(),
         storage_driver_status: flatten_pairs(v.driver_status),
-        volume_plugins: v.plugins.as_ref().and_then(|value| value.volume.clone()).unwrap_or_default(),
-        network_plugins: v.plugins.as_ref().and_then(|value| value.network.clone()).unwrap_or_default(),
-        authorization_plugins: v.plugins.as_ref().and_then(|value| value.authorization.clone()).unwrap_or_default(),
-        log_plugins: v.plugins.as_ref().and_then(|value| value.log.clone()).unwrap_or_default(),
-        firewall_driver: v.firewall_backend.as_ref().and_then(|value| value.driver.clone()).unwrap_or_default(),
+        volume_plugins: v
+            .plugins
+            .as_ref()
+            .and_then(|value| value.volume.clone())
+            .unwrap_or_default(),
+        network_plugins: v
+            .plugins
+            .as_ref()
+            .and_then(|value| value.network.clone())
+            .unwrap_or_default(),
+        authorization_plugins: v
+            .plugins
+            .as_ref()
+            .and_then(|value| value.authorization.clone())
+            .unwrap_or_default(),
+        log_plugins: v
+            .plugins
+            .as_ref()
+            .and_then(|value| value.log.clone())
+            .unwrap_or_default(),
+        firewall_driver: v
+            .firewall_backend
+            .as_ref()
+            .and_then(|value| value.driver.clone())
+            .unwrap_or_default(),
         firewall_info: flatten_pairs(v.firewall_backend.and_then(|value| value.info)),
     })
 }

@@ -27,7 +27,8 @@ interface ServerDialogProps {
 
 export default function ServerDialog({ open, onOpenChange, server, onSave }: ServerDialogProps) {
   const baseId = useId()
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const isEdit = !!server
 
@@ -48,7 +49,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
   }
 
   const onSubmit = form.handleSubmit(async (values: ServerFormValues) => {
-    setLoading(true)
+    setSubmitting(true)
     try {
       const payload: ServerConfig = {
         ...values,
@@ -68,7 +69,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
     } catch (e) {
       toastAppError(e)
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   })
 
@@ -85,7 +86,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       toast.warning(parsed.error.issues[0]?.message ?? '校验失败')
       return
     }
-    setLoading(true)
+    setTesting(true)
     try {
       const testPayload: ServerConfig = {
         id: server?.id ?? '',
@@ -97,16 +98,17 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
         password: full.password || null,
         key_path: full.key_path || null,
       }
-      const msg = await commands.testConnectionDirect(testPayload)
+      const msg = await commands.testServerConnectionDirect(testPayload)
       toast.success(msg)
     } catch (e) {
       toastAppError(e, '连接测试失败')
     } finally {
-      setLoading(false)
+      setTesting(false)
     }
   }
 
   const authType = form.watch('auth_type')
+  const busy = submitting || testing
 
   return (
     <StandardDialog
@@ -114,20 +116,20 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       onOpenChange={handleOpenChange}
       title={isEdit ? '编辑服务器' : '添加服务器'}
       icon={ServerIcon}
-      disableClose={loading}
+      disableClose={busy}
       widthClassName="w-[640px]"
       footer={
         <div className="flex items-center justify-between gap-3">
-          <Button type="button" variant="secondary" disabled={loading} onClick={handleTest}>
-            {loading ? <Loader2 className="animate-spin" /> : null}
+          <Button type="button" variant="secondary" disabled={busy} onClick={handleTest}>
+            {testing ? <Loader2 className="animate-spin" /> : null}
             测试连接
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => onOpenChange(false)}>
               取消
             </Button>
-            <Button type="submit" form={`${baseId}-server-form`} disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : null}
+            <Button type="submit" form={`${baseId}-server-form`} disabled={busy}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
               {isEdit ? '保存' : '添加'}
             </Button>
           </div>
@@ -147,7 +149,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                     id={`${baseId}-name`}
                     {...field}
                     placeholder="生产服务器"
-                    disabled={loading}
+                    disabled={busy}
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldError errors={[fieldState.error]} />
@@ -169,7 +171,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                         id={`${baseId}-host`}
                         {...field}
                         placeholder="192.168.1.100"
-                        disabled={loading}
+                        disabled={busy}
                         aria-invalid={fieldState.invalid}
                       />
                       <FieldError errors={[fieldState.error]} />
@@ -190,7 +192,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                       type="number"
                       min={1}
                       max={65535}
-                      disabled={loading}
+                      disabled={busy}
                       name={field.name}
                       ref={field.ref}
                       onBlur={field.onBlur}
@@ -219,7 +221,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                     id={`${baseId}-user`}
                     {...field}
                     placeholder="root"
-                    disabled={loading}
+                    disabled={busy}
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldError errors={[fieldState.error]} />
@@ -238,7 +240,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                     type="button"
                     variant={authType === type ? 'default' : 'outline'}
                     className="flex-1 text-sm"
-                    disabled={loading}
+                    disabled={busy}
                     onClick={() => form.setValue('auth_type', type, { shouldValidate: true })}
                   >
                     {type === 'key' ? 'SSH 密钥' : '密码'}
@@ -262,7 +264,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                         type={showPassword ? 'text' : 'password'}
                         {...field}
                         placeholder="SSH 登录密码"
-                        disabled={loading}
+                        disabled={busy}
                         className="pr-10"
                         aria-invalid={fieldState.invalid}
                       />
@@ -294,7 +296,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
                       id={`${baseId}-key`}
                       {...field}
                       placeholder="~/.ssh/id_rsa"
-                      disabled={loading}
+                      disabled={busy}
                       aria-invalid={fieldState.invalid}
                     />
                     <FieldError errors={[fieldState.error]} />

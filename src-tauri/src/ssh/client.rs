@@ -6,10 +6,9 @@ use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 use russh::{Disconnect, Error as RusshError, client};
 use tokio::runtime::{Builder, Runtime};
 
+use crate::config::timeouts::{SSH_CONNECT_TIMEOUT, SSH_KEEPALIVE_INTERVAL, SSH_SOCKET_IO_TIMEOUT};
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-
-use super::limits::{CONNECT_TIMEOUT, SOCKET_IO_TIMEOUT};
 
 #[derive(Default)]
 pub(crate) struct SshClientHandler;
@@ -139,14 +138,14 @@ fn map_ssh_connect_error(config: &ServerConfig, error: RusshError) -> AppError {
 pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClientHandler>> {
     info!(target: "shipyardx_lib::ssh::client", "opening ssh connection; server_id={} host={} port={} auth_type={}", config.id, config.host, config.port, config.auth_type);
     let client_config = Arc::new(client::Config {
-        inactivity_timeout: Some(SOCKET_IO_TIMEOUT),
-        keepalive_interval: Some(std::time::Duration::from_secs(15)),
+        inactivity_timeout: Some(SSH_SOCKET_IO_TIMEOUT),
+        keepalive_interval: Some(SSH_KEEPALIVE_INTERVAL),
         keepalive_max: 4,
         ..Default::default()
     });
 
     let mut handle = tokio::time::timeout(
-        CONNECT_TIMEOUT,
+        SSH_CONNECT_TIMEOUT,
         client::connect(client_config, (config.host.as_str(), config.port), SshClientHandler),
     )
     .await

@@ -8,6 +8,7 @@ use tauri::{AppHandle, State};
 use tauri_specta::Event;
 use tokio::sync::watch;
 
+use crate::config::timeouts::{DOCKER_EVENT_RECONNECT_DELAYS_SECS, DOCKER_EVENT_REFRESH_THROTTLE_MS};
 use crate::docker::client::{docker_streaming, map_bollard_error};
 use crate::dto::events::{
     DockerEvent, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
@@ -155,9 +156,6 @@ fn is_refresh_event(event_type: &str, action: &str) -> bool {
     }
 }
 
-const RECONNECT_DELAYS: &[u64] = &[1, 2, 4, 8, 15, 30];
-const THROTTLE_MS: u128 = 500;
-
 enum StreamLoopExit {
     Stopped,
     Reconnect(Option<AppError>),
@@ -247,7 +245,7 @@ async fn run_event_stream_task(
                                     if is_refresh_event(&event_type, &action) {
                                         let now = Instant::now();
                                         let should_emit = match last_refresh {
-                                            Some(t) => now.duration_since(t).as_millis() >= THROTTLE_MS,
+                                            Some(t) => now.duration_since(t).as_millis() >= DOCKER_EVENT_REFRESH_THROTTLE_MS,
                                             None => true,
                                         };
                                         if should_emit {
@@ -330,10 +328,10 @@ async fn run_event_stream_task(
 }
 
 fn reconnect_delay(attempt: usize) -> Duration {
-    let secs = RECONNECT_DELAYS
+    let secs = DOCKER_EVENT_RECONNECT_DELAYS_SECS
         .get(attempt)
         .copied()
-        .unwrap_or_else(|| RECONNECT_DELAYS.last().copied().unwrap_or(30));
+        .unwrap_or_else(|| DOCKER_EVENT_RECONNECT_DELAYS_SECS.last().copied().unwrap_or(30));
     Duration::from_secs(secs)
 }
 

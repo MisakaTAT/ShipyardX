@@ -18,6 +18,7 @@ import { SearchInput } from '@/shared/components/search-input'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { commands, type AppError } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
+import { timeouts } from '@/shared/config/timeouts'
 import { normalizeAppError } from '@/shared/lib/errors'
 import { matchHotkey } from '@/shared/lib/hotkeys'
 import { Input } from '@/shared/ui/input'
@@ -25,10 +26,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { cn } from '@/shared/lib/utils'
 
-const WS_OPEN_RETRIES = 20
-const WS_OPEN_RETRY_DELAY_MS = 100
-const OVERLAY_FADE_OUT_MS = 220
-const BACKEND_RESIZE_THROTTLE_MS = 120
 const TERMINAL_VIEW_PADDING_PX = 8
 const TERMINAL_SURFACE_BG = '#1e1e1e'
 
@@ -139,12 +136,12 @@ function connectTerminalTransport(url: string, cb: TransportCallbacks): Promise<
 async function openTerminalTransport(sessionId: string, wsPort: number, cb: TransportCallbacks): Promise<WebSocket> {
   const url = terminalSocketUrl(sessionId, wsPort)
   let lastError: unknown
-  for (let i = 0; i < WS_OPEN_RETRIES; i += 1) {
+  for (let i = 0; i < timeouts.terminal.wsOpenRetries; i += 1) {
     try {
       return await connectTerminalTransport(url, cb)
     } catch (e) {
       lastError = e
-      await new Promise((r) => setTimeout(r, WS_OPEN_RETRY_DELAY_MS))
+      await new Promise((r) => setTimeout(r, timeouts.terminal.wsOpenRetryDelayMs))
     }
   }
   throw lastError ?? new Error()
@@ -361,7 +358,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       overlayFadeTimerRef.current = window.setTimeout(() => {
         setOverlayMounted(false)
         overlayFadeTimerRef.current = null
-      }, OVERLAY_FADE_OUT_MS)
+      }, timeouts.terminal.overlayFadeOutMs)
       return
     }
     setOverlayMounted(true)
@@ -428,7 +425,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       backendResizeTimerRef.current = window.setTimeout(() => {
         backendResizeTimerRef.current = null
         flushBackendResize(false)
-      }, BACKEND_RESIZE_THROTTLE_MS)
+      }, timeouts.terminal.backendResizeThrottleMs)
     },
     [flushBackendResize]
   )

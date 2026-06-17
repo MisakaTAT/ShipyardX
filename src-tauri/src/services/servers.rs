@@ -7,6 +7,7 @@ use crate::docker::client::map_bollard_error;
 use crate::dto::server::ServerConfig;
 use crate::error::AppResult;
 use crate::services::{server_store, support::ServerContext};
+use crate::ssh::client::{connect, disconnect};
 use crate::state::AppState;
 
 pub async fn get_servers(state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
@@ -39,8 +40,35 @@ pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> A
     test_connection_with_context(ctx).await
 }
 
+pub async fn test_server_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
+    let ctx = ServerContext::from_state(&state, &server_id)?;
+    test_server_connection_with_context(ctx).await
+}
+
 pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
     test_connection_with_context(ServerContext::from_server(server)).await
+}
+
+pub async fn test_server_connection_direct(server: ServerConfig) -> AppResult<String> {
+    test_server_connection_with_context(ServerContext::from_server(server)).await
+}
+
+async fn test_server_connection_with_context(ctx: ServerContext) -> AppResult<String> {
+    info!(
+        target: "shipyardx_lib::services::servers",
+        "testing ssh connection; server_id={} host={} port={}",
+        ctx.server().id,
+        ctx.server().host,
+        ctx.server().port
+    );
+    let mut handle = connect(ctx.server()).await?;
+    disconnect(&mut handle).await;
+    info!(
+        target: "shipyardx_lib::services::servers",
+        "ssh connection succeeded; server_id={}",
+        ctx.server_id()
+    );
+    Ok("服务器连接成功".to_string())
 }
 
 async fn test_connection_with_context(ctx: ServerContext) -> AppResult<String> {

@@ -11,10 +11,7 @@ interface Props {
 
 export default function ServerOverview({ serverId }: Props) {
   const [warningsOpen, setWarningsOpen] = useState(false)
-  const {
-    data: info,
-    isFetching: loading,
-  } = useQuery({
+  const { data: info, isFetching: loading } = useQuery({
     queryKey: qk.dockerInfo(serverId),
     queryFn: () => commands.getDockerInfo(serverId),
     retry: false,
@@ -135,7 +132,6 @@ export default function ServerOverview({ serverId }: Props) {
             </div>
           </div>
         )}
-
       </div>
     </div>
   )
@@ -153,11 +149,7 @@ function HeroPanel({
   onToggleWarnings: () => void
 }) {
   const warningCount = info?.warning_details.length ?? 0
-  const statusDotClass = loading
-    ? 'animate-pulse bg-sky-400'
-    : warningCount > 0
-      ? 'bg-amber-500'
-      : 'bg-emerald-500'
+  const statusDotClass = loading ? 'animate-pulse bg-sky-400' : warningCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -191,13 +183,7 @@ function HeroPanel({
         <SummaryTile
           title="风险状态"
           value={warningCount > 0 ? '发现告警' : '运行稳定'}
-          meta={
-            warningCount > 0
-              ? `${warningCount} 条提示`
-              : loading
-                ? '刷新中'
-                : '当前无额外提示'
-          }
+          meta={warningCount > 0 ? `${warningCount} 条提示` : loading ? '刷新中' : '当前无额外提示'}
           tone={warningCount > 0 ? 'warning' : 'normal'}
           interactive={warningCount > 0}
           expanded={warningsOpen}
@@ -210,15 +196,7 @@ function HeroPanel({
   )
 }
 
-function SectionCard({
-  title,
-  icon,
-  children,
-}: {
-  title: string
-  icon?: ReactNode
-  children: ReactNode
-}) {
+function SectionCard({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-4 flex items-center gap-2.5">
@@ -325,12 +303,7 @@ function RuntimeStateItem({
   percent: number
   tone: 'green' | 'amber' | 'slate'
 }) {
-  const toneClass =
-    tone === 'green'
-      ? 'bg-emerald-500'
-      : tone === 'amber'
-        ? 'bg-amber-500'
-        : 'bg-slate-400'
+  const toneClass = tone === 'green' ? 'bg-emerald-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-slate-400'
 
   return (
     <div className="min-w-0 py-1 md:px-4 md:py-0 first:md:pl-0 last:md:pr-0">
@@ -360,7 +333,17 @@ function KeyValueList({
   columns?: 1 | 2
 }) {
   return (
-    <div className={columns === 2 ? (compact ? 'grid gap-1.5 md:grid-cols-2' : 'grid gap-2 md:grid-cols-2') : compact ? 'space-y-1.5' : 'space-y-2'}>
+    <div
+      className={
+        columns === 2
+          ? compact
+            ? 'grid gap-1.5 md:grid-cols-2'
+            : 'grid gap-2 md:grid-cols-2'
+          : compact
+            ? 'space-y-1.5'
+            : 'space-y-2'
+      }
+    >
       {items.map(([label, value]) => {
         const highlight = highlightKeys?.has(label) && (highlightWhen ? highlightWhen(label, value) : true)
         return (
@@ -371,7 +354,9 @@ function KeyValueList({
             }`}
           >
             <span className="text-muted-foreground">{label}</span>
-            <span className={`max-w-[60%] text-right font-medium break-all ${highlight ? 'text-amber-500' : 'text-foreground'}`}>
+            <span
+              className={`max-w-[60%] text-right font-medium break-all ${highlight ? 'text-amber-500' : 'text-foreground'}`}
+            >
               {value}
             </span>
           </div>
@@ -392,7 +377,9 @@ function CapabilityList({ items }: { items: Array<[string, boolean]> }) {
           }`}
         >
           <div className="min-w-0 text-xs text-muted-foreground">{label}</div>
-          <div className={`shrink-0 text-xs font-medium ${enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}>
+          <div
+            className={`shrink-0 text-xs font-medium ${enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}
+          >
             {enabled ? '已启用' : '未启用'}
           </div>
         </div>
@@ -429,7 +416,11 @@ function InlineTagBlock({
           ))}
         </div>
       ) : (
-        <div className={`rounded-lg border border-dashed border-border text-xs text-muted-foreground ${compact ? 'px-2.5 py-2' : 'px-3 py-3'}`}>{empty}</div>
+        <div
+          className={`rounded-lg border border-dashed border-border text-xs text-muted-foreground ${compact ? 'px-2.5 py-2' : 'px-3 py-3'}`}
+        >
+          {empty}
+        </div>
       )}
     </div>
   )

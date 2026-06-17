@@ -7,11 +7,12 @@ import { qk } from '@/shared/api/query-keys'
 
 export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
-export function useDockerAccess(serverId: string) {
+export function useDockerAccess(serverId: string, enabled = true) {
   const query = useQuery({
     queryKey: qk.dockerAccess(serverId),
     queryFn: () => commands.checkDockerAccess(serverId),
     retry: false,
+    enabled,
   })
 
   const check = useCallback(

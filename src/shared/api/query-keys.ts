@@ -16,6 +16,7 @@ export const qk = {
   volumeInspect: (serverId: string, name: string) => ['docker', serverId, 'volumes', name, 'inspect'] as const,
 
   dockerInfo: (serverId: string) => ['docker', serverId, 'info'] as const,
+  serverConnection: (serverId: string) => ['server', serverId, 'connection'] as const,
   dockerAccess: (serverId: string) => ['docker', serverId, 'access'] as const,
   dockerDaemon: (serverId: string) => ['docker', serverId, 'daemon'] as const,
 
@@ -34,6 +35,7 @@ export type QkKey =
   | ReturnType<typeof qk.networks>
   | ReturnType<typeof qk.volumes>
   | ReturnType<typeof qk.dockerInfo>
+  | ReturnType<typeof qk.serverConnection>
   | ReturnType<typeof qk.dockerAccess>
   | ReturnType<typeof qk.dockerDaemon>
   | ReturnType<typeof qk.portForwards>
