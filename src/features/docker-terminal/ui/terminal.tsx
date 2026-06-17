@@ -836,7 +836,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
             {phase === 'disconnected' && (
               <>
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <div className="flex size-14 items-center justify-center rounded-xl bg-primary/10">
                     <TerminalIcon className="size-7 text-primary" />
                   </div>
                   <h2 className="text-lg font-semibold text-foreground">
@@ -906,7 +906,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
 
             {phase === 'connecting' && (
               <div className="flex flex-col items-center gap-3 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                <div className="flex size-14 items-center justify-center rounded-xl bg-primary/10">
                   <Loader2 className="size-7 animate-spin text-primary" />
                 </div>
                 <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
@@ -919,7 +919,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
             {phase === 'error' && (
               <>
                 <div className="flex flex-col items-center gap-3 text-center">
-                  <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
+                  <div className="flex size-14 items-center justify-center rounded-xl bg-amber-500/10">
                     <ShieldAlert className="size-7 text-amber-500" />
                   </div>
                   {terminalError?.message ? (

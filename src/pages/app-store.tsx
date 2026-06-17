@@ -117,7 +117,7 @@ export default function AppStorePage() {
         /* Empty state - no apps synced */
         <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
           <div className="max-w-xs text-center">
-            <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
+            <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
               <Stone />
             </div>
             <h2 className="text-sm font-semibold text-foreground">尚未同步应用商店</h2>

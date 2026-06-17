@@ -68,7 +68,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
             {servers.length === 0 ? (
               <div className="flex h-full items-center justify-center px-4">
                 <div className="max-w-xs text-center">
-                  <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary [&_svg]:size-7">
+                  <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
                     <ServerIcon />
                   </div>
                   <h2 className="text-sm font-semibold text-foreground">尚未配置远程服务器</h2>

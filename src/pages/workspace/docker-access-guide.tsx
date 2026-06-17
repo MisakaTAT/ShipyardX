@@ -19,7 +19,7 @@ export function DockerAccessGuide({ status, username, onRetry, onDisconnect, onO
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-lg space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-amber-500/10">
+          <div className="flex size-14 items-center justify-center rounded-xl bg-amber-500/10">
             <ShieldAlert className="size-7 text-amber-500" />
           </div>
           <h2 className="text-lg font-semibold text-foreground">
