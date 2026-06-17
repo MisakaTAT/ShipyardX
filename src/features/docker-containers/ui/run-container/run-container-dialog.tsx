@@ -859,8 +859,8 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         ) : (
           <PullProgress
             steps={progressSteps}
-            pullLines={flow.pullLines}
-            showPullLog={flow.showPullLog}
+            pullProgress={flow.pullProgress}
+            showPullProgress={flow.showPullProgress}
             error={flow.progressError}
           />
         )}

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -22,7 +23,9 @@ use tokio::sync::watch;
 use crate::docker::client::{docker, docker_streaming, map_bollard_error, pretty_json};
 use crate::docker::mapping::api_image_to_dto;
 use crate::dto::cleanup::CleanupResult;
-use crate::dto::events::{DockerSshStreamChunk, DockerSshStreamDone, ImageExportProgress, ImageImportProgress};
+use crate::dto::events::{
+    ImageExportProgress, ImageImportProgress, ImagePullDone, ImagePullLayerProgress, ImagePullProgress,
+};
 use crate::dto::image::Image;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
@@ -30,12 +33,8 @@ use crate::services::support::{ServerContext, start_managed_stream, stop_managed
 use crate::state::AppState;
 use crate::utils::formatting::{format_bytes_i64, format_bytes_u64, format_unix_seconds};
 use crate::utils::id::generate_id;
-use crate::utils::output::TextOutputBuffer;
 use crate::utils::sort::sort_by_created_desc_then_id;
 
-const PULL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
-const PULL_OUTPUT_MAX_BYTES: usize = 256 * 1024;
-const PULL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续拉取日志已省略]\n";
 const EXPORT_PROGRESS_EMIT_BYTES: u64 = 512 * 1024;
 
 async fn resolve_image_size_hint(server: &ServerConfig, image_id: &str) -> AppResult<Option<u64>> {
@@ -351,6 +350,8 @@ async fn run_pull_task(
     let done_stream_id = pull_id.clone();
     let done_handle = ah.clone();
     info!(target: "shipyardx_lib::services::images", "image pull task started; pull_id={} server_id={} image={}", pull_id, config.id, image);
+    let mut tracker = PullProgressTracker::new(image.clone());
+    tracker.emit(&pull_id, &ah);
     let result = async {
         let docker = docker_streaming(&config).await.map_err(|e| {
             error!(
@@ -363,29 +364,25 @@ async fn run_pull_task(
                 e.message,
                 e.detail
             );
-            let _ = DockerSshStreamChunk {
-                stream_id: pull_id.clone(),
-                chunk: format!("连接 Docker API 失败: {}\n", e.message),
-            }
-            .emit(&ah);
+            tracker.summary_status = "连接 Docker API 失败".to_string();
+            tracker.summary_detail = Some(e.message.clone());
+            tracker.emit(&pull_id, &ah);
             e
         })?;
-        let mut stream = docker.create_image(
-            Some(CreateImageOptionsBuilder::default().from_image(&image).build()),
-            None,
-            None,
-        );
+        let image_ref = parse_pull_image_reference(&image);
+        let mut options = CreateImageOptionsBuilder::default().from_image(&image_ref.repository);
+        if let Some(tag) = image_ref.tag.as_deref() {
+            options = options.tag(tag);
+        }
+        let mut stream = docker.create_image(Some(options.build()), None, None);
 
-        let mut buffer = String::new();
-        let mut output_buffer = TextOutputBuffer::new(
-            PULL_OUTPUT_CHUNK_BYTES,
-            Some(PULL_OUTPUT_MAX_BYTES),
-            PULL_OUTPUT_TRUNCATION_NOTICE,
-        );
         loop {
             tokio::select! {
                 changed = stop_rx.changed() => {
                     if changed.is_ok() && *stop_rx.borrow() {
+                        tracker.summary_status = "已取消拉取".to_string();
+                        tracker.summary_detail = Some("用户取消了当前镜像拉取".to_string());
+                        tracker.emit(&pull_id, &ah);
                         warn!(target: "shipyardx_lib::services::images", "image pull cancelled; pull_id={} server_id={} image={}", pull_id, config.id, image);
                         return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
                     }
@@ -393,11 +390,16 @@ async fn run_pull_task(
                 item = stream.next() => {
                     match item {
                         Some(Ok(chunk)) => {
-                            buffer.push_str(&format!("{}\n", serde_json::to_string(&chunk)?));
-                            emit_pull_lines(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
+                            let event: ImagePullEvent = serde_json::from_value(serde_json::to_value(chunk)?)
+                                .map_err(|e| AppError::internal("image.pull_event_parse_failed", "解析镜像拉取进度失败").with_source(e))?;
+                            tracker.apply_event(event)?;
+                            tracker.emit(&pull_id, &ah);
                         }
                         Some(Err(e)) => {
                             let e = map_bollard_error(e);
+                            tracker.summary_status = "拉取失败".to_string();
+                            tracker.summary_detail = Some(e.message.clone());
+                            tracker.emit(&pull_id, &ah);
                             error!(
                                 target: "shipyardx_lib::services::images",
                                 "image pull stream read failed; pull_id={} server_id={} image={} code={} message={} detail={:?}",
@@ -411,8 +413,8 @@ async fn run_pull_task(
                             return Err(e);
                         }
                         None => {
-                            emit_pull_tail(&pull_id, &ah, &mut buffer, &mut output_buffer)?;
-                            flush_pull_output(&pull_id, &ah, &mut output_buffer);
+                            tracker.finish_success();
+                            tracker.emit(&pull_id, &ah);
                             info!(target: "shipyardx_lib::services::images", "image pull stream completed; pull_id={} server_id={} image={}", pull_id, config.id, image);
                             return Ok(());
                         }
@@ -439,10 +441,16 @@ async fn run_pull_task(
         ),
     }
 
-    let _ = DockerSshStreamDone {
+    let final_status = match &result {
+        Ok(_) => Some("拉取完成".to_string()),
+        Err(error) => Some(error.message.clone()),
+    };
+
+    let _ = ImagePullDone {
         stream_id: done_stream_id,
         success: result.is_ok(),
         error: result.err(),
+        final_status,
     }
     .emit(&done_handle);
 }
@@ -452,14 +460,194 @@ struct ImagePullEvent {
     status: Option<String>,
     progress: Option<String>,
     id: Option<String>,
+    #[serde(rename = "progressDetail")]
+    progress_detail: Option<ImagePullProgressDetail>,
     error: Option<String>,
     #[serde(rename = "errorDetail")]
     error_detail: Option<ImagePullErrorDetail>,
 }
 
 #[derive(Deserialize)]
+struct ImagePullProgressDetail {
+    current: Option<u64>,
+    total: Option<u64>,
+}
+
+#[derive(Deserialize)]
 struct ImagePullErrorDetail {
     message: Option<String>,
+}
+
+#[derive(Clone)]
+struct PullLayerState {
+    status: String,
+    current: Option<u64>,
+    total: Option<u64>,
+}
+
+struct PullProgressTracker {
+    image: String,
+    summary_status: String,
+    summary_detail: Option<String>,
+    layers: BTreeMap<String, PullLayerState>,
+}
+
+struct PullImageReference {
+    repository: String,
+    tag: Option<String>,
+}
+
+fn parse_pull_image_reference(input: &str) -> PullImageReference {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return PullImageReference {
+            repository: String::new(),
+            tag: None,
+        };
+    }
+
+    if trimmed.contains('@') {
+        return PullImageReference {
+            repository: trimmed.to_string(),
+            tag: None,
+        };
+    }
+
+    let slash_pos = trimmed.rfind('/');
+    let colon_pos = trimmed.rfind(':');
+    let has_explicit_tag =
+        matches!((slash_pos, colon_pos), (_, Some(colon)) if slash_pos.is_none_or(|slash| colon > slash));
+
+    if has_explicit_tag {
+        let colon = colon_pos.expect("checked above");
+        return PullImageReference {
+            repository: trimmed[..colon].to_string(),
+            tag: Some(trimmed[colon + 1..].to_string()),
+        };
+    }
+
+    PullImageReference {
+        repository: trimmed.to_string(),
+        tag: Some("latest".to_string()),
+    }
+}
+
+impl PullProgressTracker {
+    fn new(image: String) -> Self {
+        Self {
+            image,
+            summary_status: "准备拉取镜像".to_string(),
+            summary_detail: None,
+            layers: BTreeMap::new(),
+        }
+    }
+
+    fn apply_event(&mut self, event: ImagePullEvent) -> AppResult<()> {
+        let error = event
+            .error_detail
+            .as_ref()
+            .and_then(|detail| detail.message.as_deref())
+            .or(event.error.as_deref())
+            .filter(|message| !message.trim().is_empty())
+            .map(str::to_string);
+        if let Some(error) = error {
+            return Err(AppError::unavailable("image.pull_failed", "镜像拉取失败").with_detail(error));
+        }
+
+        let status = event
+            .status
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let progress_text = event
+            .progress
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+
+        if let Some(layer_id) = event
+            .id
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+        {
+            let layer = self.layers.entry(layer_id).or_insert(PullLayerState {
+                status: String::new(),
+                current: None,
+                total: None,
+            });
+
+            if let Some(next_status) = status.clone() {
+                layer.status = next_status;
+            }
+
+            if let Some(detail) = event.progress_detail {
+                layer.current = detail.current;
+                layer.total = detail.total;
+            }
+        } else if let Some(next_status) = status.clone() {
+            self.summary_status = next_status;
+        }
+
+        if let Some(detail) = progress_text {
+            self.summary_detail = Some(detail);
+        } else if let Some(next_status) = status {
+            self.summary_detail = Some(next_status);
+        }
+
+        Ok(())
+    }
+
+    fn finish_success(&mut self) {
+        self.summary_status = "拉取完成".to_string();
+        self.summary_detail = Some("镜像已就绪".to_string());
+        for layer in self.layers.values_mut() {
+            if !matches!(layer.status.as_str(), "Pull complete" | "Already exists") {
+                layer.status = "Pull complete".to_string();
+            }
+        }
+    }
+
+    fn emit(&self, stream_id: &str, app: &AppHandle) {
+        let layers: Vec<ImagePullLayerProgress> = self
+            .layers
+            .iter()
+            .map(|(id, state)| ImagePullLayerProgress {
+                id: id.clone(),
+                status: state.status.clone(),
+                current: state.current.map(format_bytes_u64),
+                total: state.total.map(format_bytes_u64),
+                percent: match (state.current, state.total) {
+                    (_, Some(0)) => Some(0.0),
+                    (Some(current), Some(total)) if total > 0 => {
+                        Some(((current as f64 / total as f64) * 100.0).clamp(0.0, 100.0))
+                    }
+                    _ if matches!(
+                        state.status.as_str(),
+                        "Pull complete" | "Already exists" | "Download complete"
+                    ) =>
+                    {
+                        Some(100.0)
+                    }
+                    _ => None,
+                },
+            })
+            .collect();
+
+        let completed_layers = layers
+            .iter()
+            .filter(|layer| matches!(layer.status.as_str(), "Pull complete" | "Already exists"))
+            .count() as u32;
+        let total_layers = layers.len() as u32;
+
+        let _ = ImagePullProgress {
+            stream_id: stream_id.to_string(),
+            image: self.image.clone(),
+            status: self.summary_status.clone(),
+            detail: self.summary_detail.clone(),
+            layers,
+            completed_layers,
+            total_layers,
+        }
+        .emit(app);
+    }
 }
 
 async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, AppState>) -> AppResult<CleanupResult> {
@@ -645,89 +833,6 @@ where
             other => other,
         }
     }
-}
-
-fn emit_pull_lines(
-    stream_id: &str,
-    app: &AppHandle,
-    buffer: &mut String,
-    output_buffer: &mut TextOutputBuffer,
-) -> AppResult<()> {
-    while let Some(pos) = buffer.find('\n') {
-        let line = buffer[..pos].trim_end_matches('\r').to_string();
-        buffer.drain(..=pos);
-        emit_pull_line(stream_id, app, &line, output_buffer)?;
-    }
-    Ok(())
-}
-
-fn emit_pull_tail(
-    stream_id: &str,
-    app: &AppHandle,
-    buffer: &mut String,
-    output_buffer: &mut TextOutputBuffer,
-) -> AppResult<()> {
-    let line = buffer.trim();
-    if !line.is_empty() {
-        emit_pull_line(stream_id, app, line, output_buffer)?;
-    }
-    buffer.clear();
-    Ok(())
-}
-
-fn emit_pull_line(stream_id: &str, app: &AppHandle, line: &str, output_buffer: &mut TextOutputBuffer) -> AppResult<()> {
-    if line.trim().is_empty() {
-        return Ok(());
-    }
-
-    let event: ImagePullEvent = serde_json::from_str(line)
-        .map_err(|e| AppError::internal("image.pull_event_parse_failed", "解析镜像拉取进度失败").with_source(e))?;
-
-    let error = event
-        .error_detail
-        .as_ref()
-        .and_then(|detail| detail.message.as_deref())
-        .or(event.error.as_deref())
-        .filter(|message| !message.trim().is_empty())
-        .map(str::to_string);
-    if let Some(error) = error {
-        return Err(AppError::unavailable("image.pull_failed", "镜像拉取失败").with_detail(error));
-    }
-
-    if let Some(text) = format_pull_event(event) {
-        emit_pull_output(stream_id, app, output_buffer, &text);
-    }
-    Ok(())
-}
-
-fn emit_pull_output(stream_id: &str, app: &AppHandle, output_buffer: &mut TextOutputBuffer, text: &str) {
-    for chunk in output_buffer.push(text) {
-        let _ = DockerSshStreamChunk {
-            stream_id: stream_id.to_string(),
-            chunk,
-        }
-        .emit(app);
-    }
-}
-
-fn flush_pull_output(stream_id: &str, app: &AppHandle, output_buffer: &mut TextOutputBuffer) {
-    for chunk in output_buffer.finish() {
-        let _ = DockerSshStreamChunk {
-            stream_id: stream_id.to_string(),
-            chunk,
-        }
-        .emit(app);
-    }
-}
-
-fn format_pull_event(event: ImagePullEvent) -> Option<String> {
-    let status = event.status?;
-    let prefix = event.id.map(|id| format!("{id}: ")).unwrap_or_default();
-    let progress = event.progress.filter(|value| !value.trim().is_empty());
-    Some(match progress {
-        Some(progress) => format!("{prefix}{status} {progress}\n"),
-        None => format!("{prefix}{status}\n"),
-    })
 }
 
 pub async fn start_image_pull(

@@ -1,60 +1,65 @@
-import { commands, type AppError } from '@/types/app-bindings'
-import { appendSshStreamChunkToLines, subscribeDockerSshStream } from '@/features/docker-terminal/lib/docker-ssh-stream'
+import { commands, events, type AppError, type ImagePullDone, type ImagePullProgress } from '@/types/app-bindings'
+
+export interface PullImageOptions {
+  onStreamId?: (streamId: string) => void
+}
+
+export interface PullImageCallbacks {
+  onProgress: (progress: ImagePullProgress) => void
+  onDone?: (result: ImagePullDone) => void
+}
 
 export async function pullImage(
   serverId: string,
   image: string,
-  onLogsUpdate: (lines: string[]) => void,
-  options?: { onStreamId?: (streamId: string) => void }
-): Promise<void> {
-  let lines: string[] = [`> docker pull ${image}`, '']
-  onLogsUpdate(lines)
-
+  callbacks: PullImageCallbacks,
+  options?: PullImageOptions
+): Promise<ImagePullDone> {
   const streamId = await commands.startImagePull(serverId, image)
   options?.onStreamId?.(streamId)
 
-  let resolveDone!: (v: { success: boolean; error?: AppError }) => void
-  const donePromise = new Promise<{ success: boolean; error?: AppError }>((r) => {
-    resolveDone = r
+  let resolveDone!: (value: ImagePullDone) => void
+  const donePromise = new Promise<ImagePullDone>((resolve) => {
+    resolveDone = resolve
   })
 
-  const unlisten = await subscribeDockerSshStream(
-    streamId,
-    (chunk) => {
-      lines = appendSshStreamChunkToLines(lines, chunk)
-      onLogsUpdate([...lines])
-    },
-    (payload) => {
-      resolveDone({
-        success: payload.success,
-        error: payload.error ?? undefined,
-      })
-    }
-  )
+  const unProgress = await events.imagePullProgress.listen((event) => {
+    if (event.payload.stream_id !== streamId) return
+    callbacks.onProgress(event.payload)
+  })
 
-  const { success, error } = await donePromise
-  unlisten()
+  const unDone = await events.imagePullDone.listen((event) => {
+    if (event.payload.stream_id !== streamId) return
+    resolveDone(event.payload)
+  })
 
-  if (!success) {
+  const cleanup = () => {
+    unProgress()
+    unDone()
+  }
+
+  const result = await donePromise
+  cleanup()
+  callbacks.onDone?.(result)
+
+  if (!result.success) {
     try {
       await commands.cancelStream(streamId)
     } catch {
       /* ignore */
     }
-    lines = [...lines, '', '✗ 拉取失败']
-    onLogsUpdate(lines)
     throw (
-      error ?? {
+      result.error ??
+      ({
         code: 'image.pull_failed',
         kind: 'unavailable' as const,
-        message: '拉取失败',
+        message: result.final_status ?? '拉取失败',
         detail: null,
         retryable: false,
         action: null,
-      }
+      } satisfies AppError)
     )
   }
 
-  lines = [...lines, '', '✓ 拉取成功']
-  onLogsUpdate(lines)
+  return result
 }

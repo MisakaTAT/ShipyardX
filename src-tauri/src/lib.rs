@@ -17,8 +17,9 @@ use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
 use dto::events::{
-    DockerSshStreamChunk, DockerSshStreamDone, DockerStreamError, DockerStreamPayload, DockerStreamRefresh,
-    DockerStreamStatus, EventStreamStatus, ImageExportProgress, ImageImportProgress, InstallStepEvent,
+    DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
+    ImageExportProgress, ImageImportProgress, ImagePullDone, ImagePullLayerProgress, ImagePullProgress,
+    InstallStepEvent,
 };
 use log::{error, info, warn};
 #[cfg(debug_assertions)]
@@ -103,13 +104,14 @@ pub fn run() {
             DockerStreamStatus,
             DockerStreamRefresh,
             DockerStreamError,
-            DockerSshStreamChunk,
-            DockerSshStreamDone,
+            ImagePullProgress,
+            ImagePullDone,
             ImageExportProgress,
             ImageImportProgress,
             InstallStepEvent,
         ])
         .typ::<EventStreamStatus>()
+        .typ::<ImagePullLayerProgress>()
         .typ::<AppError>()
         .typ::<AppErrorKind>();
 

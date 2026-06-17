@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { commands, type RunContainer, type Image } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
+import { toImagePullViewModel, type ImagePullViewModel } from '@/features/docker-images/lib/image-pull-view'
 import { imageRefExistsOnHost } from '@/shared/lib/docker-image-ref'
 import { qk } from '@/shared/api/query-keys'
 import { getErrorMessage, toastAppError } from '@/shared/lib/errors'
@@ -22,8 +23,8 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
   const [runStep, setRunStep] = useState<StepState>('pending')
   const [imageStepTitle, setImageStepTitle] = useState('')
   const [imageStepDetail, setImageStepDetail] = useState('')
-  const [pullLines, setPullLines] = useState<string[]>([])
-  const [showPullLog, setShowPullLog] = useState(false)
+  const [pullProgress, setPullProgress] = useState<ImagePullViewModel | null>(null)
+  const [showPullProgress, setShowPullProgress] = useState(false)
   const [progressError, setProgressError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -39,8 +40,8 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
     setRunStep('pending')
     setImageStepTitle('')
     setImageStepDetail('')
-    setPullLines([])
-    setShowPullLog(false)
+    setPullProgress(null)
+    setShowPullProgress(false)
     setProgressError(null)
     pendingParamsRef.current = null
     pendingForcePullRef.current = false
@@ -63,8 +64,8 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
     setImageStep('pending')
     setRunStep('pending')
     setProgressError(null)
-    setPullLines([])
-    setShowPullLog(false)
+    setPullProgress(null)
+    setShowPullProgress(false)
   }, [cancelPull])
 
   const executeRun = useCallback(
@@ -74,8 +75,8 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
 
       pullStreamIdRef.current = null
       setProgressError(null)
-      setPullLines([])
-      setShowPullLog(needsPull)
+      setPullProgress(null)
+      setShowPullProgress(needsPull)
       setRunStep('pending')
 
       try {
@@ -83,11 +84,22 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
           setImageStepTitle('拉取镜像')
           setImageStepDetail(img)
           setImageStep('active')
-          await pullImage(serverId, img, (lines) => setPullLines(lines), {
-            onStreamId: (id) => {
-              pullStreamIdRef.current = id
+          await pullImage(
+            serverId,
+            img,
+            {
+              onProgress: (progress) => {
+                const view = toImagePullViewModel(progress)
+                setPullProgress(view)
+                setImageStepDetail(progress.detail ?? view.status)
+              },
             },
-          })
+            {
+              onStreamId: (id) => {
+                pullStreamIdRef.current = id
+              },
+            }
+          )
           if (!mountedRef.current) return
           setImageStep('done')
           setImageStepDetail('镜像已就绪')
@@ -138,8 +150,8 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
     runStep,
     imageStepTitle,
     imageStepDetail,
-    pullLines,
-    showPullLog,
+    pullProgress,
+    showPullProgress,
     progressError,
     isStepActive,
     reset,

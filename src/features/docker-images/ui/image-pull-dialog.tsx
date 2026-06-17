@@ -1,20 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
+import { toImagePullViewModel, type ImagePullViewModel } from '@/features/docker-images/lib/image-pull-view'
 import {
   imagePullDefaultValues,
   imagePullFormSchema,
   type ImagePullFormValues,
 } from '@/features/docker-images/model/image-pull-schema'
 import { Download, Loader2 } from 'lucide-react'
+import { getErrorMessage } from '@/shared/lib/errors'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldError, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { qk } from '@/shared/api/query-keys'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { ImagePullProgressPanel } from '@/features/docker-images/ui/image-pull-progress'
 
 export interface ImagePullDialogProps {
   serverId: string
@@ -31,28 +34,21 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
     defaultValues: imagePullDefaultValues(),
     mode: 'onSubmit',
   })
-  const [lines, setLines] = useState<string[]>([])
+  const [progress, setProgress] = useState<ImagePullViewModel | null>(null)
   const [status, setStatus] = useState<'idle' | 'pulling' | 'success' | 'error'>('idle')
   const [pullId, setPullId] = useState<string | null>(null)
-  const outputRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const pulling = status === 'pulling'
 
   useEffect(() => {
     if (!open) return
     form.reset(imagePullDefaultValues())
-    setLines([])
+    setProgress(null)
     setStatus('idle')
     setPullId(null)
-    queueMicrotask(() => inputRef.current?.focus())
+    setErrorMessage(null)
   }, [open, form])
-
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight
-    }
-  }, [lines])
 
   const cleanup = useCallback(
     async (id?: string | null) => {
@@ -72,16 +68,26 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
   const runPull = async (img: string) => {
     await cleanup()
     setStatus('pulling')
+    setErrorMessage(null)
+    setProgress(null)
 
     try {
-      await pullImage(serverId, img, setLines, { onStreamId: (id) => setPullId(id) })
+      await pullImage(
+        serverId,
+        img,
+        {
+          onProgress: (next) => setProgress(toImagePullViewModel(next)),
+        },
+        { onStreamId: (id) => setPullId(id) }
+      )
       setPullId(null)
       setStatus('success')
       qc.invalidateQueries({ queryKey: qk.images(serverId) })
       await onSuccess?.()
-    } catch {
+    } catch (error) {
       setStatus('error')
       setPullId(null)
+      setErrorMessage(getErrorMessage(error))
     }
   }
 
@@ -123,10 +129,6 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                         aria-invalid={fieldState.invalid}
                         aria-describedby={fieldState.error ? `${formId}-image-err` : undefined}
                         {...field}
-                        ref={(el) => {
-                          field.ref(el)
-                          inputRef.current = el
-                        }}
                         placeholder="nginx:latest"
                         disabled={pulling}
                       />
@@ -151,12 +153,12 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
             />
           </FieldGroup>
 
-          {lines.length > 0 ? (
-            <div ref={outputRef} className="h-52 overflow-y-auto rounded-lg border border-border bg-background p-3">
-              <pre className="font-mono text-xs leading-relaxed break-all whitespace-pre-wrap text-foreground">
-                {lines.join('\n')}
-              </pre>
-            </div>
+          <ImagePullProgressPanel progress={progress} />
+
+          {errorMessage ? (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+              {errorMessage}
+            </p>
           ) : null}
         </div>
       </form>

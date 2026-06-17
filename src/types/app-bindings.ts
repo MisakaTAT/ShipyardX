@@ -75,14 +75,14 @@ export const commands = {
 
 /** Events */
 export const events = {
-	dockerSshStreamChunk: makeEvent<DockerSshStreamChunk>("docker-ssh-stream-chunk"),
-	dockerSshStreamDone: makeEvent<DockerSshStreamDone>("docker-ssh-stream-done"),
 	dockerStreamError: makeEvent<DockerStreamError>("docker-stream-error"),
 	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
 	dockerStreamStatus: makeEvent<DockerStreamStatus>("docker-stream-status"),
 	imageExportProgress: makeEvent<ImageExportProgress>("image-export-progress"),
 	imageImportProgress: makeEvent<ImageImportProgress>("image-import-progress"),
+	imagePullDone: makeEvent<ImagePullDone>("image-pull-done"),
+	imagePullProgress: makeEvent<ImagePullProgress>("image-pull-progress"),
 	installStepEvent: makeEvent<InstallStepEvent>("install-step-event"),
 };
 
@@ -271,17 +271,6 @@ export type DockerEvent = {
 	detail: string,
 };
 
-export type DockerSshStreamChunk = {
-	stream_id: string,
-	chunk: string,
-};
-
-export type DockerSshStreamDone = {
-	stream_id: string,
-	success: boolean,
-	error: AppError | null,
-};
-
 export type DockerStreamError = {
 	stream_id: string,
 	error: AppError,
@@ -378,6 +367,31 @@ export type ImageLayer = {
 	size: string,
 	command: string,
 	comment: string,
+};
+
+export type ImagePullDone = {
+	stream_id: string,
+	success: boolean,
+	error: AppError | null,
+	final_status: string | null,
+};
+
+export type ImagePullLayerProgress = {
+	id: string,
+	status: string,
+	current: string | null,
+	total: string | null,
+	percent: number | null,
+};
+
+export type ImagePullProgress = {
+	stream_id: string,
+	image: string,
+	status: string,
+	detail: string | null,
+	layers: ImagePullLayerProgress[],
+	completed_layers: number,
+	total_layers: number,
 };
 
 export type InstallApp = {

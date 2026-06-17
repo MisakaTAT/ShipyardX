@@ -54,16 +54,31 @@ pub struct DockerStreamError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
-pub struct DockerSshStreamChunk {
-    pub stream_id: String,
-    pub chunk: String,
+pub struct ImagePullLayerProgress {
+    pub id: String,
+    pub status: String,
+    pub current: Option<String>,
+    pub total: Option<String>,
+    pub percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
-pub struct DockerSshStreamDone {
+pub struct ImagePullProgress {
+    pub stream_id: String,
+    pub image: String,
+    pub status: String,
+    pub detail: Option<String>,
+    pub layers: Vec<ImagePullLayerProgress>,
+    pub completed_layers: u32,
+    pub total_layers: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct ImagePullDone {
     pub stream_id: String,
     pub success: bool,
     pub error: Option<AppError>,
+    pub final_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
