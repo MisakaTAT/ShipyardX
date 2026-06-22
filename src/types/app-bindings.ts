@@ -71,12 +71,17 @@ export const commands = {
 	saveTerminalExport: (path: string, content: string) => __TAURI_INVOKE<null>("save_terminal_export", { path, content }),
 	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
 	listApps: () => __TAURI_INVOKE<AppListItem[]>("list_apps"),
+	getAppstoreSettings: () => __TAURI_INVOKE<AppstoreSettings>("get_appstore_settings"),
+	updateAppstoreSettings: (settings: AppstoreSettings) => __TAURI_INVOKE<AppstoreSettings>("update_appstore_settings", { settings }),
+	getAppstoreCacheInfo: () => __TAURI_INVOKE<AppstoreCacheInfo>("get_appstore_cache_info"),
+	clearAppstoreCache: () => __TAURI_INVOKE<null>("clear_appstore_cache"),
 	getAppDetail: (appKey: string) => __TAURI_INVOKE<AppDetail_Serialize>("get_app_detail", { appKey }),
 	installApp: (serverId: string, req: InstallApp) => __TAURI_INVOKE<null>("install_app", { serverId, req }),
 };
 
 /** Events */
 export const events = {
+	appstoreSyncProgress: makeEvent<AppstoreSyncProgress>("appstore-sync-progress"),
 	dockerStreamError: makeEvent<DockerStreamError>("docker-stream-error"),
 	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
@@ -159,6 +164,26 @@ export type AppVersionInfo_Serialize = {
 	version: string,
 	form_fields: FormField_Serialize[],
 	compose_preview: string,
+};
+
+export type AppstoreCacheInfo = {
+	cache_dir: string,
+	exists: boolean,
+	size: string,
+};
+
+export type AppstoreSettings = {
+	repo_url: string,
+	proxy_enabled: boolean,
+	proxy_url: string,
+};
+
+export type AppstoreSyncProgress = {
+	phase: string,
+	received_objects: number,
+	total_objects: number,
+	indexed_objects: number,
+	percent: number | null,
 };
 
 export type CleanupResult = {

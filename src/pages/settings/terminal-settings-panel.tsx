@@ -116,7 +116,7 @@ export function TerminalSettingsPanel({
     <SettingsPanelShell>
       <SettingsPanelHeader
         eyebrow="Terminal"
-        title="终端"
+        title="终端设置"
         actions={
           <Button type="button" size="sm" onClick={onReset}>
             <RotateCcw className="size-3.5" />

@@ -12,8 +12,8 @@ use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio::process::Command;
 use uuid::Uuid;
 
-use crate::dto::appstore::{AppDetail, AppListItem, InstallApp};
-use crate::dto::events::InstallStepEvent;
+use crate::dto::appstore::{AppDetail, AppListItem, AppstoreCacheInfo, AppstoreSettings, InstallApp};
+use crate::dto::events::{AppstoreSyncProgress, InstallStepEvent};
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
@@ -30,7 +30,7 @@ const INSTALL_OUTPUT_TRUNCATION_NOTICE: &str = "\n[输出已截断，后续安�
 
 pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
     let repo = AppstoreRepo::new(app)?;
-    let cache_dir = repo.sync().await?;
+    let cache_dir = repo.sync_with_progress(app).await?;
     info!(target: "shipyardx_lib::services::appstore", "appstore synced; cache_dir={}", cache_dir.display());
     Ok(cache_dir)
 }
@@ -40,6 +40,22 @@ pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
     let items = repo.list_apps().await?;
     info!(target: "shipyardx_lib::services::appstore", "listed appstore apps; count={}", items.len());
     Ok(items)
+}
+
+pub async fn get_appstore_settings(app: &AppHandle) -> AppResult<AppstoreSettings> {
+    AppstoreRepo::new(app)?.load_settings().await
+}
+
+pub async fn update_appstore_settings(app: &AppHandle, settings: AppstoreSettings) -> AppResult<AppstoreSettings> {
+    AppstoreRepo::new(app)?.save_settings(settings).await
+}
+
+pub async fn get_appstore_cache_info(app: &AppHandle) -> AppResult<AppstoreCacheInfo> {
+    AppstoreRepo::new(app)?.get_cache_info().await
+}
+
+pub async fn clear_appstore_cache(app: &AppHandle) -> AppResult<()> {
+    AppstoreRepo::new(app)?.clear_cache().await
 }
 
 pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
@@ -56,6 +72,24 @@ fn emit_step(app: &AppHandle, step: &str, status: &str, message: &str) {
         status: status.to_string(),
         message: message.to_string(),
         output_chunk: None,
+    }
+    .emit(app);
+}
+
+pub(crate) fn emit_appstore_sync_progress(
+    app: &AppHandle,
+    phase: &str,
+    received_objects: u32,
+    total_objects: u32,
+    indexed_objects: u32,
+    percent: f64,
+) {
+    let _ = AppstoreSyncProgress {
+        phase: phase.to_string(),
+        received_objects,
+        total_objects,
+        indexed_objects,
+        percent,
     }
     .emit(app);
 }

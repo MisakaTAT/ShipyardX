@@ -190,6 +190,20 @@ pub struct InstallApp {
     pub env_values: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct AppstoreSettings {
+    pub repo_url: String,
+    pub proxy_enabled: bool,
+    pub proxy_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct AppstoreCacheInfo {
+    pub cache_dir: String,
+    pub exists: bool,
+    pub size: String,
+}
+
 fn deser_opt_string_from_any<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
     Ok(match Option::<YamlPrimitive>::deserialize(d)? {
         None => None,

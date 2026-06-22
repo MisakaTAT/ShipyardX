@@ -1,14 +1,20 @@
 import { useState, useMemo } from 'react'
-import { Loader2, PackagePlus, RefreshCw, Search, Stone } from 'lucide-react'
-import { useApps, useAppStoreSync } from '@/features/appstore/api/use-appstore'
+import { Loader2, PackagePlus, RefreshCw, Search, Settings2, Stone } from 'lucide-react'
+import { useLocation } from 'wouter'
+import { useApps, useAppStoreSync, useAppStoreSyncIndicator } from '@/features/appstore/api/use-appstore'
 import { useServers } from '@/features/servers/api/use-servers'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
 import { SearchInput } from '@/shared/components'
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import { AppDetailDialog } from '@/features/appstore/ui/app-detail-dialog'
-import { AppListItem } from '@/types/app-bindings'
+import { AppListItem, type AppstoreSyncProgress } from '@/types/app-bindings'
+import { APP_PATHS } from '@/shared/lib/app-router'
+import { cn } from '@/shared/lib/utils'
 export default function AppStorePage() {
+  const [, navigate] = useLocation()
   const sync = useAppStoreSync()
+  const syncPercent = useAppStoreSyncIndicator(sync.isPending)
   const { data: apps = [], isLoading, isFetching } = useApps()
   const { data: servers = [] } = useServers()
   const [search, setSearch] = useState('')
@@ -73,17 +79,26 @@ export default function AppStorePage() {
             <div>
               <h1 className="text-lg font-semibold text-foreground">应用商店</h1>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                浏览和安装官方仓库中的应用，一键部署到远程服务器，共 {apps.length} 个应用。
+                浏览和安装商店中的应用，一键部署到远程服务器，共 {apps.length} 个应用。
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                size="icon-sm"
+                variant="outline"
+                onClick={() => navigate(`${APP_PATHS.settings}?section=appstore`)}
+                aria-label="打开应用商店设置"
+              >
+                <Settings2 className="size-4" />
+              </Button>
+              {sync.isPending ? <SyncProgressPopover progress={syncPercent} initialSync={isEmpty} /> : null}
               <Button size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
                 {sync.isPending ? (
                   <Loader2 className="mr-1 size-4 animate-spin" />
                 ) : (
                   <RefreshCw className="mr-1 size-4" />
                 )}
-                同步
+                {sync.isPending ? '同步中...' : '同步'}
               </Button>
             </div>
           </div>
@@ -118,22 +133,26 @@ export default function AppStorePage() {
         <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
           <div className="max-w-xs text-center">
             <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
-              <Stone />
+              {sync.isPending ? <Loader2 className="animate-spin" /> : <Stone />}
             </div>
-            <h2 className="text-sm font-semibold text-foreground">尚未同步应用商店</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {sync.isPending ? '正在同步应用商店' : '尚未同步应用商店'}
+            </h2>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              同步官方仓库后，可在此浏览和搜索数百款精选应用，选择您需要的版本并一键部署到远程服务器。
+              {sync.isPending
+                ? '首次同步可能需要一点时间'
+                : '同步应用仓库后，可在此浏览和搜索数百款精选应用，选择您需要的版本并一键部署到服务器'}
             </p>
-            <div className="mt-5">
-              <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-                {sync.isPending ? (
-                  <Loader2 className="mr-1 size-4 animate-spin" />
-                ) : (
+            {sync.isPending ? (
+              <SyncProgressBar progress={syncPercent} className="mt-4 text-left" compact />
+            ) : (
+              <div className="mt-5">
+                <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
                   <RefreshCw className="mr-1 size-4" />
-                )}
-                立即同步
-              </Button>
-            </div>
+                  立即同步
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -178,6 +197,81 @@ export default function AppStorePage() {
         onClose={() => setSelectedAppKey(null)}
       />
     </div>
+  )
+}
+
+function SyncProgressBar({
+  progress,
+  className,
+  compact = false,
+}: {
+  progress: AppstoreSyncProgress | null
+  className?: string
+  compact?: boolean
+}) {
+  const percent = progress ? Math.min(Math.max(Math.round(progress.percent), 0), 100) : 0
+  const hasStarted = !!progress && progress.total_objects > 0
+  const detail = hasStarted
+    ? `${progress.received_objects} / ${progress.total_objects} 个对象`
+    : '正在等待远端返回对象信息'
+  const indexed = progress && progress.indexed_objects > 0 ? `，已处理 ${progress.indexed_objects} 个对象` : ''
+
+  return (
+    <div className={cn(compact ? 'space-y-3' : 'space-y-2', className)}>
+      <div className={cn('flex items-end justify-between gap-3', compact ? 'justify-center' : '')}>
+        {!compact ? <span className="text-xs text-muted-foreground">同步进度</span> : null}
+        <span className="shrink-0 text-sm font-medium text-foreground tabular-nums">{percent}%</span>
+      </div>
+
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted/80">
+        <div
+          className={cn(
+            'h-full rounded-full bg-primary transition-[width] duration-500 ease-out',
+            hasStarted ? '' : 'opacity-0'
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      <p className={cn('text-[11px] text-muted-foreground', compact ? 'text-center' : '')}>
+        {detail}
+        {indexed}
+      </p>
+    </div>
+  )
+}
+
+function SyncProgressPopover({
+  progress,
+  initialSync,
+}: {
+  progress: AppstoreSyncProgress | null
+  initialSync: boolean
+}) {
+  const percent = progress ? Math.min(Math.max(Math.round(progress.percent), 0), 100) : 0
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        className={cn(
+          'inline-flex items-center gap-2 rounded-md border border-border/70 bg-background px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent/40'
+        )}
+      >
+        <span className="font-medium tabular-nums">{percent}%</span>
+        <span className="text-muted-foreground">查看进度</span>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={8} className="w-72 p-3">
+        <div className="space-y-3">
+          <div>
+            <div className="text-sm font-medium text-foreground">正在同步应用商店</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {initialSync ? '首次同步可能需要一点时间' : '正在获取应用商店最新内容'}
+            </div>
+          </div>
+          <SyncProgressBar progress={progress} compact />
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

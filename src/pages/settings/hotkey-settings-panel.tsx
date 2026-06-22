@@ -40,7 +40,7 @@ export function HotkeySettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Hotkeys" title="热键" />
+      <SettingsPanelHeader eyebrow="Hotkeys" title="热键管理" />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow
@@ -51,14 +51,12 @@ export function HotkeySettingsPanel() {
               <Button
                 type="button"
                 variant={recordingHotkey === 'focusSearch' ? 'default' : 'outline'}
-                size="sm"
                 onClick={() => setRecordingHotkey((value) => (value === 'focusSearch' ? null : 'focusSearch'))}
               >
                 {recordingHotkey === 'focusSearch' ? '按下快捷键…' : formatHotkeyLabel(focusSearch)}
               </Button>
               <Button
                 type="button"
-                size="sm"
                 onClick={() => {
                   resetHotkeySettings()
                   setRecordingHotkey(null)
@@ -79,7 +77,6 @@ export function HotkeySettingsPanel() {
               <Button
                 type="button"
                 variant={recordingHotkey === 'openTerminalSearch' ? 'default' : 'outline'}
-                size="sm"
                 onClick={() =>
                   setRecordingHotkey((value) => (value === 'openTerminalSearch' ? null : 'openTerminalSearch'))
                 }
@@ -90,7 +87,6 @@ export function HotkeySettingsPanel() {
               </Button>
               <Button
                 type="button"
-                size="sm"
                 onClick={() => {
                   resetHotkeySettings()
                   setRecordingHotkey(null)

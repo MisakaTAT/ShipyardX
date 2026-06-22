@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { qk } from '@/shared/api/query-keys'
-import { commands, type AppListItem, type InstallApp } from '@/types/app-bindings'
+import { commands, events, type AppListItem, type AppstoreSyncProgress, type InstallApp } from '@/types/app-bindings'
 import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
 
@@ -14,6 +15,35 @@ export function useAppStoreSync() {
     },
     onError: (err) => toastAppError(err),
   })
+}
+
+export function useAppStoreSyncIndicator(active: boolean) {
+  const [progress, setProgress] = useState<AppstoreSyncProgress | null>(null)
+
+  useEffect(() => {
+    if (!active) {
+      setProgress(null)
+      return
+    }
+
+    const unlistenPromise = events.appstoreSyncProgress.listen((event) => {
+      setProgress((current) => {
+        if (!current) {
+          return {
+            ...event.payload,
+            percent: event.payload.total_objects > 0 ? Math.min(event.payload.percent, 12) : 0,
+          }
+        }
+        return event.payload
+      })
+    })
+
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten())
+    }
+  }, [active])
+
+  return progress
 }
 
 export function useApps() {

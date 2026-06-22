@@ -106,3 +106,12 @@ pub struct InstallStepEvent {
     pub message: String,
     pub output_chunk: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct AppstoreSyncProgress {
+    pub phase: String,
+    pub received_objects: u32,
+    pub total_objects: u32,
+    pub indexed_objects: u32,
+    pub percent: f64,
+}

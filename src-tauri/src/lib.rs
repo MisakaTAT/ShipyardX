@@ -17,9 +17,9 @@ use std::sync::Mutex;
 
 use config::store::{get_data_file, load_servers};
 use dto::events::{
-    DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus, EventStreamStatus,
-    ImageExportProgress, ImageImportProgress, ImagePullDone, ImagePullLayerProgress, ImagePullProgress,
-    InstallStepEvent,
+    AppstoreSyncProgress, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus,
+    EventStreamStatus, ImageExportProgress, ImageImportProgress, ImagePullDone, ImagePullLayerProgress,
+    ImagePullProgress, InstallStepEvent,
 };
 use log::{error, info, warn};
 #[cfg(debug_assertions)]
@@ -98,6 +98,10 @@ pub fn run() {
             commands::terminal::save_terminal_export,
             commands::appstore::sync_appstore,
             commands::appstore::list_apps,
+            commands::appstore::get_appstore_settings,
+            commands::appstore::update_appstore_settings,
+            commands::appstore::get_appstore_cache_info,
+            commands::appstore::clear_appstore_cache,
             commands::appstore::get_app_detail,
             commands::appstore::install_app,
         ])
@@ -111,6 +115,7 @@ pub fn run() {
             ImageExportProgress,
             ImageImportProgress,
             InstallStepEvent,
+            AppstoreSyncProgress,
         ])
         .typ::<EventStreamStatus>()
         .typ::<ImagePullLayerProgress>()
@@ -141,6 +146,7 @@ pub fn run() {
                 .level_for("shipyardx_lib::services::images", log::LevelFilter::Debug)
                 .level_for("shipyardx_lib::services::system", log::LevelFilter::Debug)
                 .level_for("shipyardx_lib::services::appstore", log::LevelFilter::Debug)
+                .level_for("shipyardx_lib::services::appstore_repo", log::LevelFilter::Debug)
                 .level_for("shipyardx_lib::docker::client", log::LevelFilter::Debug)
                 .level_for("shipyardx_lib::docker::transport", log::LevelFilter::Debug)
                 .level_for("shipyardx_lib::ssh::client", log::LevelFilter::Debug)

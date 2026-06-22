@@ -1,17 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearch } from 'wouter'
 import { useAppSettings } from '@/app/settings-store'
 import { commands } from '@/types/app-bindings'
 import { toast } from '@/shared/components/toast'
 import { cn } from '@/shared/lib/utils'
 import { AppSettingsPanel } from '@/pages/settings/app-settings-panel'
+import { AppStoreSettingsPanel } from '@/pages/settings/appstore-settings-panel'
 import { DebugSettingsPanel } from '@/pages/settings/debug-settings-panel'
 import { HotkeySettingsPanel } from '@/pages/settings/hotkey-settings-panel'
 import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/settings-sections'
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
 export default function SettingsPage() {
-  const { settings, updateTerminalSettings, resetTerminalSettings } = useAppSettings()
-  const [activeSection, setActiveSection] = useState<SettingsSectionKey>('app')
+  const { settings, updateTerminalSettings, resetTerminalSettings, updateAppStoreSettings, resetAppStoreSettings } =
+    useAppSettings()
+  const search = useSearch()
+  const initialSection = useMemo<SettingsSectionKey>(() => {
+    const section = new URLSearchParams(search).get('section')
+    return SETTINGS_SECTIONS.some((item) => item.key === section) ? (section as SettingsSectionKey) : 'app'
+  }, [search])
+  const [activeSection, setActiveSection] = useState<SettingsSectionKey>(initialSection)
   const [terminalFontOptions, setTerminalFontOptions] = useState<string[]>([])
 
   useEffect(() => {
@@ -36,6 +44,10 @@ export default function SettingsPage() {
     resetTerminalSettings()
     toast.success('终端设置已恢复默认')
   }
+
+  useEffect(() => {
+    setActiveSection(initialSection)
+  }, [initialSection])
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
@@ -92,6 +104,14 @@ export default function SettingsPage() {
             onCursorBlinkChange={(cursorBlink) => updateTerminalSettings({ cursorBlink })}
             onLineHeightChange={(lineHeight) => updateTerminalSettings({ lineHeight })}
             onReset={handleResetTerminalSettings}
+          />
+        ) : activeSection === 'appstore' ? (
+          <AppStoreSettingsPanel
+            repoUrl={settings.appstore.repoUrl}
+            proxyEnabled={settings.appstore.proxyEnabled}
+            proxyUrl={settings.appstore.proxyUrl}
+            onChange={updateAppStoreSettings}
+            onReset={resetAppStoreSettings}
           />
         ) : activeSection === 'hotkeys' ? (
           <HotkeySettingsPanel />

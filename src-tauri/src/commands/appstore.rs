@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::dto::appstore::{AppDetail, AppListItem, InstallApp};
+use crate::dto::appstore::{AppDetail, AppListItem, AppstoreCacheInfo, AppstoreSettings, InstallApp};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::{AppState, get_server_config};
@@ -8,14 +8,38 @@ use crate::state::{AppState, get_server_config};
 #[tauri::command]
 #[specta::specta]
 pub async fn sync_appstore(app: AppHandle) -> AppResult<String> {
-    let cache_dir = services::appstore::sync_appstore(&app).await?;
-    Ok(format!("应用商店已同步到: {}", cache_dir.display()))
+    services::appstore::sync_appstore(&app).await?;
+    Ok("同步完成".to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn list_apps(app: AppHandle) -> AppResult<Vec<AppListItem>> {
     services::appstore::list_apps(&app).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_appstore_settings(app: AppHandle) -> AppResult<AppstoreSettings> {
+    services::appstore::get_appstore_settings(&app).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_appstore_settings(app: AppHandle, settings: AppstoreSettings) -> AppResult<AppstoreSettings> {
+    services::appstore::update_appstore_settings(&app, settings).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_appstore_cache_info(app: AppHandle) -> AppResult<AppstoreCacheInfo> {
+    services::appstore::get_appstore_cache_info(&app).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_appstore_cache(app: AppHandle) -> AppResult<()> {
+    services::appstore::clear_appstore_cache(&app).await
 }
 
 #[tauri::command]

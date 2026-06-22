@@ -7,12 +7,10 @@ export function SettingsPanelShell({ children }: { children: ReactNode }) {
 export function SettingsPanelHeader({
   eyebrow,
   title,
-  description,
   actions,
 }: {
   eyebrow: string
   title: string
-  description?: string
   actions?: ReactNode
 }) {
   return (
@@ -22,7 +20,6 @@ export function SettingsPanelHeader({
         <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
     </div>
   )
 }

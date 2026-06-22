@@ -13,6 +13,11 @@ export interface AppSettings {
     focusSearch: string | null
     openTerminalSearch: string | null
   }
+  appstore: {
+    repoUrl: string
+    proxyEnabled: boolean
+    proxyUrl: string
+  }
   terminal: {
     frontend: TerminalFrontend
     theme: TerminalThemeName
@@ -31,6 +36,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
     focusSearch: '/',
     openTerminalSearch: 'Mod+F',
   },
+  appstore: {
+    repoUrl: 'https://github.com/1Panel-dev/appstore.git',
+    proxyEnabled: false,
+    proxyUrl: 'http://127.0.0.1:7890',
+  },
   terminal: {
     frontend: 'xterm-webgl',
     theme: 'Dracula',
@@ -47,9 +57,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export interface AppSettingsContextValue {
   settings: AppSettings
   updateHotkeySettings: (patch: Partial<AppSettings['hotkeys']>) => void
+  updateAppStoreSettings: (patch: Partial<AppSettings['appstore']>) => void
   updateTerminalSettings: (patch: Partial<AppSettings['terminal']>) => void
   resetSettings: () => void
   resetHotkeySettings: () => void
+  resetAppStoreSettings: () => void
   resetTerminalSettings: () => void
 }
 
@@ -84,6 +96,16 @@ export function normalizeTerminalTheme(value: unknown): TerminalThemeName {
   return value in XTERM_THEME_MAP ? (value as TerminalThemeName) : DEFAULT_SETTINGS.terminal.theme
 }
 
+function normalizeString(value: unknown, fallback: string) {
+  if (typeof value !== 'string') return fallback
+  const trimmed = value.trim()
+  return trimmed || fallback
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback
+}
+
 export function normalizeSettings(input: unknown): AppSettings {
   if (!input || typeof input !== 'object') return DEFAULT_SETTINGS
 
@@ -91,6 +113,11 @@ export function normalizeSettings(input: unknown): AppSettings {
     hotkeys?: {
       focusSearch?: unknown
       openTerminalSearch?: unknown
+    }
+    appstore?: {
+      repoUrl?: unknown
+      proxyEnabled?: unknown
+      proxyUrl?: unknown
     }
     terminal?: {
       frontend?: unknown
@@ -121,6 +148,11 @@ export function normalizeSettings(input: unknown): AppSettings {
       focusSearch: normalizeHotkey(raw.hotkeys?.focusSearch) ?? DEFAULT_SETTINGS.hotkeys.focusSearch,
       openTerminalSearch:
         normalizeHotkey(raw.hotkeys?.openTerminalSearch) ?? DEFAULT_SETTINGS.hotkeys.openTerminalSearch,
+    },
+    appstore: {
+      repoUrl: normalizeString(raw.appstore?.repoUrl, DEFAULT_SETTINGS.appstore.repoUrl),
+      proxyEnabled: normalizeBoolean(raw.appstore?.proxyEnabled, DEFAULT_SETTINGS.appstore.proxyEnabled),
+      proxyUrl: normalizeString(raw.appstore?.proxyUrl, DEFAULT_SETTINGS.appstore.proxyUrl),
     },
     terminal: {
       frontend,

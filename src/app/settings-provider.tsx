@@ -27,6 +27,16 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const updateAppStoreSettings: AppSettingsContextValue['updateAppStoreSettings'] = (patch) => {
+    setSettings((current) => ({
+      ...current,
+      appstore: {
+        ...current.appstore,
+        ...patch,
+      },
+    }))
+  }
+
   const updateTerminalSettings: AppSettingsContextValue['updateTerminalSettings'] = (patch) => {
     setSettings((current) => ({
       ...current,
@@ -51,6 +61,13 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     }))
   }
 
+  const resetAppStoreSettings: AppSettingsContextValue['resetAppStoreSettings'] = () => {
+    setSettings((current) => ({
+      ...current,
+      appstore: DEFAULT_SETTINGS.appstore,
+    }))
+  }
+
   const resetTerminalSettings: AppSettingsContextValue['resetTerminalSettings'] = () => {
     setSettings((current) => ({
       ...current,
@@ -63,9 +80,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       value={{
         settings,
         updateHotkeySettings,
+        updateAppStoreSettings,
         updateTerminalSettings,
         resetSettings,
         resetHotkeySettings,
+        resetAppStoreSettings,
         resetTerminalSettings,
       }}
     >
