@@ -209,7 +209,7 @@ function SyncProgressBar({
   className?: string
   compact?: boolean
 }) {
-  const percent = progress ? Math.min(Math.max(Math.round(progress.percent), 0), 100) : 0
+  const percent = progress ? Math.min(Math.max(Math.round(progress.percent ?? 0), 0), 100) : 0
   const hasStarted = !!progress && progress.total_objects > 0
   const detail = hasStarted
     ? `${progress.received_objects} / ${progress.total_objects} 个对象`
@@ -248,7 +248,7 @@ function SyncProgressPopover({
   progress: AppstoreSyncProgress | null
   initialSync: boolean
 }) {
-  const percent = progress ? Math.min(Math.max(Math.round(progress.percent), 0), 100) : 0
+  const percent = progress ? Math.min(Math.max(Math.round(progress.percent ?? 0), 0), 100) : 0
 
   return (
     <Popover>

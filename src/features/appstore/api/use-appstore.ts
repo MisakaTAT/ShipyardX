@@ -31,7 +31,7 @@ export function useAppStoreSyncIndicator(active: boolean) {
         if (!current) {
           return {
             ...event.payload,
-            percent: event.payload.total_objects > 0 ? Math.min(event.payload.percent, 12) : 0,
+            percent: event.payload.total_objects > 0 ? Math.min(event.payload.percent ?? 0, 12) : 0,
           }
         }
         return event.payload

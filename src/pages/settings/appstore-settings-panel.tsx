@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2, RotateCcw, Trash2 } from 'lucide-react'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { commands, type AppstoreCacheInfo, type AppstoreSettings } from '@/types/app-bindings'
@@ -32,7 +32,7 @@ export function AppStoreSettingsPanel({
   const [saving, setSaving] = useState(false)
   const [clearing, setClearing] = useState(false)
 
-  const refreshCacheInfo = async () => {
+  const refreshCacheInfo = useCallback(async () => {
     setLoading(true)
     try {
       const data = await commands.getAppstoreCacheInfo()
@@ -44,7 +44,7 @@ export function AppStoreSettingsPanel({
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -69,7 +69,7 @@ export function AppStoreSettingsPanel({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [onChange, refreshCacheInfo])
 
   const saveSettings = async (next: AppstoreSettings) => {
     setSaving(true)
