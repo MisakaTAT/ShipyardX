@@ -1,23 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getVersion } from '@tauri-apps/api/app'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
-import { useTheme } from '@/app/theme'
+import { runThemeTransition, useTheme } from '@/app/theme'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
 import { formatDateTimeString } from '@/shared/lib/datetime'
 import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { formatBytes } from '@/shared/lib/format'
-import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { ButtonGroup } from '@/shared/ui/button-group'
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'downloading' | 'installed' | 'error'
 
 type AppearanceTheme = 'light' | 'dark' | 'system'
 
 const THEME_OPTIONS: Array<{ value: AppearanceTheme; label: string; description: string }> = [
-  { value: 'light', label: '白天', description: '始终使用浅色界面' },
-  { value: 'dark', label: '夜间', description: '始终使用深色界面' },
+  { value: 'light', label: '浅色', description: '始终使用浅色界面' },
+  { value: 'dark', label: '深色', description: '始终使用深色界面' },
   { value: 'system', label: '跟随系统', description: '根据系统外观自动切换' },
 ]
 
@@ -36,6 +36,7 @@ export function GeneralSettingsPanel() {
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null)
   const [downloadedBytes, setDownloadedBytes] = useState(0)
   const [totalBytes, setTotalBytes] = useState<number | null>(null)
+  const [currentVersion, setCurrentVersion] = useState<string>('-')
 
   useEffect(() => {
     return () => {
@@ -43,6 +44,20 @@ export function GeneralSettingsPanel() {
       void pendingUpdate.close().catch(() => undefined)
     }
   }, [pendingUpdate])
+
+  useEffect(() => {
+    let cancelled = false
+    void getVersion()
+      .then((version) => {
+        if (!cancelled) setCurrentVersion(version)
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentVersion('-')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleCheckUpdate = async () => {
     if (pendingUpdate) {
@@ -106,16 +121,6 @@ export function GeneralSettingsPanel() {
     }
   }
 
-  const statusBadge = useMemo(() => {
-    if (updateStatus === 'checking') return <Badge variant="outline">检查中</Badge>
-    if (updateStatus === 'available') return <Badge>发现更新</Badge>
-    if (updateStatus === 'latest') return <Badge variant="secondary">已是最新</Badge>
-    if (updateStatus === 'downloading') return <Badge variant="outline">下载中</Badge>
-    if (updateStatus === 'installed') return <Badge variant="secondary">等待重启</Badge>
-    if (updateStatus === 'error') return <Badge variant="destructive">更新失败</Badge>
-    return <Badge variant="outline">未检查</Badge>
-  }, [updateStatus])
-
   const updateDescription =
     updateStatus === 'downloading'
       ? `正在下载更新包，${formatProgress(downloadedBytes, totalBytes)}`
@@ -124,8 +129,8 @@ export function GeneralSettingsPanel() {
         : updateStatus === 'latest'
           ? '当前已经是最新版本'
           : pendingUpdate
-            ? `最新版本 ${pendingUpdate.version}${pendingUpdate.date ? `，发布于 ${formatDateTimeString(pendingUpdate.date)}` : ''}`
-            : '查看是否有可用的新版本'
+            ? `发现新版本 ${pendingUpdate.version}${pendingUpdate.date ? `，发布于 ${formatDateTimeString(pendingUpdate.date)}` : ''}`
+            : '检查并安装最新版本'
 
   const updateActionLabel =
     updateStatus === 'checking'
@@ -139,6 +144,20 @@ export function GeneralSettingsPanel() {
   const currentTheme = (theme ?? 'system') as AppearanceTheme
   const themeDescription =
     THEME_OPTIONS.find((option) => option.value === currentTheme)?.description ?? '根据系统外观自动切换'
+  const updateSummary =
+    updateStatus === 'checking'
+      ? '正在检查更新'
+      : updateStatus === 'downloading'
+        ? '正在下载更新'
+        : updateStatus === 'installed'
+          ? '等待重启'
+          : updateStatus === 'available'
+            ? `发现新版本 ${pendingUpdate?.version ?? ''}`.trim()
+            : updateStatus === 'error'
+              ? '检查更新失败'
+              : updateStatus === 'latest'
+                ? '已是最新版本'
+                : '尚未检查'
 
   return (
     <SettingsPanelShell>
@@ -149,57 +168,66 @@ export function GeneralSettingsPanel() {
           title="主题设置"
           description={themeDescription}
           action={
-            <div className="w-full max-w-xs">
-              <Select value={currentTheme} onValueChange={(value) => setTheme(value as AppearanceTheme)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {THEME_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ButtonGroup className="w-full max-w-xs">
+              {THEME_OPTIONS.map((option) => {
+                const active = currentTheme === option.value
+                return (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect()
+                      runThemeTransition(
+                        {
+                          x: rect.left + rect.width / 2,
+                          y: rect.top + rect.height / 2,
+                        },
+                        () => setTheme(option.value)
+                      )
+                    }}
+                    variant={active ? 'default' : 'outline'}
+                    className="flex-1"
+                  >
+                    {option.label}
+                  </Button>
+                )
+              })}
+            </ButtonGroup>
           }
         />
 
         <SettingsActionRow
-          title="更新状态"
+          title="版本信息"
           description={updateDescription}
           action={
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">{statusBadge}</div>
-              {pendingUpdate?.body?.trim() ? (
-                <div className="rounded-lg border border-border/70 bg-muted/35 px-3 py-2 text-xs leading-5 whitespace-pre-wrap text-muted-foreground">
-                  {pendingUpdate.body.trim()}
-                </div>
-              ) : null}
+            <div className="w-full max-w-xs text-right">
+              <div className="text-sm font-medium text-foreground">当前版本 {currentVersion}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{updateSummary}</div>
             </div>
           }
         />
 
         <SettingsActionRow
           title="检查更新"
-          description="获取最新版本；如果有新版本，可直接下载并安装"
+          description="检查并安装最新版本"
           action={
-            <Button
-              variant={pendingUpdate ? 'default' : 'outline'}
-              className="w-full max-w-xs justify-center"
-              onClick={() => void (pendingUpdate ? handleInstallUpdate() : handleCheckUpdate())}
-              disabled={updateStatus === 'checking' || updateStatus === 'downloading' || updateStatus === 'installed'}
-            >
-              {updateStatus === 'checking' || updateStatus === 'downloading' ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : pendingUpdate ? (
-                <Download className="size-4" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              <span>{updateActionLabel}</span>
-            </Button>
+            <div className="flex w-full max-w-xs justify-end">
+              <Button
+                variant={pendingUpdate ? 'default' : 'outline'}
+                className="justify-center"
+                onClick={() => void (pendingUpdate ? handleInstallUpdate() : handleCheckUpdate())}
+                disabled={updateStatus === 'checking' || updateStatus === 'downloading' || updateStatus === 'installed'}
+              >
+                {updateStatus === 'checking' || updateStatus === 'downloading' ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : pendingUpdate ? (
+                  <Download className="size-4" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                <span>{updateActionLabel}</span>
+              </Button>
+            </div>
           }
         />
       </div>
