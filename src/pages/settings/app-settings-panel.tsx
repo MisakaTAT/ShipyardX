@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  getBundleType,
-  getIdentifier,
-  getName,
-  getTauriVersion,
-  getVersion,
-  type BundleType,
-} from '@tauri-apps/api/app'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { useTheme } from '@/app/theme'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
 import { formatDateTimeString } from '@/shared/lib/datetime'
@@ -16,25 +9,17 @@ import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { formatBytes } from '@/shared/lib/format'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-
-interface AppMetadata {
-  name: string
-  version: string
-  tauriVersion: string
-  identifier: string
-  bundleType: BundleType
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'downloading' | 'installed' | 'error'
 
-const BUNDLE_TYPE_LABELS: Record<BundleType, string> = {
-  app: 'macOS App',
-  appimage: 'AppImage',
-  deb: 'DEB',
-  msi: 'MSI',
-  nsis: 'NSIS',
-  rpm: 'RPM',
-}
+type AppearanceTheme = 'light' | 'dark' | 'system'
+
+const THEME_OPTIONS: Array<{ value: AppearanceTheme; label: string; description: string }> = [
+  { value: 'light', label: '白天', description: '始终使用浅色界面' },
+  { value: 'dark', label: '夜间', description: '始终使用深色界面' },
+  { value: 'system', label: '跟随系统', description: '根据系统外观自动切换' },
+]
 
 function formatProgress(downloadedBytes: number, totalBytes: number | null) {
   if (!Number.isFinite(downloadedBytes) || downloadedBytes <= 0) return '准备下载…'
@@ -45,37 +30,12 @@ function formatProgress(downloadedBytes: number, totalBytes: number | null) {
   return `已下载 ${formatBytes(downloadedBytes)}`
 }
 
-export function AppSettingsPanel() {
-  const [appMetadata, setAppMetadata] = useState<AppMetadata | null>(null)
-  const [metadataLoading, setMetadataLoading] = useState(true)
+export function GeneralSettingsPanel() {
+  const { theme, setTheme } = useTheme()
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null)
   const [downloadedBytes, setDownloadedBytes] = useState(0)
   const [totalBytes, setTotalBytes] = useState<number | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    void Promise.all([getName(), getVersion(), getTauriVersion(), getIdentifier(), getBundleType()])
-      .then(([name, version, tauriVersion, identifier, bundleType]) => {
-        if (cancelled) return
-        setAppMetadata({ name, version, tauriVersion, identifier, bundleType })
-      })
-      .catch((error) => {
-        if (cancelled) return
-        toast.error(getErrorMessage(error, '读取应用信息失败'), {
-          description: getErrorDescription(error, '读取应用信息失败'),
-        })
-      })
-      .finally(() => {
-        if (cancelled) return
-        setMetadataLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     return () => {
@@ -176,52 +136,34 @@ export function AppSettingsPanel() {
           ? `安装 ${pendingUpdate.version}`
           : '检查更新'
 
+  const currentTheme = (theme ?? 'system') as AppearanceTheme
+  const themeDescription =
+    THEME_OPTIONS.find((option) => option.value === currentTheme)?.description ?? '根据系统外观自动切换'
+
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Application" title="应用信息" />
+      <SettingsPanelHeader eyebrow="General" title="通用" />
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title="应用名称"
-          description="当前应用名称"
+          title="主题设置"
+          description={themeDescription}
           action={
-            metadataLoading ? (
-              <div className="flex h-8 items-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                正在读取…
-              </div>
-            ) : (
-              <div className="text-sm text-foreground">{appMetadata?.name ?? '-'}</div>
-            )
-          }
-        />
-
-        <SettingsActionRow
-          title="当前版本"
-          description="当前安装的版本号"
-          action={<div className="text-sm text-foreground">{appMetadata?.version ?? '-'}</div>}
-        />
-
-        <SettingsActionRow
-          title="打包类型"
-          description="当前安装包格式"
-          action={
-            <div className="text-sm text-foreground">
-              {appMetadata ? (BUNDLE_TYPE_LABELS[appMetadata.bundleType] ?? appMetadata.bundleType) : '-'}
+            <div className="w-full max-w-xs">
+              <Select value={currentTheme} onValueChange={(value) => setTheme(value as AppearanceTheme)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {THEME_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           }
-        />
-
-        <SettingsActionRow
-          title="Tauri 版本"
-          description="当前运行时版本"
-          action={<div className="text-sm text-foreground">{appMetadata?.tauriVersion ?? '-'}</div>}
-        />
-
-        <SettingsActionRow
-          title="应用标识"
-          description="当前应用标识"
-          action={<div className="text-sm break-all text-foreground">{appMetadata?.identifier ?? '-'}</div>}
         />
 
         <SettingsActionRow

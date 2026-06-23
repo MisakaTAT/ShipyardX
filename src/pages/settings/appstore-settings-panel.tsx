@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, RotateCcw, Trash2 } from 'lucide-react'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { commands, type AppstoreCacheInfo, type AppstoreSettings } from '@/types/app-bindings'
@@ -31,6 +31,11 @@ export function AppStoreSettingsPanel({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   const refreshCacheInfo = useCallback(async () => {
     setLoading(true)
@@ -52,7 +57,7 @@ export function AppStoreSettingsPanel({
       .getAppstoreSettings()
       .then((settings) => {
         if (cancelled) return
-        onChange({
+        onChangeRef.current({
           repoUrl: settings.repo_url,
           proxyEnabled: settings.proxy_enabled,
           proxyUrl: settings.proxy_url,
@@ -69,7 +74,7 @@ export function AppStoreSettingsPanel({
     return () => {
       cancelled = true
     }
-  }, [onChange, refreshCacheInfo])
+  }, [refreshCacheInfo])
 
   const saveSettings = async (next: AppstoreSettings) => {
     setSaving(true)
@@ -142,7 +147,7 @@ export function AppStoreSettingsPanel({
     <SettingsPanelShell>
       <SettingsPanelHeader
         eyebrow="App Store"
-        title="商店配置"
+        title="应用商店"
         actions={
           <Button size="sm" onClick={() => void handleReset()} disabled={saving}>
             <RotateCcw className="size-3.5" />

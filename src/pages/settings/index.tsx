@@ -4,7 +4,8 @@ import { useAppSettings } from '@/app/settings-store'
 import { commands } from '@/types/app-bindings'
 import { toast } from '@/shared/components/toast'
 import { cn } from '@/shared/lib/utils'
-import { AppSettingsPanel } from '@/pages/settings/app-settings-panel'
+import { GeneralSettingsPanel } from '@/pages/settings/app-settings-panel'
+import { AboutSettingsPanel } from '@/pages/settings/about-settings-panel'
 import { AppStoreSettingsPanel } from '@/pages/settings/appstore-settings-panel'
 import { DebugSettingsPanel } from '@/pages/settings/debug-settings-panel'
 import { HotkeySettingsPanel } from '@/pages/settings/hotkey-settings-panel'
@@ -17,7 +18,7 @@ export default function SettingsPage() {
   const search = useSearch()
   const initialSection = useMemo<SettingsSectionKey>(() => {
     const section = new URLSearchParams(search).get('section')
-    return SETTINGS_SECTIONS.some((item) => item.key === section) ? (section as SettingsSectionKey) : 'app'
+    return SETTINGS_SECTIONS.some((item) => item.key === section) ? (section as SettingsSectionKey) : 'general'
   }, [search])
   const [activeSection, setActiveSection] = useState<SettingsSectionKey>(initialSection)
   const [terminalFontOptions, setTerminalFontOptions] = useState<string[]>([])
@@ -113,12 +114,14 @@ export default function SettingsPage() {
             onChange={updateAppStoreSettings}
             onReset={resetAppStoreSettings}
           />
+        ) : activeSection === 'about' ? (
+          <AboutSettingsPanel />
         ) : activeSection === 'hotkeys' ? (
           <HotkeySettingsPanel />
         ) : activeSection === 'debug' ? (
           <DebugSettingsPanel />
         ) : (
-          <AppSettingsPanel />
+          <GeneralSettingsPanel />
         )}
       </section>
     </div>
