@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint .",
-    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "fmt": "prettier --write \"**/*.{ts,tsx}\" && cargo fmt --manifest-path src-tauri/Cargo.toml --all",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
