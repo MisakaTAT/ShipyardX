@@ -1,10 +1,12 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use git2::{AutotagOption, FetchOptions, ProxyOptions, Repository, ResetType, build::RepoBuilder};
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use tokio::fs;
 use tokio::task;
+use tokio::time::{Duration, sleep};
+use uuid::Uuid;
 
 use crate::config::store::atomic_write;
 use crate::dto::appstore::{
@@ -16,6 +18,15 @@ use crate::utils::formatting::format_bytes_u64;
 
 const DEFAULT_APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
 const APPSTORE_SETTINGS_FILE: &str = "appstore-settings.json";
+const APPSTORE_CACHE_REMOVE_RETRIES: usize = 3;
+const APPSTORE_CACHE_REMOVE_RETRY_DELAY_MS: u64 = 250;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CacheRepoState {
+    Missing,
+    ValidGitRepo,
+    Incomplete,
+}
 
 pub(crate) struct AppstoreRepo {
     cache_dir: PathBuf,
@@ -51,17 +62,26 @@ impl AppstoreRepo {
     }
 
     pub(crate) async fn sync_with_progress(&self, app: &AppHandle) -> AppResult<PathBuf> {
-        let git_dir = self.cache_dir.join(".git");
         info!(target: "shipyardx_lib::services::appstore_repo", "syncing appstore; cache_dir={}", self.cache_dir.display());
         let settings = self.load_settings().await?;
 
-        if fs::try_exists(&git_dir).await.unwrap_or(false) {
-            git_sync_existing_repo(self.cache_dir.clone(), settings.clone(), Some(app.clone())).await?;
-            info!(target: "shipyardx_lib::services::appstore_repo", "appstore sync completed; cache_dir={}", self.cache_dir.display());
-            return Ok(self.cache_dir.clone());
+        match detect_cache_repo_state(self.cache_dir.clone()).await? {
+            CacheRepoState::ValidGitRepo => {
+                git_sync_existing_repo(self.cache_dir.clone(), settings.clone(), Some(app.clone())).await?;
+                info!(target: "shipyardx_lib::services::appstore_repo", "appstore sync completed; cache_dir={}", self.cache_dir.display());
+                return Ok(self.cache_dir.clone());
+            }
+            CacheRepoState::Incomplete => {
+                warn!(
+                    target: "shipyardx_lib::services::appstore_repo",
+                    "detected incomplete appstore cache; cache_dir={}",
+                    self.cache_dir.display()
+                );
+                recover_incomplete_cache_dir(&self.cache_dir).await?;
+            }
+            CacheRepoState::Missing => {}
         }
 
-        let _ = fs::remove_dir_all(&self.cache_dir).await;
         git_clone_repo(self.cache_dir.clone(), settings, Some(app.clone())).await?;
         info!(target: "shipyardx_lib::services::appstore_repo", "appstore clone completed; cache_dir={}", self.cache_dir.display());
         Ok(self.cache_dir.clone())
@@ -464,4 +484,93 @@ fn pick_description(desc: &crate::dto::appstore::DescriptionI18n) -> String {
         return desc.en.clone();
     }
     String::new()
+}
+
+async fn detect_cache_repo_state(cache_dir: PathBuf) -> AppResult<CacheRepoState> {
+    task::spawn_blocking(move || {
+        if !cache_dir.exists() {
+            return Ok(CacheRepoState::Missing);
+        }
+        if !cache_dir.join(".git").exists() {
+            return Ok(CacheRepoState::Incomplete);
+        }
+        match Repository::open(&cache_dir) {
+            Ok(_) => Ok(CacheRepoState::ValidGitRepo),
+            Err(_) => Ok(CacheRepoState::Incomplete),
+        }
+    })
+    .await
+    .map_err(|e| AppError::internal("appstore.cache_state_join_failed", "检查应用商店缓存状态失败").with_source(e))?
+}
+
+async fn recover_incomplete_cache_dir(cache_dir: &Path) -> AppResult<()> {
+    if !fs::try_exists(cache_dir).await.unwrap_or(false) {
+        return Ok(());
+    }
+
+    if try_remove_dir_all(cache_dir).await? {
+        return Ok(());
+    }
+
+    let parent = cache_dir
+        .parent()
+        .ok_or_else(|| AppError::internal("appstore.cache_parent_missing", "无法定位应用商店缓存目录的父目录"))?;
+    let file_name = cache_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| AppError::internal("appstore.cache_dir_name_invalid", "应用商店缓存目录名称无效"))?;
+    let quarantine_dir = parent.join(format!("{file_name}.stale-{}", Uuid::new_v4()));
+
+    fs::rename(cache_dir, &quarantine_dir).await.map_err(|e| {
+        AppError::internal("appstore.cache_recover_rename_failed", "清理未完成的应用商店缓存失败")
+            .with_detail(format!(
+                "无法重命名残留目录：{} -> {}: {}",
+                cache_dir.display(),
+                quarantine_dir.display(),
+                e
+            ))
+            .with_action("请关闭占用该目录的程序后重试")
+    })?;
+
+    info!(
+        target: "shipyardx_lib::services::appstore_repo",
+        "quarantined incomplete appstore cache; from={} to={}",
+        cache_dir.display(),
+        quarantine_dir.display()
+    );
+
+    let cleanup_dir = quarantine_dir.clone();
+    tokio::spawn(async move {
+        if let Err(error) = try_remove_dir_all(&cleanup_dir).await {
+            warn!(
+                target: "shipyardx_lib::services::appstore_repo",
+                "failed to remove quarantined appstore cache; path={} detail={}",
+                cleanup_dir.display(),
+                error.detail.unwrap_or(error.message)
+            );
+        }
+    });
+
+    Ok(())
+}
+
+async fn try_remove_dir_all(path: &Path) -> AppResult<bool> {
+    for attempt in 0..APPSTORE_CACHE_REMOVE_RETRIES {
+        match fs::remove_dir_all(path).await {
+            Ok(_) => return Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+            Err(error) => {
+                warn!(
+                    target: "shipyardx_lib::services::appstore_repo",
+                    "remove appstore cache dir failed; path={} attempt={} detail={}",
+                    path.display(),
+                    attempt + 1,
+                    error
+                );
+                sleep(Duration::from_millis(APPSTORE_CACHE_REMOVE_RETRY_DELAY_MS)).await;
+            }
+        }
+    }
+
+    Ok(!fs::try_exists(path).await.unwrap_or(true))
 }
