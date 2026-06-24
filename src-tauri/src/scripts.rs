@@ -1,16 +1,10 @@
-pub(crate) const APPSTORE_DEPLOY_FILES_SH: &str = include_str!("scripts/appstore_deploy_files.sh");
 pub(crate) const APPSTORE_CREATE_NETWORK_SH: &str = include_str!("scripts/appstore_create_network.sh");
 pub(crate) const APPSTORE_COMPOSE_UP_SH: &str = include_str!("scripts/appstore_compose_up.sh");
-pub(crate) const APPSTORE_EXTRACT_DATA_STREAM_SH: &str = include_str!("scripts/appstore_extract_data.sh");
 pub(crate) const DOCKER_READ_DAEMON_CONFIG_SH: &str = include_str!("scripts/docker_read_daemon_config.sh");
 pub(crate) const DOCKER_CHECK_SOCKET_SH: &str = include_str!("scripts/docker_check_socket.sh");
 pub(crate) const DOCKER_CHECK_TCP_SH: &str = include_str!("scripts/docker_check_tcp.sh");
 pub(crate) const SYSTEM_RESTART_WITH_PASSWORD_SH: &str = include_str!("scripts/system_restart_with_password.sh");
 pub(crate) const SYSTEM_RESTART_WITHOUT_PASSWORD_SH: &str = include_str!("scripts/system_restart_without_password.sh");
-pub(crate) const SYSTEM_WRITE_DAEMON_WITH_PASSWORD_SH: &str =
-    include_str!("scripts/system_write_daemon_with_password.sh");
-pub(crate) const SYSTEM_WRITE_DAEMON_WITHOUT_PASSWORD_SH: &str =
-    include_str!("scripts/system_write_daemon_without_password.sh");
 
 pub(crate) fn render(template: &str, replacements: &[(&str, &str)]) -> String {
     let mut rendered = template.to_string();

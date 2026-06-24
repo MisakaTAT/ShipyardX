@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use log::{debug, warn};
 use russh::{Channel, ChannelMsg, client};
-use tokio::io::{AsyncRead, AsyncWriteExt};
 
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
@@ -130,58 +129,6 @@ where
     exec_internal(config, command, |chunk| on_chunk(chunk)).await
 }
 
-pub async fn exec_with_stdin_reader<R>(config: &ServerConfig, command: &str, reader: &mut R) -> AppResult<String>
-where
-    R: AsyncRead + Unpin + Send,
-{
-    debug!(target: "shipyardx_lib::ssh::pool", "executing pooled ssh command with stdin; server_id={} command_bytes={}", config.id, command.len());
-    let entry = get_entry(config);
-    let mut pooled = entry.lock().await;
-
-    let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
-    if needs_connect {
-        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for exec with stdin; server_id={}", config.id);
-        pooled.handle = Some(connect(config).await?);
-    }
-
-    let channel = {
-        let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
-        handle.channel_open_session().await
-    };
-    let channel = match channel {
-        Ok(channel) => channel,
-        Err(error) => {
-            warn!(target: "shipyardx_lib::ssh::pool", "ssh channel open failed for exec with stdin; server_id={} error={}", config.id, error);
-            if let Some(mut handle) = pooled.handle.take() {
-                disconnect(&mut handle).await;
-            }
-            return Err(AppError::internal("ssh.channel_open_failed", "创建 SSH 通道失败").with_source(error));
-        }
-    };
-    drop(pooled);
-
-    channel
-        .exec(true, command)
-        .await
-        .map_err(|e| {
-            warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed for stdin command; server_id={} error={}", config.id, e);
-            AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
-        })?;
-
-    {
-        let mut writer = channel.make_writer();
-        tokio::io::copy(reader, &mut writer)
-            .await
-            .map_err(|e| AppError::internal("ssh.stdin_copy_failed", "上传远程命令输入流失败").with_source(e))?;
-        writer
-            .shutdown()
-            .await
-            .map_err(|e| AppError::internal("ssh.stdin_close_failed", "关闭远程命令输入流失败").with_source(e))?;
-    }
-
-    collect_exec_output(channel).await
-}
-
 fn push_limited(buf: &mut String, chunk: &str) {
     let remaining = MAX_CAPTURE_BYTES.saturating_sub(buf.len());
     if remaining == 0 {
@@ -230,10 +177,6 @@ where
     })?;
 
     collect_exec_output_with(channel, |chunk| on_chunk(chunk)).await
-}
-
-async fn collect_exec_output(channel: Channel<client::Msg>) -> AppResult<String> {
-    collect_exec_output_with(channel, |_| {}).await
 }
 
 async fn collect_exec_output_with<F>(mut channel: Channel<client::Msg>, mut on_chunk: F) -> AppResult<String>
