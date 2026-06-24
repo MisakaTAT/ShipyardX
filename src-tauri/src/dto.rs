@@ -9,5 +9,6 @@ pub mod info;
 pub mod network;
 pub mod port_forward;
 pub mod server;
+pub mod templates;
 pub mod terminal;
 pub mod volume;

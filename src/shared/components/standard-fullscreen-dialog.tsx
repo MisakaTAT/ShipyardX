@@ -16,6 +16,7 @@ export interface StandardFullScreenDialogProps {
   headerActions?: ReactNode
 
   children: ReactNode
+  footer?: ReactNode
 
   disableClose?: boolean
   showCloseButton?: boolean
@@ -31,6 +32,7 @@ export function StandardFullScreenDialog({
   icon: Icon,
   headerActions,
   children,
+  footer,
   disableClose = false,
   showCloseButton = true,
   showHeader = true,
@@ -78,6 +80,7 @@ export function StandardFullScreenDialog({
           </div>
         ) : null}
         {children}
+        {footer ? <div className="shrink-0 border-t border-border bg-card px-3 py-3">{footer}</div> : null}
       </DialogContent>
     </Dialog>
   )

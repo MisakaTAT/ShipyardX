@@ -5,6 +5,7 @@ import Sider from '@/layouts/sider/sider'
 import Connections from '@/pages/connections'
 import Workspace, { type WorkspaceTab } from '@/pages/workspace'
 import AppStore from '@/pages/app-store'
+import AppTemplatesPage from '@/pages/app-templates'
 import PortForward from '@/pages/port-forward'
 import SettingsPage from '@/pages/settings'
 import { KeepAlive } from '@/shared/components/keep-alive'
@@ -23,6 +24,7 @@ function LayoutContent() {
   const [selectedServer, setSelectedServer] = useState<ServerConfig | null>(null)
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview')
   const isStore = location === APP_PATHS.store
+  const isTemplates = location === APP_PATHS.templates
   const isPortForward = location === APP_PATHS.portForward
   const isWorkspace = location === APP_PATHS.workspace
   const isSettings = location === APP_PATHS.settings
@@ -39,6 +41,12 @@ function LayoutContent() {
         {isStore ? (
           <div className="flex-1 overflow-auto p-3">
             <AppStore />
+          </div>
+        ) : null}
+
+        {isTemplates ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AppTemplatesPage />
           </div>
         ) : null}
 

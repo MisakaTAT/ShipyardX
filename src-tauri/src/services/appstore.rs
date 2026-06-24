@@ -66,7 +66,7 @@ pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDeta
     Ok(detail)
 }
 
-fn emit_step(app: &AppHandle, step: &str, status: &str, message: &str) {
+pub(crate) fn emit_step(app: &AppHandle, step: &str, status: &str, message: &str) {
     let _ = InstallStepEvent {
         step: step.to_string(),
         status: status.to_string(),
@@ -104,13 +104,13 @@ fn emit_output(app: &AppHandle, step: &str, chunk: &str) {
     .emit(app);
 }
 
-fn emit_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer, chunk: &str) {
+pub(crate) fn emit_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer, chunk: &str) {
     for flushed in buffer.push(chunk) {
         emit_output(app, step, &flushed);
     }
 }
 
-fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer) {
+pub(crate) fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuffer) {
     for flushed in buffer.finish() {
         emit_output(app, step, &flushed);
     }
@@ -260,7 +260,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
 }
 
 /// 渲染 docker-compose 模板：将 ${VAR} 替换为实际值，网络替换为 shipyardx-network
-fn render_compose(template: &str, env_values: &HashMap<String, String>) -> String {
+pub(crate) fn render_compose(template: &str, env_values: &HashMap<String, String>) -> String {
     let mut result = template.to_string();
     for (key, value) in env_values {
         let placeholder = format!("${{{}}}", key);
@@ -272,7 +272,7 @@ fn render_compose(template: &str, env_values: &HashMap<String, String>) -> Strin
 }
 
 /// 构建 .env 文件内容
-fn build_env_file(env_values: &HashMap<String, String>) -> String {
+pub(crate) fn build_env_file(env_values: &HashMap<String, String>) -> String {
     env_values
         .iter()
         .map(|(k, v)| format!("{}={}", k, v))

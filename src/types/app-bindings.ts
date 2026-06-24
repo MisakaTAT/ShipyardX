@@ -69,6 +69,13 @@ export const commands = {
 	openContainerExecTerminal: (serverId: string, params: ContainerExecTerminalParams) => __TAURI_INVOKE<TerminalSession>("open_container_exec_terminal", { serverId, params }),
 	closeTerminal: (sessionId: string) => __TAURI_INVOKE<null>("close_terminal", { sessionId }),
 	saveTerminalExport: (path: string, content: string) => __TAURI_INVOKE<null>("save_terminal_export", { path, content }),
+	listTemplates: () => __TAURI_INVOKE<AppTemplate[]>("list_templates"),
+	createTemplate: (input: AppTemplateInput) => __TAURI_INVOKE<AppTemplate>("create_template", { input }),
+	updateTemplate: (templateId: string, input: AppTemplateInput) => __TAURI_INVOKE<AppTemplate>("update_template", { templateId, input }),
+	deleteTemplate: (templateId: string) => __TAURI_INVOKE<null>("delete_template", { templateId }),
+	extractTemplateFields: (compose: string) => __TAURI_INVOKE<AppTemplateField[]>("extract_template_fields", { compose }),
+	importTemplateFile: (filePath: string) => __TAURI_INVOKE<AppTemplateFile>("import_template_file", { filePath }),
+	deployTemplate: (serverId: string, req: DeployTemplate) => __TAURI_INVOKE<null>("deploy_template", { serverId, req }),
 	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
 	listApps: () => __TAURI_INVOKE<AppListItem[]>("list_apps"),
 	getAppstoreSettings: () => __TAURI_INVOKE<AppstoreSettings>("get_appstore_settings"),
@@ -150,6 +157,43 @@ export type AppListItem = {
 	website: string,
 	icon: string,
 	versions: string[],
+};
+
+export type AppTemplate = {
+	id: string,
+	name: string,
+	description?: string,
+	tags?: string[],
+	compose: string,
+	directories?: string[],
+	files?: AppTemplateFile[],
+	fields?: AppTemplateField[],
+	created_at: string,
+	updated_at: string,
+};
+
+export type AppTemplateField = {
+	env_key: string,
+	label: string,
+	default_value?: string,
+	required?: boolean,
+	field_type?: string,
+};
+
+export type AppTemplateFile = {
+	path: string,
+	content?: string,
+	executable?: boolean,
+};
+
+export type AppTemplateInput = {
+	name: string,
+	description?: string,
+	tags?: string[],
+	compose: string,
+	directories?: string[],
+	files?: AppTemplateFile[],
+	fields?: AppTemplateField[],
 };
 
 export type AppVersionInfo = AppVersionInfo_Serialize | AppVersionInfo_Deserialize;
@@ -246,6 +290,12 @@ export type DaemonUpdate = {
 	cgroup_driver: string,
 	socket_path: string,
 	sudo_password: string | null,
+};
+
+export type DeployTemplate = {
+	server_id: string,
+	template_id: string,
+	env_values: { [key in string]: string },
 };
 
 export type DescriptionI18n = {

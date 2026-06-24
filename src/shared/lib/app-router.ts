@@ -4,6 +4,7 @@ export const APP_PATHS = {
   workspace: '/workspace',
   portForward: '/port-forward',
   store: '/store',
+  templates: '/templates',
   settings: '/settings',
 } as const
 

@@ -7,5 +7,6 @@ pub mod networks;
 pub mod port_forward;
 pub mod servers;
 pub mod system;
+pub mod templates;
 pub mod terminal;
 pub mod volumes;

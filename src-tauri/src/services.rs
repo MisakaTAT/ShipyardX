@@ -10,5 +10,6 @@ pub mod server_store;
 pub mod servers;
 pub mod support;
 pub mod system;
+pub mod templates;
 pub mod terminal;
 pub mod volumes;
