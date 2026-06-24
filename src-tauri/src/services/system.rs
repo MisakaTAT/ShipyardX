@@ -17,7 +17,8 @@ use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::scripts::{
     DOCKER_CHECK_SOCKET_SH, DOCKER_CHECK_TCP_SH, DOCKER_READ_DAEMON_CONFIG_SH, SYSTEM_RESTART_WITH_PASSWORD_SH,
-    SYSTEM_RESTART_WITHOUT_PASSWORD_SH, render, render_shell, shell_quote,
+    SYSTEM_RESTART_WITHOUT_PASSWORD_SH, SYSTEM_WRITE_DAEMON_FROM_TEMP_WITH_PASSWORD_SH,
+    SYSTEM_WRITE_DAEMON_FROM_TEMP_WITHOUT_PASSWORD_SH, render, render_shell,
 };
 use crate::services::support::ServerContext;
 use crate::ssh::exec::ssh_exec;
@@ -53,28 +54,6 @@ struct DaemonConfig {
     hosts: Option<Vec<String>>,
     #[serde(flatten)]
     extra: std::collections::BTreeMap<String, serde_json::Value>,
-}
-
-fn render_write_daemon_from_temp(remote_tmp_path: &str, sudo_password: Option<&str>) -> String {
-    let tmp_path = shell_quote(remote_tmp_path);
-    match sudo_password.filter(|value| !value.is_empty()) {
-        Some(password) => {
-            let pwd_b64 = STANDARD.encode(password);
-            render(
-                &format!(
-                    "TMP_PATH={tmp_path}\nPASS_B64='__PASS_B64__'\nPASS=\"$(printf '%s' \"$PASS_B64\" | base64 -d)\"\ntrap 'rm -f \"$TMP_PATH\"' EXIT\nif [ \"$(id -u)\" = \"0\" ]; then\n  install -m 0644 \"$TMP_PATH\" /etc/docker/daemon.json\nelif command -v sudo >/dev/null 2>&1; then\n  if printf '%s\\n' \"$PASS\" | sudo -S -p '' -k -v >/dev/null 2>&1; then\n    printf '%s\\n' \"$PASS\" | sudo -S -p '' install -m 0644 \"$TMP_PATH\" /etc/docker/daemon.json\n  else\n    echo \"__ERR_BAD_SUDO_PASSWORD__\" 1>&2\n    exit 1\n  fi\nelif command -v su >/dev/null 2>&1; then\n  if printf '%s\\n' \"$PASS\" | su -c 'true' root >/dev/null 2>&1; then\n    printf '%s\\n' \"$PASS\" | su -c \"install -m 0644 \\\"$TMP_PATH\\\" /etc/docker/daemon.json\" root\n  else\n    echo \"__ERR_BAD_SU_PASSWORD__\" 1>&2\n    exit 1\n  fi\nelse\n  echo \"{ERR_NO_SUDO}\" 1>&2\n  exit 1\nfi\n"
-                ),
-                &[
-                    ("__PASS_B64__", &pwd_b64),
-                    ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
-                    ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
-                ],
-            )
-        }
-        None => format!(
-            "TMP_PATH={tmp_path}\ntrap 'rm -f \"$TMP_PATH\"' EXIT\nif [ \"$(id -u)\" = \"0\" ]; then\n  install -m 0644 \"$TMP_PATH\" /etc/docker/daemon.json\nelif command -v sudo >/dev/null 2>&1; then\n  if sudo -n true >/dev/null 2>&1; then\n    sudo -n install -m 0644 \"$TMP_PATH\" /etc/docker/daemon.json\n  else\n    echo \"{ERR_SUDO_NONINTERACTIVE}\" 1>&2\n    exit 1\n  fi\nelse\n  echo \"{ERR_NO_SUDO}\" 1>&2\n  exit 1\nfi\n"
-        ),
-    }
 }
 
 pub async fn list_system_fonts() -> AppResult<Vec<String>> {
@@ -492,7 +471,28 @@ pub async fn update_docker_daemon_settings(
     let sftp = SshSftpSession::connect(ctx.server()).await?;
     let remote_tmp_path = sftp.home_path(&format!("shipyardx/system/docker/daemon-{}.json.tmp", Uuid::new_v4()));
     sftp.upload_bytes(&remote_tmp_path, json.as_bytes()).await?;
-    let write_cmd = render_write_daemon_from_temp(&remote_tmp_path, params.sudo_password.as_deref());
+    let write_cmd = if let Some(password) = params.sudo_password.as_deref().filter(|value| !value.is_empty()) {
+        let pwd_b64 = STANDARD.encode(password);
+        render_shell(
+            SYSTEM_WRITE_DAEMON_FROM_TEMP_WITH_PASSWORD_SH,
+            &[
+                ("__PASS_B64__", &pwd_b64),
+                ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
+                ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
+                ("__ERR_NO_SUDO__", ERR_NO_SUDO),
+            ],
+            &[("__TMP_PATH__", &remote_tmp_path)],
+        )
+    } else {
+        render_shell(
+            SYSTEM_WRITE_DAEMON_FROM_TEMP_WITHOUT_PASSWORD_SH,
+            &[
+                ("__ERR_SUDO_NONINTERACTIVE__", ERR_SUDO_NONINTERACTIVE),
+                ("__ERR_NO_SUDO__", ERR_NO_SUDO),
+            ],
+            &[("__TMP_PATH__", &remote_tmp_path)],
+        )
+    };
     ssh_exec(ctx.server(), &write_cmd).await.map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker daemon settings updated; server_id={}", server_id);
     Ok(())

@@ -5,6 +5,10 @@ pub(crate) const DOCKER_CHECK_SOCKET_SH: &str = include_str!("scripts/docker_che
 pub(crate) const DOCKER_CHECK_TCP_SH: &str = include_str!("scripts/docker_check_tcp.sh");
 pub(crate) const SYSTEM_RESTART_WITH_PASSWORD_SH: &str = include_str!("scripts/system_restart_with_password.sh");
 pub(crate) const SYSTEM_RESTART_WITHOUT_PASSWORD_SH: &str = include_str!("scripts/system_restart_without_password.sh");
+pub(crate) const SYSTEM_WRITE_DAEMON_FROM_TEMP_WITH_PASSWORD_SH: &str =
+    include_str!("scripts/system_write_daemon_from_temp_with_password.sh");
+pub(crate) const SYSTEM_WRITE_DAEMON_FROM_TEMP_WITHOUT_PASSWORD_SH: &str =
+    include_str!("scripts/system_write_daemon_from_temp_without_password.sh");
 
 pub(crate) fn render(template: &str, replacements: &[(&str, &str)]) -> String {
     let mut rendered = template.to_string();
