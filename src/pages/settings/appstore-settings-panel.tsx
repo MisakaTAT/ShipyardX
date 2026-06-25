@@ -42,6 +42,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
   const [clearing, setClearing] = useState(false)
   const [draftSources, setDraftSources] = useState<AppStorePanelSettings['sources']>([])
   const onChangeRef = useRef(onChange)
+  const lastSavedSettingsRef = useRef<string>(JSON.stringify(toCommandAppstoreSettings(settings)))
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -68,7 +69,9 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
       .then((next) => {
         if (cancelled) return
         setDraftSources([])
-        onChangeRef.current(fromCommandAppstoreSettings(next))
+        const normalized = fromCommandAppstoreSettings(next)
+        lastSavedSettingsRef.current = JSON.stringify(next)
+        onChangeRef.current(normalized)
       })
       .catch((error) => {
         if (cancelled) return
@@ -83,12 +86,20 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
     }
   }, [refreshCacheInfo])
 
-  const saveSettings = async (next: AppStorePanelSettings, successMessage = '应用商店设置已保存') => {
+  const hasSettingsChanged = (next: AppStorePanelSettings) =>
+    JSON.stringify(toCommandAppstoreSettings(next)) !== lastSavedSettingsRef.current
+
+  const saveSettings = async (next: AppStorePanelSettings, options?: { successMessage?: string; silent?: boolean }) => {
+    if (!hasSettingsChanged(next)) return
+
     setSaving(true)
     try {
       const saved = await commands.updateAppstoreSettings(toCommandAppstoreSettings(next))
+      lastSavedSettingsRef.current = JSON.stringify(saved)
       onChange(fromCommandAppstoreSettings(saved))
-      toast.success(successMessage)
+      if (!options?.silent) {
+        toast.success(options?.successMessage ?? '应用商店设置已保存')
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, '保存应用商店设置失败'), {
         description: getErrorDescription(error),
@@ -124,7 +135,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
     }
     onChange(next)
     setDraftSources((current) => current.filter((source) => source.id !== sourceId))
-    await saveSettings(next, '应用商店源已添加')
+    await saveSettings(next, { successMessage: '应用商店源已添加' })
   }
 
   const handleAddSource = () => {
@@ -143,7 +154,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
       sources: settings.sources.map((source) => (source.id === sourceId ? { ...source, enabled } : source)),
     }
     onChange(next)
-    await saveSettings(next, enabled ? '应用商店源已启用' : '应用商店源已禁用')
+    await saveSettings(next, { successMessage: enabled ? '应用商店源已启用' : '应用商店源已禁用' })
   }
 
   const handleRemoveSource = async (sourceId: string) => {
@@ -164,7 +175,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
       sources: nextSources,
     }
     onChange(next)
-    await saveSettings(next, '应用商店源已删除')
+    await saveSettings(next, { successMessage: '应用商店源已删除' })
   }
 
   const handleReset = async () => {
@@ -176,7 +187,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
         proxyEnabled: false,
         proxyUrl: 'http://127.0.0.1:7890',
       },
-      '应用商店设置已恢复默认'
+      { successMessage: '应用商店设置已恢复默认' }
     )
   }
 
