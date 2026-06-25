@@ -20,14 +20,30 @@ const INSTALL_OUTPUT_CHUNK_BYTES: usize = 4 * 1024;
 const DATA_UPLOAD_PROGRESS_BYTES: u64 = 4 * 1024 * 1024;
 
 pub async fn sync_appstore(app: &AppHandle) -> AppResult<PathBuf> {
-    let repo = AppstoreRepo::new(app)?;
-    let cache_dir = repo.sync_with_progress(app).await?;
-    info!(target: "shipyardx_lib::services::appstore", "appstore synced; cache_dir={}", cache_dir.display());
-    Ok(cache_dir)
+    let cache_dirs = AppstoreRepo::sync_enabled_with_progress(app).await?;
+    let last_cache_dir = cache_dirs
+        .last()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("appstore_cache"));
+    info!(target: "shipyardx_lib::services::appstore", "appstore synced; count={} last_cache_dir={}", cache_dirs.len(), last_cache_dir.display());
+    Ok(last_cache_dir)
 }
 
-pub async fn list_apps(app: &AppHandle) -> AppResult<Vec<AppListItem>> {
-    let repo = AppstoreRepo::new(app)?;
+pub async fn list_apps(app: &AppHandle, source_id: Option<&str>) -> AppResult<Vec<AppListItem>> {
+    let repo = match source_id {
+        Some(source_id) => {
+            let settings = AppstoreRepo::new(app)?.load_settings().await?;
+            let source = settings
+                .sources
+                .into_iter()
+                .find(|source| source.id == source_id)
+                .ok_or_else(|| {
+                    AppError::not_found("appstore.source_not_found", format!("应用商店源不存在: {source_id}"))
+                })?;
+            AppstoreRepo::with_source(app, source)?
+        }
+        None => AppstoreRepo::new(app)?,
+    };
     let items = repo.list_apps().await?;
     info!(target: "shipyardx_lib::services::appstore", "listed appstore apps; count={}", items.len());
     Ok(items)
@@ -49,9 +65,22 @@ pub async fn clear_appstore_cache(app: &AppHandle) -> AppResult<()> {
     AppstoreRepo::new(app)?.clear_cache().await
 }
 
-pub async fn get_app_detail(app: &AppHandle, app_key: &str) -> AppResult<AppDetail> {
-    debug!(target: "shipyardx_lib::services::appstore", "fetching app detail; app_key={}", app_key);
-    let repo = AppstoreRepo::new(app)?;
+pub async fn get_app_detail(app: &AppHandle, source_id: Option<&str>, app_key: &str) -> AppResult<AppDetail> {
+    debug!(target: "shipyardx_lib::services::appstore", "fetching app detail; source_id={:?} app_key={}", source_id, app_key);
+    let repo = match source_id {
+        Some(source_id) => {
+            let settings = AppstoreRepo::new(app)?.load_settings().await?;
+            let source = settings
+                .sources
+                .into_iter()
+                .find(|source| source.id == source_id)
+                .ok_or_else(|| {
+                    AppError::not_found("appstore.source_not_found", format!("应用商店源不存在: {source_id}"))
+                })?;
+            AppstoreRepo::with_source(app, source)?
+        }
+        None => AppstoreRepo::new(app)?,
+    };
     let detail = repo.get_app_detail(app_key).await?;
     info!(target: "shipyardx_lib::services::appstore", "fetched app detail; app_key={} versions={}", app_key, detail.versions.len());
     Ok(detail)
@@ -129,15 +158,8 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
             AppError::internal("appstore.compose_template_read_failed", "读取部署模板失败").with_source(e)
         })?;
 
-    // 注入 1Panel 标准变量：CONTAINER_NAME
-    let mut env_values = req.env_values.clone();
-    let container_name = format!("shipyardx-{}", &req.app_key);
-    env_values
-        .entry("CONTAINER_NAME".to_string())
-        .or_insert_with(|| container_name);
-
-    let rendered = render_compose(&compose_template, &env_values);
-    debug!(target: "shipyardx_lib::services::appstore", "app compose rendered; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, env_values.len());
+    let rendered = render_compose(&compose_template, &req.env_values);
+    debug!(target: "shipyardx_lib::services::appstore", "app compose rendered; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, req.env_values.len());
     emit_step(app, "prepare", "done", "部署模板准备完成");
 
     // Step 2: 部署文件
@@ -146,7 +168,7 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     let remote_rel_base = format!("shipyardx/apps/{}", install_id);
     info!(target: "shipyardx_lib::services::appstore", "deploying app files; server_id={} app_key={} version={} install_id={}", server.id, req.app_key, req.version, install_id);
 
-    let env_content = build_env_file(&env_values);
+    let env_content = build_env_file(&req.env_values);
     let sftp = SshSftpSession::connect(server).await.map_err(|e| {
         emit_step(app, "deploy", "error", &format!("建立 SFTP 连接失败: {}", e));
         e

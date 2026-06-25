@@ -70,12 +70,12 @@ export const commands = {
 	closeTerminal: (sessionId: string) => __TAURI_INVOKE<null>("close_terminal", { sessionId }),
 	saveTerminalExport: (path: string, content: string) => __TAURI_INVOKE<null>("save_terminal_export", { path, content }),
 	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
-	listApps: () => __TAURI_INVOKE<AppListItem[]>("list_apps"),
+	listApps: (sourceId: string | null) => __TAURI_INVOKE<AppListItem[]>("list_apps", { sourceId }),
 	getAppstoreSettings: () => __TAURI_INVOKE<AppstoreSettings>("get_appstore_settings"),
 	updateAppstoreSettings: (settings: AppstoreSettings) => __TAURI_INVOKE<AppstoreSettings>("update_appstore_settings", { settings }),
 	getAppstoreCacheInfo: () => __TAURI_INVOKE<AppstoreCacheInfo>("get_appstore_cache_info"),
 	clearAppstoreCache: () => __TAURI_INVOKE<null>("clear_appstore_cache"),
-	getAppDetail: (appKey: string) => __TAURI_INVOKE<AppDetail_Serialize>("get_app_detail", { appKey }),
+	getAppDetail: (sourceId: string | null, appKey: string) => __TAURI_INVOKE<AppDetail_Serialize>("get_app_detail", { sourceId, appKey }),
 	installApp: (serverId: string, req: InstallApp) => __TAURI_INVOKE<null>("install_app", { serverId, req }),
 };
 
@@ -173,9 +173,16 @@ export type AppstoreCacheInfo = {
 };
 
 export type AppstoreSettings = {
-	repo_url: string,
+	sources: AppstoreSource[],
 	proxy_enabled: boolean,
 	proxy_url: string,
+};
+
+export type AppstoreSource = {
+	id: string,
+	name: string,
+	repo_url: string,
+	enabled: boolean,
 };
 
 export type AppstoreSyncProgress = {

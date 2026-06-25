@@ -10,13 +10,15 @@ use uuid::Uuid;
 
 use crate::config::store::atomic_write;
 use crate::dto::appstore::{
-    AppDetail, AppListItem, AppManifest, AppVersionInfo, AppstoreCacheInfo, AppstoreSettings, VersionManifest,
+    AppDetail, AppListItem, AppManifest, AppVersionInfo, AppstoreCacheInfo, AppstoreSettings, AppstoreSource,
+    VersionManifest,
 };
 use crate::error::{AppError, AppResult};
 use crate::services::appstore::emit_appstore_sync_progress;
 use crate::utils::formatting::format_bytes_u64;
 
-const DEFAULT_APPSTORE_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
+const DEFAULT_APPSTORE_1PANEL_REPO_URL: &str = "https://github.com/1Panel-dev/appstore.git";
+const DEFAULT_APPSTORE_OKXLIN_REPO_URL: &str = "https://github.com/okxlin/appstore.git";
 const APPSTORE_SETTINGS_FILE: &str = "appstore-settings.json";
 const APPSTORE_CACHE_REMOVE_RETRIES: usize = 3;
 const APPSTORE_CACHE_REMOVE_RETRY_DELAY_MS: u64 = 250;
@@ -24,67 +26,122 @@ const APPSTORE_CACHE_REMOVE_RETRY_DELAY_MS: u64 = 250;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CacheRepoState {
     Missing,
-    ValidGitRepo,
-    Incomplete,
+    Ready,
+    ResetRequired,
 }
 
 pub(crate) struct AppstoreRepo {
-    cache_dir: PathBuf,
+    app_data_dir: PathBuf,
+    cache_root_dir: PathBuf,
+    source: Option<AppstoreSource>,
 }
 
 impl AppstoreRepo {
     pub(crate) fn new(app: &AppHandle) -> AppResult<Self> {
-        let cache_dir = app
+        let app_data_dir = app
             .path()
             .app_data_dir()
-            .map_err(|e| AppError::internal("appstore.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?
-            .join("appstore_cache");
-        Ok(Self { cache_dir })
+            .map_err(|e| AppError::internal("appstore.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
+        let cache_root_dir = app_data_dir.join("appstore_cache");
+        Ok(Self {
+            app_data_dir,
+            cache_root_dir,
+            source: None,
+        })
     }
 
-    pub(crate) fn apps_dir(&self) -> PathBuf {
-        self.cache_dir.join("apps")
+    pub(crate) fn with_source(app: &AppHandle, source: AppstoreSource) -> AppResult<Self> {
+        let mut repo = Self::new(app)?;
+        repo.source = Some(source);
+        Ok(repo)
     }
 
-    pub(crate) fn app_dir(&self, app_key: &str) -> PathBuf {
-        self.apps_dir().join(app_key)
+    pub(crate) async fn sync_enabled_with_progress(app: &AppHandle) -> AppResult<Vec<PathBuf>> {
+        let root_repo = Self::new(app)?;
+        let settings = root_repo.load_settings().await?;
+        let enabled_sources: Vec<AppstoreSource> =
+            settings.sources.into_iter().filter(|source| source.enabled).collect();
+        if enabled_sources.is_empty() {
+            return Err(AppError::validation(
+                "appstore.source_missing",
+                "没有可同步的启用应用商店源",
+            ));
+        }
+
+        let mut synced_dirs = Vec::with_capacity(enabled_sources.len());
+        for source in enabled_sources {
+            let repo = Self::with_source(app, source)?;
+            synced_dirs.push(repo.sync_with_progress(app).await?);
+        }
+        Ok(synced_dirs)
+    }
+
+    fn apps_dir(&self, cache_dir: &Path) -> PathBuf {
+        cache_dir.join("apps")
+    }
+
+    fn app_dir(&self, cache_dir: &Path, app_key: &str) -> PathBuf {
+        self.apps_dir(cache_dir).join(app_key)
     }
 
     pub(crate) fn version_dir(&self, app_key: &str, version: &str) -> PathBuf {
-        self.app_dir(app_key).join(version)
+        self.cache_dir_for_active_source()
+            .join("apps")
+            .join(app_key)
+            .join(version)
     }
 
     fn settings_file(&self) -> PathBuf {
-        self.cache_dir
-            .parent()
-            .unwrap_or(&self.cache_dir)
-            .join(APPSTORE_SETTINGS_FILE)
+        self.app_data_dir.join(APPSTORE_SETTINGS_FILE)
+    }
+
+    fn cache_dir_for_source(&self, source: &AppstoreSource) -> PathBuf {
+        self.cache_root_dir.join(&source.id)
+    }
+
+    fn cache_dir_for_active_source(&self) -> PathBuf {
+        self.source
+            .as_ref()
+            .map(|source| self.cache_dir_for_source(source))
+            .unwrap_or_else(|| self.cache_root_dir.join("1panel"))
+    }
+
+    async fn resolved_source(&self) -> AppResult<AppstoreSource> {
+        if let Some(source) = &self.source {
+            return Ok(source.clone());
+        }
+        let settings = self.load_settings().await?;
+        active_source(&settings).cloned()
     }
 
     pub(crate) async fn sync_with_progress(&self, app: &AppHandle) -> AppResult<PathBuf> {
-        info!(target: "shipyardx_lib::services::appstore_repo", "syncing appstore; cache_dir={}", self.cache_dir.display());
         let settings = self.load_settings().await?;
+        let source = self.resolved_source().await?;
+        let cache_dir = self.cache_dir_for_source(&source);
+        info!(target: "shipyardx_lib::services::appstore_repo", "syncing appstore; source_id={} cache_dir={}", source.id, cache_dir.display());
 
-        match detect_cache_repo_state(self.cache_dir.clone()).await? {
-            CacheRepoState::ValidGitRepo => {
-                git_sync_existing_repo(self.cache_dir.clone(), settings.clone(), Some(app.clone())).await?;
-                info!(target: "shipyardx_lib::services::appstore_repo", "appstore sync completed; cache_dir={}", self.cache_dir.display());
-                return Ok(self.cache_dir.clone());
+        match detect_cache_repo_state(cache_dir.clone(), &source.repo_url).await? {
+            CacheRepoState::Ready => {
+                git_sync_existing_repo(cache_dir.clone(), settings.clone(), source.clone(), Some(app.clone())).await?;
+                info!(target: "shipyardx_lib::services::appstore_repo", "appstore sync completed; source_id={} cache_dir={}", source.id, cache_dir.display());
+                return Ok(cache_dir);
             }
-            CacheRepoState::Incomplete => {
+            CacheRepoState::ResetRequired => {
                 warn!(
                     target: "shipyardx_lib::services::appstore_repo",
-                    "detected incomplete appstore cache; cache_dir={}",
-                    self.cache_dir.display()
+                    "appstore cache requires reset before sync; source_id={} cache_dir={} active_repo={}",
+                    source.id,
+                    cache_dir.display(),
+                    source.repo_url
                 );
-                recover_incomplete_cache_dir(&self.cache_dir).await?;
+                recover_incomplete_cache_dir(&cache_dir).await?;
             }
             CacheRepoState::Missing => {}
         }
 
-        git_clone_repo(self.cache_dir.clone(), settings, Some(app.clone())).await?;
-        info!(target: "shipyardx_lib::services::appstore_repo", "appstore clone completed; cache_dir={}", self.cache_dir.display());
-        Ok(self.cache_dir.clone())
+        git_clone_repo(cache_dir.clone(), settings, source.clone(), Some(app.clone())).await?;
+        info!(target: "shipyardx_lib::services::appstore_repo", "appstore clone completed; source_id={} cache_dir={}", source.id, cache_dir.display());
+        Ok(cache_dir)
     }
 
     pub(crate) async fn load_settings(&self) -> AppResult<AppstoreSettings> {
@@ -117,7 +174,7 @@ impl AppstoreRepo {
     }
 
     pub(crate) async fn get_cache_info(&self) -> AppResult<AppstoreCacheInfo> {
-        let cache_dir = self.cache_dir.clone();
+        let cache_dir = self.cache_root_dir.clone();
         task::spawn_blocking(move || {
             let exists = cache_dir.exists();
             let size_bytes = if exists { dir_size(&cache_dir)? } else { 0 };
@@ -132,7 +189,7 @@ impl AppstoreRepo {
     }
 
     pub(crate) async fn clear_cache(&self) -> AppResult<()> {
-        let cache_dir = self.cache_dir.clone();
+        let cache_dir = self.cache_root_dir.clone();
         task::spawn_blocking(move || {
             if cache_dir.exists() {
                 std::fs::remove_dir_all(&cache_dir).map_err(|e| {
@@ -146,7 +203,9 @@ impl AppstoreRepo {
     }
 
     pub(crate) async fn list_apps(&self) -> AppResult<Vec<AppListItem>> {
-        let apps_dir = self.apps_dir();
+        let source = self.resolved_source().await?;
+        let cache_dir = self.cache_dir_for_source(&source);
+        let apps_dir = self.apps_dir(&cache_dir);
         debug!(target: "shipyardx_lib::services::appstore_repo", "listing appstore apps; apps_dir={}", apps_dir.display());
         if !fs::try_exists(&apps_dir).await.unwrap_or(false) {
             return Ok(vec![]);
@@ -202,7 +261,9 @@ impl AppstoreRepo {
     }
 
     pub(crate) async fn get_app_detail(&self, app_key: &str) -> AppResult<AppDetail> {
-        let app_dir = self.app_dir(app_key);
+        let source = self.resolved_source().await?;
+        let cache_dir = self.cache_dir_for_source(&source);
+        let app_dir = self.app_dir(&cache_dir, app_key);
         if !fs::try_exists(&app_dir).await.unwrap_or(false) {
             return Err(AppError::not_found(
                 "appstore.app_not_found",
@@ -328,15 +389,21 @@ impl AppstoreRepo {
 async fn git_sync_existing_repo(
     cache_dir: PathBuf,
     settings: AppstoreSettings,
+    source: AppstoreSource,
     app: Option<AppHandle>,
 ) -> AppResult<()> {
-    task::spawn_blocking(move || sync_existing_repo_blocking(&cache_dir, &settings, app.as_ref()))
+    task::spawn_blocking(move || sync_existing_repo_blocking(&cache_dir, &settings, &source, app.as_ref()))
         .await
         .map_err(|e| AppError::internal("appstore.sync_join_failed", "等待应用商店同步任务失败").with_source(e))?
 }
 
-async fn git_clone_repo(cache_dir: PathBuf, settings: AppstoreSettings, app: Option<AppHandle>) -> AppResult<()> {
-    task::spawn_blocking(move || clone_repo_blocking(&cache_dir, &settings, app.as_ref()))
+async fn git_clone_repo(
+    cache_dir: PathBuf,
+    settings: AppstoreSettings,
+    source: AppstoreSource,
+    app: Option<AppHandle>,
+) -> AppResult<()> {
+    task::spawn_blocking(move || clone_repo_blocking(&cache_dir, &settings, &source, app.as_ref()))
         .await
         .map_err(|e| AppError::internal("appstore.sync_join_failed", "等待应用商店同步任务失败").with_source(e))?
 }
@@ -344,13 +411,24 @@ async fn git_clone_repo(cache_dir: PathBuf, settings: AppstoreSettings, app: Opt
 fn sync_existing_repo_blocking(
     cache_dir: &Path,
     settings: &AppstoreSettings,
+    source: &AppstoreSource,
     app: Option<&AppHandle>,
 ) -> AppResult<()> {
     let repo = Repository::open(cache_dir)
         .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
 
+    let current_url = repo
+        .find_remote("origin")
+        .ok()
+        .and_then(|remote| remote.url().map(|url| url.trim().to_string()))
+        .unwrap_or_default();
+    if current_url != source.repo_url.trim() {
+        repo.remote_set_url("origin", source.repo_url.trim())
+            .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+    }
     let mut remote = repo
         .find_remote("origin")
+        .or_else(|_| repo.remote("origin", &source.repo_url))
         .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
 
     let mut fetch_options = build_fetch_options("fetch", settings, app);
@@ -367,14 +445,17 @@ fn sync_existing_repo_blocking(
     Ok(())
 }
 
-fn clone_repo_blocking(cache_dir: &Path, settings: &AppstoreSettings, app: Option<&AppHandle>) -> AppResult<()> {
+fn clone_repo_blocking(
+    cache_dir: &Path,
+    settings: &AppstoreSettings,
+    source: &AppstoreSource,
+    app: Option<&AppHandle>,
+) -> AppResult<()> {
     let fetch_options = build_fetch_options("clone", settings, app);
-
     let mut builder = RepoBuilder::new();
     builder.fetch_options(fetch_options);
-
     builder
-        .clone(&settings.repo_url, cache_dir)
+        .clone(&source.repo_url, cache_dir)
         .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
     Ok(())
 }
@@ -434,19 +515,22 @@ fn build_fetch_options(
 
 fn default_appstore_settings() -> AppstoreSettings {
     AppstoreSettings {
-        repo_url: DEFAULT_APPSTORE_REPO_URL.to_string(),
+        sources: default_appstore_sources(),
         proxy_enabled: false,
         proxy_url: "http://127.0.0.1:7890".to_string(),
     }
 }
 
 fn normalize_appstore_settings(settings: AppstoreSettings) -> AppstoreSettings {
+    let mut sources: Vec<AppstoreSource> = settings.sources.into_iter().map(normalize_appstore_source).collect();
+    if sources.is_empty() {
+        sources = default_appstore_sources();
+    }
+    dedupe_source_ids(&mut sources);
+    ensure_enabled_source(&mut sources);
+
     AppstoreSettings {
-        repo_url: if settings.repo_url.trim().is_empty() {
-            DEFAULT_APPSTORE_REPO_URL.to_string()
-        } else {
-            settings.repo_url.trim().to_string()
-        },
+        sources,
         proxy_enabled: settings.proxy_enabled,
         proxy_url: if settings.proxy_url.trim().is_empty() {
             "http://127.0.0.1:7890".to_string()
@@ -486,21 +570,35 @@ fn pick_description(desc: &crate::dto::appstore::DescriptionI18n) -> String {
     String::new()
 }
 
-async fn detect_cache_repo_state(cache_dir: PathBuf) -> AppResult<CacheRepoState> {
-    task::spawn_blocking(move || {
-        if !cache_dir.exists() {
-            return Ok(CacheRepoState::Missing);
-        }
-        if !cache_dir.join(".git").exists() {
-            return Ok(CacheRepoState::Incomplete);
-        }
-        match Repository::open(&cache_dir) {
-            Ok(_) => Ok(CacheRepoState::ValidGitRepo),
-            Err(_) => Ok(CacheRepoState::Incomplete),
-        }
-    })
-    .await
-    .map_err(|e| AppError::internal("appstore.cache_state_join_failed", "检查应用商店缓存状态失败").with_source(e))?
+fn detect_cache_repo_state_blocking(cache_dir: &Path, expected_repo_url: &str) -> AppResult<CacheRepoState> {
+    if !cache_dir.exists() {
+        return Ok(CacheRepoState::Missing);
+    }
+    if !cache_dir.join(".git").exists() {
+        return Ok(CacheRepoState::ResetRequired);
+    }
+    let repo = match Repository::open(cache_dir) {
+        Ok(repo) => repo,
+        Err(_) => return Ok(CacheRepoState::ResetRequired),
+    };
+    let remote = match repo.find_remote("origin") {
+        Ok(remote) => remote,
+        Err(_) => return Ok(CacheRepoState::ResetRequired),
+    };
+    let current_url = remote.url().unwrap_or_default().trim();
+    if current_url.is_empty() || current_url != expected_repo_url.trim() {
+        return Ok(CacheRepoState::ResetRequired);
+    }
+    Ok(CacheRepoState::Ready)
+}
+
+async fn detect_cache_repo_state(cache_dir: PathBuf, expected_repo_url: &str) -> AppResult<CacheRepoState> {
+    let expected_repo_url = expected_repo_url.to_string();
+    task::spawn_blocking(move || detect_cache_repo_state_blocking(&cache_dir, &expected_repo_url))
+        .await
+        .map_err(|e| {
+            AppError::internal("appstore.cache_state_join_failed", "检查应用商店缓存状态失败").with_source(e)
+        })?
 }
 
 async fn recover_incomplete_cache_dir(cache_dir: &Path) -> AppResult<()> {
@@ -571,6 +669,72 @@ async fn try_remove_dir_all(path: &Path) -> AppResult<bool> {
             }
         }
     }
-
     Ok(!fs::try_exists(path).await.unwrap_or(true))
+}
+
+fn default_appstore_sources() -> Vec<AppstoreSource> {
+    vec![
+        AppstoreSource {
+            id: "1panel".to_string(),
+            name: "1Panel".to_string(),
+            repo_url: DEFAULT_APPSTORE_1PANEL_REPO_URL.to_string(),
+            enabled: true,
+        },
+        AppstoreSource {
+            id: "okxlin".to_string(),
+            name: "Okxlin".to_string(),
+            repo_url: DEFAULT_APPSTORE_OKXLIN_REPO_URL.to_string(),
+            enabled: true,
+        },
+    ]
+}
+
+fn normalize_appstore_source(source: AppstoreSource) -> AppstoreSource {
+    AppstoreSource {
+        id: if source.id.trim().is_empty() {
+            Uuid::new_v4().to_string()
+        } else {
+            source.id.trim().to_string()
+        },
+        name: if source.name.trim().is_empty() {
+            "未命名源".to_string()
+        } else {
+            source.name.trim().to_string()
+        },
+        repo_url: if source.repo_url.trim().is_empty() {
+            DEFAULT_APPSTORE_1PANEL_REPO_URL.to_string()
+        } else {
+            source.repo_url.trim().to_string()
+        },
+        enabled: source.enabled,
+    }
+}
+
+fn dedupe_source_ids(sources: &mut [AppstoreSource]) {
+    let mut seen = std::collections::HashSet::new();
+    for source in sources.iter_mut() {
+        if seen.insert(source.id.clone()) {
+            continue;
+        }
+        source.id = Uuid::new_v4().to_string();
+        seen.insert(source.id.clone());
+    }
+}
+
+fn active_source(settings: &AppstoreSettings) -> AppResult<&AppstoreSource> {
+    settings
+        .sources
+        .iter()
+        .find(|source| source.enabled)
+        .or_else(|| settings.sources.first())
+        .ok_or_else(|| AppError::validation("appstore.source_missing", "应用商店源配置为空"))
+}
+
+fn ensure_enabled_source(sources: &mut [AppstoreSource]) {
+    if sources.iter().any(|source| source.enabled) {
+        return;
+    }
+    if let Some(first) = sources.first_mut() {
+        first.enabled = true;
+    }
 }

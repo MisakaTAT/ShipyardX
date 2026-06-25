@@ -37,7 +37,7 @@ export function SettingsActionRow({
     <div className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
       <div>
         <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+        {description ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p> : null}
       </div>
       <div>{action}</div>
     </div>

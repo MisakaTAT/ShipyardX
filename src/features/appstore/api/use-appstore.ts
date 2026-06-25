@@ -10,7 +10,7 @@ export function useAppStoreSync() {
   return useMutation({
     mutationFn: commands.syncAppstore,
     onSuccess: (msg) => {
-      qc.invalidateQueries({ queryKey: qk.apps() })
+      qc.invalidateQueries({ queryKey: ['appstore'] })
       toast.success(msg)
     },
     onError: (err) => toastAppError(err),
@@ -46,19 +46,19 @@ export function useAppStoreSyncIndicator(active: boolean) {
   return progress
 }
 
-export function useApps() {
+export function useApps(sourceId: string | null) {
   return useQuery({
-    queryKey: qk.apps(),
-    queryFn: commands.listApps,
+    queryKey: qk.apps(sourceId),
+    queryFn: () => commands.listApps(sourceId),
     placeholderData: [] as AppListItem[],
   })
 }
 
-export function useAppDetail(appKey: string | null) {
+export function useAppDetail(sourceId: string | null, appKey: string | null) {
   return useQuery({
-    queryKey: qk.appDetail(appKey),
-    queryFn: () => commands.getAppDetail(appKey!),
-    enabled: !!appKey,
+    queryKey: qk.appDetail(sourceId, appKey),
+    queryFn: () => commands.getAppDetail(sourceId, appKey!),
+    enabled: !!sourceId && !!appKey,
   })
 }
 
@@ -67,7 +67,7 @@ export function useInstallApp() {
   return useMutation({
     mutationFn: (params: { serverId: string; req: InstallApp }) => commands.installApp(params.serverId, params.req),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.apps() })
+      qc.invalidateQueries({ queryKey: ['appstore'] })
     },
   })
 }

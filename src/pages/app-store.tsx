@@ -1,26 +1,44 @@
-import { useState, useMemo } from 'react'
-import { Loader2, PackagePlus, RefreshCw, Search, Settings2, Stone } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Loader2, PackagePlus, Search, Settings2, Stone } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { useApps, useAppStoreSync, useAppStoreSyncIndicator } from '@/features/appstore/api/use-appstore'
 import { useServers } from '@/features/servers/api/use-servers'
+import { useAppSettings } from '@/app/settings-store'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
+import { Spinner } from '@/shared/ui/spinner'
 import { SearchInput } from '@/shared/components'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import { AppDetailDialog } from '@/features/appstore/ui/app-detail-dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
+import { qk } from '@/shared/api/query-keys'
 import { AppListItem, type AppstoreSyncProgress } from '@/types/app-bindings'
 import { APP_PATHS } from '@/shared/lib/app-router'
 import { cn } from '@/shared/lib/utils'
+
 export default function AppStorePage() {
   const [, navigate] = useLocation()
+  const qc = useQueryClient()
+  const { settings: appSettings } = useAppSettings()
   const sync = useAppStoreSync()
   const syncPercent = useAppStoreSyncIndicator(sync.isPending)
-  const { data: apps = [], isLoading, isFetching } = useApps()
+  const enabledSources = useMemo(
+    () => appSettings.appstore.sources.filter((source) => source.enabled && source.repoUrl.trim()),
+    [appSettings.appstore.sources]
+  )
+  const [selectedSourceId, setSelectedSourceId] = useState('')
+  const activeSourceId =
+    enabledSources.find((source) => source.id === selectedSourceId)?.id ?? enabledSources[0]?.id ?? ''
+  const activeSource = enabledSources.find((source) => source.id === activeSourceId) ?? null
+  const { data: apps = [], isLoading, isFetching } = useApps(activeSourceId || null)
   const { data: servers = [] } = useServers()
+  const [switchingSource, setSwitchingSource] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [selectedAppKey, setSelectedAppKey] = useState<string | null>(null)
   const [dialogMode, setDialogMode] = useState<'readme' | 'install'>('readme')
+
   const allTags = useMemo(() => {
     const tags = new Map<string, number>()
     for (const app of apps) {
@@ -52,13 +70,18 @@ export default function AppStorePage() {
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) => {
       const next = new Set(prev)
-      if (next.has(tag)) {
-        next.delete(tag)
-      } else {
-        next.add(tag)
-      }
+      if (next.has(tag)) next.delete(tag)
+      else next.add(tag)
       return next
     })
+  }
+
+  const handleSourceChange = async (sourceId: string) => {
+    if (!sourceId || sourceId === activeSourceId) return
+    setSwitchingSource(true)
+    setSelectedSourceId(sourceId)
+    await qc.invalidateQueries({ queryKey: qk.apps(sourceId) })
+    setSwitchingSource(false)
   }
 
   if (isLoading || (isFetching && apps.length === 0)) {
@@ -83,22 +106,44 @@ export default function AppStorePage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {enabledSources.length > 0 ? (
+                <Select
+                  value={activeSourceId}
+                  onValueChange={(value) => {
+                    if (!value) return
+                    void handleSourceChange(value)
+                  }}
+                  disabled={sync.isPending || switchingSource}
+                >
+                  <SelectTrigger className="h-8 max-w-56 min-w-40 text-xs">
+                    <span className="truncate">{activeSource?.name ?? '选择应用源'}</span>
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {enabledSources.map((source) => (
+                      <SelectItem key={source.id} value={source.id}>
+                        {source.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
               <Button
                 size="icon-sm"
                 variant="outline"
                 onClick={() => navigate(`${APP_PATHS.settings}?section=appstore`)}
                 aria-label="打开应用商店设置"
+                disabled={switchingSource}
               >
                 <Settings2 className="size-4" />
               </Button>
               {sync.isPending ? <SyncProgressPopover progress={syncPercent} initialSync={isEmpty} /> : null}
-              <Button size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
-                {sync.isPending ? (
-                  <Loader2 className="mr-1 size-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-1 size-4" />
-                )}
-                {sync.isPending ? '同步中...' : '同步'}
+              <Button
+                size="sm"
+                onClick={() => sync.mutate()}
+                disabled={sync.isPending || switchingSource || enabledSources.length === 0}
+              >
+                {sync.isPending ? <Spinner data-icon="inline-start" /> : null}
+                <span>{sync.isPending ? '同步中' : '同步'}</span>
               </Button>
             </div>
           </div>
@@ -129,7 +174,6 @@ export default function AppStorePage() {
       )}
 
       {isEmpty ? (
-        /* Empty state - no apps synced */
         <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
           <div className="max-w-xs text-center">
             <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
@@ -148,49 +192,43 @@ export default function AppStorePage() {
             ) : (
               <div className="mt-5">
                 <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-                  <RefreshCw className="mr-1 size-4" />
                   立即同步
                 </Button>
               </div>
             )}
           </div>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <Search className="mx-auto size-8 text-muted-foreground/60" />
+            <p className="mt-2 text-sm text-muted-foreground">未找到匹配的应用</p>
+          </div>
+        </div>
       ) : (
-        <>
-          {/* App Grid */}
-          {filtered.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="text-center">
-                <Search className="mx-auto size-8 text-muted-foreground/60" />
-                <p className="mt-2 text-sm text-muted-foreground">未找到匹配的应用</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto pr-1">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                {filtered.map((app) => (
-                  <AppCard
-                    key={app.key}
-                    app={app}
-                    onClick={() => {
-                      setSelectedAppKey(app.key)
-                      setDialogMode('readme')
-                    }}
-                    onInstall={(e) => {
-                      e.stopPropagation()
-                      setSelectedAppKey(app.key)
-                      setDialogMode('install')
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+        <div className="flex-1 overflow-auto pr-1">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+            {filtered.map((app) => (
+              <AppCard
+                key={app.key}
+                app={app}
+                onClick={() => {
+                  setSelectedAppKey(app.key)
+                  setDialogMode('readme')
+                }}
+                onInstall={(e) => {
+                  e.stopPropagation()
+                  setSelectedAppKey(app.key)
+                  setDialogMode('install')
+                }}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* Detail Dialog */}
       <AppDetailDialog
+        sourceId={activeSourceId || null}
         appKey={selectedAppKey}
         servers={servers}
         mode={dialogMode}
@@ -258,17 +296,16 @@ function SyncProgressPopover({
         )}
       >
         <span className="font-medium tabular-nums">{percent}%</span>
-        <span className="text-muted-foreground">查看进度</span>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-72 p-3">
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium text-foreground">正在同步应用商店</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {initialSync ? '首次同步可能需要一点时间' : '正在获取应用商店最新内容'}
-            </div>
+            <h3 className="text-sm font-medium text-foreground">{initialSync ? '首次同步中' : '同步中'}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {initialSync ? '正在拉取应用商店仓库，完成后将自动展示应用列表。' : '正在更新已启用的应用商店仓库。'}
+            </p>
           </div>
-          <SyncProgressBar progress={progress} compact />
+          <SyncProgressBar progress={progress} />
         </div>
       </PopoverContent>
     </Popover>
@@ -282,7 +319,7 @@ function AppCard({
 }: {
   app: AppListItem
   onClick: () => void
-  onInstall: (e: React.MouseEvent) => void
+  onInstall: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
   return (
     <div
@@ -290,7 +327,6 @@ function AppCard({
       onClick={onClick}
     >
       <div className="flex items-start gap-2.5">
-        {/* Icon */}
         <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
           {app.icon ? (
             <img src={`data:image/png;base64,${app.icon}`} alt={app.name} className="size-full object-cover" />
@@ -298,7 +334,6 @@ function AppCard({
             <Stone className="size-5 text-muted-foreground" />
           )}
         </div>
-
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h3 className="truncate text-sm font-medium text-foreground">{app.name}</h3>

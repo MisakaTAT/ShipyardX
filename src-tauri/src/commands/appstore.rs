@@ -14,8 +14,8 @@ pub async fn sync_appstore(app: AppHandle) -> AppResult<String> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn list_apps(app: AppHandle) -> AppResult<Vec<AppListItem>> {
-    services::appstore::list_apps(&app).await
+pub async fn list_apps(app: AppHandle, source_id: Option<String>) -> AppResult<Vec<AppListItem>> {
+    services::appstore::list_apps(&app, source_id.as_deref()).await
 }
 
 #[tauri::command]
@@ -44,8 +44,8 @@ pub async fn clear_appstore_cache(app: AppHandle) -> AppResult<()> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn get_app_detail(app: AppHandle, app_key: String) -> AppResult<AppDetail> {
-    services::appstore::get_app_detail(&app, &app_key).await
+pub async fn get_app_detail(app: AppHandle, source_id: Option<String>, app_key: String) -> AppResult<AppDetail> {
+    services::appstore::get_app_detail(&app, source_id.as_deref(), &app_key).await
 }
 
 #[tauri::command]

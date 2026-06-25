@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { DEFAULT_APPSTORE_SOURCES } from '@/shared/lib/appstore-settings'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { normalizeHotkey } from '@/shared/lib/hotkeys'
 
@@ -14,7 +15,12 @@ export interface AppSettings {
     openTerminalSearch: string | null
   }
   appstore: {
-    repoUrl: string
+    sources: Array<{
+      id: string
+      name: string
+      repoUrl: string
+      enabled: boolean
+    }>
     proxyEnabled: boolean
     proxyUrl: string
   }
@@ -37,7 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     openTerminalSearch: 'Mod+F',
   },
   appstore: {
-    repoUrl: 'https://github.com/1Panel-dev/appstore.git',
+    sources: DEFAULT_APPSTORE_SOURCES,
     proxyEnabled: false,
     proxyUrl: 'http://127.0.0.1:7890',
   },
@@ -57,7 +63,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export interface AppSettingsContextValue {
   settings: AppSettings
   updateHotkeySettings: (patch: Partial<AppSettings['hotkeys']>) => void
-  updateAppStoreSettings: (patch: Partial<AppSettings['appstore']>) => void
+  updateAppStoreSettings: (next: AppSettings['appstore']) => void
   updateTerminalSettings: (patch: Partial<AppSettings['terminal']>) => void
   resetSettings: () => void
   resetHotkeySettings: () => void
@@ -114,11 +120,7 @@ export function normalizeSettings(input: unknown): AppSettings {
       focusSearch?: unknown
       openTerminalSearch?: unknown
     }
-    appstore?: {
-      repoUrl?: unknown
-      proxyEnabled?: unknown
-      proxyUrl?: unknown
-    }
+    appstore?: unknown
     terminal?: {
       frontend?: unknown
       theme?: unknown
@@ -149,11 +151,7 @@ export function normalizeSettings(input: unknown): AppSettings {
       openTerminalSearch:
         normalizeHotkey(raw.hotkeys?.openTerminalSearch) ?? DEFAULT_SETTINGS.hotkeys.openTerminalSearch,
     },
-    appstore: {
-      repoUrl: normalizeString(raw.appstore?.repoUrl, DEFAULT_SETTINGS.appstore.repoUrl),
-      proxyEnabled: normalizeBoolean(raw.appstore?.proxyEnabled, DEFAULT_SETTINGS.appstore.proxyEnabled),
-      proxyUrl: normalizeString(raw.appstore?.proxyUrl, DEFAULT_SETTINGS.appstore.proxyUrl),
-    },
+    appstore: normalizeAppstoreSettings(raw.appstore),
     terminal: {
       frontend,
       theme: normalizeTerminalTheme(raw.terminal?.theme),
@@ -181,6 +179,47 @@ export function loadSettings(): AppSettings {
     return normalizeSettings(JSON.parse(raw))
   } catch {
     return DEFAULT_SETTINGS
+  }
+}
+
+function normalizeAppstoreSettings(input: unknown): AppSettings['appstore'] {
+  const fallbackSource = DEFAULT_SETTINGS.appstore.sources[0]
+  if (!input || typeof input !== 'object') {
+    return DEFAULT_SETTINGS.appstore
+  }
+
+  const raw = input as {
+    sources?: Array<{
+      id?: unknown
+      name?: unknown
+      repoUrl?: unknown
+      enabled?: unknown
+    }>
+    proxyEnabled?: unknown
+    proxyUrl?: unknown
+  }
+
+  if (!Array.isArray(raw.sources)) {
+    return DEFAULT_SETTINGS.appstore
+  }
+
+  const sources = raw.sources.length
+    ? raw.sources.map((source, index) => ({
+        id: normalizeString(source.id, `source-${index + 1}`),
+        name: normalizeString(source.name, `应用商店 ${index + 1}`),
+        repoUrl: normalizeString(source.repoUrl, fallbackSource.repoUrl),
+        enabled: normalizeBoolean(source.enabled, true),
+      }))
+    : [...DEFAULT_SETTINGS.appstore.sources]
+
+  if (!sources.some((source) => source.enabled)) {
+    sources[0] = { ...sources[0], enabled: true }
+  }
+
+  return {
+    sources,
+    proxyEnabled: normalizeBoolean(raw.proxyEnabled, DEFAULT_SETTINGS.appstore.proxyEnabled),
+    proxyUrl: normalizeString(raw.proxyUrl, DEFAULT_SETTINGS.appstore.proxyUrl),
   }
 }
 

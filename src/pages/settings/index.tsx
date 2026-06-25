@@ -108,9 +108,7 @@ export default function SettingsPage() {
           />
         ) : activeSection === 'appstore' ? (
           <AppStoreSettingsPanel
-            repoUrl={settings.appstore.repoUrl}
-            proxyEnabled={settings.appstore.proxyEnabled}
-            proxyUrl={settings.appstore.proxyUrl}
+            settings={settings.appstore}
             onChange={updateAppStoreSettings}
             onReset={resetAppStoreSettings}
           />

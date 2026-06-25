@@ -1,9 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Controller, useForm } from 'react-hook-form'
 import { CheckCircle2, Circle, Globe, Loader2, Stone, XCircle } from 'lucide-react'
 import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstore'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
+import { Field, FieldContent, FieldError, FieldLabel } from '@/shared/ui/field'
+import { Input } from '@/shared/ui/input'
 import type {
   AppVersionInfo_Serialize,
   FormField_Serialize,
@@ -22,21 +25,69 @@ const STEP_LABELS: Record<string, string> = {
   start: '启动容器',
 }
 
+function buildDefaultContainerName(appKey: string) {
+  const bytes = crypto.getRandomValues(new Uint8Array(4))
+  const shortId = Array.from(bytes, (byte) => byte.toString(36).padStart(2, '0'))
+    .join('')
+    .slice(0, 6)
+  return `shipyardx-${appKey}-${shortId}`
+}
+
+const CONTAINER_NAME_FIELD: FormField_Serialize = {
+  envKey: 'CONTAINER_NAME',
+  default: '',
+  label: {
+    zh: '容器名称',
+    en: 'Container Name',
+    'zh-Hant': '',
+    'pt-br': '',
+    ja: '',
+    'es-es': '',
+    ko: '',
+    ru: '',
+  },
+  required: true,
+  type: 'text',
+  values: [],
+  random: false,
+  rule: 'containerName',
+}
+
 interface AppDetailDialogProps {
+  sourceId: string | null
   appKey: string | null
   servers: ServerConfig[]
   mode: 'readme' | 'install'
   onClose: () => void
 }
 
-export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDialogProps) {
-  const { data: detail, isLoading } = useAppDetail(appKey)
+export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: AppDetailDialogProps) {
+  const { data: detail, isLoading } = useAppDetail(sourceId, appKey)
   const install = useInstallApp()
   const [selectedVersion, setSelectedVersion] = useState<AppVersionInfo_Serialize | null>(null)
   const [selectedServerId, setSelectedServerId] = useState<string>('')
-  const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [installSteps, setInstallSteps] = useState<Map<string, InstallStepEvent>>(new Map())
   const [stepOutputs, setStepOutputs] = useState<Map<string, string[]>>(new Map())
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<Record<string, string>>({
+    defaultValues: {
+      CONTAINER_NAME: appKey ? buildDefaultContainerName(appKey) : '',
+    },
+    mode: 'onSubmit',
+  })
+
+  const versionFields = selectedVersion
+    ? selectedVersion.form_fields.some((field) => field.envKey === 'CONTAINER_NAME')
+      ? [
+          ...selectedVersion.form_fields.filter((field) => field.envKey === 'CONTAINER_NAME'),
+          ...selectedVersion.form_fields.filter((field) => field.envKey !== 'CONTAINER_NAME'),
+        ]
+      : [CONTAINER_NAME_FIELD, ...selectedVersion.form_fields]
+    : []
 
   // 监听安装步骤事件
   useEffect(() => {
@@ -80,17 +131,20 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
   if (!appKey) return null
 
   const handleOpenChange = (open: boolean) => {
+    if (!open && install.isPending) {
+      return
+    }
     if (!open) {
       setSelectedVersion(null)
       setSelectedServerId('')
-      setFormValues({})
+      reset({ CONTAINER_NAME: appKey ? buildDefaultContainerName(appKey) : '' })
       resetInstall()
       install.reset()
       onClose()
     }
   }
 
-  const handleInstall = () => {
+  const handleInstall = handleSubmit((values) => {
     if (!detail || !selectedVersion || !selectedServerId) return
 
     resetInstall()
@@ -100,14 +154,10 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
         server_id: selectedServerId,
         app_key: detail.key,
         version: selectedVersion.version,
-        env_values: formValues,
+        env_values: values,
       },
     })
-  }
-
-  const handleValueChange = (envKey: string, value: string) => {
-    setFormValues((prev) => ({ ...prev, [envKey]: value }))
-  }
+  })
 
   const isLoadingContent = isLoading || !detail
 
@@ -118,6 +168,7 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
       title={isLoadingContent ? '加载中...' : detail.name}
       icon={Stone}
       widthClassName="w-[640px]"
+      disableClose={install.isPending}
       footer={
         mode === 'readme' ? null : install.isSuccess || install.isError ? (
           <div className="flex items-center justify-end gap-2">
@@ -246,7 +297,7 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
           })}
         </div>
       ) : (
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleInstall}>
           {/* Version selection */}
           <div>
             <h4 className="mb-2 text-[13px] font-medium text-foreground">选择版本</h4>
@@ -262,13 +313,15 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
                   }`}
                   onClick={() => {
                     setSelectedVersion(v)
-                    const defaults: Record<string, string> = {}
+                    const defaults: Record<string, string> = {
+                      CONTAINER_NAME: buildDefaultContainerName(detail.key),
+                    }
                     for (const field of v.form_fields) {
                       if (field.default) {
                         defaults[field.envKey] = field.default
                       }
                     }
-                    setFormValues(defaults)
+                    reset(defaults)
                   }}
                 >
                   {v.version}
@@ -278,17 +331,12 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
           </div>
 
           {/* Config form */}
-          {selectedVersion && selectedVersion.form_fields.length > 0 && (
+          {selectedVersion && versionFields.length > 0 && (
             <div>
               <h4 className="mb-2 text-[13px] font-medium text-foreground">配置参数</h4>
               <div className="space-y-3">
-                {selectedVersion.form_fields.map((field) => (
-                  <FormFieldInput
-                    key={field.envKey}
-                    field={field}
-                    value={formValues[field.envKey] || ''}
-                    onChange={(v) => handleValueChange(field.envKey, v)}
-                  />
+                {versionFields.map((field) => (
+                  <FormFieldInput key={field.envKey} field={field} control={control} error={errors[field.envKey]} />
                 ))}
               </div>
             </div>
@@ -324,7 +372,7 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
               </div>
             </div>
           )}
-        </div>
+        </form>
       )}
     </StandardDialog>
   )
@@ -332,52 +380,66 @@ export function AppDetailDialog({ appKey, servers, mode, onClose }: AppDetailDia
 
 function FormFieldInput({
   field,
-  value,
-  onChange,
+  control,
+  error,
 }: {
   field: FormField_Serialize
-  value: string
-  onChange: (value: string) => void
+  control: ReturnType<typeof useForm<Record<string, string>>>['control']
+  error: { message?: string } | undefined
 }) {
   const label = field.label?.zh || field.label?.en || field.envKey
   const isPassword = field.type === 'password'
   const fieldType = isPassword ? 'password' : 'text'
+  const placeholder = field.envKey === 'CONTAINER_NAME' ? '请填写容器名称' : field.default || ''
 
   if (field.type === 'select' || field.values?.length > 0) {
     return (
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-foreground">
+      <Field data-invalid={!!error} className="gap-1.5">
+        <FieldLabel>
           {label}
           {field.required && <span className="ml-0.5 text-red-500">*</span>}
-        </label>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-        >
-          {field.values.map((v) => (
-            <option key={v.value} value={v.value}>
-              {v.label}
-            </option>
-          ))}
-        </select>
-      </div>
+        </FieldLabel>
+        <FieldContent>
+          <Controller
+            control={control}
+            name={field.envKey}
+            rules={field.required ? { required: `请填写 ${label}` } : undefined}
+            render={({ field: formField }) => (
+              <select
+                value={formField.value || ''}
+                onChange={(e) => formField.onChange(e.target.value)}
+                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+              >
+                <option value="">请选择</option>
+                {field.values.map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          />
+          <FieldError errors={error ? [{ message: error.message }] : []} />
+        </FieldContent>
+      </Field>
     )
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-foreground">
+    <Field data-invalid={!!error} className="gap-1.5">
+      <FieldLabel>
         {label}
         {field.required && <span className="ml-0.5 text-red-500">*</span>}
-      </label>
-      <input
-        type={fieldType}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={field.default || ''}
-        className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
-      />
-    </div>
+      </FieldLabel>
+      <FieldContent>
+        <Controller
+          control={control}
+          name={field.envKey}
+          rules={field.required ? { required: `请填写 ${label}` } : undefined}
+          render={({ field: formField }) => <Input type={fieldType} {...formField} placeholder={placeholder} />}
+        />
+        <FieldError errors={error ? [{ message: error.message }] : []} />
+      </FieldContent>
+    </Field>
   )
 }

@@ -24,8 +24,9 @@ export const qk = {
 
   localAddresses: () => ['local-addresses'] as const,
 
-  apps: () => ['appstore', 'apps'] as const,
-  appDetail: (appKey: string | null) => ['appstore', 'apps', appKey, 'detail'] as const,
+  apps: (sourceId: string | null) => ['appstore', sourceId, 'apps'] as const,
+  appDetail: (sourceId: string | null, appKey: string | null) =>
+    ['appstore', sourceId, 'apps', appKey, 'detail'] as const,
 } as const
 
 export type QkKey =

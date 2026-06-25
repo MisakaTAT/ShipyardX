@@ -27,13 +27,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     )
   }
 
-  const updateAppStoreSettings: AppSettingsContextValue['updateAppStoreSettings'] = (patch) => {
+  const updateAppStoreSettings: AppSettingsContextValue['updateAppStoreSettings'] = (next) => {
     setSettings((current) => ({
       ...current,
-      appstore: {
-        ...current.appstore,
-        ...patch,
-      },
+      appstore: next,
     }))
   }
 

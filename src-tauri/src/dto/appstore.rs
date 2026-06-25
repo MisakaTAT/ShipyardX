@@ -191,8 +191,16 @@ pub struct InstallApp {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
-pub struct AppstoreSettings {
+pub struct AppstoreSource {
+    pub id: String,
+    pub name: String,
     pub repo_url: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct AppstoreSettings {
+    pub sources: Vec<AppstoreSource>,
     pub proxy_enabled: bool,
     pub proxy_url: String,
 }
