@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export function usePortForwards() {
   return useQuery({
@@ -14,15 +14,25 @@ export function usePortForwards() {
   })
 }
 
+export function useLocalAddresses(enabled = true) {
+  return useQuery({
+    queryKey: qk.localAddresses(),
+    queryFn: () => commands.listLocalAddresses(),
+    enabled,
+    placeholderData: [
+      { ip: '0.0.0.0', name: '所有网卡 (0.0.0.0)' },
+      { ip: '127.0.0.1', name: '127.0.0.1 (localhost)' },
+    ],
+  })
+}
+
 export function useCreatePortForwardRule() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (args: Parameters<typeof commands.createPortForwardRule>) => commands.createPortForwardRule(...args),
+    invalidate: [qk.portForwards()],
     onSuccess: (created) => {
       toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
-      qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toastAppError(err),
   })
 }
 
@@ -57,49 +67,41 @@ export function usePortForwardPolling(enabled: boolean) {
 }
 
 export function useSetPortForwardEnabled() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => commands.setPortForwardEnabled(id, enabled),
+    invalidate: [qk.portForwards()],
     onSuccess: (_r, { enabled }) => {
       toast.success(enabled ? '规则已启用' : '规则已禁用')
-      qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toastAppError(err),
   })
 }
 
 export function useDeletePortForward() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (id: string) => commands.deletePortForward(id),
+    invalidate: [qk.portForwards()],
     onSuccess: () => {
       toast.success('已删除规则')
-      qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toastAppError(err),
   })
 }
 
 export function useStartAllPortForwards() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: () => commands.startAllEnabledGlobal(),
+    invalidate: [qk.portForwards()],
     onSuccess: () => {
       toast.success('已启动所有已启用规则')
-      qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toastAppError(err),
   })
 }
 
 export function useStopAllPortForwards() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: () => commands.stopAllGlobal(),
+    invalidate: [qk.portForwards()],
     onSuccess: () => {
       toast.success('已停止所有转发')
-      qc.invalidateQueries({ queryKey: qk.portForwards() })
     },
-    onError: (err) => toastAppError(err),
   })
 }

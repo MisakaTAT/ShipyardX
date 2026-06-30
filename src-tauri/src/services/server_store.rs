@@ -9,7 +9,7 @@ use crate::docker::transport::invalidate_pooled_http_server_id;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::pool;
-use crate::state::{AppState, lock_mutex};
+use crate::state::{AppState, lock_mutex, lock_read, lock_write};
 use crate::utils::id::generate_id;
 
 fn current_servers_and_data_file(state: &State<'_, AppState>) -> AppResult<(Vec<ServerConfig>, PathBuf)> {
@@ -19,7 +19,7 @@ fn current_servers_and_data_file(state: &State<'_, AppState>) -> AppResult<(Vec<
         "读取服务器配置路径失败",
     )?
     .clone();
-    let servers = lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone();
+    let servers = lock_read(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone();
     Ok((servers, data_file))
 }
 
@@ -31,7 +31,7 @@ fn save_and_replace(
     message: &'static str,
 ) -> AppResult<Vec<ServerConfig>> {
     save_servers(&data_file, &servers)?;
-    *lock_mutex(&state.servers, code, message)? = servers.clone();
+    *lock_write(&state.servers, code, message)? = servers.clone();
     Ok(servers)
 }
 
@@ -43,7 +43,7 @@ async fn invalidate_server(server_id: &str) -> AppResult<()> {
 }
 
 pub(crate) fn list_servers(state: &State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
-    Ok(lock_mutex(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone())
+    Ok(lock_read(&state.servers, "servers.list_lock_failed", "读取服务器列表失败")?.clone())
 }
 
 pub(crate) fn add_server(state: &State<'_, AppState>, mut server: ServerConfig) -> AppResult<Vec<ServerConfig>> {

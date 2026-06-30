@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { commands, type Image, type ImageLayer } from '@/types/app-bindings'
+import { type Image } from '@/types/app-bindings'
 import { Layers, Loader2 } from 'lucide-react'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { getErrorMessage } from '@/shared/lib/errors'
+import { useImageHistory } from '@/features/docker-images/api/use-images'
 
 export interface ImageLayersDialogProps {
   serverId: string
@@ -12,41 +12,12 @@ export interface ImageLayersDialogProps {
 }
 
 export default function ImageLayersDialog({ serverId, open, image, onOpenChange }: ImageLayersDialogProps) {
-  const [layers, setLayers] = useState<ImageLayer[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open || !image) return
-    let cancelled = false
-    setLayers(null)
-    setError(null)
-    void (async () => {
-      try {
-        const hist = await commands.getImageHistory(serverId, image.id)
-        if (!cancelled) setLayers(hist ?? [])
-      } catch (e) {
-        if (!cancelled) setError(getErrorMessage(e))
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [open, image, serverId])
+  const imageHistoryQuery = useImageHistory(serverId, image?.id ?? '', open && Boolean(image))
+  const layers = imageHistoryQuery.data
+  const error = imageHistoryQuery.error ? getErrorMessage(imageHistoryQuery.error) : null
 
   return (
-    <StandardDialog
-      open={open}
-      onOpenChange={(next) => {
-        onOpenChange(next)
-        if (!next) {
-          setLayers(null)
-          setError(null)
-        }
-      }}
-      title="Layers"
-      icon={Layers}
-      widthClassName="w-[920px]"
-    >
+    <StandardDialog open={open} onOpenChange={onOpenChange} title="Layers" icon={Layers} widthClassName="w-[920px]">
       <div className="min-h-0 flex-1 overflow-auto">
         {error ? (
           <div className="text-sm text-red-500">{error}</div>

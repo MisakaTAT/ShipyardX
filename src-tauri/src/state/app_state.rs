@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, atomic::AtomicU64};
+use std::sync::{Arc, Mutex, RwLock, atomic::AtomicU64};
 use std::time::Instant;
 
 use crate::dto::events::EventStreamStatus;
@@ -30,18 +30,18 @@ pub(crate) struct StreamHandle {
 pub(crate) struct EventStreamHandle {
     pub(crate) stream_id: String,
     pub(crate) stop_tx: watch::Sender<bool>,
-    pub(crate) status: Arc<Mutex<EventStreamStatus>>,
+    pub(crate) status: Arc<RwLock<EventStreamStatus>>,
 }
 
 pub struct AppState {
     pub(crate) server_store: Mutex<()>,
-    pub(crate) servers: Mutex<Vec<ServerConfig>>,
+    pub(crate) servers: RwLock<Vec<ServerConfig>>,
     pub(crate) data_file: Mutex<std::path::PathBuf>,
-    pub(crate) terminals: Mutex<HashMap<String, TerminalHandle>>,
+    pub(crate) terminals: RwLock<HashMap<String, TerminalHandle>>,
     pub(crate) streams: Mutex<HashMap<String, StreamHandle>>,
-    pub(crate) terminal_ws_clients: Mutex<HashMap<String, tokio_mpsc::UnboundedSender<Vec<u8>>>>,
-    pub(crate) terminal_handshakes: Mutex<HashMap<String, TerminalHandshakeState>>,
-    pub(crate) event_streams: Mutex<HashMap<String, EventStreamHandle>>,
+    pub(crate) terminal_ws_clients: RwLock<HashMap<String, tokio_mpsc::UnboundedSender<Vec<u8>>>>,
+    pub(crate) terminal_handshakes: RwLock<HashMap<String, TerminalHandshakeState>>,
+    pub(crate) event_streams: RwLock<HashMap<String, EventStreamHandle>>,
     pub(crate) port_forwards: Mutex<HashMap<String, PortForwardRuntimeState>>,
 }
 

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
-import { commands, type AppstoreCacheInfo } from '@/types/app-bindings'
 import { toast } from '@/shared/components/toast'
 import {
   DEFAULT_APPSTORE_SOURCES,
@@ -13,16 +12,23 @@ import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Switch } from '@/shared/ui/switch'
+import {
+  useAppStoreCacheInfo,
+  useAppStoreSettings,
+  useClearAppStoreCache,
+  useUpdateAppStoreSettings,
+} from '@/features/appstore/api/use-appstore'
+import { useSavedDraft } from '@/shared/hooks/use-saved-draft'
 
 const SETTINGS_CONTROL_CLASSNAME = 'h-6 rounded-sm border-border bg-card px-2 text-xs leading-none shadow-none'
 const SETTINGS_TOGGLE_CLASSNAME = 'flex h-6 w-fit items-center gap-2'
 
-export interface AppStorePanelSettings extends LocalAppstoreSettings {}
+export type AppStorePanelSettings = LocalAppstoreSettings
+type AppStoreSource = AppStorePanelSettings['sources'][number]
 
 interface AppStoreSettingsPanelProps {
   settings: AppStorePanelSettings
-  onChange: (next: AppStorePanelSettings) => void
-  onReset: () => void
+  onSavedChange: (next: AppStorePanelSettings) => void
 }
 
 function createSourceDraft() {
@@ -35,176 +41,144 @@ function createSourceDraft() {
   }
 }
 
-export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreSettingsPanelProps) {
-  const [cacheInfo, setCacheInfo] = useState<AppstoreCacheInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [clearing, setClearing] = useState(false)
-  const [draftSources, setDraftSources] = useState<AppStorePanelSettings['sources']>([])
-  const onChangeRef = useRef(onChange)
-  const lastSavedSettingsRef = useRef<string>(JSON.stringify(toCommandAppstoreSettings(settings)))
+function fingerprint(settings: AppStorePanelSettings) {
+  return JSON.stringify(toCommandAppstoreSettings(settings))
+}
 
-  useEffect(() => {
-    onChangeRef.current = onChange
-  }, [onChange])
+export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSettingsPanelProps) {
+  const { data: remoteSettings } = useAppStoreSettings(toCommandAppstoreSettings(settings))
+  const { data: cacheInfo, isLoading: loading, refetch: refreshCacheInfo } = useAppStoreCacheInfo()
+  const updateSettings = useUpdateAppStoreSettings()
+  const clearCache = useClearAppStoreCache()
+  const lastSyncedHashRef = useRef<string>('')
 
-  const refreshCacheInfo = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await commands.getAppstoreCacheInfo()
-      setCacheInfo(data)
-    } catch (error) {
-      toast.error(getErrorMessage(error, '读取应用商店缓存失败'), {
-        description: getErrorDescription(error),
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const savedSettings = useMemo(
+    () => (remoteSettings ? fromCommandAppstoreSettings(remoteSettings) : settings),
+    [remoteSettings, settings]
+  )
 
-  useEffect(() => {
-    let cancelled = false
-    void commands
-      .getAppstoreSettings()
-      .then((next) => {
-        if (cancelled) return
-        setDraftSources([])
-        const normalized = fromCommandAppstoreSettings(next)
-        lastSavedSettingsRef.current = JSON.stringify(next)
-        onChangeRef.current(normalized)
-      })
-      .catch((error) => {
-        if (cancelled) return
-        toast.error(getErrorMessage(error, '读取应用商店设置失败'), {
-          description: getErrorDescription(error),
-        })
-      })
-
-    void refreshCacheInfo()
-    return () => {
-      cancelled = true
-    }
-  }, [refreshCacheInfo])
-
-  const hasSettingsChanged = (next: AppStorePanelSettings) =>
-    JSON.stringify(toCommandAppstoreSettings(next)) !== lastSavedSettingsRef.current
-
-  const saveSettings = async (next: AppStorePanelSettings, options?: { successMessage?: string; silent?: boolean }) => {
-    if (!hasSettingsChanged(next)) return
-
-    setSaving(true)
-    try {
-      const saved = await commands.updateAppstoreSettings(toCommandAppstoreSettings(next))
-      lastSavedSettingsRef.current = JSON.stringify(saved)
-      onChange(fromCommandAppstoreSettings(saved))
-      if (!options?.silent) {
-        toast.success(options?.successMessage ?? '应用商店设置已保存')
-      }
-    } catch (error) {
-      toast.error(getErrorMessage(error, '保存应用商店设置失败'), {
-        description: getErrorDescription(error),
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const buildPatchedSettings = (
-    sourceId: string,
-    patch: Partial<(typeof settings.sources)[number]>
-  ): AppStorePanelSettings => ({
-    ...settings,
-    sources: settings.sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source)),
+  const { draft, setDraft, replaceSaved } = useSavedDraft(savedSettings, {
+    isEqual: (left, right) => fingerprint(left) === fingerprint(right),
   })
 
-  const patchSource = (sourceId: string, patch: Partial<(typeof settings.sources)[number]>) => {
-    onChange(buildPatchedSettings(sourceId, patch))
-  }
+  useEffect(() => {
+    const nextHash = fingerprint(savedSettings)
+    if (lastSyncedHashRef.current === nextHash) return
+    lastSyncedHashRef.current = nextHash
+    onSavedChange(savedSettings)
+  }, [onSavedChange, savedSettings])
 
-  const patchDraftSource = (sourceId: string, patch: Partial<(typeof draftSources)[number]>) => {
-    setDraftSources((current) => current.map((source) => (source.id === sourceId ? { ...source, ...patch } : source)))
-  }
+  const persistSettings = useCallback(
+    async (next: AppStorePanelSettings, options?: { successMessage?: string; silent?: boolean }) => {
+      if (fingerprint(next) === fingerprint(savedSettings)) return
 
-  const handleDraftSourceBlur = async (sourceId: string) => {
-    const draft = draftSources.find((source) => source.id === sourceId)
-    if (!draft || !draft.repoUrl.trim()) return
+      try {
+        const saved = await updateSettings.mutateAsync(toCommandAppstoreSettings(next))
+        const normalized = fromCommandAppstoreSettings(saved)
+        replaceSaved(normalized)
+        lastSyncedHashRef.current = fingerprint(normalized)
+        onSavedChange(normalized)
+        if (!options?.silent) {
+          toast.success(options?.successMessage ?? '应用商店设置已保存')
+        }
+      } catch (error) {
+        toast.error(getErrorMessage(error, '保存应用商店设置失败'), {
+          description: getErrorDescription(error),
+        })
+      }
+    },
+    [onSavedChange, replaceSaved, savedSettings, updateSettings]
+  )
 
-    const next = {
-      ...settings,
-      sources: [...settings.sources, { ...draft, repoUrl: draft.repoUrl.trim() }],
-    }
-    onChange(next)
-    setDraftSources((current) => current.filter((source) => source.id !== sourceId))
-    await saveSettings(next, { successMessage: '应用商店源已添加' })
+  const buildPatchedSettings = useCallback(
+    (sourceId: string, patch: Partial<AppStoreSource>): AppStorePanelSettings => ({
+      ...draft,
+      sources: draft.sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source)),
+    }),
+    [draft]
+  )
+
+  const patchSource = useCallback(
+    (sourceId: string, patch: Partial<AppStoreSource>) => {
+      setDraft((current) => ({
+        ...current,
+        sources: current.sources.map((source) => (source.id === sourceId ? { ...source, ...patch } : source)),
+      }))
+    },
+    [setDraft]
+  )
+
+  const handleSourceBlur = async (sourceId: string) => {
+    const source = draft.sources.find((item) => item.id === sourceId)
+    if (!source) return
+    await persistSettings(buildPatchedSettings(sourceId, { repoUrl: source.repoUrl.trim() }))
   }
 
   const handleAddSource = () => {
-    setDraftSources((current) => [...current, createSourceDraft()])
+    setDraft((current) => ({
+      ...current,
+      sources: [...current.sources, createSourceDraft()],
+    }))
   }
 
   const handleToggleSourceEnabled = async (sourceId: string, enabled: boolean) => {
-    const enabledCount = settings.sources.filter((source) => source.enabled).length
+    const enabledCount = draft.sources.filter((source) => source.enabled).length
     if (!enabled && enabledCount <= 1) {
       toast.error('至少保留一个启用源')
       return
     }
 
     const next = {
-      ...settings,
-      sources: settings.sources.map((source) => (source.id === sourceId ? { ...source, enabled } : source)),
+      ...draft,
+      sources: draft.sources.map((source) => (source.id === sourceId ? { ...source, enabled } : source)),
     }
-    onChange(next)
-    await saveSettings(next, { successMessage: enabled ? '应用商店源已启用' : '应用商店源已禁用' })
+    setDraft(next)
+    await persistSettings(next, { successMessage: enabled ? '应用商店源已启用' : '应用商店源已禁用' })
   }
 
   const handleRemoveSource = async (sourceId: string) => {
-    if (draftSources.some((source) => source.id === sourceId)) {
-      setDraftSources((current) => current.filter((source) => source.id !== sourceId))
-      return
-    }
-    if (settings.sources.length <= 1) {
+    if (draft.sources.length <= 1) {
       toast.error('至少保留一个应用商店源')
       return
     }
-    const nextSources = settings.sources.filter((source) => source.id !== sourceId)
+
+    const nextSources = draft.sources.filter((source) => source.id !== sourceId)
     if (!nextSources.some((source) => source.enabled) && nextSources[0]) {
       nextSources[0] = { ...nextSources[0], enabled: true }
     }
+
     const next = {
-      ...settings,
+      ...draft,
       sources: nextSources,
     }
-    onChange(next)
-    await saveSettings(next, { successMessage: '应用商店源已删除' })
+    setDraft(next)
+    await persistSettings(next, { successMessage: '应用商店源已删除' })
   }
 
   const handleReset = async () => {
-    onReset()
-    setDraftSources([])
-    await saveSettings(
-      {
-        sources: DEFAULT_APPSTORE_SOURCES.map((source) => ({ ...source })),
-        proxyEnabled: false,
-        proxyUrl: 'http://127.0.0.1:7890',
-      },
-      { successMessage: '应用商店设置已恢复默认' }
-    )
+    const next = {
+      sources: DEFAULT_APPSTORE_SOURCES.map((source) => ({ ...source })),
+      proxyEnabled: false,
+      proxyUrl: 'http://127.0.0.1:7890',
+    }
+    setDraft(next)
+    await persistSettings(next, { successMessage: '应用商店设置已恢复默认' })
   }
 
   const handleClearCache = async () => {
-    setClearing(true)
     try {
-      await commands.clearAppstoreCache()
+      await clearCache.mutateAsync()
       toast.success('应用商店缓存已清除')
       await refreshCacheInfo()
     } catch (error) {
       toast.error(getErrorMessage(error, '清除应用商店缓存失败'), {
         description: getErrorDescription(error),
       })
-    } finally {
-      setClearing(false)
     }
   }
+
+  const saving = updateSettings.isPending
+  const clearing = clearCache.isPending
 
   return (
     <SettingsPanelShell>
@@ -227,12 +201,14 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
           </div>
 
           <div className="space-y-1">
-            {settings.sources.map((source) => (
+            {draft.sources.map((source) => (
               <div key={source.id} className="grid grid-cols-[128px_minmax(0,1fr)_44px_28px] gap-1.5 px-0.5">
                 <Input
                   value={source.name}
                   onChange={(event) => patchSource(source.id, { name: event.target.value })}
-                  onBlur={(event) => void saveSettings(buildPatchedSettings(source.id, { name: event.target.value }))}
+                  onBlur={(event) =>
+                    void persistSettings(buildPatchedSettings(source.id, { name: event.target.value }))
+                  }
                   placeholder="仓库名称"
                   disabled={saving}
                   className={SETTINGS_CONTROL_CLASSNAME}
@@ -240,9 +216,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
                 <Input
                   value={source.repoUrl}
                   onChange={(event) => patchSource(source.id, { repoUrl: event.target.value })}
-                  onBlur={(event) =>
-                    void saveSettings(buildPatchedSettings(source.id, { repoUrl: event.target.value }))
-                  }
+                  onBlur={() => void handleSourceBlur(source.id)}
                   placeholder={DEFAULT_APPSTORE_SOURCES[0].repoUrl}
                   disabled={saving}
                   className={SETTINGS_CONTROL_CLASSNAME}
@@ -259,46 +233,7 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
                     size="sm"
                     variant="outline"
                     onClick={() => void handleRemoveSource(source.id)}
-                    disabled={saving || settings.sources.length <= 1}
-                    className="h-6 w-6 px-0"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {draftSources.map((source) => (
-              <div key={source.id} className="grid grid-cols-[128px_minmax(0,1fr)_44px_28px] gap-1.5 px-0.5">
-                <Input
-                  value={source.name}
-                  onChange={(event) => patchDraftSource(source.id, { name: event.target.value })}
-                  onBlur={() => void handleDraftSourceBlur(source.id)}
-                  placeholder="仓库名称"
-                  disabled={saving}
-                  className={SETTINGS_CONTROL_CLASSNAME}
-                />
-                <Input
-                  value={source.repoUrl}
-                  onChange={(event) => patchDraftSource(source.id, { repoUrl: event.target.value })}
-                  onBlur={() => void handleDraftSourceBlur(source.id)}
-                  placeholder={DEFAULT_APPSTORE_SOURCES[0].repoUrl}
-                  disabled={saving}
-                  className={SETTINGS_CONTROL_CLASSNAME}
-                />
-                <div className="flex h-6 items-center justify-center">
-                  <Switch
-                    checked={source.enabled}
-                    onCheckedChange={(checked) => patchDraftSource(source.id, { enabled: checked })}
-                    disabled={saving}
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handleRemoveSource(source.id)}
-                    disabled={saving}
+                    disabled={saving || draft.sources.length <= 1}
                     className="h-6 w-6 px-0"
                   >
                     <Trash2 className="size-3.5" />
@@ -328,11 +263,11 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
           action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch
-                checked={settings.proxyEnabled}
+                checked={draft.proxyEnabled}
                 onCheckedChange={(checked) => {
-                  const next = { ...settings, proxyEnabled: checked }
-                  onChange(next)
-                  void saveSettings(next)
+                  const next = { ...draft, proxyEnabled: checked }
+                  setDraft(next)
+                  void persistSettings(next)
                 }}
               />
             </label>
@@ -345,9 +280,9 @@ export function AppStoreSettingsPanel({ settings, onChange, onReset }: AppStoreS
           action={
             <div className="w-full max-w-xs">
               <Input
-                value={settings.proxyUrl}
-                onChange={(event) => onChange({ ...settings, proxyUrl: event.target.value })}
-                onBlur={(event) => void saveSettings({ ...settings, proxyUrl: event.target.value })}
+                value={draft.proxyUrl}
+                onChange={(event) => setDraft((current) => ({ ...current, proxyUrl: event.target.value }))}
+                onBlur={(event) => void persistSettings({ ...draft, proxyUrl: event.target.value })}
                 placeholder="http://127.0.0.1:7890"
                 disabled={saving}
                 className={SETTINGS_CONTROL_CLASSNAME}

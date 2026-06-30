@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { commands, type NetworkCreate } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export function useNetworks(serverId: string) {
   return useQuery({
@@ -12,33 +12,27 @@ export function useNetworks(serverId: string) {
 }
 
 export function useRemoveNetwork(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (networkId: string) => commands.removeNetwork(serverId, networkId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.networks(serverId) }),
-    onError: (err) => toastAppError(err),
+    invalidate: [qk.networks(serverId)],
   })
 }
 
 export function useCreateNetwork(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (params: NetworkCreate) => commands.createNetwork(serverId, params),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.networks(serverId) }),
-    onError: (err) => toastAppError(err),
+    invalidate: [qk.networks(serverId)],
   })
 }
 
 export function usePruneUnusedNetworks(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: () => commands.pruneUnusedNetworks(serverId),
+    invalidate: [qk.networks(serverId)],
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: qk.networks(serverId) })
       toast.success('已清理未使用网络', {
         description: `清理项 ${result.deleted_count} 个`,
       })
     },
-    onError: (err) => toastAppError(err),
   })
 }

@@ -56,6 +56,8 @@ export function useEngineEvents({
     refreshDebouncers.current.clear()
     errorStreakRef.current = 0
     lastErrorToastRef.current = null
+    setEventsList([])
+    setStatus('disconnected')
 
     if (streamIdRef.current) {
       try {
@@ -74,6 +76,9 @@ export function useEngineEvents({
     }
 
     let cancelled = false
+
+    setEventsList([])
+    setStatus('connecting')
 
     async function start() {
       let localId: string | null = null
@@ -167,7 +172,10 @@ export function useEngineEvents({
         unStatus()
         unRefresh()
         unError()
-        if (!cancelled) setStatus('disconnected')
+        if (!cancelled) {
+          setEventsList([])
+          setStatus('disconnected')
+        }
       }
     }
 

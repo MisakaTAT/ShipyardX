@@ -1,23 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { commands } from '@/types/app-bindings'
 import {
   portForwardCreateDefaultValues,
   portForwardCreateFormSchema,
   type PortForwardCreateFormValues,
 } from '@/features/port-forward/model/port-forward-create-schema'
 import { parseContainerTcpPortOptions } from '@/features/port-forward/lib/parse-container-tcp-ports'
-import type { Container, LocalAddress, ServerConfig } from '@/types/app-bindings'
 import { ArrowLeftRight, Loader2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import { useCreatePortForwardRule } from '@/features/port-forward/api/use-port-forwards'
+import { useCreatePortForwardRule, useLocalAddresses } from '@/features/port-forward/api/use-port-forwards'
 import { StandardDialog } from '@/shared/components/standard-dialog'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useServers } from '@/features/servers/api/use-servers'
+import { useContainers } from '@/features/docker-containers/api/use-containers'
 
 interface PortForwardCreateDialogProps {
   open: boolean
@@ -27,17 +26,7 @@ interface PortForwardCreateDialogProps {
 
 export default function PortForwardCreateDialog({ open, onOpenChange, onCreated }: PortForwardCreateDialogProps) {
   const formId = useId()
-  const [submitting, setSubmitting] = useState(false)
   const createRule = useCreatePortForwardRule()
-
-  const [servers, setServers] = useState<ServerConfig[]>([])
-  const [serversLoading, setServersLoading] = useState(false)
-  const [containers, setContainers] = useState<Container[]>([])
-  const [containersLoading, setContainersLoading] = useState(false)
-  const [localAddresses, setLocalAddresses] = useState<LocalAddress[]>([
-    { ip: '0.0.0.0', name: '所有网卡 (0.0.0.0)' },
-    { ip: '127.0.0.1', name: '127.0.0.1 (localhost)' },
-  ])
 
   const form = useForm<PortForwardCreateFormValues>({
     resolver: zodResolver(portForwardCreateFormSchema),
@@ -47,6 +36,9 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
 
   const watchServerId = form.watch('serverId')
   const watchContainerId = form.watch('containerId')
+  const { data: servers = [], isLoading: serversLoading } = useServers()
+  const { data: localAddresses = [] } = useLocalAddresses(open)
+  const { data: containers = [], isLoading: containersLoading } = useContainers(watchServerId, open)
 
   const selectedContainer = useMemo(
     () => containers.find((c) => c.id === watchContainerId) ?? null,
@@ -54,51 +46,10 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
   )
   const portOptions = useMemo(() => parseContainerTcpPortOptions(selectedContainer?.ports ?? ''), [selectedContainer])
 
-  const loadServers = useCallback(async () => {
-    setServersLoading(true)
-    try {
-      const data = await commands.getServers()
-      setServers(data)
-    } catch (e) {
-      toastAppError(e)
-    } finally {
-      setServersLoading(false)
-    }
-  }, [])
-
-  const loadLocalAddresses = useCallback(async () => {
-    try {
-      const data = await commands.listLocalAddresses()
-      if (data.length > 0) setLocalAddresses(data)
-    } catch {
-      /* 使用默认列表 */
-    }
-  }, [])
-
-  const fetchContainers = useCallback(async (serverId: string) => {
-    if (!serverId) {
-      setContainers([])
-      return
-    }
-    setContainersLoading(true)
-    try {
-      const data = await commands.listContainers(serverId)
-      setContainers(data)
-    } catch (e) {
-      toastAppError(e)
-      setContainers([])
-    } finally {
-      setContainersLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (!open) return
     form.reset(portForwardCreateDefaultValues())
-    void loadServers()
-    void loadLocalAddresses()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [form, open])
 
   useEffect(() => {
     if (!open || serversLoading) return
@@ -110,14 +61,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
     if (!cur || !servers.some((s) => s.id === cur)) {
       form.setValue('serverId', servers[0].id)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, servers, serversLoading])
-
-  useEffect(() => {
-    if (!open) return
-    void fetchContainers(watchServerId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, watchServerId])
+  }, [form, open, servers, serversLoading])
 
   useEffect(() => {
     if (!open || containersLoading) return
@@ -129,8 +73,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
     if (!cur || !containers.some((c) => c.id === cur)) {
       form.setValue('containerId', containers[0].id)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, containers, containersLoading])
+  }, [containers, containersLoading, form, open])
 
   useEffect(() => {
     if (!open) return
@@ -144,8 +87,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
       const fallback = localAddresses.find((a) => a.ip === '127.0.0.1')?.ip ?? localAddresses[0].ip
       form.setValue('bindAddress', fallback)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, localAddresses])
+  }, [form, localAddresses, open])
 
   const onSubmit = form.handleSubmit(async (values) => {
     const container = containers.find((c) => c.id === values.containerId)
@@ -158,7 +100,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
       return
     }
 
-    setSubmitting(true)
     createRule.mutate(
       [
         values.serverId,
@@ -179,12 +120,11 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
           onOpenChange(false)
           void onCreated?.()
         },
-        onSettled: () => {
-          setSubmitting(false)
-        },
       }
     )
   })
+
+  const submitting = createRule.isPending
 
   return (
     <StandardDialog

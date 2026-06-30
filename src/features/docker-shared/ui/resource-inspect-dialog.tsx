@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { commands } from '@/types/app-bindings'
 import Editor from '@monaco-editor/react'
 import { Check, Copy, RefreshCw, ScanSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
 import { toastAppError } from '@/shared/lib/errors'
-
-type InspectKind = 'container' | 'image' | 'network' | 'volume'
+import { useResourceInspect, type InspectKind } from '@/features/docker-shared/api/use-resource-inspect'
 
 interface Props {
   serverId: string
@@ -17,42 +15,14 @@ interface Props {
 }
 
 export default function ResourceInspectDialog({ serverId, kind, targetId, targetLabel, onClose }: Props) {
-  const [loading, setLoading] = useState(true)
-  const [json, setJson] = useState('')
   const [copied, setCopied] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      let text: string
-      switch (kind) {
-        case 'container':
-          text = await commands.inspectContainer(serverId, targetId)
-          break
-        case 'image':
-          text = await commands.inspectImage(serverId, targetId)
-          break
-        case 'network':
-          text = await commands.inspectNetwork(serverId, targetId)
-          break
-        case 'volume':
-          text = await commands.inspectVolume(serverId, targetId)
-          break
-        default:
-          text = ''
-      }
-      setJson(text)
-    } catch (e) {
-      setJson('')
-      toastAppError(e)
-    } finally {
-      setLoading(false)
-    }
-  }, [serverId, kind, targetId])
+  const inspectQuery = useResourceInspect(serverId, kind, targetId)
+  const json = inspectQuery.data ?? ''
+  const loading = inspectQuery.isLoading || inspectQuery.isFetching
 
   useEffect(() => {
-    void load()
-  }, [load])
+    if (inspectQuery.error) toastAppError(inspectQuery.error)
+  }, [inspectQuery.error])
 
   const handleCopy = useCallback(() => {
     if (!json) return
@@ -90,7 +60,13 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
       icon={ScanSearch}
       headerActions={
         <>
-          <Button type="button" variant="default" disabled={loading} title="重新加载" onClick={() => void load()}>
+          <Button
+            type="button"
+            variant="default"
+            disabled={loading}
+            title="重新加载"
+            onClick={() => void inspectQuery.refetch()}
+          >
             <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />
             刷新
           </Button>

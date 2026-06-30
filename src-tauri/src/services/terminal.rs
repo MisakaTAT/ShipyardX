@@ -19,7 +19,9 @@ use crate::dto::server::ServerConfig;
 use crate::dto::terminal::{ContainerExecTerminalParams, TerminalSession, WsClientCtrl, WsServerMsg};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::{connect, disconnect, spawn_on_runtime};
-use crate::state::{AppState, TerminalHandle, TerminalHandshakeState, TerminalMsg, get_server_config, lock_mutex};
+use crate::state::{
+    AppState, TerminalHandle, TerminalHandshakeState, TerminalMsg, get_server_config, lock_read, lock_write,
+};
 use crate::utils::id::generate_id;
 
 /// 终端 WS 走单路二进制，首字节是 channel tag：0x00 = PTY 字节流，0x01 = 控制 JSON（UTF-8）。
@@ -57,7 +59,7 @@ fn is_safe_docker_ident(v: &str) -> bool {
 }
 
 fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
-    if let Ok(clients) = lock_mutex(
+    if let Ok(clients) = lock_read(
         &app.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
         "读取终端 WebSocket 客户端失败",
@@ -77,7 +79,7 @@ fn send_pty_bytes(app: &AppHandle, session_id: &str, bytes: &[u8]) {
 }
 
 fn maybe_send_ready(app: &AppHandle, session_id: &str) {
-    let should_send = lock_mutex(
+    let should_send = lock_read(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
         "读取终端握手状态失败",
@@ -96,7 +98,7 @@ fn maybe_send_ready(app: &AppHandle, session_id: &str) {
 }
 
 fn mark_backend_ready(app: &AppHandle, session_id: &str) {
-    if let Ok(mut handshakes) = lock_mutex(
+    if let Ok(mut handshakes) = lock_write(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
         "更新终端握手状态失败",
@@ -110,7 +112,7 @@ fn mark_backend_ready(app: &AppHandle, session_id: &str) {
 }
 
 fn mark_client_ready(app: &AppHandle, session_id: &str) {
-    if let Ok(mut handshakes) = lock_mutex(
+    if let Ok(mut handshakes) = lock_write(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
         "更新终端握手状态失败",
@@ -484,7 +486,7 @@ async fn run_terminal_io_loop(
 
 fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
     let app_state = ah.state::<AppState>();
-    if let Ok(terminals) = lock_mutex(
+    if let Ok(terminals) = lock_read(
         &app_state.terminals,
         "terminal.sessions_lock_failed",
         "读取终端会话失败",
@@ -493,6 +495,26 @@ fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
             let _ = handle.tx.send(msg);
         }
     }
+}
+
+fn remove_terminal_session(ah: &AppHandle, session_id: &str) -> Option<TerminalHandle> {
+    let app_state = ah.state::<AppState>();
+
+    if let Ok(mut handshakes) = lock_write(
+        &app_state.terminal_handshakes,
+        "terminal.handshake_lock_failed",
+        "移除终端握手状态失败",
+    ) {
+        handshakes.remove(session_id);
+    }
+
+    lock_write(
+        &app_state.terminals,
+        "terminal.sessions_lock_failed",
+        "移除终端会话失败",
+    )
+    .ok()
+    .and_then(|mut terminals| terminals.remove(session_id))
 }
 
 fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
@@ -575,7 +597,7 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     );
 
     let (tx, mut rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
-    if let Ok(mut clients) = lock_mutex(
+    if let Ok(mut clients) = lock_write(
         &ah.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
         "记录终端 WebSocket 客户端失败",
@@ -611,12 +633,20 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
         }
     }
 
-    if let Ok(mut clients) = lock_mutex(
+    if let Ok(mut clients) = lock_write(
         &ah.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
         "移除终端 WebSocket 客户端失败",
     ) {
         clients.remove(&session_id);
+    }
+    if let Some(handle) = remove_terminal_session(&ah, &session_id) {
+        let _ = handle.tx.send(TerminalMsg::Close);
+        info!(
+            target: "shipyardx_lib::services::terminal",
+            "terminal session cleaned up after websocket disconnect; session_id={}",
+            session_id
+        );
     }
     debug!(
         target: "shipyardx_lib::services::terminal",
@@ -679,9 +709,9 @@ pub async fn open_terminal(
     let session_id = generate_id();
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
 
-    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
+    lock_write(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
-    lock_mutex(
+    lock_write(
         &state.terminal_handshakes,
         "terminal.handshake_lock_failed",
         "记录终端握手状态失败",
@@ -697,9 +727,9 @@ pub async fn open_terminal(
             fail_terminal(&fail_handle, &fail_session_id, error);
         }
     }) {
-        let _ = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
             .map(|mut terminals| terminals.remove(&session_id));
-        let _ = lock_mutex(
+        let _ = lock_write(
             &state.terminal_handshakes,
             "terminal.handshake_lock_failed",
             "移除终端握手状态失败",
@@ -734,9 +764,9 @@ pub async fn open_container_exec_terminal(
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
+    lock_write(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
         .insert(session_id.clone(), TerminalHandle { tx });
-    lock_mutex(
+    lock_write(
         &state.terminal_handshakes,
         "terminal.handshake_lock_failed",
         "记录终端握手状态失败",
@@ -762,9 +792,9 @@ pub async fn open_container_exec_terminal(
             fail_terminal(&fail_handle, &fail_session_id, error);
         }
     }) {
-        let _ = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
             .map(|mut terminals| terminals.remove(&session_id));
-        let _ = lock_mutex(
+        let _ = lock_write(
             &state.terminal_handshakes,
             "terminal.handshake_lock_failed",
             "移除终端握手状态失败",
@@ -784,10 +814,10 @@ pub async fn open_container_exec_terminal(
 }
 
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let mut terminals = lock_mutex(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
+    let mut terminals = lock_write(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);
-        if let Ok(mut handshakes) = lock_mutex(
+        if let Ok(mut handshakes) = lock_write(
             &state.terminal_handshakes,
             "terminal.handshake_lock_failed",
             "移除终端握手状态失败",

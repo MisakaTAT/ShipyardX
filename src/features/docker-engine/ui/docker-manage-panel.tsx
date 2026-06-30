@@ -1,5 +1,4 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
@@ -10,12 +9,16 @@ import {
   formValuesToDaemonUpdate,
   type DockerDaemonFormValues,
 } from '@/features/docker-engine/model/daemon-schema'
+import {
+  useDockerDaemonSettings,
+  useRestartDockerDaemon,
+  useUpdateDockerDaemonSettings,
+} from '@/features/docker-engine/api/use-docker-access'
 import DockerSudoPasswordDialog from '@/features/docker-engine/ui/docker-sudo-password-dialog'
 import { Loader2, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
-import { qk } from '@/shared/api/query-keys'
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
@@ -27,13 +30,12 @@ interface Props {
 }
 
 export default function DockerManagePanel({ serverId }: Props) {
-  const qc = useQueryClient()
   const daemonFormId = useId()
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [restarting, setRestarting] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'save' | 'restart' | null>(null)
+  const daemonSettingsQuery = useDockerDaemonSettings(serverId)
+  const updateDaemonSettings = useUpdateDockerDaemonSettings(serverId)
+  const restartDaemon = useRestartDockerDaemon(serverId)
 
   const daemonForm = useForm<DockerDaemonFormValues>({
     resolver: zodResolver(dockerDaemonFormSchema),
@@ -44,32 +46,31 @@ export default function DockerManagePanel({ serverId }: Props) {
   const cgroupDriver = daemonForm.watch('cgroup_driver')
   const logRotation = daemonForm.watch('log_rotation')
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await commands.getDockerDaemonSettings(serverId)
-      daemonForm.reset(daemonSettingsToFormValues(data))
-    } catch (e) {
-      toastAppError(e)
-    } finally {
-      setLoading(false)
-    }
-  }, [serverId, daemonForm])
+  useEffect(() => {
+    if (!daemonSettingsQuery.data) return
+    daemonForm.reset(daemonSettingsToFormValues(daemonSettingsQuery.data))
+  }, [daemonForm, daemonSettingsQuery.data])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    if (!daemonSettingsQuery.error) return
+    toastAppError(daemonSettingsQuery.error)
+  }, [daemonSettingsQuery.error])
+
+  const reload = useCallback(async () => {
+    const result = await daemonSettingsQuery.refetch()
+    if (result.error) {
+      toastAppError(result.error)
+    }
+  }, [daemonSettingsQuery])
 
   const persistUpdate = async (values: DockerDaemonFormValues, password?: string) => {
     const params = formValuesToDaemonUpdate(values, password ?? null)
-    setSaving(true)
     try {
-      await commands.updateDockerDaemonSettings(serverId, params)
+      await updateDaemonSettings.mutateAsync(params)
       toast.success('Docker 配置已保存，需手动重启后生效。')
       setAuthOpen(false)
       setPendingAction(null)
-      await qc.invalidateQueries({ queryKey: qk.dockerDaemon(serverId) })
-      await load()
+      await reload()
     } catch (e) {
       if (!password && isPermissionRelatedError(e)) {
         setPendingAction('save')
@@ -77,15 +78,12 @@ export default function DockerManagePanel({ serverId }: Props) {
         return
       }
       toastAppError(e)
-    } finally {
-      setSaving(false)
     }
   }
 
   const runRestart = async (password?: string) => {
-    setRestarting(true)
     try {
-      await commands.restartDockerDaemon(serverId, password ?? null)
+      await restartDaemon.mutateAsync(password ?? null)
 
       let lastError: ReturnType<typeof normalizeAppError> | null = null
       let recovered = false
@@ -116,9 +114,7 @@ export default function DockerManagePanel({ serverId }: Props) {
       toast.success('重启完成')
       setAuthOpen(false)
       setPendingAction(null)
-      await qc.invalidateQueries({ queryKey: qk.dockerAccess(serverId) })
-      await qc.invalidateQueries({ queryKey: qk.dockerInfo(serverId) })
-      await load()
+      await reload()
     } catch (e) {
       if (!password && isPermissionRelatedError(e)) {
         setPendingAction('restart')
@@ -126,14 +122,17 @@ export default function DockerManagePanel({ serverId }: Props) {
         return
       }
       toastAppError(e)
-    } finally {
-      setRestarting(false)
     }
   }
 
   const onDaemonSubmit = daemonForm.handleSubmit(async (values) => {
     await persistUpdate(values, undefined)
   })
+
+  const loading = daemonSettingsQuery.isLoading
+  const saving = updateDaemonSettings.isPending
+  const restarting = restartDaemon.isPending
+  const busy = loading || saving || restarting
 
   return (
     <>
@@ -152,16 +151,18 @@ export default function DockerManagePanel({ serverId }: Props) {
                     <div className="mt-1 text-xs text-muted-foreground">多个地址换行填写（为空则取消镜像加速）</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void runRestart()}
-                      disabled={loading || saving || restarting}
-                    >
+                    <Button type="button" variant="outline" onClick={() => void runRestart()} disabled={busy}>
                       {restarting ? <Loader2 className="animate-spin" /> : <RotateCcw />}
                       重启 Docker
                     </Button>
-                    <Button type="submit" form={`${daemonFormId}-daemon`} disabled={loading || saving || restarting}>
+                    <Button type="button" variant="ghost" onClick={() => daemonForm.reset()} disabled={busy}>
+                      恢复已加载配置
+                    </Button>
+                    <Button
+                      type="submit"
+                      form={`${daemonFormId}-daemon`}
+                      disabled={busy || !daemonForm.formState.isDirty}
+                    >
                       {saving ? <Loader2 className="animate-spin" /> : <Save />}
                       保存
                     </Button>
@@ -178,7 +179,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                             {...field}
                             placeholder={'https://docker.1panel.live\nhttps://mirror.example.com'}
                             className="h-24 resize-none"
-                            disabled={saving || restarting}
+                            disabled={busy}
                             aria-invalid={fieldState.invalid}
                           />
                           <FieldError errors={[fieldState.error]} />
@@ -202,7 +203,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                           <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <Checkbox
                               checked={field.value}
-                              disabled={saving || restarting}
+                              disabled={busy}
                               onCheckedChange={(c) => field.onChange(c === true)}
                             />
                             {field.value ? '已启用' : '已禁用'}
@@ -225,7 +226,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                           <RadioGroup
                             value={field.value === '' ? 'default' : field.value}
                             onValueChange={(v) => field.onChange(v === 'default' ? '' : v)}
-                            disabled={saving || restarting}
+                            disabled={busy}
                             className="flex flex-row flex-wrap items-center gap-x-5 gap-y-2"
                           >
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
@@ -260,7 +261,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                         <Input
                           {...field}
                           placeholder="unix:///var/run/docker.sock"
-                          disabled={saving || restarting}
+                          disabled={busy}
                           aria-invalid={fieldState.invalid}
                         />
                         <FieldError errors={[fieldState.error]} />
@@ -281,7 +282,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                         <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                           <Checkbox
                             checked={field.value}
-                            disabled={saving || restarting}
+                            disabled={busy}
                             onCheckedChange={(c) => field.onChange(c === true)}
                           />
                           启用日志切割
@@ -294,12 +295,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                               render={({ field: f, fieldState }) => (
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
-                                    <Input
-                                      {...f}
-                                      placeholder="10m"
-                                      disabled={saving || restarting}
-                                      aria-invalid={fieldState.invalid}
-                                    />
+                                    <Input {...f} placeholder="10m" disabled={busy} aria-invalid={fieldState.invalid} />
                                     <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>
@@ -311,12 +307,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                               render={({ field: f, fieldState }) => (
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
-                                    <Input
-                                      {...f}
-                                      placeholder="3"
-                                      disabled={saving || restarting}
-                                      aria-invalid={fieldState.invalid}
-                                    />
+                                    <Input {...f} placeholder="3" disabled={busy} aria-invalid={fieldState.invalid} />
                                     <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>

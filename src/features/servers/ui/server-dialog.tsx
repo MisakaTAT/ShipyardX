@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { commands } from '@/types/app-bindings'
 import type { ServerConfig } from '@/types/app-bindings'
 import {
   defaultServerFormValues,
@@ -15,22 +14,21 @@ import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useSaveServer, useTestServerConnection } from '@/features/servers/api/use-servers'
 
 interface ServerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   server?: ServerConfig | null
-  onSave: (servers: ServerConfig[]) => void
 }
 
-export default function ServerDialog({ open, onOpenChange, server, onSave }: ServerDialogProps) {
+export default function ServerDialog({ open, onOpenChange, server }: ServerDialogProps) {
   const baseId = useId()
-  const [submitting, setSubmitting] = useState(false)
-  const [testing, setTesting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const isEdit = !!server
+  const saveServer = useSaveServer()
+  const testConnection = useTestServerConnection()
 
   const form = useForm<ServerFormValues>({
     resolver: zodResolver(serverFormSchema),
@@ -48,32 +46,22 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
     onOpenChange(next)
   }
 
-  const onSubmit = form.handleSubmit(async (values: ServerFormValues) => {
-    setSubmitting(true)
-    try {
-      const payload: ServerConfig = {
-        ...values,
-        id: isEdit && server ? server.id : '',
-        password: values.password || null,
-        key_path: values.key_path || null,
-        auth_type: values.auth_type,
-      }
-      let servers: ServerConfig[]
-      if (isEdit && server) {
-        servers = await commands.updateServer(payload)
-      } else {
-        servers = await commands.addServer(payload)
-      }
-      onSave(servers)
-      onOpenChange(false)
-    } catch (e) {
-      toastAppError(e)
-    } finally {
-      setSubmitting(false)
+  const onSubmit = form.handleSubmit((values: ServerFormValues) => {
+    const payload: ServerConfig = {
+      ...values,
+      id: isEdit && server ? server.id : '',
+      password: values.password || null,
+      key_path: values.key_path || null,
+      auth_type: values.auth_type,
     }
+    saveServer.mutate(payload, {
+      onSuccess: () => {
+        onOpenChange(false)
+      },
+    })
   })
 
-  const handleTest = async () => {
+  const handleTest = () => {
     const full = form.getValues()
     const parsed = serverTestConnectionSchema.safeParse({
       host: full.host,
@@ -86,29 +74,25 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       toast.warning(parsed.error.issues[0]?.message ?? '校验失败')
       return
     }
-    setTesting(true)
-    try {
-      const testPayload: ServerConfig = {
-        id: server?.id ?? '',
-        name: full.name,
-        host: full.host,
-        port: full.port,
-        username: full.username,
-        auth_type: full.auth_type,
-        password: full.password || null,
-        key_path: full.key_path || null,
-      }
-      const msg = await commands.testServerConnectionDirect(testPayload)
-      toast.success(msg)
-    } catch (e) {
-      toastAppError(e, '连接测试失败')
-    } finally {
-      setTesting(false)
+    const testPayload: ServerConfig = {
+      id: server?.id ?? '',
+      name: full.name,
+      host: full.host,
+      port: full.port,
+      username: full.username,
+      auth_type: full.auth_type,
+      password: full.password || null,
+      key_path: full.key_path || null,
     }
+    testConnection.mutate(testPayload, {
+      onSuccess: (msg) => {
+        toast.success(msg)
+      },
+    })
   }
 
   const authType = form.watch('auth_type')
-  const busy = submitting || testing
+  const busy = saveServer.isPending || testConnection.isPending
 
   return (
     <StandardDialog
@@ -121,7 +105,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
       footer={
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="secondary" disabled={busy} onClick={handleTest}>
-            {testing ? <Loader2 className="animate-spin" /> : null}
+            {testConnection.isPending ? <Loader2 className="animate-spin" /> : null}
             测试连接
           </Button>
           <div className="flex gap-2">
@@ -129,7 +113,7 @@ export default function ServerDialog({ open, onOpenChange, server, onSave }: Ser
               取消
             </Button>
             <Button type="submit" form={`${baseId}-server-form`} disabled={busy}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
+              {saveServer.isPending ? <Loader2 className="animate-spin" /> : null}
               {isEdit ? '保存' : '添加'}
             </Button>
           </div>

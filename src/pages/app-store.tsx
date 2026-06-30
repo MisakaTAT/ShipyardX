@@ -302,7 +302,7 @@ function SyncProgressPopover({
           <div>
             <h3 className="text-sm font-medium text-foreground">{initialSync ? '首次同步中' : '同步中'}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {initialSync ? '正在拉取应用商店仓库，完成后将自动展示应用列表。' : '正在更新已启用的应用商店仓库。'}
+              {initialSync ? '正在拉取应用商店仓库，完成后将自动展示应用列表' : '正在更新已启用的应用商店仓库'}
             </p>
           </div>
           <SyncProgressBar progress={progress} />

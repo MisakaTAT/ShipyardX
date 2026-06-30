@@ -1,6 +1,6 @@
 mod app_state;
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub use app_state::AppState;
 pub(crate) use app_state::{
@@ -24,8 +24,26 @@ pub(crate) fn lock_mutex<'a, T>(
         .map_err(|e| AppError::internal(code, message).with_detail(e.to_string()))
 }
 
+pub(crate) fn lock_read<'a, T>(
+    lock: &'a RwLock<T>,
+    code: &'static str,
+    message: &'static str,
+) -> AppResult<RwLockReadGuard<'a, T>> {
+    lock.read()
+        .map_err(|e| AppError::internal(code, message).with_detail(e.to_string()))
+}
+
+pub(crate) fn lock_write<'a, T>(
+    lock: &'a RwLock<T>,
+    code: &'static str,
+    message: &'static str,
+) -> AppResult<RwLockWriteGuard<'a, T>> {
+    lock.write()
+        .map_err(|e| AppError::internal(code, message).with_detail(e.to_string()))
+}
+
 pub fn get_server_config(state: &State<AppState>, id: &str) -> AppResult<ServerConfig> {
-    lock_mutex(&state.servers, "state.servers_lock_failed", "读取服务器列表失败")?
+    lock_read(&state.servers, "state.servers_lock_failed", "读取服务器列表失败")?
         .iter()
         .find(|s| s.id == id)
         .cloned()
@@ -59,7 +77,7 @@ pub(crate) fn register_event_stream_handle(
     code: &'static str,
     message: &'static str,
 ) -> AppResult<()> {
-    lock_mutex(&state.event_streams, code, message)?.insert(server_id, handle);
+    lock_write(&state.event_streams, code, message)?.insert(server_id, handle);
     Ok(())
 }
 
@@ -69,5 +87,5 @@ pub(crate) fn remove_event_stream_handle(
     code: &'static str,
     message: &'static str,
 ) -> AppResult<Option<EventStreamHandle>> {
-    Ok(lock_mutex(&state.event_streams, code, message)?.remove(server_id))
+    Ok(lock_write(&state.event_streams, code, message)?.remove(server_id))
 }

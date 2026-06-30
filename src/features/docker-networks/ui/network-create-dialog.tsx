@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
   networkCreateDefaultValues,
@@ -26,7 +26,6 @@ export interface NetworkCreateDialogProps {
 
 export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCreated }: NetworkCreateDialogProps) {
   const formId = useId()
-  const [submitting, setSubmitting] = useState(false)
   const createNetwork = useCreateNetwork(serverId)
 
   const form = useForm<NetworkCreateFormValues>({
@@ -41,7 +40,6 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
   }, [open, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
-    setSubmitting(true)
     const req: NetworkCreate = {
       name: values.name.trim(),
       driver: values.driver.trim() || null,
@@ -56,11 +54,10 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
         onOpenChange(false)
         void onCreated?.()
       },
-      onSettled: () => {
-        setSubmitting(false)
-      },
     })
   })
+
+  const submitting = createNetwork.isPending
 
   return (
     <StandardDialog

@@ -5,7 +5,7 @@ import ServerDialog from '@/features/servers/ui/server-dialog'
 import { Button } from '@/shared/ui/button'
 import { ConfirmDialog, SearchInput, EmptyState } from '@/shared/components'
 import { ServerCard } from '@/features/servers/ui/server-card'
-import { useDeleteServer, useServers, useSetServers } from '@/features/servers/api/use-servers'
+import { useDeleteServer, useServers } from '@/features/servers/api/use-servers'
 
 interface ConnectionsProps {
   onConnect: (server: ServerConfig) => void
@@ -14,7 +14,6 @@ interface ConnectionsProps {
 export default function Connections({ onConnect }: ConnectionsProps) {
   const { data: servers = [], isLoading, isFetching } = useServers()
   const deleteServer = useDeleteServer()
-  const setServers = useSetServers()
 
   const [search, setSearch] = useState('')
   const [showDialog, setShowDialog] = useState(false)
@@ -114,7 +113,6 @@ export default function Connections({ onConnect }: ConnectionsProps) {
           }
         }}
         server={editingServer}
-        onSave={setServers}
       />
 
       <ConfirmDialog

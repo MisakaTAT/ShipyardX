@@ -1,13 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { commands, type RunContainer } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
-export function useContainers(serverId: string) {
+export function useContainers(serverId: string, enabled = true) {
   return useQuery({
     queryKey: qk.containers(serverId),
     queryFn: () => commands.listContainers(serverId),
+    enabled: enabled && Boolean(serverId),
+    placeholderData: [],
+  })
+}
+
+export function useContainerStats(serverId: string, containerId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.containerStats(serverId, containerId),
+    queryFn: () => commands.getContainerStats(serverId, containerId),
+    enabled: enabled && Boolean(serverId) && Boolean(containerId),
+    refetchInterval: 5000,
   })
 }
 
@@ -20,8 +31,7 @@ interface ContainerActionVars {
 }
 
 export function useContainerAction(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: async ({ containerId, action, force }: ContainerActionVars) => {
       switch (action) {
         case 'start':
@@ -34,29 +44,25 @@ export function useContainerAction(serverId: string) {
           return commands.removeContainer(serverId, containerId, Boolean(force))
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.containers(serverId) }),
-    onError: (err) => toastAppError(err),
+    invalidate: [qk.containers(serverId)],
   })
 }
 
 export function useRunContainer(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (params: RunContainer) => commands.runContainer(serverId, params),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.containers(serverId) }),
+    invalidate: [qk.containers(serverId)],
   })
 }
 
 export function usePruneStoppedContainers(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: () => commands.pruneStoppedContainers(serverId),
+    invalidate: [qk.containers(serverId)],
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: qk.containers(serverId) })
       toast.success('已清理已停止容器', {
         description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
       })
     },
-    onError: (err) => toastAppError(err),
   })
 }

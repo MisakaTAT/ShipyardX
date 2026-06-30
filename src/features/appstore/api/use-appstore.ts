@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { qk } from '@/shared/api/query-keys'
-import { commands, events, type AppListItem, type AppstoreSyncProgress, type InstallApp } from '@/types/app-bindings'
-import { toastAppError } from '@/shared/lib/errors'
+import {
+  commands,
+  events,
+  type AppListItem,
+  type AppstoreCacheInfo,
+  type AppstoreSettings,
+  type AppstoreSyncProgress,
+  type InstallApp,
+} from '@/types/app-bindings'
 import { toast } from '@/shared/components/toast'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export function useAppStoreSync() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: commands.syncAppstore,
+    invalidate: [['appstore']],
     onSuccess: (msg) => {
-      qc.invalidateQueries({ queryKey: ['appstore'] })
       toast.success(msg)
     },
-    onError: (err) => toastAppError(err),
   })
 }
 
@@ -63,11 +69,42 @@ export function useAppDetail(sourceId: string | null, appKey: string | null) {
 }
 
 export function useInstallApp() {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (params: { serverId: string; req: InstallApp }) => commands.installApp(params.serverId, params.req),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['appstore'] })
+    invalidate: [['appstore']],
+  })
+}
+
+export function useAppStoreSettings(initialData?: AppstoreSettings) {
+  return useQuery({
+    queryKey: qk.appstoreSettings(),
+    queryFn: commands.getAppstoreSettings,
+    ...(initialData ? { initialData } : {}),
+  })
+}
+
+export function useUpdateAppStoreSettings() {
+  const qc = useQueryClient()
+  return useInvalidatingMutation({
+    mutationFn: (settings: AppstoreSettings) => commands.updateAppstoreSettings(settings),
+    invalidate: [['appstore']],
+    onSuccess: (saved) => {
+      qc.setQueryData(qk.appstoreSettings(), saved)
     },
+  })
+}
+
+export function useAppStoreCacheInfo(initialData?: AppstoreCacheInfo) {
+  return useQuery({
+    queryKey: qk.appstoreCacheInfo(),
+    queryFn: commands.getAppstoreCacheInfo,
+    ...(initialData ? { initialData } : {}),
+  })
+}
+
+export function useClearAppStoreCache() {
+  return useInvalidatingMutation({
+    mutationFn: commands.clearAppstoreCache,
+    invalidate: [qk.appstoreCacheInfo(), ['appstore']],
   })
 }

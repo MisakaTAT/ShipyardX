@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import {
   volumeCreateDefaultValues,
@@ -25,7 +25,6 @@ export interface VolumeCreateDialogProps {
 
 export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCreated }: VolumeCreateDialogProps) {
   const formId = useId()
-  const [submitting, setSubmitting] = useState(false)
   const createVolume = useCreateVolume(serverId)
 
   const form = useForm<VolumeCreateFormValues>({
@@ -42,7 +41,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
   }, [open, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
-    setSubmitting(true)
     const driverOpts: Record<string, string> = {}
 
     if (values.enableNfs) {
@@ -78,12 +76,11 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
           onOpenChange(false)
           void onCreated?.()
         },
-        onSettled: () => {
-          setSubmitting(false)
-        },
       }
     )
   })
+
+  const submitting = createVolume.isPending
 
   return (
     <StandardDialog

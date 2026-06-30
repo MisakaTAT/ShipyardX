@@ -13,7 +13,7 @@ pub use error::{AppError, AppErrorKind, AppResult};
 pub use state::AppState;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 use config::store::{get_data_file, load_servers};
 use dto::events::{
@@ -183,13 +183,13 @@ pub fn run() {
             );
             app.manage(AppState {
                 server_store: Mutex::new(()),
-                servers: Mutex::new(servers),
+                servers: RwLock::new(servers),
                 data_file: Mutex::new(data_file),
-                terminals: Mutex::new(HashMap::new()),
+                terminals: RwLock::new(HashMap::new()),
                 streams: Mutex::new(HashMap::new()),
-                terminal_ws_clients: Mutex::new(HashMap::new()),
-                terminal_handshakes: Mutex::new(HashMap::new()),
-                event_streams: Mutex::new(HashMap::new()),
+                terminal_ws_clients: RwLock::new(HashMap::new()),
+                terminal_handshakes: RwLock::new(HashMap::new()),
+                event_streams: RwLock::new(HashMap::new()),
                 port_forwards: Mutex::new(HashMap::new()),
             });
             Ok(())

@@ -13,8 +13,7 @@ import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/set
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
 export default function SettingsPage() {
-  const { settings, updateTerminalSettings, resetTerminalSettings, updateAppStoreSettings, resetAppStoreSettings } =
-    useAppSettings()
+  const { settings, updateTerminalSettings, resetTerminalSettings, updateAppStoreSettings } = useAppSettings()
   const search = useSearch()
   const initialSection = useMemo<SettingsSectionKey>(() => {
     const section = new URLSearchParams(search).get('section')
@@ -107,11 +106,7 @@ export default function SettingsPage() {
             onReset={handleResetTerminalSettings}
           />
         ) : activeSection === 'appstore' ? (
-          <AppStoreSettingsPanel
-            settings={settings.appstore}
-            onChange={updateAppStoreSettings}
-            onReset={resetAppStoreSettings}
-          />
+          <AppStoreSettingsPanel settings={settings.appstore} onSavedChange={updateAppStoreSettings} />
         ) : activeSection === 'about' ? (
           <AboutSettingsPanel />
         ) : activeSection === 'hotkeys' ? (

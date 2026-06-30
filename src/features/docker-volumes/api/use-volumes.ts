@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
-import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export function useVolumes(serverId: string) {
   return useQuery({
@@ -12,11 +12,9 @@ export function useVolumes(serverId: string) {
 }
 
 export function useRemoveVolume(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (name: string) => commands.removeVolume(serverId, name),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.volumes(serverId) }),
-    onError: (err) => toastAppError(err),
+    invalidate: [qk.volumes(serverId)],
   })
 }
 
@@ -27,24 +25,20 @@ interface CreateVolumeVars {
 }
 
 export function useCreateVolume(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: (vars: CreateVolumeVars) => commands.createVolume(serverId, vars.name, vars.driver, vars.driverOpts),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.volumes(serverId) }),
-    onError: (err) => toastAppError(err),
+    invalidate: [qk.volumes(serverId)],
   })
 }
 
 export function usePruneUnusedVolumes(serverId: string) {
-  const qc = useQueryClient()
-  return useMutation({
+  return useInvalidatingMutation({
     mutationFn: () => commands.pruneUnusedVolumes(serverId),
+    invalidate: [qk.volumes(serverId)],
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: qk.volumes(serverId) })
       toast.success('已清理未使用存储卷', {
         description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
       })
     },
-    onError: (err) => toastAppError(err),
   })
 }

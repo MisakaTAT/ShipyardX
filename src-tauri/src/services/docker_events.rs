@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use bollard::models::EventMessage;
@@ -16,7 +16,7 @@ use crate::dto::events::{
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::services::support::{ServerContext, start_managed_event_stream, stop_managed_event_stream};
-use crate::state::{AppState, EventStreamHandle, lock_mutex};
+use crate::state::{AppState, EventStreamHandle, lock_read, lock_write};
 use crate::utils::formatting::format_unix_seconds_time;
 use crate::utils::id::generate_id;
 
@@ -164,10 +164,10 @@ enum StreamLoopExit {
 fn emit_stream_status(
     ah: &AppHandle,
     stream_id: &str,
-    status_slot: &Arc<Mutex<EventStreamStatus>>,
+    status_slot: &Arc<RwLock<EventStreamStatus>>,
     status: EventStreamStatus,
 ) {
-    if let Ok(mut current) = lock_mutex(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败")
+    if let Ok(mut current) = lock_write(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败")
     {
         *current = status;
     }
@@ -181,7 +181,7 @@ fn emit_stream_status(
 async fn run_event_stream_task(
     config: ServerConfig,
     stream_id: String,
-    status_slot: Arc<Mutex<EventStreamStatus>>,
+    status_slot: Arc<RwLock<EventStreamStatus>>,
     mut stop_rx: watch::Receiver<bool>,
     ah: AppHandle,
 ) {
@@ -344,14 +344,14 @@ pub async fn start_event_stream(
     info!(target: "shipyardx_lib::services::docker_events", "starting event stream; server_id={}", server_id);
 
     {
-        let streams = lock_mutex(
+        let streams = lock_read(
             &state.event_streams,
             "docker_events.streams_lock_failed",
             "读取事件流状态失败",
         )?;
         if let Some(existing) = streams.get(&server_id) {
             debug!(target: "shipyardx_lib::services::docker_events", "reusing existing event stream; server_id={} stream_id={}", server_id, existing.stream_id);
-            let current = *lock_mutex(
+            let current = *lock_read(
                 &existing.status,
                 "docker_events.status_lock_failed",
                 "读取事件流状态失败",
@@ -367,7 +367,7 @@ pub async fn start_event_stream(
 
     let stream_id = generate_id();
     let (stop_tx, stop_rx) = watch::channel(false);
-    let status = Arc::new(Mutex::new(EventStreamStatus::Connecting));
+    let status = Arc::new(RwLock::new(EventStreamStatus::Connecting));
 
     let sid = stream_id.clone();
     let status_for_thread = status.clone();

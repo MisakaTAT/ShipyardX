@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { commands } from '@/types/app-bindings'
+import { useEffect, useState } from 'react'
 import { Cpu, HardDrive, MemoryStick, Network } from 'lucide-react'
-import type { ContainerStats } from '@/types/app-bindings'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toastAppError } from '@/shared/lib/errors'
+import { useContainerStats } from '@/features/docker-containers/api/use-containers'
 
 interface Props {
   serverId: string
@@ -95,34 +94,19 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
 }
 
 export default function StatsDialog({ serverId, containerId, containerName, onClose }: Props) {
-  const [stats, setStats] = useState<ContainerStats | null>(null)
-  const [loading, setLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState('')
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const fetchStats = useCallback(async () => {
-    setLoading(true)
-    try {
-      const s = await commands.getContainerStats(serverId, containerId)
-      setStats(s)
-      setLastUpdated(formatNowTime())
-    } catch (e) {
-      toastAppError(e)
-    } finally {
-      setLoading(false)
-    }
-  }, [serverId, containerId])
+  const statsQuery = useContainerStats(serverId, containerId)
+  const stats = statsQuery.data ?? null
+  const loading = statsQuery.isLoading
 
   useEffect(() => {
-    void fetchStats()
-  }, [fetchStats])
+    if (statsQuery.error) toastAppError(statsQuery.error)
+  }, [statsQuery.error])
 
   useEffect(() => {
-    intervalRef.current = setInterval(fetchStats, 5000)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [fetchStats])
+    if (!stats) return
+    setLastUpdated(formatNowTime(statsQuery.dataUpdatedAt))
+  }, [stats, statsQuery.dataUpdatedAt])
 
   return (
     <StandardDialog open onOpenChange={(v) => (!v ? onClose() : null)} title={containerName} icon={Cpu}>

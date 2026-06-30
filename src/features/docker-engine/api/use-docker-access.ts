@@ -4,6 +4,7 @@ import { commands } from '@/types/app-bindings'
 import { getErrorCode, toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
 import { qk } from '@/shared/api/query-keys'
+import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export type DockerStatus = 'checking' | 'ok' | 'no_permission' | 'no_docker' | 'error'
 
@@ -48,4 +49,27 @@ export function useDockerAccess(serverId: string, enabled = true) {
       : 'ok'
 
   return { status, recheck: check, ok: status === 'ok' }
+}
+
+export function useDockerDaemonSettings(serverId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.dockerDaemon(serverId),
+    queryFn: () => commands.getDockerDaemonSettings(serverId),
+    enabled,
+  })
+}
+
+export function useUpdateDockerDaemonSettings(serverId: string) {
+  return useInvalidatingMutation({
+    mutationFn: (params: Parameters<typeof commands.updateDockerDaemonSettings>[1]) =>
+      commands.updateDockerDaemonSettings(serverId, params),
+    invalidate: [qk.dockerDaemon(serverId), qk.dockerInfo(serverId)],
+  })
+}
+
+export function useRestartDockerDaemon(serverId: string) {
+  return useInvalidatingMutation({
+    mutationFn: (password: string | null) => commands.restartDockerDaemon(serverId, password),
+    invalidate: [qk.dockerAccess(serverId), qk.dockerInfo(serverId), qk.dockerDaemon(serverId)],
+  })
 }
