@@ -10,9 +10,10 @@ import {
   type ServerFormValues,
 } from '@/features/servers/model/schema'
 import { Server as ServerIcon, Loader2, Eye, EyeOff } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toast } from '@/shared/components/toast'
 import { useSaveServer, useTestServerConnection } from '@/features/servers/api/use-servers'
@@ -46,7 +47,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
     onOpenChange(next)
   }
 
-  const onSubmit = form.handleSubmit((values: ServerFormValues) => {
+  const onSubmit = createToastFormSubmit(form, (values: ServerFormValues) => {
     const payload: ServerConfig = {
       ...values,
       id: isEdit && server ? server.id : '',
@@ -136,7 +137,6 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                     disabled={busy}
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -151,14 +151,13 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={`${baseId}-host`}>主机地址</FieldLabel>
                     <FieldContent>
-                      <Input
-                        id={`${baseId}-host`}
-                        {...field}
-                        placeholder="192.168.1.100"
-                        disabled={busy}
-                        aria-invalid={fieldState.invalid}
-                      />
-                      <FieldError errors={[fieldState.error]} />
+                    <Input
+                      id={`${baseId}-host`}
+                      {...field}
+                      placeholder="192.168.1.100"
+                      disabled={busy}
+                      aria-invalid={fieldState.invalid}
+                    />
                     </FieldContent>
                   </Field>
                 )}
@@ -187,7 +186,6 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                       }}
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldError errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}
@@ -208,7 +206,6 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                     disabled={busy}
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -263,7 +260,6 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                         {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </Button>
                     </div>
-                    <FieldError errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}
@@ -283,7 +279,6 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                       disabled={busy}
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldError errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}

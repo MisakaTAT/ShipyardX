@@ -7,9 +7,10 @@ import {
   type VolumeCreateFormValues,
 } from '@/features/docker-volumes/model/volume-create-schema'
 import { Database, Loader2, Plus } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateVolume } from '@/features/docker-volumes/api/use-volumes'
@@ -40,7 +41,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
     form.reset(volumeCreateDefaultValues())
   }, [open, form])
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = createToastFormSubmit(form, async (values) => {
     const driverOpts: Record<string, string> = {}
 
     if (values.enableNfs) {
@@ -129,7 +130,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                     disabled={submitting}
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -187,7 +187,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                         disabled={submitting}
                         aria-invalid={fieldState.invalid}
                       />
-                      <FieldError errors={[fieldState.error]} />
                     </FieldContent>
                   </Field>
                 )}
@@ -207,7 +206,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                           disabled={submitting}
                           aria-invalid={fieldState.invalid}
                         />
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -226,7 +224,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                           disabled={submitting}
                           aria-invalid={fieldState.invalid}
                         />
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -246,7 +243,6 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                         disabled={submitting}
                         aria-invalid={fieldState.invalid}
                       />
-                      <FieldError errors={[fieldState.error]} />
                     </FieldContent>
                   </Field>
                 )}

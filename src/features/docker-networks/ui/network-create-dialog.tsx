@@ -8,9 +8,10 @@ import {
 } from '@/features/docker-networks/model/network-create-schema'
 import type { NetworkCreate } from '@/types/app-bindings'
 import { Share2, Loader2, Plus } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateNetwork } from '@/features/docker-networks/api/use-networks'
@@ -39,7 +40,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
     form.reset(networkCreateDefaultValues())
   }, [open, form])
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = createToastFormSubmit(form, async (values) => {
     const req: NetworkCreate = {
       name: values.name.trim(),
       driver: values.driver.trim() || null,
@@ -106,7 +107,6 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     disabled={submitting}
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -131,7 +131,6 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                       <SelectItem value="none">none</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -151,7 +150,6 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                       disabled={submitting}
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldError errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}
@@ -170,7 +168,6 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                       disabled={submitting}
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldError errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}

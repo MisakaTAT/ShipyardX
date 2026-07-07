@@ -3,9 +3,11 @@ import { Controller, useForm } from 'react-hook-form'
 import { CheckCircle2, Circle, Globe, Loader2, Stone, XCircle } from 'lucide-react'
 import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstore'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
+import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
-import { Field, FieldContent, FieldError, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import type {
   AppVersionInfo_Serialize,
@@ -68,17 +70,17 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
   const [selectedServerId, setSelectedServerId] = useState<string>('')
   const [installSteps, setInstallSteps] = useState<Map<string, InstallStepEvent>>(new Map())
   const [stepOutputs, setStepOutputs] = useState<Map<string, string[]>>(new Map())
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<Record<string, string>>({
+  const form = useForm<Record<string, string>>({
     defaultValues: {
       CONTAINER_NAME: appKey ? buildDefaultContainerName(appKey) : '',
     },
     mode: 'onSubmit',
   })
+  const {
+    control,
+    reset,
+    formState: { errors },
+  } = form
 
   const versionFields = selectedVersion
     ? selectedVersion.form_fields.some((field) => field.envKey === 'CONTAINER_NAME')
@@ -144,7 +146,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
     }
   }
 
-  const handleInstall = handleSubmit((values) => {
+  const handleInstall = (values: Record<string, string>) => {
     if (!detail || !selectedVersion || !selectedServerId) return
 
     resetInstall()
@@ -157,7 +159,19 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
         env_values: values,
       },
     })
-  })
+  }
+
+  const submitInstallWithToast = createToastFormSubmit(
+    form,
+    async (values) => {
+      if (!selectedServerId) {
+        toast.warning('请选择服务器')
+        return
+      }
+      handleInstall(values)
+    },
+    '请检查应用安装配置后重试'
+  )
 
   const isLoadingContent = isLoading || !detail
 
@@ -192,7 +206,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
                 ))}
               </select>
             </div>
-            <Button onClick={handleInstall} disabled={install.isPending || !selectedServerId}>
+            <Button onClick={() => void submitInstallWithToast()} disabled={install.isPending || !selectedServerId}>
               {install.isPending && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
               安装
             </Button>
@@ -297,7 +311,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
           })}
         </div>
       ) : (
-        <form className="space-y-4" onSubmit={handleInstall}>
+        <form className="space-y-4" onSubmit={submitInstallWithToast}>
           {/* Version selection */}
           <div>
             <h4 className="mb-2 text-[13px] font-medium text-foreground">选择版本</h4>
@@ -419,7 +433,6 @@ function FormFieldInput({
               </select>
             )}
           />
-          <FieldError errors={error ? [{ message: error.message }] : []} />
         </FieldContent>
       </Field>
     )
@@ -438,7 +451,6 @@ function FormFieldInput({
           rules={field.required ? { required: `请填写 ${label}` } : undefined}
           render={({ field: formField }) => <Input type={fieldType} {...formField} placeholder={placeholder} />}
         />
-        <FieldError errors={error ? [{ message: error.message }] : []} />
       </FieldContent>
     </Field>
   )

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
-import { Controller, useForm, type FieldErrors } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import {
   daemonSettingsToFormValues,
@@ -16,6 +16,7 @@ import {
 } from '@/features/docker-engine/api/use-docker-access'
 import DockerSudoPasswordDialog from '@/features/docker-engine/ui/docker-sudo-password-dialog'
 import { Loader2, RotateCcw, Save, Undo2 } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field'
@@ -27,13 +28,6 @@ import { toast } from '@/shared/components/toast'
 
 interface Props {
   serverId: string
-}
-
-function getFirstDaemonFormError(errors: FieldErrors<DockerDaemonFormValues>) {
-  for (const error of Object.values(errors)) {
-    if (error?.message) return String(error.message)
-  }
-  return '表单校验失败，请检查配置后重试'
 }
 
 export default function DockerManagePanel({ serverId }: Props) {
@@ -132,14 +126,9 @@ export default function DockerManagePanel({ serverId }: Props) {
     }
   }
 
-  const onDaemonSubmit = daemonForm.handleSubmit(
-    async (values) => {
-      await persistUpdate(values, undefined)
-    },
-    (errors) => {
-      toast.warning(getFirstDaemonFormError(errors))
-    }
-  )
+  const onDaemonSubmit = createToastFormSubmit(daemonForm, async (values) => {
+    await persistUpdate(values, undefined)
+  })
 
   const loading = daemonSettingsQuery.isLoading
   const saving = updateDaemonSettings.isPending

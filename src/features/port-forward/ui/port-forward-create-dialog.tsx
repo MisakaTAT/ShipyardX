@@ -8,8 +8,9 @@ import {
 } from '@/features/port-forward/model/port-forward-create-schema'
 import { parseContainerTcpPortOptions } from '@/features/port-forward/lib/parse-container-tcp-ports'
 import { ArrowLeftRight, Loader2 } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreatePortForwardRule, useLocalAddresses } from '@/features/port-forward/api/use-port-forwards'
@@ -89,7 +90,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
     }
   }, [form, localAddresses, open])
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = createToastFormSubmit(form, async (values) => {
     const container = containers.find((c) => c.id === values.containerId)
     if (!container) {
       toast.error('请选择容器')
@@ -122,7 +123,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
         },
       }
     )
-  })
+  }, '请检查端口转发配置后重试')
 
   const submitting = createRule.isPending
 
@@ -175,7 +176,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                       ))}
                     </SelectContent>
                   </Select>
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -212,7 +212,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                       </SelectContent>
                     </Select>
                   )}
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -249,7 +248,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                       </SelectContent>
                     </Select>
                   )}
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -274,7 +272,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                       ))}
                     </SelectContent>
                   </Select>
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -305,7 +302,6 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     aria-invalid={fieldState.invalid}
                   />
                   <FieldDescription>填 0 时由系统随机分配本地端口</FieldDescription>
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}

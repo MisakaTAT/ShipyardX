@@ -12,8 +12,9 @@ import {
 } from '@/features/docker-images/model/image-pull-schema'
 import { Download, Loader2 } from 'lucide-react'
 import { getErrorMessage } from '@/shared/lib/errors'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldError, FieldGroup } from '@/shared/ui/field'
+import { Field, FieldContent, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { qk } from '@/shared/api/query-keys'
 import { StandardDialog } from '@/shared/components/standard-dialog'
@@ -91,7 +92,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
     }
   }
 
-  const handlePull = form.handleSubmit(async (values) => {
+  const handlePull = createToastFormSubmit(form, async (values) => {
     await runPull(values.image.trim())
   })
 
@@ -127,7 +128,6 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                       <Input
                         id={`${formId}-image`}
                         aria-invalid={fieldState.invalid}
-                        aria-describedby={fieldState.error ? `${formId}-image-err` : undefined}
                         {...field}
                         placeholder="nginx:latest"
                         disabled={pulling}
@@ -146,7 +146,6 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                         )}
                       </Button>
                     </div>
-                    <FieldError id={`${formId}-image-err`} className="mt-0" errors={[fieldState.error]} />
                   </FieldContent>
                 </Field>
               )}

@@ -10,9 +10,10 @@ import {
   type ImageExportFormValues,
 } from '@/features/docker-images/model/image-export-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldTitle } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { events, type Image } from '@/types/app-bindings'
 
@@ -90,7 +91,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
     }
   }
 
-  const handleExport = form.handleSubmit(async (values) => {
+  const handleExport = createToastFormSubmit(form, async (values) => {
     if (!image) return
     const exportId = crypto.randomUUID()
     activeExportIdRef.current = exportId
@@ -162,12 +163,11 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
                       nameInputRef.current = el
                     }}
                     aria-invalid={fieldState.invalid}
-                    aria-describedby={fieldState.error ? `${formId}-name-err` : `${formId}-name-desc`}
+                    aria-describedby={`${formId}-name-desc`}
                     placeholder="nginx_latest.tar"
                     disabled={exporting}
                   />
                   <FieldDescription id={`${formId}-name-desc`}>可自定义名称；未带 `.tar` 会自动补上。</FieldDescription>
-                  <FieldError id={`${formId}-name-err`} errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}
@@ -184,7 +184,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
                     <Input
                       {...field}
                       aria-invalid={fieldState.invalid}
-                      aria-describedby={fieldState.error ? `${formId}-dir-err` : `${formId}-dir-desc`}
+                      aria-describedby={`${formId}-dir-desc`}
                       placeholder="请选择本地目录"
                       disabled={exporting}
                     />
@@ -199,7 +199,6 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
                     </Button>
                   </div>
                   <FieldDescription id={`${formId}-dir-desc`}>镜像会以 tar 包形式保存到该目录。</FieldDescription>
-                  <FieldError id={`${formId}-dir-err`} errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}

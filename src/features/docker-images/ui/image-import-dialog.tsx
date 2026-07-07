@@ -10,9 +10,10 @@ import {
   type ImageImportFormValues,
 } from '@/features/docker-images/model/image-import-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldTitle } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { events } from '@/types/app-bindings'
 
@@ -93,7 +94,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
     }
   }
 
-  const handleImport = form.handleSubmit(async (values) => {
+  const handleImport = createToastFormSubmit(form, async (values) => {
     const importId = crypto.randomUUID()
     activeImportIdRef.current = importId
     setProgress({
@@ -162,7 +163,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
                         fileInputRef.current = el
                       }}
                       aria-invalid={fieldState.invalid}
-                      aria-describedby={fieldState.error ? `${formId}-file-err` : `${formId}-file-desc`}
+                      aria-describedby={`${formId}-file-desc`}
                       placeholder="请选择本地镜像 tar 包"
                       disabled={importing}
                     />
@@ -174,7 +175,6 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
                   <FieldDescription id={`${formId}-file-desc`}>
                     支持上传 Docker 镜像包，系统会自动完成远程导入。
                   </FieldDescription>
-                  <FieldError id={`${formId}-file-err`} errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}

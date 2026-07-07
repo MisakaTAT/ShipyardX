@@ -7,8 +7,9 @@ import {
   type DockerSudoPasswordFormValues,
 } from '@/features/docker-engine/model/daemon-schema'
 import { KeyRound, Loader2 } from 'lucide-react'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 
@@ -37,7 +38,7 @@ export default function DockerSudoPasswordDialog({
     form.reset(dockerSudoPasswordDefaultValues())
   }, [open, form])
 
-  const onSubmit = form.handleSubmit(async ({ password }) => {
+  const onSubmit = createToastFormSubmit(form, async ({ password }) => {
     await onSubmitPassword(password)
   })
 
@@ -86,7 +87,6 @@ export default function DockerSudoPasswordDialog({
                     autoComplete="off"
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </FieldContent>
               </Field>
             )}

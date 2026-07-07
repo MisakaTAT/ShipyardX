@@ -11,18 +11,11 @@ import {
 } from '@/features/docker-containers/model/run-container-schema'
 import { buildRunParamsFromForm } from '@/features/docker-containers/lib/docker-run-cli'
 import { listSelectableImageRefs } from '@/shared/lib/docker-image-ref'
+import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -102,11 +95,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
   const {
     control,
-    handleSubmit,
     watch,
     getValues,
     setValue,
-    formState: { errors },
     reset: resetForm,
   } = form
 
@@ -179,6 +170,14 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
     [flow, images]
   )
 
+  const submitWithToast = createToastFormSubmit(
+    form,
+    async (values) => {
+      onSubmit(values)
+    },
+    '请检查容器运行配置后重试'
+  )
+
   const progressSteps = [
     {
       status: flow.imageStep,
@@ -230,17 +229,10 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             <form
               id="run-container-builder-form"
               className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-4"
-              onSubmit={handleSubmit(onSubmit)}
+              onSubmit={submitWithToast}
               noValidate
             >
               <FieldGroup className="gap-7">
-                {errors.root?.message ? (
-                  <FieldError
-                    className="rounded-lg border border-destructive/30 bg-destructive/10 p-3"
-                    errors={[errors.root]}
-                  />
-                ) : null}
-
                 {/* 基础：名称 + 镜像 */}
                 <Controller
                   control={control}
@@ -256,7 +248,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           aria-invalid={fieldState.invalid}
                         />
                         <SectionHint>仅支持字母数字下划线连字符与英文句点</SectionHint>
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -358,7 +349,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                               ) : !imagesLoading && imageOptions.length === 0 ? (
                                 <SectionHint>当前无本地镜像 可切换到自定输入 或先到镜像页拉取后再选</SectionHint>
                               ) : null}
-                              <FieldError errors={[fieldState.error]} />
                             </Field>
                           )}
                         />
@@ -644,7 +634,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           aria-invalid={fieldState.invalid}
                         />
                         <SectionHint>留空则沿用镜像默认 CMD</SectionHint>
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -676,7 +665,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           placeholder={'app=ShipyardX'}
                           aria-invalid={fieldState.invalid}
                         />
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -695,7 +683,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           placeholder={'TZ=Asia/Shanghai'}
                           aria-invalid={fieldState.invalid}
                         />
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
