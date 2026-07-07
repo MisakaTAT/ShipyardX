@@ -11,10 +11,11 @@ import {
   type ImagePullFormValues,
 } from '@/features/docker-images/model/image-pull-schema'
 import { Download, Loader2 } from 'lucide-react'
+import { FormFieldRow } from '@/shared/components/form-field'
 import { getErrorMessage } from '@/shared/lib/errors'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldGroup } from '@/shared/ui/field'
+import { FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { qk } from '@/shared/api/query-keys'
 import { StandardDialog } from '@/shared/components/standard-dialog'
@@ -122,32 +123,37 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
               control={form.control}
               name="image"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid} className="w-full">
-                  <FieldContent className="gap-2">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id={`${formId}-image`}
-                        aria-invalid={fieldState.invalid}
-                        {...field}
-                        placeholder="nginx:latest"
-                        disabled={pulling}
-                      />
-                      <Button type="submit" form={`${formId}-pull`} className="shrink-0" disabled={pulling}>
-                        {pulling ? (
-                          <>
-                            <Loader2 className="animate-spin" />
-                            拉取中
-                          </>
-                        ) : (
-                          <>
-                            <Download />
-                            拉取
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </FieldContent>
-                </Field>
+                <FormFieldRow
+                  label="镜像引用"
+                  required
+                  invalid={fieldState.invalid}
+                  variant="title"
+                  className="w-full"
+                  contentClassName="gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id={`${formId}-image`}
+                      aria-invalid={fieldState.invalid}
+                      {...field}
+                      placeholder="nginx:latest"
+                      disabled={pulling}
+                    />
+                    <Button type="submit" form={`${formId}-pull`} className="shrink-0" disabled={pulling}>
+                      {pulling ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          拉取中
+                        </>
+                      ) : (
+                        <>
+                          <Download />
+                          拉取
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </FormFieldRow>
               )}
             />
           </FieldGroup>

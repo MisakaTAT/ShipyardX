@@ -1,9 +1,12 @@
 import { z } from 'zod'
 import type { DaemonSettings, DaemonUpdate } from '@/types/app-bindings'
 
-const mirrorUrlSchema = z.string().trim().refine((value) => z.httpUrl().safeParse(value).success, {
-  message: '镜像加速地址仅支持合法的 http 或 https 地址',
-})
+const mirrorUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => z.httpUrl().safeParse(value).success, {
+    message: '镜像加速地址仅支持合法的 http 或 https 地址',
+  })
 
 const cgroupDriverSchema = z.enum(['', 'systemd', 'cgroupfs'])
 

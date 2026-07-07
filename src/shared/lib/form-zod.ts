@@ -8,9 +8,12 @@ export function trimmedRequiredString(message: string) {
 }
 
 export function safeFileNameSchema(requiredMessage: string, invalidMessage: string) {
-  return trimmedRequiredString(requiredMessage).refine((value) => value !== '.' && value !== '..' && !invalidFileNameChars.test(value), {
-    message: invalidMessage,
-  })
+  return trimmedRequiredString(requiredMessage).refine(
+    (value) => value !== '.' && value !== '..' && !invalidFileNameChars.test(value),
+    {
+      message: invalidMessage,
+    }
+  )
 }
 
 export function archiveFilePathSchema(requiredMessage: string, invalidMessage: string) {

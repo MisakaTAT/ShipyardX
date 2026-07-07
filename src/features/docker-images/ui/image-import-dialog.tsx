@@ -10,10 +10,11 @@ import {
   type ImageImportFormValues,
 } from '@/features/docker-images/model/image-import-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { FormFieldHint, FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from '@/shared/ui/field'
+import { FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { events } from '@/types/app-bindings'
 
@@ -152,31 +153,36 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
             control={form.control}
             name="filePath"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldContent className="gap-2">
-                  <FieldTitle>镜像文件</FieldTitle>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      {...field}
-                      ref={(el) => {
-                        field.ref(el)
-                        fileInputRef.current = el
-                      }}
-                      aria-invalid={fieldState.invalid}
-                      aria-describedby={`${formId}-file-desc`}
-                      placeholder="请选择本地镜像 tar 包"
-                      disabled={importing}
-                    />
-                    <Button type="button" variant="outline" onClick={() => void handlePickFile()} disabled={importing}>
-                      <FolderUp />
-                      选择文件
-                    </Button>
-                  </div>
-                  <FieldDescription id={`${formId}-file-desc`}>
+              <FormFieldRow
+                label="镜像文件"
+                required
+                invalid={fieldState.invalid}
+                variant="title"
+                contentClassName="gap-2"
+                description={
+                  <FormFieldHint id={`${formId}-file-desc`}>
                     支持上传 Docker 镜像包，系统会自动完成远程导入。
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
+                  </FormFieldHint>
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    {...field}
+                    ref={(el) => {
+                      field.ref(el)
+                      fileInputRef.current = el
+                    }}
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={`${formId}-file-desc`}
+                    placeholder="请选择本地镜像 tar 包"
+                    disabled={importing}
+                  />
+                  <Button type="button" variant="outline" onClick={() => void handlePickFile()} disabled={importing}>
+                    <FolderUp />
+                    选择文件
+                  </Button>
+                </div>
+              </FormFieldRow>
             )}
           />
         </FieldGroup>

@@ -10,10 +10,11 @@ import {
   type ServerFormValues,
 } from '@/features/servers/model/schema'
 import { Server as ServerIcon, Loader2, Eye, EyeOff } from 'lucide-react'
+import { FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Field, FieldContent, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { FieldGroup } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toast } from '@/shared/components/toast'
 import { useSaveServer, useTestServerConnection } from '@/features/servers/api/use-servers'
@@ -127,18 +128,15 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${baseId}-name`}>服务器名称</FieldLabel>
-                <FieldContent>
-                  <Input
-                    id={`${baseId}-name`}
-                    {...field}
-                    placeholder="生产服务器"
-                    disabled={busy}
-                    aria-invalid={fieldState.invalid}
-                  />
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="服务器名称" htmlFor={`${baseId}-name`} required invalid={fieldState.invalid}>
+                <Input
+                  id={`${baseId}-name`}
+                  {...field}
+                  placeholder="生产服务器"
+                  disabled={busy}
+                  aria-invalid={fieldState.invalid}
+                />
+              </FormFieldRow>
             )}
           />
 
@@ -148,9 +146,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                 control={form.control}
                 name="host"
                 render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${baseId}-host`}>主机地址</FieldLabel>
-                    <FieldContent>
+                  <FormFieldRow label="主机地址" htmlFor={`${baseId}-host`} required invalid={fieldState.invalid}>
                     <Input
                       id={`${baseId}-host`}
                       {...field}
@@ -158,8 +154,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                       disabled={busy}
                       aria-invalid={fieldState.invalid}
                     />
-                    </FieldContent>
-                  </Field>
+                  </FormFieldRow>
                 )}
               />
             </div>
@@ -167,27 +162,24 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
               control={form.control}
               name="port"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${baseId}-port`}>端口</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      id={`${baseId}-port`}
-                      type="number"
-                      min={1}
-                      max={65535}
-                      disabled={busy}
-                      name={field.name}
-                      ref={field.ref}
-                      onBlur={field.onBlur}
-                      value={field.value}
-                      onChange={(e) => {
-                        const n = parseInt(e.target.value, 10)
-                        field.onChange(Number.isFinite(n) ? n : 22)
-                      }}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+                <FormFieldRow label="端口" htmlFor={`${baseId}-port`} required invalid={fieldState.invalid}>
+                  <Input
+                    id={`${baseId}-port`}
+                    type="number"
+                    min={1}
+                    max={65535}
+                    disabled={busy}
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={field.value}
+                    onChange={(e) => {
+                      const n = parseInt(e.target.value, 10)
+                      field.onChange(Number.isFinite(n) ? n : 22)
+                    }}
+                    aria-invalid={fieldState.invalid}
+                  />
+                </FormFieldRow>
               )}
             />
           </div>
@@ -196,72 +188,63 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
             control={form.control}
             name="username"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${baseId}-user`}>用户名</FieldLabel>
-                <FieldContent>
-                  <Input
-                    id={`${baseId}-user`}
-                    {...field}
-                    placeholder="root"
-                    disabled={busy}
-                    aria-invalid={fieldState.invalid}
-                  />
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="用户名" htmlFor={`${baseId}-user`} required invalid={fieldState.invalid}>
+                <Input
+                  id={`${baseId}-user`}
+                  {...field}
+                  placeholder="root"
+                  disabled={busy}
+                  aria-invalid={fieldState.invalid}
+                />
+              </FormFieldRow>
             )}
           />
 
-          <Field>
-            <FieldLabel>认证方式</FieldLabel>
-            <FieldContent>
-              <div className="flex gap-2">
-                {(['key', 'password'] as const).map((type) => (
-                  <Button
-                    key={type}
-                    type="button"
-                    variant={authType === type ? 'default' : 'outline'}
-                    className="flex-1 text-sm"
-                    disabled={busy}
-                    onClick={() => form.setValue('auth_type', type, { shouldValidate: true })}
-                  >
-                    {type === 'key' ? 'SSH 密钥' : '密码'}
-                  </Button>
-                ))}
-              </div>
-            </FieldContent>
-          </Field>
+          <FormFieldRow label="认证方式" required>
+            <div className="flex gap-2">
+              {(['key', 'password'] as const).map((type) => (
+                <Button
+                  key={type}
+                  type="button"
+                  variant={authType === type ? 'default' : 'outline'}
+                  className="flex-1 text-sm"
+                  disabled={busy}
+                  onClick={() => form.setValue('auth_type', type, { shouldValidate: true })}
+                >
+                  {type === 'key' ? 'SSH 密钥' : '密码'}
+                </Button>
+              ))}
+            </div>
+          </FormFieldRow>
 
           {authType === 'password' ? (
             <Controller
               control={form.control}
               name="password"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${baseId}-pwd`}>密码</FieldLabel>
-                  <FieldContent>
-                    <div className="relative">
-                      <Input
-                        id={`${baseId}-pwd`}
-                        type={showPassword ? 'text' : 'password'}
-                        {...field}
-                        placeholder="SSH 登录密码"
-                        disabled={busy}
-                        className="pr-10"
-                        aria-invalid={fieldState.invalid}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        onClick={() => setShowPassword((v) => !v)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </Button>
-                    </div>
-                  </FieldContent>
-                </Field>
+                <FormFieldRow label="密码" htmlFor={`${baseId}-pwd`} required invalid={fieldState.invalid}>
+                  <div className="relative">
+                    <Input
+                      id={`${baseId}-pwd`}
+                      type={showPassword ? 'text' : 'password'}
+                      {...field}
+                      placeholder="SSH 登录密码"
+                      disabled={busy}
+                      className="pr-10"
+                      aria-invalid={fieldState.invalid}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => setShowPassword((v) => !v)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </Button>
+                  </div>
+                </FormFieldRow>
               )}
             />
           ) : (
@@ -269,18 +252,15 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
               control={form.control}
               name="key_path"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${baseId}-key`}>密钥路径</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      id={`${baseId}-key`}
-                      {...field}
-                      placeholder="~/.ssh/id_rsa"
-                      disabled={busy}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+                <FormFieldRow label="密钥路径" htmlFor={`${baseId}-key`} required invalid={fieldState.invalid}>
+                  <Input
+                    id={`${baseId}-key`}
+                    {...field}
+                    placeholder="~/.ssh/id_rsa"
+                    disabled={busy}
+                    aria-invalid={fieldState.invalid}
+                  />
+                </FormFieldRow>
               )}
             />
           )}

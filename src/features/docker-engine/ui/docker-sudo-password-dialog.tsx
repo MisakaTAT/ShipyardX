@@ -7,9 +7,10 @@ import {
   type DockerSudoPasswordFormValues,
 } from '@/features/docker-engine/model/daemon-schema'
 import { KeyRound, Loader2 } from 'lucide-react'
+import { FormFieldHint, FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldGroup } from '@/shared/ui/field'
+import { FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 
@@ -71,24 +72,22 @@ export default function DockerSudoPasswordDialog({
     >
       <form id={`${formId}-sudo`} onSubmit={onSubmit} className="contents">
         <FieldGroup className="gap-3">
-          <FieldDescription>当前操作需要 sudo 权限 请输入服务器用户的提权密码</FieldDescription>
+          <FormFieldHint>当前操作需要 sudo 权限 请输入服务器用户的提权密码</FormFieldHint>
           <Controller
             control={form.control}
             name="password"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldContent>
-                  <Input
-                    id={`${formId}-pwd`}
-                    type="password"
-                    {...field}
-                    placeholder="sudo 密码"
-                    disabled={busy}
-                    autoComplete="off"
-                    aria-invalid={fieldState.invalid}
-                  />
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="sudo 密码" required invalid={fieldState.invalid} variant="title">
+                <Input
+                  id={`${formId}-pwd`}
+                  type="password"
+                  {...field}
+                  placeholder="sudo 密码"
+                  disabled={busy}
+                  autoComplete="off"
+                  aria-invalid={fieldState.invalid}
+                />
+              </FormFieldRow>
             )}
           />
         </FieldGroup>

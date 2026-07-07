@@ -15,7 +15,7 @@ describe('serverFormSchema', () => {
 
     expect(result.success).toBe(false)
     expect(result.error?.issues.map((issue) => issue.message)).toEqual(
-      expect.arrayContaining(['请填写服务器名称', '请填写主机地址', '请填写用户名']),
+      expect.arrayContaining(['请填写服务器名称', '请填写主机地址', '请填写用户名'])
     )
   })
 })

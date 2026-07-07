@@ -2,12 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { CheckCircle2, Circle, Globe, Loader2, Stone, XCircle } from 'lucide-react'
 import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstore'
+import { FormFieldLabel, FormFieldRow } from '@/shared/components/form-field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
-import { Field, FieldContent, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import type {
   AppVersionInfo_Serialize,
@@ -314,7 +314,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
         <form className="space-y-4" onSubmit={submitInstallWithToast}>
           {/* Version selection */}
           <div>
-            <h4 className="mb-2 text-[13px] font-medium text-foreground">选择版本</h4>
+            <FormFieldLabel className="mb-2">选择版本</FormFieldLabel>
             <div className="grid grid-cols-3 gap-2">
               {detail.versions.map((v) => (
                 <button
@@ -346,20 +346,17 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
 
           {/* Config form */}
           {selectedVersion && versionFields.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-[13px] font-medium text-foreground">配置参数</h4>
-              <div className="space-y-3">
-                {versionFields.map((field) => (
-                  <FormFieldInput key={field.envKey} field={field} control={control} error={errors[field.envKey]} />
-                ))}
-              </div>
+            <div className="space-y-3">
+              {versionFields.map((field) => (
+                <FormFieldInput key={field.envKey} field={field} control={control} error={errors[field.envKey]} />
+              ))}
             </div>
           )}
 
           {/* Docker Compose 配置 */}
           {selectedVersion && (
             <div>
-              <h4 className="mb-2 text-[13px] font-medium text-foreground">Docker Compose 配置</h4>
+              <FormFieldLabel className="mb-2">Compose</FormFieldLabel>
               <div className="overflow-hidden rounded-lg border border-border" style={{ background: '#1e1e1e' }}>
                 <Editor
                   height="260px"
@@ -408,50 +405,38 @@ function FormFieldInput({
 
   if (field.type === 'select' || field.values?.length > 0) {
     return (
-      <Field data-invalid={!!error} className="gap-1.5">
-        <FieldLabel>
-          {label}
-          {field.required && <span className="ml-0.5 text-red-500">*</span>}
-        </FieldLabel>
-        <FieldContent>
-          <Controller
-            control={control}
-            name={field.envKey}
-            rules={field.required ? { required: `请填写 ${label}` } : undefined}
-            render={({ field: formField }) => (
-              <select
-                value={formField.value || ''}
-                onChange={(e) => formField.onChange(e.target.value)}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-              >
-                <option value="">请选择</option>
-                {field.values.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          />
-        </FieldContent>
-      </Field>
-    )
-  }
-
-  return (
-    <Field data-invalid={!!error} className="gap-1.5">
-      <FieldLabel>
-        {label}
-        {field.required && <span className="ml-0.5 text-red-500">*</span>}
-      </FieldLabel>
-      <FieldContent>
+      <FormFieldRow label={label} required={field.required} invalid={!!error} className="gap-1.5">
         <Controller
           control={control}
           name={field.envKey}
           rules={field.required ? { required: `请填写 ${label}` } : undefined}
-          render={({ field: formField }) => <Input type={fieldType} {...formField} placeholder={placeholder} />}
+          render={({ field: formField }) => (
+            <select
+              value={formField.value || ''}
+              onChange={(e) => formField.onChange(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+            >
+              <option value="">请选择</option>
+              {field.values.map((v) => (
+                <option key={v.value} value={v.value}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          )}
         />
-      </FieldContent>
-    </Field>
+      </FormFieldRow>
+    )
+  }
+
+  return (
+    <FormFieldRow label={label} required={field.required} invalid={!!error} className="gap-1.5">
+      <Controller
+        control={control}
+        name={field.envKey}
+        rules={field.required ? { required: `请填写 ${label}` } : undefined}
+        render={({ field: formField }) => <Input type={fieldType} {...formField} placeholder={placeholder} />}
+      />
+    </FormFieldRow>
   )
 }

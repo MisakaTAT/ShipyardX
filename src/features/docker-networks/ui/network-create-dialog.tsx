@@ -8,10 +8,11 @@ import {
 } from '@/features/docker-networks/model/network-create-schema'
 import type { NetworkCreate } from '@/types/app-bindings'
 import { Share2, Loader2, Plus } from 'lucide-react'
+import { FormFieldHint, FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateNetwork } from '@/features/docker-networks/api/use-networks'
@@ -97,42 +98,36 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${formId}-name`}>名称</FieldLabel>
-                <FieldContent>
-                  <Input
-                    id={`${formId}-name`}
-                    {...field}
-                    placeholder="my-net"
-                    disabled={submitting}
-                    aria-invalid={fieldState.invalid}
-                  />
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="名称" htmlFor={`${formId}-name`} required invalid={fieldState.invalid}>
+                <Input
+                  id={`${formId}-name`}
+                  {...field}
+                  placeholder="my-net"
+                  disabled={submitting}
+                  aria-invalid={fieldState.invalid}
+                />
+              </FormFieldRow>
             )}
           />
           <Controller
             control={form.control}
             name="driver"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel>Driver</FieldLabel>
-                <FieldContent>
-                  <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                    <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
-                      <SelectValue placeholder="选择 Driver" />
-                    </SelectTrigger>
-                    <SelectContent align="start">
-                      <SelectItem value="bridge">bridge</SelectItem>
-                      <SelectItem value="host">host</SelectItem>
-                      <SelectItem value="overlay">overlay</SelectItem>
-                      <SelectItem value="macvlan">macvlan</SelectItem>
-                      <SelectItem value="ipvlan">ipvlan</SelectItem>
-                      <SelectItem value="none">none</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="Driver" required invalid={fieldState.invalid}>
+                <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
+                  <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
+                    <SelectValue placeholder="选择 Driver" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="bridge">bridge</SelectItem>
+                    <SelectItem value="host">host</SelectItem>
+                    <SelectItem value="overlay">overlay</SelectItem>
+                    <SelectItem value="macvlan">macvlan</SelectItem>
+                    <SelectItem value="ipvlan">ipvlan</SelectItem>
+                    <SelectItem value="none">none</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormFieldRow>
             )}
           />
           <div className="grid grid-cols-2 gap-3">
@@ -140,40 +135,34 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               control={form.control}
               name="subnet"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${formId}-subnet`}>子网（可选）</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      id={`${formId}-subnet`}
-                      {...field}
-                      placeholder="172.28.0.0/16"
-                      disabled={submitting}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+                <FormFieldRow label="子网（可选）" htmlFor={`${formId}-subnet`} invalid={fieldState.invalid}>
+                  <Input
+                    id={`${formId}-subnet`}
+                    {...field}
+                    placeholder="172.28.0.0/16"
+                    disabled={submitting}
+                    aria-invalid={fieldState.invalid}
+                  />
+                </FormFieldRow>
               )}
             />
             <Controller
               control={form.control}
               name="gateway"
               render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={`${formId}-gw`}>网关（可选）</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      id={`${formId}-gw`}
-                      {...field}
-                      placeholder="172.28.0.1"
-                      disabled={submitting}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+                <FormFieldRow label="网关（可选）" htmlFor={`${formId}-gw`} invalid={fieldState.invalid}>
+                  <Input
+                    id={`${formId}-gw`}
+                    {...field}
+                    placeholder="172.28.0.1"
+                    disabled={submitting}
+                    aria-invalid={fieldState.invalid}
+                  />
+                </FormFieldRow>
               )}
             />
           </div>
-          <FieldDescription>不填子网时由 Docker 自动分配地址池</FieldDescription>
+          <FormFieldHint>不填子网时由 Docker 自动分配地址池</FormFieldHint>
           <Controller
             control={form.control}
             name="internal"

@@ -7,10 +7,11 @@ import {
   type VolumeCreateFormValues,
 } from '@/features/docker-volumes/model/volume-create-schema'
 import { Database, Loader2, Plus } from 'lucide-react'
+import { FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useCreateVolume } from '@/features/docker-volumes/api/use-volumes'
@@ -120,37 +121,31 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${formId}-name`}>名称</FieldLabel>
-                <FieldContent>
-                  <Input
-                    id={`${formId}-name`}
-                    {...field}
-                    placeholder="my-volume"
-                    disabled={submitting}
-                    aria-invalid={fieldState.invalid}
-                  />
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="名称" htmlFor={`${formId}-name`} required invalid={fieldState.invalid}>
+                <Input
+                  id={`${formId}-name`}
+                  {...field}
+                  placeholder="my-volume"
+                  disabled={submitting}
+                  aria-invalid={fieldState.invalid}
+                />
+              </FormFieldRow>
             )}
           />
           <Controller
             control={form.control}
             name="driver"
             render={({ field }) => (
-              <Field>
-                <FieldLabel>模式</FieldLabel>
-                <FieldContent>
-                  <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="选择 Driver" />
-                    </SelectTrigger>
-                    <SelectContent align="start">
-                      <SelectItem value="local">local</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FieldContent>
-              </Field>
+              <FormFieldRow label="模式" required>
+                <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="选择 Driver" />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="local">local</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormFieldRow>
             )}
           />
 
@@ -177,18 +172,15 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 control={form.control}
                 name="nfsAddr"
                 render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${formId}-nfs-addr`}>地址</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        id={`${formId}-nfs-addr`}
-                        {...field}
-                        placeholder="10.0.0.10 或 nfs.example.com"
-                        disabled={submitting}
-                        aria-invalid={fieldState.invalid}
-                      />
-                    </FieldContent>
-                  </Field>
+                  <FormFieldRow label="地址" htmlFor={`${formId}-nfs-addr`} required invalid={fieldState.invalid}>
+                    <Input
+                      id={`${formId}-nfs-addr`}
+                      {...field}
+                      placeholder="10.0.0.10 或 nfs.example.com"
+                      disabled={submitting}
+                      aria-invalid={fieldState.invalid}
+                    />
+                  </FormFieldRow>
                 )}
               />
               <div className="grid grid-cols-2 gap-3">
@@ -196,36 +188,30 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                   control={form.control}
                   name="nfsVersion"
                   render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={`${formId}-nfs-ver`}>版本</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          id={`${formId}-nfs-ver`}
-                          {...field}
-                          placeholder="4.1"
-                          disabled={submitting}
-                          aria-invalid={fieldState.invalid}
-                        />
-                      </FieldContent>
-                    </Field>
+                    <FormFieldRow label="版本" htmlFor={`${formId}-nfs-ver`} invalid={fieldState.invalid}>
+                      <Input
+                        id={`${formId}-nfs-ver`}
+                        {...field}
+                        placeholder="4.1"
+                        disabled={submitting}
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </FormFieldRow>
                   )}
                 />
                 <Controller
                   control={form.control}
                   name="nfsMount"
                   render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={`${formId}-nfs-mount`}>挂载点</FieldLabel>
-                      <FieldContent>
-                        <Input
-                          id={`${formId}-nfs-mount`}
-                          {...field}
-                          placeholder="/nfs-share"
-                          disabled={submitting}
-                          aria-invalid={fieldState.invalid}
-                        />
-                      </FieldContent>
-                    </Field>
+                    <FormFieldRow label="挂载点" htmlFor={`${formId}-nfs-mount`} required invalid={fieldState.invalid}>
+                      <Input
+                        id={`${formId}-nfs-mount`}
+                        {...field}
+                        placeholder="/nfs-share"
+                        disabled={submitting}
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </FormFieldRow>
                   )}
                 />
               </div>
@@ -233,18 +219,15 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 control={form.control}
                 name="nfsOptions"
                 render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={`${formId}-nfs-opt`}>可选参数</FieldLabel>
-                    <FieldContent>
-                      <Input
-                        id={`${formId}-nfs-opt`}
-                        {...field}
-                        placeholder="rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14"
-                        disabled={submitting}
-                        aria-invalid={fieldState.invalid}
-                      />
-                    </FieldContent>
-                  </Field>
+                  <FormFieldRow label="可选参数" htmlFor={`${formId}-nfs-opt`} invalid={fieldState.invalid}>
+                    <Input
+                      id={`${formId}-nfs-opt`}
+                      {...field}
+                      placeholder="rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14"
+                      disabled={submitting}
+                      aria-invalid={fieldState.invalid}
+                    />
+                  </FormFieldRow>
                 )}
               />
             </>

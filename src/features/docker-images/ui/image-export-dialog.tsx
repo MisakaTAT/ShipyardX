@@ -10,10 +10,11 @@ import {
   type ImageExportFormValues,
 } from '@/features/docker-images/model/image-export-schema'
 import { StandardDialog } from '@/shared/components/standard-dialog'
+import { FormFieldHint, FormFieldRow } from '@/shared/components/form-field'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from '@/shared/ui/field'
+import { FieldGroup } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { events, type Image } from '@/types/app-bindings'
 
@@ -153,23 +154,27 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             control={form.control}
             name="fileName"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldContent>
-                  <FieldTitle>文件名</FieldTitle>
-                  <Input
-                    {...field}
-                    ref={(el) => {
-                      field.ref(el)
-                      nameInputRef.current = el
-                    }}
-                    aria-invalid={fieldState.invalid}
-                    aria-describedby={`${formId}-name-desc`}
-                    placeholder="nginx_latest.tar"
-                    disabled={exporting}
-                  />
-                  <FieldDescription id={`${formId}-name-desc`}>可自定义名称；未带 `.tar` 会自动补上。</FieldDescription>
-                </FieldContent>
-              </Field>
+              <FormFieldRow
+                label="文件名"
+                required
+                invalid={fieldState.invalid}
+                variant="title"
+                description={
+                  <FormFieldHint id={`${formId}-name-desc`}>可自定义名称；未带 `.tar` 会自动补上。</FormFieldHint>
+                }
+              >
+                <Input
+                  {...field}
+                  ref={(el) => {
+                    field.ref(el)
+                    nameInputRef.current = el
+                  }}
+                  aria-invalid={fieldState.invalid}
+                  aria-describedby={`${formId}-name-desc`}
+                  placeholder="nginx_latest.tar"
+                  disabled={exporting}
+                />
+              </FormFieldRow>
             )}
           />
 
@@ -177,30 +182,33 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             control={form.control}
             name="directory"
             render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldContent className="gap-2">
-                  <FieldTitle>保存目录</FieldTitle>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      {...field}
-                      aria-invalid={fieldState.invalid}
-                      aria-describedby={`${formId}-dir-desc`}
-                      placeholder="请选择本地目录"
-                      disabled={exporting}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handlePickDirectory()}
-                      disabled={exporting}
-                    >
-                      <FolderOpen />
-                      选择目录
-                    </Button>
-                  </div>
-                  <FieldDescription id={`${formId}-dir-desc`}>镜像会以 tar 包形式保存到该目录。</FieldDescription>
-                </FieldContent>
-              </Field>
+              <FormFieldRow
+                label="保存目录"
+                required
+                invalid={fieldState.invalid}
+                variant="title"
+                contentClassName="gap-2"
+                description={<FormFieldHint id={`${formId}-dir-desc`}>镜像会以 tar 包形式保存到该目录。</FormFieldHint>}
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    {...field}
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={`${formId}-dir-desc`}
+                    placeholder="请选择本地目录"
+                    disabled={exporting}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handlePickDirectory()}
+                    disabled={exporting}
+                  >
+                    <FolderOpen />
+                    选择目录
+                  </Button>
+                </div>
+              </FormFieldRow>
             )}
           />
         </FieldGroup>
