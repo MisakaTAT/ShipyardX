@@ -173,18 +173,6 @@ pub async fn export_image(
 ) -> AppResult<()> {
     let directory = directory.trim();
     let file_name = file_name.trim();
-    if directory.is_empty() {
-        return Err(AppError::validation("image.export_dir_required", "请选择导出目录"));
-    }
-    if file_name.is_empty() {
-        return Err(AppError::validation("image.export_name_required", "请输入导出文件名"));
-    }
-    if !is_valid_export_name(file_name) {
-        return Err(AppError::validation(
-            "image.export_name_invalid",
-            "文件名包含非法字符，请重新命名",
-        ));
-    }
 
     let export_dir = PathBuf::from(directory);
     ensure_export_directory(&export_dir)?;
@@ -264,9 +252,6 @@ pub async fn import_image(
     state: State<'_, AppState>,
 ) -> AppResult<()> {
     let file_path = file_path.trim();
-    if file_path.is_empty() {
-        return Err(AppError::validation("image.import_file_required", "请选择镜像文件"));
-    }
 
     let import_path = PathBuf::from(file_path);
     let file_name = import_path
@@ -274,7 +259,7 @@ pub async fn import_image(
         .and_then(|name| name.to_str())
         .map(str::to_string)
         .filter(|name| !name.trim().is_empty())
-        .ok_or_else(|| AppError::validation("image.import_name_invalid", "无法识别镜像文件名"))?;
+        .unwrap_or_else(|| String::from("image archive"));
 
     let total_bytes = ensure_import_file(&import_path).await?;
     let ctx = ServerContext::from_state(&state, &server_id)?;
@@ -703,17 +688,6 @@ fn ensure_tar_extension(file_name: &str) -> String {
     } else {
         format!("{file_name}.tar")
     }
-}
-
-fn is_valid_export_name(file_name: &str) -> bool {
-    if matches!(file_name, "." | "..") {
-        return false;
-    }
-
-    !file_name.is_empty()
-        && !file_name
-            .bytes()
-            .any(|b| b < 32 || matches!(b, b'<' | b'>' | b':' | b'"' | b'/' | b'\\' | b'|' | b'?' | b'*'))
 }
 
 async fn create_export_file(path: &Path) -> AppResult<tokio::fs::File> {

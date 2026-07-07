@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import type { ServerConfig } from '@/types/app-bindings'
+import { trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const serverFormSchema = z
   .object({
-    name: z.string().min(1, '请填写服务器名称'),
-    host: z.string().min(1, '请填写主机地址'),
+    name: trimmedRequiredString('请填写服务器名称'),
+    host: trimmedRequiredString('请填写主机地址'),
     port: z.number().int().min(1, '端口须在 1–65535').max(65535),
-    username: z.string().min(1, '请填写用户名'),
+    username: trimmedRequiredString('请填写用户名'),
     auth_type: z.enum(['key', 'password']),
     password: z.string(),
     key_path: z.string(),
@@ -49,8 +50,8 @@ export function serverConfigToFormValues(s: ServerConfig): ServerFormValues {
 
 export const serverTestConnectionSchema = z
   .object({
-    host: z.string().min(1, '请先填写主机地址'),
-    username: z.string().min(1, '请先填写用户名'),
+    host: trimmedRequiredString('请先填写主机地址'),
+    username: trimmedRequiredString('请先填写用户名'),
     auth_type: z.enum(['key', 'password']),
     password: z.string(),
     key_path: z.string(),

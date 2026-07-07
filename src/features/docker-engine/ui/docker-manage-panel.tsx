@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, type FieldErrors } from 'react-hook-form'
 import { commands } from '@/types/app-bindings'
 import {
   daemonSettingsToFormValues,
@@ -18,7 +18,7 @@ import DockerSudoPasswordDialog from '@/features/docker-engine/ui/docker-sudo-pa
 import { Loader2, RotateCcw, Save, Undo2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
@@ -27,6 +27,13 @@ import { toast } from '@/shared/components/toast'
 
 interface Props {
   serverId: string
+}
+
+function getFirstDaemonFormError(errors: FieldErrors<DockerDaemonFormValues>) {
+  for (const error of Object.values(errors)) {
+    if (error?.message) return String(error.message)
+  }
+  return '表单校验失败，请检查配置后重试'
 }
 
 export default function DockerManagePanel({ serverId }: Props) {
@@ -125,9 +132,14 @@ export default function DockerManagePanel({ serverId }: Props) {
     }
   }
 
-  const onDaemonSubmit = daemonForm.handleSubmit(async (values) => {
-    await persistUpdate(values, undefined)
-  })
+  const onDaemonSubmit = daemonForm.handleSubmit(
+    async (values) => {
+      await persistUpdate(values, undefined)
+    },
+    (errors) => {
+      toast.warning(getFirstDaemonFormError(errors))
+    }
+  )
 
   const loading = daemonSettingsQuery.isLoading
   const saving = updateDaemonSettings.isPending
@@ -199,7 +211,6 @@ export default function DockerManagePanel({ serverId }: Props) {
                             disabled={busy}
                             aria-invalid={fieldState.invalid}
                           />
-                          <FieldError errors={[fieldState.error]} />
                         </FieldContent>
                       </Field>
                     )}
@@ -281,7 +292,6 @@ export default function DockerManagePanel({ serverId }: Props) {
                           disabled={busy}
                           aria-invalid={fieldState.invalid}
                         />
-                        <FieldError errors={[fieldState.error]} />
                       </FieldContent>
                     </Field>
                   )}
@@ -313,7 +323,6 @@ export default function DockerManagePanel({ serverId }: Props) {
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
                                     <Input {...f} placeholder="10m" disabled={busy} aria-invalid={fieldState.invalid} />
-                                    <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>
                               )}
@@ -325,7 +334,6 @@ export default function DockerManagePanel({ serverId }: Props) {
                                 <Field data-invalid={fieldState.invalid}>
                                   <FieldContent>
                                     <Input {...f} placeholder="3" disabled={busy} aria-invalid={fieldState.invalid} />
-                                    <FieldError errors={[fieldState.error]} />
                                   </FieldContent>
                                 </Field>
                               )}

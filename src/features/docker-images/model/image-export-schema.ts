@@ -1,13 +1,10 @@
 import { z } from 'zod'
 import type { Image } from '@/types/app-bindings'
+import { safeFileNameSchema, trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const imageExportFormSchema = z.object({
-  fileName: z
-    .string()
-    .trim()
-    .min(1, '请输入导出文件名')
-    .refine((value) => !/[\\/]/.test(value), '文件名不能包含路径分隔符'),
-  directory: z.string().trim().min(1, '请选择导出目录'),
+  fileName: safeFileNameSchema('请输入导出文件名', '文件名包含非法字符，请重新命名'),
+  directory: trimmedRequiredString('请选择导出目录'),
 })
 
 export type ImageExportFormValues = z.infer<typeof imageExportFormSchema>

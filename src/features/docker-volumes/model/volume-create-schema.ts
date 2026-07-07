@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const volumeCreateFormSchema = z
   .object({
-    name: z.string().min(1, '请填写卷名称'),
+    name: trimmedRequiredString('请填写卷名称'),
     driver: z.literal('local'),
     enableNfs: z.boolean(),
     nfsAddr: z.string(),
