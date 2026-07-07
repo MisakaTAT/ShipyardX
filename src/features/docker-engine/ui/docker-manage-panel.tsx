@@ -15,7 +15,7 @@ import {
   useUpdateDockerDaemonSettings,
 } from '@/features/docker-engine/api/use-docker-access'
 import DockerSudoPasswordDialog from '@/features/docker-engine/ui/docker-sudo-password-dialog'
-import { Loader2, RotateCcw, Save } from 'lucide-react'
+import { Loader2, RotateCcw, Save, Undo2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/shared/ui/field'
@@ -151,20 +151,37 @@ export default function DockerManagePanel({ serverId }: Props) {
                     <div className="mt-1 text-xs text-muted-foreground">多个地址换行填写（为空则取消镜像加速）</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" onClick={() => void runRestart()} disabled={busy}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      title="重启 Docker"
+                      aria-label="重启 Docker"
+                      onClick={() => void runRestart()}
+                      disabled={busy}
+                    >
                       {restarting ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-                      重启 Docker
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => daemonForm.reset()} disabled={busy}>
-                      恢复已加载配置
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      title="撤销未保存修改"
+                      aria-label="撤销未保存修改"
+                      onClick={() => daemonForm.reset()}
+                      disabled={busy}
+                    >
+                      <Undo2 />
                     </Button>
                     <Button
                       type="submit"
                       form={`${daemonFormId}-daemon`}
+                      size="icon-sm"
+                      title="保存"
+                      aria-label="保存"
                       disabled={busy || !daemonForm.formState.isDirty}
                     >
                       {saving ? <Loader2 className="animate-spin" /> : <Save />}
-                      保存
                     </Button>
                   </div>
                 </div>
