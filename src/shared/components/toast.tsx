@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from 'lucide-react'
+import { CircleCheckIcon, InfoIcon, Loader2Icon, CircleAlertIcon, CircleAlert } from 'lucide-react'
 import { toast as sonnerToast, type ExternalToast } from 'sonner'
 import { cn } from '@/shared/lib/utils'
 
@@ -22,9 +22,9 @@ function renderIcon(kind: ToastKind) {
     kind === 'success' ? (
       <CircleCheckIcon className={iconClassName} />
     ) : kind === 'error' ? (
-      <OctagonXIcon className={iconClassName} />
+      <CircleAlertIcon className={iconClassName} />
     ) : kind === 'warning' ? (
-      <TriangleAlertIcon className={iconClassName} />
+      <CircleAlert className={iconClassName} />
     ) : kind === 'info' ? (
       <InfoIcon className={iconClassName} />
     ) : (
