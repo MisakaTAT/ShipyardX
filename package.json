@@ -1,7 +1,7 @@
 {
   "name": "shipyardx",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "packageManager": "pnpm@11.3.0",
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "release-version": "node scripts/release-version.mjs",
     "lint": "eslint .",
     "fmt": "prettier --write \"**/*.{ts,tsx}\" && cargo fmt --manifest-path src-tauri/Cargo.toml --all",
     "typecheck": "tsc --noEmit",
