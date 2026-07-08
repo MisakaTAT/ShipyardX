@@ -1,7 +1,16 @@
 import { z } from 'zod'
 
-const invalidFileNameChars = /[<>:"/\\|?*\u0000-\u001f]/
 const archiveFilePattern = /\.(tar|tgz|tar\.gz|gz|xz|tar\.xz|zst|tar\.zst)$/i
+const invalidFileNameCharSet = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
+
+function hasInvalidFileNameChars(value: string) {
+  for (const char of value) {
+    if (invalidFileNameCharSet.has(char)) return true
+    const code = char.charCodeAt(0)
+    if (code >= 0 && code <= 31) return true
+  }
+  return false
+}
 
 export function trimmedRequiredString(message: string) {
   return z.string().trim().min(1, message)
@@ -9,7 +18,7 @@ export function trimmedRequiredString(message: string) {
 
 export function safeFileNameSchema(requiredMessage: string, invalidMessage: string) {
   return trimmedRequiredString(requiredMessage).refine(
-    (value) => value !== '.' && value !== '..' && !invalidFileNameChars.test(value),
+    (value) => value !== '.' && value !== '..' && !hasInvalidFileNameChars(value),
     {
       message: invalidMessage,
     }
