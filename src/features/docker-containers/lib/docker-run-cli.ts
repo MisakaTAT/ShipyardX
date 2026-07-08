@@ -43,6 +43,32 @@ function normalizeRestartPolicy(s: string): string {
   return s.trim().toLowerCase().replace(/_/g, '-')
 }
 
+function isValidIpv4(value: string): boolean {
+  const parts = value.split('.')
+  if (parts.length !== 4) return false
+
+  return parts.every((part) => {
+    if (!/^\d+$/.test(part)) return false
+    const num = Number(part)
+    return num >= 0 && num <= 255
+  })
+}
+
+function isValidIpv6(value: string): boolean {
+  if (!value || /\s/.test(value)) return false
+  const parts = value.split('::')
+  if (parts.length > 2) return false
+
+  const left = parts[0] ? parts[0].split(':').filter(Boolean) : []
+  const right = parts[1] ? parts[1].split(':').filter(Boolean) : []
+  const all = [...left, ...right]
+
+  if (all.length === 0 || all.length > 8) return false
+  if (parts.length === 1 && all.length !== 8) return false
+
+  return all.every((part) => /^[0-9a-fA-F]{1,4}$/.test(part))
+}
+
 export function getRunContainerValidationIssues(params: RunContainer): RunContainerValidationIssue[] {
   const issues: RunContainerValidationIssue[] = []
 
@@ -62,35 +88,36 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
     }
   }
 
-  for (const line of params.env ?? []) {
-    const t = line.trim()
+  for (let i = 0; i < (params.env ?? []).length; i++) {
+    const t = params.env?.[i]?.trim() ?? ''
     if (!t) continue
     const eq = t.indexOf('=')
     if (eq === -1) {
-      issues.push({ message: `环境变量须为 KEY=value：${t}`, path: ['envText'] })
+      issues.push({ message: `环境变量须为 KEY=value：${t}`, path: ['envEntries', i, 'key'] })
       break
     }
     if (!t.slice(0, eq).trim()) {
-      issues.push({ message: `环境变量键名不能为空：${t}`, path: ['envText'] })
+      issues.push({ message: `环境变量键名不能为空：${t}`, path: ['envEntries', i, 'key'] })
       break
     }
   }
 
-  for (const line of params.labels ?? []) {
-    const t = line.trim()
+  for (let i = 0; i < (params.labels ?? []).length; i++) {
+    const t = params.labels?.[i]?.trim() ?? ''
     if (!t) continue
     const eq = t.indexOf('=')
     if (eq === -1) {
-      issues.push({ message: `标签须为 KEY=value：${t}`, path: ['labelText'] })
+      issues.push({ message: `标签须为 KEY=value：${t}`, path: ['labelEntries', i, 'key'] })
       break
     }
     if (!t.slice(0, eq).trim()) {
-      issues.push({ message: `标签键名不能为空：${t}`, path: ['labelText'] })
+      issues.push({ message: `标签键名不能为空：${t}`, path: ['labelEntries', i, 'key'] })
       break
     }
   }
 
   const ports = params.ports ?? []
+  const seenHostPorts = new Map<string, number>()
   for (let i = 0; i < ports.length; i++) {
     const p = ports[i]
     const cp = p.container_port
@@ -104,6 +131,16 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
     const proto = (p.protocol || 'tcp').trim().toLowerCase()
     if (proto !== 'tcp' && proto !== 'udp') {
       issues.push({ message: '端口协议仅支持 tcp 或 udp', path: ['ports', i, 'protocol'] })
+    }
+
+    if (hp != null && hp !== 0) {
+      const key = `${proto}:${hp}`
+      const previousIndex = seenHostPorts.get(key)
+      if (previousIndex != null) {
+        issues.push({ message: `主机端口 ${hp} 已重复（${proto}）`, path: ['ports', i, 'hostPort'] })
+      } else {
+        seenHostPorts.set(key, i)
+      }
     }
   }
 
@@ -122,6 +159,12 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   const ip6 = params.ipv6_address?.trim() ?? ''
   const netNorm = (params.network?.trim() ?? '').toLowerCase()
   const isUserDefinedNetwork = netNorm.length > 0 && !['bridge', 'host', 'none', 'default'].includes(netNorm)
+  if (ip4 && !isValidIpv4(ip4)) {
+    issues.push({ message: 'IPv4 地址格式不正确', path: ['ipv4Address'] })
+  }
+  if (ip6 && !isValidIpv6(ip6)) {
+    issues.push({ message: 'IPv6 地址格式不正确', path: ['ipv6Address'] })
+  }
   if ((ip4 || ip6) && !isUserDefinedNetwork) {
     issues.push({
       message: '固定 IPv4/IPv6 仅适用于用户自定义网络，请在网络中选择自建网络（非 bridge / host / none）',
@@ -160,8 +203,8 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
 export function buildRunParamsFromForm(args: {
   image: string
   name: string
-  envLines: string[]
-  labelLines: string[]
+  envEntries: { key: string; value: string }[]
+  labelEntries: { key: string; value: string }[]
   ports: { containerPort: number; hostPort: number | null; protocol: string }[]
   volumes: { hostPath: string; containerPath: string; readOnly: boolean }[]
   restartPolicy: string
@@ -170,8 +213,12 @@ export function buildRunParamsFromForm(args: {
   network: string
   ipv4Address: string
   ipv6Address: string
-  commandLines: string[]
-  entrypointLine: string
+  commandMode: 'raw' | 'args'
+  commandText: string
+  commandArgs: { value: string }[]
+  entrypointMode: 'raw' | 'args'
+  entrypointText: string
+  entrypointArgs: { value: string }[]
   autoRemove: boolean
   privileged: boolean
   tty: boolean
@@ -180,10 +227,22 @@ export function buildRunParamsFromForm(args: {
   cpuQuotaCores: string
   memoryMb: string
 }): RunContainer {
-  const env = args.envLines.map((s) => s.trim()).filter(Boolean)
-  const labels = args.labelLines.map((s) => s.trim()).filter(Boolean)
-  const command = args.commandLines.map((s) => s.trim()).filter(Boolean)
-  const entrypoint = splitShellArgs(args.entrypointLine.trim()).filter(Boolean)
+  const env = args.envEntries
+    .map(({ key, value }) => ({ key: key.trim(), value }))
+    .filter(({ key, value }) => key || value)
+    .map(({ key, value }) => `${key}=${value}`)
+  const labels = args.labelEntries
+    .map(({ key, value }) => ({ key: key.trim(), value }))
+    .filter(({ key, value }) => key || value)
+    .map(({ key, value }) => `${key}=${value}`)
+  const command =
+    args.commandMode === 'raw'
+      ? splitShellArgs(args.commandText.trim()).filter(Boolean)
+      : args.commandArgs.map(({ value }) => value.trim()).filter(Boolean)
+  const entrypoint =
+    args.entrypointMode === 'raw'
+      ? splitShellArgs(args.entrypointText.trim()).filter(Boolean)
+      : args.entrypointArgs.map(({ value }) => value.trim()).filter(Boolean)
   const cpuShares = Math.max(0, parseInt(args.cpuShares, 10) || 0)
   const cpuQuota = Math.max(0, parseFloat(args.cpuQuotaCores) || 0)
   const memMb = Math.max(0, parseInt(args.memoryMb, 10) || 0)

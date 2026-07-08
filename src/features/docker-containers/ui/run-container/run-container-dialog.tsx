@@ -16,7 +16,7 @@ import { StandardDialog } from '@/shared/components/standard-dialog'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldTitle } from '@/shared/ui/field'
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldTitle } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -42,6 +42,14 @@ const RESTART_OPTIONS = [
 
 const BUILT_IN_NETWORKS = new Set(['bridge', 'host', 'none', 'default'])
 
+function emptyKeyValueRow() {
+  return { key: '', value: '' }
+}
+
+function emptyArgRow() {
+  return { value: '' }
+}
+
 function emptyPort(): RunContainerFormValues['ports'][number] {
   return { containerPort: 80, hostPort: null, protocol: 'tcp' }
 }
@@ -50,12 +58,61 @@ function emptyVolume(): RunContainerFormValues['volumes'][number] {
   return { hostPath: '', containerPath: '', readOnly: false }
 }
 
+function getRestartPolicyLabel(value: RunContainerFormValues['restartPolicy']) {
+  return RESTART_OPTIONS.find((option) => option.value === value)?.label ?? value
+}
+
 function SectionTitle({ className, invalid, ...props }: ComponentProps<typeof FieldTitle> & { invalid?: boolean }) {
   return <FieldTitle className={cn(SECTION_TITLE, invalid ? 'text-destructive' : null, className)} {...props} />
 }
 
 function SectionHint({ className, ...props }: ComponentProps<typeof FieldDescription>) {
   return <FieldDescription className={cn(SECTION_HINT, className)} {...props} />
+}
+
+interface FormSectionProps {
+  title?: ReactNode
+  invalid?: boolean
+  action?: ReactNode
+  hint?: ReactNode
+  children: ReactNode
+  className?: string
+}
+
+function FormSection({ title, invalid, action, hint, children, className }: FormSectionProps) {
+  return (
+    <div className={cn(SECTION_SHELL, className)}>
+      {title ? (
+        <div className="flex items-center justify-between gap-3">
+          <SectionTitle invalid={invalid}>{title}</SectionTitle>
+          {action}
+        </div>
+      ) : null}
+      {hint ? <SectionHint className="nth-last-2:mt-0">{hint}</SectionHint> : null}
+      {children}
+    </div>
+  )
+}
+
+interface StackFieldProps {
+  label: ReactNode
+  htmlFor?: string
+  invalid?: boolean
+  hint?: ReactNode
+  children: ReactNode
+  className?: string
+}
+
+function StackField({ label, htmlFor, invalid, hint, children, className }: StackFieldProps) {
+  return (
+    <div className={cn(FIELD_SHELL, className)}>
+      <FieldLabel htmlFor={htmlFor} className={invalid ? 'text-destructive' : undefined}>
+        {label}
+      </FieldLabel>
+      {children}
+      {hint ? <SectionHint>{hint}</SectionHint> : null}
+    </div>
+  )
 }
 
 interface CheckRowProps {
@@ -70,6 +127,151 @@ function CheckRow({ checked, onCheckedChange, children }: CheckRowProps) {
       <Checkbox checked={checked} onCheckedChange={(c) => onCheckedChange(c === true)} />
       <span>{children}</span>
     </label>
+  )
+}
+
+interface KeyValueEditorProps {
+  title: string
+  hint: ReactNode
+  fields: Array<{ id: string }>
+  invalid?: boolean
+  onAdd: () => void
+  onRemove: (index: number) => void
+  renderKeyInput: (index: number) => ReactNode
+  renderValueInput: (index: number) => ReactNode
+}
+
+function KeyValueEditor({
+  title,
+  hint,
+  fields,
+  invalid,
+  onAdd,
+  onRemove,
+  renderKeyInput,
+  renderValueInput,
+}: KeyValueEditorProps) {
+  return (
+    <FormSection
+      title={title}
+      invalid={invalid}
+      action={
+        <Button type="button" variant="outline" size="sm" className="gap-1 px-2" onClick={onAdd}>
+          <Plus className="size-3" />
+          添加
+        </Button>
+      }
+      hint={hint}
+    >
+      {fields.length === 0 ? (
+        <SectionHint>暂未添加</SectionHint>
+      ) : (
+        <div className="space-y-2">
+          {fields.map((row, i) => (
+            <div key={row.id} className="flex flex-row items-center gap-2 rounded-lg border border-border p-1">
+              <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                {renderKeyInput(i)}
+                {renderValueInput(i)}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 text-muted-foreground hover:text-red-500"
+                onClick={() => onRemove(i)}
+                aria-label={`删除${title}第 ${i + 1} 项`}
+                title={`删除${title}第 ${i + 1} 项`}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </FormSection>
+  )
+}
+
+interface ArgListEditorProps {
+  title: string
+  hint: ReactNode
+  mode: 'raw' | 'args'
+  onModeChange: (mode: 'raw' | 'args') => void
+  rawValue: string
+  onRawChange: (value: string) => void
+  rawPlaceholder: string
+  fields: Array<{ id: string }>
+  onAddArg: () => void
+  onRemoveArg: (index: number) => void
+  renderArgInput: (index: number) => ReactNode
+}
+
+function ArgListEditor({
+  title,
+  hint,
+  mode,
+  onModeChange,
+  rawValue,
+  onRawChange,
+  rawPlaceholder,
+  fields,
+  onAddArg,
+  onRemoveArg,
+  renderArgInput,
+}: ArgListEditorProps) {
+  return (
+    <FormSection title={title} hint={hint}>
+      <RadioGroup value={mode} onValueChange={(value) => onModeChange(value as 'raw' | 'args')} className="flex gap-4">
+        <label className={RADIO_ROW}>
+          <RadioGroupItem value="raw" />
+          <span>原始命令</span>
+        </label>
+        <label className={RADIO_ROW}>
+          <RadioGroupItem value="args" />
+          <span>参数列表</span>
+        </label>
+      </RadioGroup>
+      {mode === 'raw' ? (
+        <Textarea
+          value={rawValue}
+          onChange={(e) => onRawChange(e.target.value)}
+          placeholder={rawPlaceholder}
+          rows={3}
+        />
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <FieldLabel>参数列表</FieldLabel>
+            <Button type="button" variant="outline" size="sm" className="gap-1 px-2" onClick={onAddArg}>
+              <Plus className="size-3" />
+              添加参数
+            </Button>
+          </div>
+          {fields.length === 0 ? (
+            <SectionHint>暂未添加参数</SectionHint>
+          ) : (
+            <div className="space-y-2">
+              {fields.map((row, i) => (
+                <div key={row.id} className="flex items-center gap-2 rounded-lg border border-border p-1">
+                  <div className="min-w-0 flex-1">{renderArgInput(i)}</div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="shrink-0 text-muted-foreground hover:text-red-500"
+                    onClick={() => onRemoveArg(i)}
+                    aria-label={`删除${title}参数 ${i + 1}`}
+                    title={`删除${title}参数 ${i + 1}`}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </FormSection>
   )
 }
 
@@ -108,9 +310,31 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
     append: appendVolume,
     remove: removeVolume,
   } = useFieldArray({ control, name: 'volumes' })
+  const { fields: envFields, append: appendEnv, remove: removeEnv } = useFieldArray({ control, name: 'envEntries' })
+  const {
+    fields: labelFields,
+    append: appendLabel,
+    remove: removeLabel,
+  } = useFieldArray({ control, name: 'labelEntries' })
+  const {
+    fields: commandArgFields,
+    append: appendCommandArg,
+    remove: removeCommandArg,
+  } = useFieldArray({ control, name: 'commandArgs' })
+  const {
+    fields: entrypointArgFields,
+    append: appendEntrypointArg,
+    remove: removeEntrypointArg,
+  } = useFieldArray({ control, name: 'entrypointArgs' })
 
   const restartPolicy = watch('restartPolicy')
+  const network = watch('network')
+  const commandMode = watch('commandMode')
+  const commandText = watch('commandText')
+  const entrypointMode = watch('entrypointMode')
+  const entrypointText = watch('entrypointText')
   const imageInvalid = !!errors.image
+  const isCustomNetwork = Boolean(network.trim()) && !BUILT_IN_NETWORKS.has(network.trim().toLowerCase())
 
   const handleSuccess = useCallback(() => {
     onSuccess?.()
@@ -360,7 +584,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                 />
               )}
             />
-            <div className={SECTION_SHELL}>
+            <FormSection>
               <Controller
                 control={control}
                 name="forcePull"
@@ -373,15 +597,15 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   </>
                 )}
               />
-            </div>
+            </FormSection>
 
             {/* 端口 */}
-            <div className={SECTION_SHELL}>
-              <div className="flex items-center justify-between">
-                <SectionTitle>端口</SectionTitle>
+            <FormSection
+              title="端口"
+              action={
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="gap-1 px-2"
                   onClick={() => appendPort(emptyPort())}
@@ -389,7 +613,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   <Plus className="size-3" />
                   添加映射
                 </Button>
-              </div>
+              }
+              hint="可与下方映射同时使用。启用 `-P` 后，镜像中已 `EXPOSE` 的端口会在主机侧自动分配随机端口。"
+            >
               <Controller
                 control={control}
                 name="publishAllPorts"
@@ -411,7 +637,6 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   </RadioGroup>
                 )}
               />
-              <SectionHint>可与下方映射同时使用 启用 -P 时为 Dockerfile 中 EXPOSE 端口在主机分配临时端口</SectionHint>
               {portFields.length === 0 ? (
                 <SectionHint>未添加映射且未启用 -P 时容器内端口不会暴露到主机</SectionHint>
               ) : (
@@ -493,16 +718,22 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   ))}
                 </div>
               )}
-            </div>
+            </FormSection>
 
             {/* 网络 */}
-            <div className={SECTION_SHELL}>
+            <FormSection
+              title="网络"
+              hint={
+                isCustomNetwork
+                  ? '当前为自定义网络，可按需指定固定 IPv4 / IPv6。请确保 IP 位于该网络可分配网段内。'
+                  : '固定 IP 仅适用于用户自定义网络。若要指定 IPv4 / IPv6，请先切换到自建网络。'
+              }
+            >
               <Controller
                 control={control}
                 name="network"
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid} className="gap-2">
-                    <SectionTitle>网络</SectionTitle>
                     <Select
                       value={field.value.trim() || 'bridge'}
                       onValueChange={field.onChange}
@@ -527,48 +758,45 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   </Field>
                 )}
               />
-              <SectionHint>固定 IP 仅适用于用户自定义网络 填写 IP 后请在网络下拉选择对应名称</SectionHint>
               <div className="grid grid-cols-2 gap-3">
                 <Controller
                   control={control}
                   name="ipv4Address"
                   render={({ field, fieldState }) => (
-                    <div className={FIELD_SHELL}>
-                      <FieldLabel htmlFor="run-ctr-ipv4">IPv4</FieldLabel>
+                    <StackField label="IPv4" htmlFor="run-ctr-ipv4" invalid={fieldState.invalid}>
                       <Input
                         id="run-ctr-ipv4"
                         {...field}
                         placeholder="留空则自动分配"
                         aria-invalid={fieldState.invalid}
                       />
-                    </div>
+                    </StackField>
                   )}
                 />
                 <Controller
                   control={control}
                   name="ipv6Address"
                   render={({ field, fieldState }) => (
-                    <div className={FIELD_SHELL}>
-                      <FieldLabel htmlFor="run-ctr-ipv6">IPv6</FieldLabel>
+                    <StackField label="IPv6" htmlFor="run-ctr-ipv6" invalid={fieldState.invalid}>
                       <Input
                         id="run-ctr-ipv6"
                         {...field}
                         placeholder="留空则自动分配"
                         aria-invalid={fieldState.invalid}
                       />
-                    </div>
+                    </StackField>
                   )}
                 />
               </div>
-            </div>
+            </FormSection>
 
             {/* 数据卷 */}
-            <div className={SECTION_SHELL}>
-              <div className="flex items-center justify-between">
-                <SectionTitle>数据卷</SectionTitle>
+            <FormSection
+              title="数据卷"
+              action={
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="gap-1 px-2"
                   onClick={() => appendVolume(emptyVolume())}
@@ -576,7 +804,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   <Plus className="size-3" />
                   添加挂载
                 </Button>
-              </div>
+              }
+              hint="当前仅支持主机路径绑定挂载。适合持久化配置、数据目录和日志目录。"
+            >
               {volumeFields.map((row, i) => (
                 <div key={row.id} className="flex flex-row items-center gap-2 rounded-lg border border-border p-1">
                   <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
@@ -617,137 +847,190 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   </div>
                 </div>
               ))}
-            </div>
+            </FormSection>
 
             {/* 启动命令 & 入口 */}
-            <Controller
-              control={control}
-              name="commandText"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="run-ctr-cmd">启动命令（CMD）</FieldLabel>
-                  <FieldContent>
-                    <Textarea
-                      id="run-ctr-cmd"
+            <ArgListEditor
+              title="启动命令（CMD）"
+              mode={commandMode}
+              onModeChange={(mode) => setValue('commandMode', mode)}
+              rawValue={commandText}
+              onRawChange={(value) => setValue('commandText', value)}
+              rawPlaceholder="例如：nginx -g 'daemon off;'"
+              hint="留空则沿用镜像默认 CMD。原始命令适合一次性粘贴，参数列表适合逐项编辑。"
+              fields={commandArgFields}
+              onAddArg={() => appendCommandArg(emptyArgRow())}
+              onRemoveArg={removeCommandArg}
+              renderArgInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`commandArgs.${index}.value`}
+                  render={({ field, fieldState }) => (
+                    <Input
                       {...field}
-                      placeholder={'nginx\n-g\ndaemon off;'}
-                      rows={3}
+                      placeholder={index === 0 ? '例如 nginx' : '例如 -g / daemon off;'}
                       aria-invalid={fieldState.invalid}
                     />
-                    <SectionHint>留空则沿用镜像默认 CMD</SectionHint>
-                  </FieldContent>
-                </Field>
+                  )}
+                />
               )}
             />
 
-            <Controller
-              control={control}
-              name="entrypointLine"
-              render={({ field }) => (
-                <div className={FIELD_SHELL}>
-                  <FieldLabel htmlFor="run-ctr-ep">入口命令（ENTRYPOINT）</FieldLabel>
-                  <Input id="run-ctr-ep" {...field} placeholder="/docker-entrypoint.sh" />
-                  <SectionHint>留空则沿用镜像默认 ENTRYPOINT</SectionHint>
-                </div>
+            <ArgListEditor
+              title="入口命令（ENTRYPOINT）"
+              mode={entrypointMode}
+              onModeChange={(mode) => setValue('entrypointMode', mode)}
+              rawValue={entrypointText}
+              onRawChange={(value) => setValue('entrypointText', value)}
+              rawPlaceholder="例如：/docker-entrypoint.sh nginx"
+              hint="留空则沿用镜像默认 ENTRYPOINT。多数镜像无需额外修改，只有需要覆盖入口脚本时再填写。"
+              fields={entrypointArgFields}
+              onAddArg={() => appendEntrypointArg(emptyArgRow())}
+              onRemoveArg={removeEntrypointArg}
+              renderArgInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`entrypointArgs.${index}.value`}
+                  render={({ field, fieldState }) => (
+                    <Input
+                      {...field}
+                      placeholder={index === 0 ? '例如 /docker-entrypoint.sh' : '例如 nginx'}
+                      aria-invalid={fieldState.invalid}
+                    />
+                  )}
+                />
               )}
             />
 
             {/* 标签 & 环境变量 */}
-            <Controller
-              control={control}
-              name="labelText"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="run-ctr-labels">容器标签（Labels）</FieldLabel>
-                  <FieldContent>
-                    <Textarea
-                      id="run-ctr-labels"
-                      {...field}
-                      placeholder={'app=ShipyardX'}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+            <KeyValueEditor
+              title="容器标签（Labels）"
+              hint="适合写元数据，例如 `app=shipyardx`、`env=prod`。"
+              fields={labelFields}
+              invalid={Boolean(errors.labelEntries)}
+              onAdd={() => appendLabel(emptyKeyValueRow())}
+              onRemove={removeLabel}
+              renderKeyInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`labelEntries.${index}.key`}
+                  render={({ field, fieldState }) => (
+                    <Input {...field} placeholder="app" aria-invalid={fieldState.invalid} />
+                  )}
+                />
+              )}
+              renderValueInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`labelEntries.${index}.value`}
+                  render={({ field, fieldState }) => (
+                    <Input {...field} placeholder="shipyardx" aria-invalid={fieldState.invalid} />
+                  )}
+                />
               )}
             />
 
-            <Controller
-              control={control}
-              name="envText"
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="run-ctr-env">环境变量</FieldLabel>
-                  <FieldContent>
-                    <Textarea
-                      id="run-ctr-env"
-                      {...field}
-                      placeholder={'TZ=Asia/Shanghai'}
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </FieldContent>
-                </Field>
+            <KeyValueEditor
+              title="环境变量"
+              hint="前端会校验键名是否为空，提交时会转换为 `KEY=value` 传给 Docker。"
+              fields={envFields}
+              invalid={Boolean(errors.envEntries)}
+              onAdd={() => appendEnv(emptyKeyValueRow())}
+              onRemove={removeEnv}
+              renderKeyInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`envEntries.${index}.key`}
+                  render={({ field, fieldState }) => (
+                    <Input {...field} placeholder="TZ" aria-invalid={fieldState.invalid} />
+                  )}
+                />
+              )}
+              renderValueInput={(index) => (
+                <Controller
+                  control={control}
+                  name={`envEntries.${index}.value`}
+                  render={({ field, fieldState }) => (
+                    <Input {...field} placeholder="Asia/Shanghai" aria-invalid={fieldState.invalid} />
+                  )}
+                />
               )}
             />
 
             {/* 资源限制 */}
-            <div className="grid grid-cols-3 gap-3">
-              <Controller
-                control={control}
-                name="cpuShares"
-                render={({ field, fieldState }) => (
-                  <div className={FIELD_SHELL}>
-                    <FieldLabel htmlFor="run-cpu-shares">CPU 权重（shares）</FieldLabel>
-                    <Input
-                      id="run-cpu-shares"
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="默认 1024；0 表示不设置"
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="cpuQuotaCores"
-                render={({ field, fieldState }) => (
-                  <div className={FIELD_SHELL}>
-                    <FieldLabel htmlFor="run-cpu-quota">CPU 上限（核数）</FieldLabel>
-                    <Input
-                      id="run-cpu-quota"
-                      type="number"
-                      min={0}
-                      step="0.1"
-                      {...field}
-                      placeholder="0 或留空表示不限制"
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </div>
-                )}
-              />
-              <Controller
-                control={control}
-                name="memoryMb"
-                render={({ field, fieldState }) => (
-                  <div className={FIELD_SHELL}>
-                    <FieldLabel htmlFor="run-mem">内存上限（MB）</FieldLabel>
-                    <Input
-                      id="run-mem"
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="0 或留空表示不限制"
-                      aria-invalid={fieldState.invalid}
-                    />
-                  </div>
-                )}
-              />
-            </div>
+            <FormSection
+              title="资源限制"
+              hint="CPU 权重用于相对调度优先级，CPU 上限与内存上限用于硬限制。桌面环境下建议先从温和限制开始。"
+            >
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setValue('cpuQuotaCores', '0.5')}>
+                  0.5 核
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setValue('cpuQuotaCores', '1')}>
+                  1 核
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setValue('memoryMb', '512')}>
+                  512 MB
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setValue('memoryMb', '1024')}>
+                  1 GB
+                </Button>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Controller
+                  control={control}
+                  name="cpuShares"
+                  render={({ field, fieldState }) => (
+                    <StackField label="CPU 权重（shares）" htmlFor="run-cpu-shares" invalid={fieldState.invalid}>
+                      <Input
+                        id="run-cpu-shares"
+                        type="number"
+                        min={0}
+                        {...field}
+                        placeholder="默认 1024；0 表示不设置"
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </StackField>
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="cpuQuotaCores"
+                  render={({ field, fieldState }) => (
+                    <StackField label="CPU 上限（核数）" htmlFor="run-cpu-quota" invalid={fieldState.invalid}>
+                      <Input
+                        id="run-cpu-quota"
+                        type="number"
+                        min={0}
+                        step="0.1"
+                        {...field}
+                        placeholder="0 或留空表示不限制"
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </StackField>
+                  )}
+                />
+                <Controller
+                  control={control}
+                  name="memoryMb"
+                  render={({ field, fieldState }) => (
+                    <StackField label="内存上限（MB）" htmlFor="run-mem" invalid={fieldState.invalid}>
+                      <Input
+                        id="run-mem"
+                        type="number"
+                        min={0}
+                        {...field}
+                        placeholder="0 或留空表示不限制"
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </StackField>
+                  )}
+                />
+              </div>
+            </FormSection>
 
             {/* 其它选项 */}
-            <div className={SECTION_SHELL}>
-              <SectionTitle>其它选项</SectionTitle>
+            <FormSection title="其它选项">
               <Controller
                 control={control}
                 name="autoRemove"
@@ -757,6 +1040,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   </CheckRow>
                 )}
               />
+              <SectionHint className="pl-6">
+                适合一次性任务或临时调试。启用后容器停止即删除，日志和元数据也会一起消失。
+              </SectionHint>
               <Controller
                 control={control}
                 name="privileged"
@@ -787,44 +1073,70 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   )}
                 />
               </div>
-            </div>
+              <SectionHint className="pl-6">
+                交互式容器通常会同时开启 TTY 和保持标准输入打开；如果只是后台服务，一般不需要勾选。
+              </SectionHint>
+            </FormSection>
 
             {/* 重启策略 */}
-            <div className="grid grid-cols-2 gap-3">
-              <Controller
-                control={control}
-                name="restartPolicy"
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid} className="gap-2">
-                    <SectionTitle>重启策略</SectionTitle>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger aria-invalid={fieldState.invalid}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent align="start">
-                        {RESTART_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              />
-              {restartPolicy === 'on-failure' ? (
+            <FormSection
+              title="重启策略"
+              hint={
+                restartPolicy === 'no'
+                  ? '容器退出后不自动重启。适合一次性任务。'
+                  : restartPolicy === 'always'
+                    ? 'Docker 或宿主重启后都会尝试拉起容器。适合常驻服务。'
+                    : restartPolicy === 'unless-stopped'
+                      ? '与 always 类似，但手动停止后不会自动恢复。适合日常服务。'
+                      : '仅当容器异常退出时重试，适合需要保护但不希望无限重启的任务。'
+              }
+            >
+              <div className="grid grid-cols-2 gap-3">
                 <Controller
                   control={control}
-                  name="restartMaxRetry"
+                  name="restartPolicy"
                   render={({ field, fieldState }) => (
-                    <div className={FIELD_SHELL}>
-                      <FieldLabel htmlFor="run-restart-max">最大重试次数（on-failure）</FieldLabel>
-                      <Input id="run-restart-max" type="number" min={0} {...field} aria-invalid={fieldState.invalid} />
-                    </div>
+                    <StackField label="策略" invalid={fieldState.invalid}>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger aria-invalid={fieldState.invalid} className="w-full">
+                          <SelectValue>
+                            {(value) => getRestartPolicyLabel(value as RunContainerFormValues['restartPolicy'])}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          {RESTART_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </StackField>
                   )}
                 />
-              ) : null}
-            </div>
+                {restartPolicy === 'on-failure' ? (
+                  <Controller
+                    control={control}
+                    name="restartMaxRetry"
+                    render={({ field, fieldState }) => (
+                      <StackField
+                        label="最大重试次数（on-failure）"
+                        htmlFor="run-restart-max"
+                        invalid={fieldState.invalid}
+                      >
+                        <Input
+                          id="run-restart-max"
+                          type="number"
+                          min={0}
+                          {...field}
+                          aria-invalid={fieldState.invalid}
+                        />
+                      </StackField>
+                    )}
+                  />
+                ) : null}
+              </div>
+            </FormSection>
           </FieldGroup>
         </form>
       ) : (
