@@ -8,15 +8,13 @@
 
 ## Features
 
-- Manage local and remote Docker servers over SSH
-- Check Docker availability and guide users through common access issues
-- Inspect and operate containers, images, networks, and volumes
-- Run containers with structured configuration for ports, volumes, environment variables, restart policies, and resource limits
-- Open host terminals and container exec terminals
-- Stream container logs and Docker events in real time
-- Create and manage port forwarding rules
-- View Docker engine status, inspect daemon settings, and apply daemon configuration updates
-- Sync app store sources, browse apps, and install apps to target servers
+- Manage remote Docker servers via SSH
+- Monitor Docker status and troubleshoot access issues
+- Manage containers, images, networks, and volumes
+- Deploy containers with flexible configurations
+- Access terminals, logs, and real-time events
+- Configure port forwarding and Docker daemon settings
+- Browse and deploy apps from app sources
 
 ## Requirements
 
