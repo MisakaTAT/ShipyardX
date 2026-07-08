@@ -321,7 +321,8 @@ jobs:
             libssl-dev \
             patchelf \
             librsvg2-dev \
-            libfuse2
+            libfuse2 \
+            xdg-utils
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
