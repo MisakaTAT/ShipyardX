@@ -83,7 +83,7 @@ export function AboutSettingsPanel() {
   return (
     <SettingsPanelShell>
       <div className="flex items-center gap-4 px-3 py-2">
-        <img src="/tauri.svg" alt="ShipyardX logo" className="size-11 shrink-0" />
+        <img src="/logo.png" alt="ShipyardX logo" className="size-24" />
         <div className="min-w-0 flex-1">
           <div className="text-base font-semibold text-foreground">
             {loading ? 'ShipyardX' : (appMetadata?.name ?? 'ShipyardX')}
