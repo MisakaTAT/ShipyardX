@@ -324,7 +324,7 @@ jobs:
             src-tauri -> target
 
       - name: Build Linux ARM bundles
-        uses: pguyot/arm-runner-action@v2.7.0
+        uses: pguyot/arm-runner-action@v2.6.5
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
