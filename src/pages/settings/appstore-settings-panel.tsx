@@ -197,7 +197,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
         <div className="py-2">
           <div className="mb-1.5">
             <h3 className="text-sm font-medium text-foreground">应用源</h3>
-            <p className="mt-1 text-xs text-muted-foreground">维护可用仓库列表，商店页面再选择当前使用的源。</p>
+            <p className="mt-1 text-xs text-muted-foreground">维护可用仓库列表，商店页面再选择当前使用的源</p>
           </div>
 
           <div className="space-y-1">
@@ -259,7 +259,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
         <SettingsActionRow
           title="启用代理"
-          description="同步应用商店时统一走全局代理。"
+          description="同步应用商店时统一走全局代理"
           action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch
@@ -276,7 +276,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
         <SettingsActionRow
           title="代理地址"
-          description="支持 HTTP 代理地址，例如 http://127.0.0.1:7890。"
+          description="支持 HTTP 代理地址，例如 http://127.0.0.1:7890"
           action={
             <div className="w-full max-w-xs">
               <Input
@@ -293,7 +293,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
         <SettingsActionRow
           title="缓存目录"
-          description="应用商店仓库与元数据的本地缓存位置。"
+          description="应用商店仓库与元数据的本地缓存位置"
           action={
             <div className="w-full max-w-xs text-sm break-all text-foreground">{cacheInfo?.cache_dir ?? '-'}</div>
           }
@@ -301,7 +301,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
         <SettingsActionRow
           title="缓存大小"
-          description="当前本地缓存占用空间。"
+          description="当前本地缓存占用空间"
           action={
             loading ? (
               <div className="flex h-8 w-full max-w-xs items-center text-sm text-muted-foreground">
@@ -316,7 +316,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
         <SettingsActionRow
           title="清除缓存"
-          description="删除本地缓存，下次进入商店时会重新拉取。"
+          description="删除本地缓存，下次进入商店时会重新拉取"
           action={
             <Button
               variant="outline"
