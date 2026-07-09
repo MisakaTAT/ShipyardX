@@ -1,10 +1,6 @@
-<p align="center">
-  <img src="./public/logo.png" alt="ShipyardX logo" width="160" />
-</p>
+# ShipyardX
 
-<h1 align="center" style="margin-top: 0;">ShipyardX</h1>
-
-<p align="center">A cross-platform Docker management client built with Tauri.</p>
+A cross-platform Docker management client built with Tauri.
 
 ## Features
 
