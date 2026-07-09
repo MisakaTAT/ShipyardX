@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
+import { canStopContainer } from '@/features/docker-containers/lib/container-state'
 import type { Container } from '@/types/app-bindings'
 
 interface ContainerActionsMenuProps {
@@ -35,6 +36,7 @@ export function ContainerActionsMenu({
   onInspect,
 }: ContainerActionsMenuProps) {
   const isRunning = container.state === 'running'
+  const canStop = canStopContainer(container.state)
   const disabled = Boolean(busy)
 
   return (
@@ -47,7 +49,7 @@ export function ContainerActionsMenu({
           <Play className="size-3.5" />
           启动
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onAction('stop')} disabled={!isRunning || disabled}>
+        <DropdownMenuItem onClick={() => onAction('stop')} disabled={!canStop || disabled}>
           <Square className="size-3.5" />
           停止
         </DropdownMenuItem>

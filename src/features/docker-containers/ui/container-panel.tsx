@@ -12,6 +12,7 @@ import { ContainerStateBadge } from '@/features/docker-containers/ui/container-s
 import { ContainerActionsMenu } from '@/features/docker-containers/ui/container-actions-menu'
 import RunContainerDialog from '@/features/docker-containers/ui/run-container/run-container-dialog'
 import { ContainerPortsCell } from '@/features/docker-containers/ui/container-ports-cell'
+import { shouldForceRemoveContainer } from '@/features/docker-containers/lib/container-state'
 import { consumeNextContainerSearch } from '@/shared/lib/workspace-nav'
 import {
   useContainerAction,
@@ -189,11 +190,11 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
   )
 
   const removeDescription = removeTarget
-    ? removeTarget.state === 'running'
+    ? shouldForceRemoveContainer(removeTarget.state)
       ? `容器「${removeTarget.name}」正在运行，将使用强制移除。`
       : `确定要删除容器「${removeTarget.name}」吗？`
     : ''
-  const removeConfirmText = removeTarget?.state === 'running' ? '强制删除' : '删除'
+  const removeConfirmText = removeTarget && shouldForceRemoveContainer(removeTarget.state) ? '强制删除' : '删除'
 
   return (
     <PanelShell>
@@ -282,7 +283,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         confirmText={removeConfirmText}
         onConfirm={() => {
           if (!removeTarget) return
-          const force = removeTarget.state === 'running'
+          const force = shouldForceRemoveContainer(removeTarget.state)
           runAction(removeTarget.id, 'remove', force)
         }}
       />
