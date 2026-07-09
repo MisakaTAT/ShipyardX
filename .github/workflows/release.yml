@@ -361,9 +361,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.prepare-release.outputs.release_tag }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | tee assets.txt
+          gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json assets --jq '.assets[].name' | tee assets.txt
 
           grep -Eq 'setup\.exe$' assets.txt
           grep -Eq '\.dmg$' assets.txt
