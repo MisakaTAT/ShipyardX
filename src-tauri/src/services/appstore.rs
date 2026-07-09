@@ -261,15 +261,13 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     Ok(())
 }
 
-/// 渲染 docker-compose 模板：将 ${VAR} 替换为实际值，网络替换为 shipyardx-network
+/// 渲染 docker-compose 模板：将 ${VAR} 替换为实际值
 fn render_compose(template: &str, env_values: &HashMap<String, String>) -> String {
     let mut result = template.to_string();
     for (key, value) in env_values {
         let placeholder = format!("${{{}}}", key);
         result = result.replace(&placeholder, value);
     }
-    // 将 1Panel 的 1panel-network 替换为 shipyardx-network
-    result = result.replace("1panel-network", "shipyardx-network");
     result
 }
 
