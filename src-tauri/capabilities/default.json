@@ -8,7 +8,17 @@
     "dialog:default",
     "log:default",
     "opener:default",
-    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        }
+      ]
+    },
     "updater:default"
   ]
 }
