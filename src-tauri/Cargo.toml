@@ -64,7 +64,9 @@ serde_yaml = "0.9"
 chrono = "0.4"
 font-kit = "0.14"
 git2 = { version = "0.20", default-features = false, features = [
+    "https",
     "vendored-libgit2",
+    "vendored-openssl",
 ] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
