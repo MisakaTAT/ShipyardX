@@ -6,6 +6,7 @@ use russh::{Channel, ChannelMsg, client};
 
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
+use crate::utils::output::floor_char_boundary;
 
 use super::client::{SshClientHandler, connect, disconnect};
 
@@ -137,7 +138,7 @@ fn push_limited(buf: &mut String, chunk: &str) {
     if chunk.len() <= remaining {
         buf.push_str(chunk);
     } else {
-        buf.push_str(&chunk[..remaining]);
+        buf.push_str(&chunk[..floor_char_boundary(chunk, remaining)]);
     }
 }
 
