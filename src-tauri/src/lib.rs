@@ -18,8 +18,8 @@ use std::sync::{Mutex, RwLock};
 use config::store::{get_data_file, load_servers};
 use dto::events::{
     AppstoreSyncProgress, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus,
-    EventStreamStatus, ImageExportProgress, ImageImportProgress, ImagePullDone, ImagePullLayerProgress,
-    ImagePullProgress, InstallStepEvent,
+    EventStreamStatus, HostKeyPromptRequired, ImageExportProgress, ImageImportProgress, ImagePullDone,
+    ImagePullLayerProgress, ImagePullProgress, InstallStepEvent,
 };
 use log::{error, info, warn};
 #[cfg(debug_assertions)]
@@ -36,6 +36,8 @@ pub fn run() {
             commands::servers::add_server,
             commands::servers::update_server,
             commands::servers::delete_server,
+            commands::servers::get_pending_host_key,
+            commands::servers::trust_host_key,
             commands::servers::test_connection,
             commands::servers::test_server_connection,
             commands::servers::test_connection_direct,
@@ -116,6 +118,7 @@ pub fn run() {
             ImageImportProgress,
             InstallStepEvent,
             AppstoreSyncProgress,
+            HostKeyPromptRequired,
         ])
         .typ::<EventStreamStatus>()
         .typ::<ImagePullLayerProgress>()
@@ -166,6 +169,7 @@ pub fn run() {
                 let detail = error.detail.unwrap_or(error.message);
                 Box::<dyn std::error::Error>::from(detail)
             })?;
+            ssh::known_hosts::init(app.handle(), &config::store::data_dir_from_file(&data_file));
             let servers = load_servers(&data_file);
             match app.path().app_log_dir() {
                 Ok(log_dir) => info!(target: "shipyardx_lib::app", "app log directory: {}", log_dir.display()),

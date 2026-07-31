@@ -2,6 +2,16 @@ pub use crate::dto::error::{AppError, AppErrorKind};
 
 pub type AppResult<T> = Result<T, AppError>;
 
+pub const HOST_KEY_UNKNOWN: &str = "ssh.host_key_unknown";
+pub const HOST_KEY_CHANGED: &str = "ssh.host_key_changed";
+
+impl AppError {
+    /// 主机密钥相关错误需要原样冒泡到前端
+    pub fn is_host_key(&self) -> bool {
+        self.code == HOST_KEY_UNKNOWN || self.code == HOST_KEY_CHANGED
+    }
+}
+
 impl AppError {
     pub fn new(code: impl Into<String>, kind: AppErrorKind, message: impl Into<String>) -> Self {
         Self {

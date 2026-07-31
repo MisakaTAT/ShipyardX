@@ -9,6 +9,13 @@ export const commands = {
 	addServer: (server: ServerConfig) => __TAURI_INVOKE<ServerConfig[]>("add_server", { server }),
 	updateServer: (server: ServerConfig) => __TAURI_INVOKE<ServerConfig[]>("update_server", { server }),
 	deleteServer: (id: string) => __TAURI_INVOKE<ServerConfig[]>("delete_server", { id }),
+	getPendingHostKey: () => __TAURI_INVOKE<{
+	host: string,
+	port: number,
+	fingerprint: string,
+	known_fingerprint: string | null,
+} | null>("get_pending_host_key"),
+	trustHostKey: (host: string, port: number, fingerprint: string) => __TAURI_INVOKE<null>("trust_host_key", { host, port, fingerprint }),
 	testConnection: (serverId: string) => __TAURI_INVOKE<string>("test_connection", { serverId }),
 	testServerConnection: (serverId: string) => __TAURI_INVOKE<string>("test_server_connection", { serverId }),
 	testConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<string>("test_connection_direct", { server }),
@@ -86,6 +93,7 @@ export const events = {
 	dockerStreamPayload: makeEvent<DockerStreamPayload>("docker-stream-payload"),
 	dockerStreamRefresh: makeEvent<DockerStreamRefresh>("docker-stream-refresh"),
 	dockerStreamStatus: makeEvent<DockerStreamStatus>("docker-stream-status"),
+	hostKeyPromptRequired: makeEvent<HostKeyPromptRequired>("host-key-prompt-required"),
 	imageExportProgress: makeEvent<ImageExportProgress>("image-export-progress"),
 	imageImportProgress: makeEvent<ImageImportProgress>("image-import-progress"),
 	imagePullDone: makeEvent<ImagePullDone>("image-pull-done"),
@@ -400,6 +408,18 @@ export type FormField_Serialize = {
 	values: FormFieldValue[],
 	random: boolean,
 	rule: string,
+};
+
+export type HostKeyPrompt = {
+	host: string,
+	port: number,
+	fingerprint: string,
+	known_fingerprint: string | null,
+};
+
+/**  主机密钥校验失败时通知前端弹出确认框 */
+export type HostKeyPromptRequired = {
+	prompt: HostKeyPrompt,
 };
 
 export type Image = {

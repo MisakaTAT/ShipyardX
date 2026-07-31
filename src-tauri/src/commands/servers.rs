@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::dto::server::ServerConfig;
+use crate::dto::server::{HostKeyPrompt, ServerConfig};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;
@@ -27,6 +27,18 @@ pub async fn update_server(server: ServerConfig, state: State<'_, AppState>) -> 
 #[specta::specta]
 pub async fn delete_server(id: String, state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
     services::servers::delete_server(id, state).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_pending_host_key() -> AppResult<Option<HostKeyPrompt>> {
+    services::servers::get_pending_host_key().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn trust_host_key(host: String, port: u16, fingerprint: String) -> AppResult<()> {
+    services::servers::trust_host_key(host, port, fingerprint).await
 }
 
 #[tauri::command]

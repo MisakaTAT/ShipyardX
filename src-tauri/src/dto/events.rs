@@ -2,7 +2,14 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri_specta::Event;
 
+use crate::dto::server::HostKeyPrompt;
 use crate::error::AppError;
+
+/// 主机密钥校验失败时通知前端弹出确认框
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct HostKeyPromptRequired {
+    pub prompt: HostKeyPrompt,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]

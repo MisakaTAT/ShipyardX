@@ -40,6 +40,14 @@ pub(super) fn error_message(error: AppError) -> String {
     error.detail.unwrap_or(error.message)
 }
 
+/// 主机密钥错误原样上抛，包装后前端就没法提示了
+fn connect_error(error: AppError) -> AppError {
+    if error.is_host_key() {
+        return error;
+    }
+    AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(error))
+}
+
 pub(super) fn normalize_host(ip: &str) -> String {
     let v = ip.trim();
     if v.is_empty() || v == "0.0.0.0" || v == "::" || v == "::0" {
@@ -67,9 +75,7 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
     let result = async move {
         let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
             .await
-            .map_err(|e| {
-                AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
-            })?
+            .map_err(connect_error)?
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
 
         local_stream.set_nonblocking(true).map_err(|e| {

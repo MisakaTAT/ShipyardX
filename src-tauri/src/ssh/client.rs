@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use log::{debug, info, warn};
 use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
@@ -7,20 +7,91 @@ use russh::{Disconnect, Error as RusshError, client};
 use tokio::runtime::{Builder, Runtime};
 
 use crate::config::timeouts::{SSH_CONNECT_TIMEOUT, SSH_KEEPALIVE_INTERVAL, SSH_SOCKET_IO_TIMEOUT};
-use crate::dto::server::ServerConfig;
-use crate::error::{AppError, AppResult};
+use crate::dto::server::{HostKeyPrompt, ServerConfig};
+use crate::error::{AppError, AppResult, HOST_KEY_CHANGED, HOST_KEY_UNKNOWN};
+use crate::ssh::known_hosts;
 
-#[derive(Default)]
-pub(crate) struct SshClientHandler;
+#[derive(Debug, Clone)]
+enum HostKeyVerdict {
+    Trusted,
+    Unknown { fingerprint: String },
+    Changed { expected: String, actual: String },
+}
+
+pub(crate) struct SshClientHandler {
+    host: String,
+    port: u16,
+    verdict: Arc<Mutex<Option<HostKeyVerdict>>>,
+}
+
+fn fingerprint_of(key: &russh::keys::ssh_key::PublicKey) -> String {
+    key.fingerprint(russh::keys::ssh_key::HashAlg::Sha256).to_string()
+}
 
 impl client::Handler for SshClientHandler {
     type Error = russh::Error;
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh::keys::ssh_key::PublicKey,
+        server_public_key: &russh::keys::ssh_key::PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        let fingerprint = fingerprint_of(server_public_key);
+        let known = known_hosts::lookup(&self.host, self.port);
+        let verdict = match known.clone() {
+            Some(expected) if expected == fingerprint => HostKeyVerdict::Trusted,
+            Some(expected) => HostKeyVerdict::Changed {
+                expected,
+                actual: fingerprint.clone(),
+            },
+            None => HostKeyVerdict::Unknown {
+                fingerprint: fingerprint.clone(),
+            },
+        };
+        let trusted = matches!(verdict, HostKeyVerdict::Trusted);
+
+        if !trusted {
+            warn!(
+                target: "shipyardx_lib::ssh::client",
+                "host key verification failed; host={} port={} fingerprint={} known={:?}",
+                self.host,
+                self.port,
+                fingerprint,
+                known
+            );
+            known_hosts::set_pending(HostKeyPrompt {
+                host: self.host.clone(),
+                port: self.port,
+                fingerprint,
+                known_fingerprint: known,
+            });
+        }
+
+        if let Ok(mut slot) = self.verdict.lock() {
+            *slot = Some(verdict);
+        }
+        Ok(trusted)
+    }
+}
+
+fn host_key_error(config: &ServerConfig, verdict: HostKeyVerdict) -> Option<AppError> {
+    match verdict {
+        HostKeyVerdict::Trusted => None,
+        HostKeyVerdict::Unknown { fingerprint } => Some(
+            AppError::auth(
+                HOST_KEY_UNKNOWN,
+                format!("{}:{} 的主机密钥尚未被信任", config.host, config.port),
+            )
+            .with_detail(fingerprint)
+            .with_action("请核对服务器指纹后确认信任"),
+        ),
+        HostKeyVerdict::Changed { expected, actual } => Some(
+            AppError::auth(
+                HOST_KEY_CHANGED,
+                format!("{}:{} 的主机密钥已变更", config.host, config.port),
+            )
+            .with_detail(format!("已记录指纹：{expected}；当前指纹：{actual}"))
+            .with_action("这可能是中间人攻击。请确认服务器确实更换了密钥后再重新信任"),
+        ),
     }
 }
 
@@ -144,9 +215,16 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
         ..Default::default()
     });
 
+    let verdict: Arc<Mutex<Option<HostKeyVerdict>>> = Arc::new(Mutex::new(None));
+    let handler = SshClientHandler {
+        host: config.host.clone(),
+        port: config.port,
+        verdict: Arc::clone(&verdict),
+    };
+
     let mut handle = tokio::time::timeout(
         SSH_CONNECT_TIMEOUT,
-        client::connect(client_config, (config.host.as_str(), config.port), SshClientHandler),
+        client::connect(client_config, (config.host.as_str(), config.port), handler),
     )
     .await
     .map_err(|_| {
@@ -156,7 +234,14 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
         )
         .retryable(true)
     })?
-    .map_err(|e| map_ssh_connect_error(config, e))?;
+    .map_err(|e| {
+        verdict
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take())
+            .and_then(|verdict| host_key_error(config, verdict))
+            .unwrap_or_else(|| map_ssh_connect_error(config, e))
+    })?;
 
     let auth = match config.auth_type.as_str() {
         "password" => {
@@ -216,7 +301,7 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
     Ok(handle)
 }
 
-pub async fn disconnect(handle: &mut client::Handle<SshClientHandler>) {
+pub async fn disconnect<H: client::Handler>(handle: &mut client::Handle<H>) {
     debug!(target: "shipyardx_lib::ssh::client", "closing ssh connection");
     let _ = handle.disconnect(Disconnect::ByApplication, "", "").await;
 }

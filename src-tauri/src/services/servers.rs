@@ -4,10 +4,11 @@ use bollard::models::SystemVersion;
 use log::info;
 
 use crate::docker::client::map_bollard_error;
-use crate::dto::server::ServerConfig;
+use crate::dto::server::{HostKeyPrompt, ServerConfig};
 use crate::error::AppResult;
 use crate::services::{server_store, support::ServerContext};
 use crate::ssh::client::{connect, disconnect};
+use crate::ssh::known_hosts;
 use crate::state::AppState;
 
 pub async fn get_servers(state: State<'_, AppState>) -> AppResult<Vec<ServerConfig>> {
@@ -33,6 +34,17 @@ pub async fn delete_server(id: String, state: State<'_, AppState>) -> AppResult<
     let updated = server_store::delete_server(&state, id.clone()).await?;
     info!(target: "shipyardx_lib::services::servers", "server deleted; server_id={}", id);
     Ok(updated)
+}
+
+/// 返回最近一次未通过校验的主机密钥
+pub async fn get_pending_host_key() -> AppResult<Option<HostKeyPrompt>> {
+    Ok(known_hosts::pending())
+}
+
+pub async fn trust_host_key(host: String, port: u16, fingerprint: String) -> AppResult<()> {
+    known_hosts::trust(&host, port, &fingerprint)?;
+    info!(target: "shipyardx_lib::services::servers", "host key trusted; host={} port={}", host, port);
+    Ok(())
 }
 
 pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
