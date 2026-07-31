@@ -355,7 +355,7 @@ pub async fn get_container_stats(
         .await
         .ok_or_else(|| AppError::unavailable("container.stats_empty", "容器统计信息为空"))?
         .map_err(map_bollard_error)?;
-    let stats = compute_stats(raw);
+    let stats = compute_stats(&format!("{server_id}|{container_id}"), raw);
     debug!(target: "shipyardx_lib::services::system", "fetched container stats; server_id={} container_id={} cpu_percent={:.2} mem_usage={}", server_id, container_id, stats.cpu_percent, stats.mem_usage);
     Ok(stats)
 }
