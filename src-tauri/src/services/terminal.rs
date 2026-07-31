@@ -571,11 +571,41 @@ fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
     }
 }
 
+/// WebSocket 不受同源策略约束，只放行 Tauri 自身来源；不带 Origin 的客户端仍需猜中 session id
+fn is_allowed_ws_origin(origin: Option<&str>) -> bool {
+    let Some(origin) = origin else {
+        return true;
+    };
+    if matches!(
+        origin,
+        "tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost"
+    ) {
+        return true;
+    }
+    cfg!(debug_assertions) && (origin.starts_with("http://localhost:") || origin.starts_with("http://127.0.0.1:"))
+}
+
+fn session_exists(ah: &AppHandle, session_id: &str) -> bool {
+    lock_read(
+        &ah.state::<AppState>().terminals,
+        "terminal.sessions_lock_failed",
+        "读取终端会话失败",
+    )
+    .map(|terminals| terminals.contains_key(session_id))
+    .unwrap_or(false)
+}
+
 async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     let mut req_path = String::new();
+    let mut origin: Option<String> = None;
     #[allow(clippy::result_large_err)]
     let mut ws = match accept_hdr_async(stream, |req: &Request, resp: Response| {
         req_path = req.uri().path().to_string();
+        origin = req
+            .headers()
+            .get("origin")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
         Ok(resp)
     })
     .await
@@ -584,8 +614,29 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
         Err(_) => return,
     };
 
+    if !is_allowed_ws_origin(origin.as_deref()) {
+        warn!(
+            target: "shipyardx_lib::services::terminal",
+            "rejected terminal websocket from unexpected origin; origin={:?}",
+            origin
+        );
+        let _ = ws.close(None).await;
+        return;
+    }
+
     let session_id = req_path.strip_prefix("/terminal/").unwrap_or("").to_string();
     if session_id.is_empty() {
+        let _ = ws.close(None).await;
+        return;
+    }
+
+    // 只接受已登记的会话，否则本地进程能用随机 id 撑大客户端表
+    if !session_exists(&ah, &session_id) {
+        warn!(
+            target: "shipyardx_lib::services::terminal",
+            "rejected terminal websocket for unknown session; session_id={}",
+            session_id
+        );
         let _ = ws.close(None).await;
         return;
     }
@@ -597,13 +648,27 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     );
 
     let (tx, mut rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
-    if let Ok(mut clients) = lock_write(
+    let registered = match lock_write(
         &ah.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
         "记录终端 WebSocket 客户端失败",
     ) {
-        clients.insert(session_id.clone(), tx);
-    } else {
+        // 已有客户端时拒绝，不让后来者顶掉终端
+        Ok(mut clients) if !clients.contains_key(&session_id) => {
+            clients.insert(session_id.clone(), tx);
+            true
+        }
+        Ok(_) => {
+            warn!(
+                target: "shipyardx_lib::services::terminal",
+                "rejected duplicate terminal websocket; session_id={}",
+                session_id
+            );
+            false
+        }
+        Err(_) => false,
+    };
+    if !registered {
         let _ = ws.close(None).await;
         return;
     }
@@ -837,4 +902,28 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> A
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allows_tauri_webview_origins() {
+        assert!(is_allowed_ws_origin(Some("tauri://localhost")));
+        assert!(is_allowed_ws_origin(Some("http://tauri.localhost")));
+        assert!(is_allowed_ws_origin(Some("https://tauri.localhost")));
+    }
+
+    #[test]
+    fn rejects_foreign_browser_origins() {
+        assert!(!is_allowed_ws_origin(Some("https://evil.example")));
+        assert!(!is_allowed_ws_origin(Some("http://tauri.localhost.evil.example")));
+        assert!(!is_allowed_ws_origin(Some("null")));
+    }
+
+    #[test]
+    fn allows_clients_without_origin_header() {
+        assert!(is_allowed_ws_origin(None));
+    }
 }
