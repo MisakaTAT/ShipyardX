@@ -151,6 +151,9 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
 
     // Step 1: 准备模板
     emit_step(app, "prepare", "running", "正在准备部署模板...");
+    validate_env_values(&req.env_values).inspect_err(|e| {
+        emit_step(app, "prepare", "error", &format!("变量校验失败: {}", e.message));
+    })?;
     let compose_template = fs::read_to_string(version_dir.join("docker-compose.yml"))
         .await
         .map_err(|e| {
@@ -158,7 +161,9 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
             AppError::internal("appstore.compose_template_read_failed", "读取部署模板失败").with_source(e)
         })?;
 
-    let rendered = render_compose(&compose_template, &req.env_values);
+    let rendered = render_compose(&compose_template, &req.env_values).inspect_err(|e| {
+        emit_step(app, "prepare", "error", &format!("渲染模板失败: {}", e.message));
+    })?;
     debug!(target: "shipyardx_lib::services::appstore", "app compose rendered; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, req.env_values.len());
     emit_step(app, "prepare", "done", "部署模板准备完成");
 
@@ -261,23 +266,74 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     Ok(())
 }
 
+fn is_valid_env_key(key: &str) -> bool {
+    let mut chars = key.chars();
+    matches!(chars.next(), Some(first) if first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// 变量值会写进 docker-compose.yml 和 .env，换行会被当成新的配置项
+fn validate_env_values(env_values: &HashMap<String, String>) -> AppResult<()> {
+    for (key, value) in env_values {
+        if !is_valid_env_key(key) {
+            return Err(AppError::validation(
+                "appstore.env_key_invalid",
+                format!("环境变量名不合法：{key}"),
+            )
+            .with_action("变量名只能包含字母、数字和下划线，且不能以数字开头"));
+        }
+        if let Some(bad) = value.chars().find(|c| *c == '\n' || *c == '\r' || (c.is_control() && *c != '\t')) {
+            return Err(AppError::validation(
+                "appstore.env_value_invalid",
+                format!("环境变量 {key} 的值包含非法字符"),
+            )
+            .with_detail(format!("字符编码：U+{:04X}", bad as u32))
+            .with_action("请去掉值中的换行和控制字符"));
+        }
+    }
+    Ok(())
+}
+
 /// 渲染 docker-compose 模板：将 ${VAR} 替换为实际值
-fn render_compose(template: &str, env_values: &HashMap<String, String>) -> String {
+fn render_compose(template: &str, env_values: &HashMap<String, String>) -> AppResult<String> {
     let mut result = template.to_string();
     for (key, value) in env_values {
         let placeholder = format!("${{{}}}", key);
         result = result.replace(&placeholder, value);
     }
-    result
+    // 渲染结果必须仍是合法 YAML
+    serde_yaml::from_str::<serde_yaml::Value>(&result).map_err(|e| {
+        AppError::validation(
+            "appstore.compose_render_invalid",
+            "渲染后的 docker-compose.yml 不是合法 YAML",
+        )
+        .with_detail(e.to_string())
+        .with_action("请检查填写的变量值是否包含引号、冒号等会破坏 YAML 结构的字符")
+    })?;
+    Ok(result)
+}
+
+/// .env 只支持单行 KEY=VALUE；`$` 会被 compose 当作插值，`$$` 才是字面量
+fn quote_env_value(value: &str) -> String {
+    let escaped = value.replace('$', "$$");
+    let needs_quotes = escaped.is_empty()
+        || escaped
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '"' | '\'' | '#' | '\\' | '`'));
+    if !needs_quotes {
+        return escaped;
+    }
+    format!("\"{}\"", escaped.replace('\\', r"\\").replace('"', "\\\""))
 }
 
 /// 构建 .env 文件内容
 fn build_env_file(env_values: &HashMap<String, String>) -> String {
-    env_values
+    let mut lines: Vec<String> = env_values
         .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
-        .collect::<Vec<_>>()
-        .join("\n")
+        .map(|(key, value)| format!("{}={}", key, quote_env_value(value)))
+        .collect();
+    lines.sort();
+    lines.join("\n")
 }
 
 fn format_bytes(bytes: u64) -> String {
@@ -370,4 +426,59 @@ async fn copy_data_dir_to_remote(
     };
     emit_step(app, "deploy", "running", &done_message);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn rejects_newlines_in_env_values() {
+        let values = env(&[("PORT", "8080\n    privileged: true")]);
+        let error = validate_env_values(&values).expect_err("值里的换行必须被拒绝");
+        assert_eq!(error.code, "appstore.env_value_invalid");
+    }
+
+    #[test]
+    fn rejects_invalid_env_keys() {
+        assert!(validate_env_values(&env(&[("1PORT", "80")])).is_err());
+        assert!(validate_env_values(&env(&[("PORT-A", "80")])).is_err());
+        assert!(validate_env_values(&env(&[("_PORT_A1", "80")])).is_ok());
+    }
+
+    #[test]
+    fn renders_compose_with_substituted_values() {
+        let template = "services:\n  web:\n    image: nginx\n    ports:\n      - \"${PORT}:80\"\n";
+        let rendered = render_compose(template, &env(&[("PORT", "8080")])).expect("模板应渲染成功");
+        assert!(rendered.contains("\"8080:80\""));
+    }
+
+    #[test]
+    fn rejects_values_that_break_compose_structure() {
+        let template = "services:\n  web:\n    image: ${IMAGE}\n";
+        let error = render_compose(template, &env(&[("IMAGE", "nginx: latest: broken")]))
+            .expect_err("破坏 YAML 结构的值必须被拒绝");
+        assert_eq!(error.code, "appstore.compose_render_invalid");
+    }
+
+    #[test]
+    fn quotes_env_values_that_need_it() {
+        assert_eq!(quote_env_value("simple"), "simple");
+        assert_eq!(quote_env_value("with space"), "\"with space\"");
+        assert_eq!(quote_env_value("p@ss$word"), "\"p@ss$$word\"");
+        assert_eq!(quote_env_value("say \"hi\""), "\"say \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn builds_env_file_deterministically() {
+        let values = env(&[("B_KEY", "2"), ("A_KEY", "1")]);
+        assert_eq!(build_env_file(&values), "A_KEY=1\nB_KEY=2");
+    }
 }
