@@ -1,6 +1,9 @@
-import { Terminal as TerminalIcon, X } from 'lucide-react'
+import { lazy, Suspense } from 'react'
+import { Loader2, Terminal as TerminalIcon, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import Terminal from '@/features/docker-terminal/ui/terminal'
+
+// xterm 和一堆 addon 只在打开终端时才需要
+const Terminal = lazy(() => import('@/features/docker-terminal/ui/terminal'))
 
 interface TerminalPanelProps {
   serverId: string
@@ -35,7 +38,15 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
         </div>
       ) : null}
       <div className="relative flex-1 overflow-hidden">
-        <Terminal serverId={serverId} containerId={containerId} />
+        <Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </div>
+          }
+        >
+          <Terminal serverId={serverId} containerId={containerId} />
+        </Suspense>
       </div>
     </div>
   )
