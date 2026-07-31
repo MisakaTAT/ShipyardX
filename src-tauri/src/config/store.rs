@@ -1,31 +1,63 @@
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use aes_gcm::{
     Aes256Gcm, KeyInit, Nonce,
     aead::{Aead, AeadCore, OsRng},
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use log::{info, warn};
 use tauri::{AppHandle, Manager};
 use tempfile::NamedTempFile;
 
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 
-const KEY_FILE: &str = "encryption.key";
+const KEYRING_SERVICE: &str = "com.mikuac.shipyardx";
+const KEYRING_ACCOUNT: &str = "ShipyardX Safe Storage";
 
-fn get_or_create_key(data_dir: &Path) -> AppResult<[u8; 32]> {
-    let key_path = data_dir.join(KEY_FILE);
-    if let Ok(bytes) = std::fs::read(&key_path)
-        && bytes.len() == 32
-    {
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&bytes);
-        return Ok(key);
-    }
+static MASTER_KEY: OnceLock<[u8; 32]> = OnceLock::new();
+
+fn keyring_error(action: &str, error: keyring::Error) -> AppError {
+    AppError::internal("config.keyring_unavailable", format!("{action}失败"))
+        .with_detail(error.to_string())
+        .with_action("请确认系统钥匙串服务可用（Linux 需要 gnome-keyring、KWallet 等 Secret Service 实现）")
+}
+
+fn decode_key(encoded: &str) -> Option<[u8; 32]> {
+    BASE64.decode(encoded).ok()?.try_into().ok()
+}
+
+fn generate_key() -> [u8; 32] {
     let mut key = [0u8; 32];
     aes_gcm::aead::rand_core::RngCore::fill_bytes(&mut OsRng, &mut key);
-    std::fs::write(&key_path, key)
-        .map_err(|e| AppError::internal("config.key_write_failed", "写入加密密钥失败").with_source(e))?;
+    key
+}
+
+fn master_key() -> AppResult<[u8; 32]> {
+    if let Some(key) = MASTER_KEY.get() {
+        return Ok(*key);
+    }
+
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| keyring_error("访问系统钥匙串", e))?;
+    let key = match entry.get_password() {
+        Ok(encoded) => decode_key(&encoded).ok_or_else(|| {
+            AppError::internal("config.master_key_invalid", "钥匙串中的主密钥格式无效")
+                .with_action(format!("请在钥匙串中删除「{KEYRING_ACCOUNT}」条目后重试"))
+        })?,
+        Err(keyring::Error::NoEntry) => {
+            let key = generate_key();
+            entry
+                .set_password(&BASE64.encode(key))
+                .map_err(|e| keyring_error("写入系统钥匙串", e))?;
+            info!(target: "shipyardx_lib::config::store", "created master key in system keyring");
+            key
+        }
+        Err(error) => return Err(keyring_error("读取系统钥匙串", error)),
+    };
+
+    let _ = MASTER_KEY.set(key);
     Ok(key)
 }
 
@@ -100,51 +132,55 @@ pub fn atomic_write(path: &Path, contents: &[u8]) -> AppResult<()> {
 }
 
 pub fn load_servers(path: &Path) -> Vec<ServerConfig> {
-    let key = match get_or_create_key(&data_dir_from_file(path)) {
-        Ok(k) => k,
-        Err(e) => {
-            eprintln!("[crypto] key init failed: {e}");
-            return std::fs::read_to_string(path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default();
+    let mut servers: Vec<ServerConfig> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default();
+
+    let key = match master_key() {
+        Ok(key) => Some(key),
+        Err(error) => {
+            warn!(target: "shipyardx_lib::config::store", "master key unavailable, saved passwords stay unreadable; message={}", error.message);
+            None
         }
     };
 
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str::<Vec<ServerConfig>>(&s).ok())
-        .map(|mut servers| {
-            for s in &mut servers {
-                if s.auth_type == "password"
-                    && let Some(ref enc) = s.password
-                {
-                    match decrypt(&key, enc) {
-                        Ok(p) => s.password = Some(p),
-                        Err(e) => eprintln!("[crypto] decrypt failed for {}: {e}", s.id),
-                    }
-                }
+    for server in &mut servers {
+        if server.auth_type != "password" {
+            server.password = None;
+            continue;
+        }
+        let Some(encoded) = server.password.take() else {
+            continue;
+        };
+        match key.as_ref().and_then(|key| decrypt(key, &encoded).ok()) {
+            Some(plaintext) => server.password = Some(plaintext),
+            None => {
+                warn!(target: "shipyardx_lib::config::store", "unable to decrypt stored password, it must be re-entered; server_id={}", server.id);
             }
-            servers
-        })
-        .unwrap_or_default()
-}
-
-pub fn save_servers(path: &Path, servers: &[ServerConfig]) -> AppResult<()> {
-    let key = get_or_create_key(&data_dir_from_file(path))?;
-
-    let mut out: Vec<ServerConfig> = servers.to_vec();
-    for s in &mut out {
-        if s.auth_type == "password" {
-            if let Some(ref p) = s.password {
-                s.password = Some(encrypt(&key, p)?);
-            }
-        } else {
-            s.password = None;
         }
     }
 
-    let json = serde_json::to_string_pretty(&out)
+    servers
+}
+
+pub fn save_servers(path: &Path, servers: &[ServerConfig]) -> AppResult<()> {
+    let key = master_key()?;
+    let sanitized: Vec<ServerConfig> = servers
+        .iter()
+        .map(|server| {
+            let password = match server.password.as_deref().filter(|value| !value.is_empty()) {
+                Some(plaintext) if server.auth_type == "password" => Some(encrypt(&key, plaintext)?),
+                _ => None,
+            };
+            Ok(ServerConfig {
+                password,
+                ..server.clone()
+            })
+        })
+        .collect::<AppResult<Vec<_>>>()?;
+
+    let json = serde_json::to_string_pretty(&sanitized)
         .map_err(|e| AppError::internal("config.server_serialize_failed", "序列化服务器配置失败").with_source(e))?;
     atomic_write(path, json.as_bytes()).map_err(|e| {
         AppError::internal("config.server_write_failed", "写入服务器配置失败")
