@@ -28,6 +28,8 @@ use crate::state::lock_mutex;
 
 const DEFAULT_DOCKER_HOST: &str = "unix:///var/run/docker.sock";
 const HTTP_POOL_SIZE: usize = 3;
+/// hijack 响应头的最大长度
+const MAX_HIJACK_HEAD_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug)]
 pub(crate) enum DockerEndpoint {
@@ -548,9 +550,18 @@ pub(crate) async fn send_pooled_request(
 async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppResult<(StatusCode, String, Vec<u8>)> {
     let mut received = Vec::new();
     let mut chunk = [0u8; 4096];
+    let mut scanned = 0usize;
     let header_end = loop {
-        if let Some(pos) = find_header_end(&received) {
+        // 从上次扫描处继续，不重扫整个缓冲区
+        if let Some(pos) = find_header_end(&received, scanned) {
             break pos;
+        }
+        scanned = received.len().saturating_sub(3);
+        if received.len() > MAX_HIJACK_HEAD_BYTES {
+            return Err(AppError::internal(
+                "docker.hijack_head_too_large",
+                "Docker hijack 响应头超出长度限制",
+            ));
         }
         let n = tokio::time::timeout(DOCKER_HIJACK_HEAD_READ_TIMEOUT, io.read(&mut chunk))
             .await
@@ -607,8 +618,15 @@ async fn read_hijack_error_body(
     Ok(body)
 }
 
-fn find_header_end(buf: &[u8]) -> Option<usize> {
-    buf.windows(4).position(|window| window == b"\r\n\r\n")
+fn find_header_end(buf: &[u8], from: usize) -> Option<usize> {
+    if buf.len() < 4 {
+        return None;
+    }
+    let start = from.min(buf.len() - 4);
+    buf[start..]
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|offset| start + offset)
 }
 
 fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
@@ -616,4 +634,28 @@ fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
         let (key, value) = line.split_once(':')?;
         key.eq_ignore_ascii_case(name).then_some(value.trim())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finds_header_terminator_from_offset() {
+        let buf = b"HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody";
+        let expected = buf.len() - "\r\n\r\nbody".len();
+        assert_eq!(find_header_end(buf, 0), Some(expected));
+        assert_eq!(find_header_end(buf, expected), Some(expected));
+        assert_eq!(find_header_end(b"HTTP/1.1 200 OK\r\n", 0), None);
+        assert_eq!(find_header_end(b"abc", 0), None);
+    }
+
+    #[test]
+    fn does_not_miss_terminator_spanning_reads() {
+        // 分隔符横跨两次读取，扫描起点回退 3 字节
+        let mut buf = b"HTTP/1.1 200 OK\r\n\r".to_vec();
+        let scanned = buf.len().saturating_sub(3);
+        buf.push(b'\n');
+        assert_eq!(find_header_end(&buf, scanned), Some(buf.len() - 4));
+    }
 }
