@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
@@ -20,6 +20,17 @@ interface Props {
 
 const TAIL_OPTIONS = [50, 100, 200, 500, 1000] as const
 
+/** 跟踪刷屏容器时行数会无限增长，滚动裁剪 */
+const MAX_LOG_LINES = 5000
+/** 合并短时间内的多个分块再渲染 */
+const FLUSH_INTERVAL_MS = 50
+
+interface LogLineItem {
+  id: number
+  text: string
+  html: string
+}
+
 function logPayloadToBytes(payload: unknown): Uint8Array | null {
   if (payload == null) return null
   if (payload instanceof Uint8Array) return payload
@@ -35,18 +46,21 @@ function getEventPayload(event: unknown): unknown {
   return event
 }
 
-function LogLine({ line, ansi }: { line: string; ansi: AnsiUp }) {
-  const html = useMemo(() => sanitizeHtml(ansi.ansi_to_html(line.length ? line : '\u00a0')), [ansi, line])
+const LogLine = memo(function LogLine({ html }: { html: string }) {
   return (
     <div
       className="px-3 font-mono text-[13px] leading-[1.45] wrap-break-word text-[#e6edf3]"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
-}
+})
 
 export default function LogDialog({ serverId, containerId, containerName, onClose }: Props) {
-  const ansi = useMemo(() => new AnsiUp(), [])
+  // AnsiUp 有跨行颜色状态，必须在入队时按顺序转换，不能放在会乱序重绘的虚拟列表回调里
+  const ansiRef = useRef(new AnsiUp())
+  const pendingRef = useRef<LogLineItem[]>([])
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nextLineIdRef = useRef(0)
 
   const streamDecoderRef = useRef(new TextDecoder('utf-8', { fatal: false }))
   const streamLineBufferRef = useRef('')
@@ -59,7 +73,53 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
   const [follow, setFollow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [lines, setLines] = useState<string[]>([])
+  const [lines, setLines] = useState<LogLineItem[]>([])
+
+  const flushPending = useCallback(() => {
+    flushTimerRef.current = null
+    const pending = pendingRef.current
+    if (pending.length === 0) return
+    pendingRef.current = []
+    setLines((prev) => {
+      const next = prev.concat(pending)
+      return next.length > MAX_LOG_LINES ? next.slice(next.length - MAX_LOG_LINES) : next
+    })
+  }, [])
+
+  const appendLines = useCallback(
+    (rawLines: string[]) => {
+      if (rawLines.length === 0) return
+      for (const text of rawLines) {
+        pendingRef.current.push({
+          id: nextLineIdRef.current++,
+          text,
+          html: sanitizeHtml(ansiRef.current.ansi_to_html(text.length ? text : ' ')),
+        })
+      }
+      if (flushTimerRef.current === null) {
+        flushTimerRef.current = setTimeout(flushPending, FLUSH_INTERVAL_MS)
+      }
+    },
+    [flushPending]
+  )
+
+  const resetLines = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = null
+    }
+    pendingRef.current = []
+    nextLineIdRef.current = 0
+    ansiRef.current = new AnsiUp()
+    setLines([])
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current)
+    },
+    []
+  )
 
   const stopStream = useCallback(async () => {
     if (unlistenDataRef.current) {
@@ -83,24 +143,25 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
   const loadStaticLogs = useCallback(async () => {
     await stopStream()
     setLoading(true)
-    setLines([])
+    resetLines()
     streamLineBufferRef.current = ''
     try {
       const logs = await commands.getContainerLogs(serverId, containerId, tail, timestamps)
       const normalized = logs.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-      setLines(normalized.length ? normalized.split('\n') : [])
+      appendLines(normalized.length ? normalized.split('\n') : [])
     } catch (e) {
       toastAppError(e)
     } finally {
       setLoading(false)
     }
-  }, [serverId, containerId, tail, timestamps, stopStream])
+  }, [serverId, containerId, tail, timestamps, stopStream, resetLines, appendLines])
 
   const startFollow = useCallback(async () => {
     await stopStream()
     streamDecoderRef.current = new TextDecoder('utf-8', { fatal: false })
     streamLineBufferRef.current = ''
-    setLines([`[${formatNowTime()}] 正在连接日志流...`])
+    resetLines()
+    appendLines([`[${formatNowTime()}] 正在连接日志流...`])
 
     try {
       const streamId = await commands.startLogStream(serverId, containerId, tail, timestamps)
@@ -115,9 +176,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
         const parts = buf.split('\n')
         const incomplete = parts.pop() ?? ''
         streamLineBufferRef.current = incomplete
-        if (parts.length) {
-          setLines((prev) => [...prev, ...parts])
-        }
+        appendLines(parts)
       })
 
       unlistenDoneRef.current = await listen(`log-done:${streamId}`, () => {
@@ -126,7 +185,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
         const remaining = streamLineBufferRef.current
         streamLineBufferRef.current = ''
         const tailParts = remaining.length ? remaining.split('\n') : []
-        setLines((prev) => [...prev, ...tailParts, `[${formatNowTime()}] 日志流已结束`])
+        appendLines([...tailParts, `[${formatNowTime()}] 日志流已结束`])
         setFollow(false)
         streamIdRef.current = null
       })
@@ -134,7 +193,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
       toastAppError(e)
       setFollow(false)
     }
-  }, [serverId, containerId, tail, timestamps, stopStream])
+  }, [serverId, containerId, tail, timestamps, stopStream, resetLines, appendLines])
 
   useEffect(() => {
     if (follow) {
@@ -169,7 +228,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
   }, [stopStream, onClose])
 
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    void navigator.clipboard.writeText(lines.map((line) => line.text).join('\n')).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
@@ -267,7 +326,8 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
             data={lines}
             defaultItemHeight={22}
             followOutput={follow ? 'smooth' : false}
-            itemContent={(_index, line) => <LogLine line={line} ansi={ansi} />}
+            computeItemKey={(_index, line) => line.id}
+            itemContent={(_index, line) => <LogLine html={line.html} />}
           />
         </div>
       </div>
