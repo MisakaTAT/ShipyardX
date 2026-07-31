@@ -13,7 +13,6 @@ use crate::services::support::ServerContext;
 use crate::ssh::client::spawn_on_runtime;
 use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, lock_mutex};
 
-use super::PORT_FORWARD_BIND_IP;
 use super::bridge::{PortForwardAcceptArgs, accept_loop, probe_remote};
 use super::rules::{
     load_port_forward_rules_from_state, record_start_failure, save_port_forward_rules_to_state, set_runtime_error,
@@ -68,12 +67,9 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
         return Ok(());
     }
 
-    let bind_addr = if rule.bind_address.is_empty() {
-        PORT_FORWARD_BIND_IP
-    } else {
-        &rule.bind_address
-    };
-    let listener = TcpListener::bind((bind_addr, rule.local_port)).map_err(|e| {
+    // 磁盘上的旧规则可能带着未经校验的绑定地址，启动前再过一遍。
+    let bind_addr = super::rules::resolve_bind_address(Some(&rule.bind_address))?;
+    let listener = TcpListener::bind((bind_addr.as_str(), rule.local_port)).map_err(|e| {
         AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
     })?;
     let actual_local_port = listener

@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::net::{IpAddr, TcpListener};
 
 use tauri::State;
 
@@ -69,6 +69,36 @@ pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -
         .collect())
 }
 
+/// 绑定地址必须是 IP 字面量，否则 `TcpListener::bind` 会走 DNS 解析
+pub(super) fn resolve_bind_address(raw: Option<&str>) -> AppResult<String> {
+    let bind_addr = raw.unwrap_or(PORT_FORWARD_BIND_IP).trim();
+    if bind_addr.is_empty() {
+        return Ok(PORT_FORWARD_BIND_IP.to_string());
+    }
+    let parsed = bind_addr.parse::<IpAddr>().map_err(|_| {
+        AppError::validation(
+            "port_forward.bind_address_invalid",
+            format!("绑定地址必须是 IP 字面量：{bind_addr}"),
+        )
+        .with_action("请从本机地址列表中选择，或填写 127.0.0.1")
+    })?;
+    if parsed.is_multicast() {
+        return Err(AppError::validation(
+            "port_forward.bind_address_invalid",
+            "绑定地址不能是组播地址",
+        ));
+    }
+    if !parsed.is_loopback() {
+        // 非回环地址会把远端服务暴露到局域网
+        log::warn!(
+            target: "shipyardx_lib::services::port_forward",
+            "port forward will be reachable beyond localhost; bind_address={}",
+            parsed
+        );
+    }
+    Ok(parsed.to_string())
+}
+
 pub async fn create_port_forward_rule(
     server_id: String,
     params: PortForwardCreate,
@@ -76,24 +106,10 @@ pub async fn create_port_forward_rule(
 ) -> AppResult<PortForward> {
     let protocol = params.protocol.trim().to_lowercase();
     let remote_host = normalize_host(&params.remote_host);
-    let bind_address = params
-        .bind_address
-        .as_deref()
-        .unwrap_or(PORT_FORWARD_BIND_IP)
-        .trim()
-        .to_string();
-    let bind_addr = if bind_address.is_empty() {
-        PORT_FORWARD_BIND_IP.to_string()
-    } else {
-        bind_address
-    };
+    let bind_addr = resolve_bind_address(params.bind_address.as_deref())?;
 
     if params.local_port != 0 {
-        let listener = TcpListener::bind((bind_addr.as_str(), params.local_port)).map_err(|e| {
-            AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
-        })?;
-        drop(listener);
-
+        // 先查冲突再探测绑定
         let existing_rules = load_port_forward_rules_from_state(&state)?;
         if existing_rules
             .iter()
@@ -104,6 +120,11 @@ pub async fn create_port_forward_rule(
                 format!("本地端口 {} 已被其他规则占用", params.local_port),
             ));
         }
+
+        let listener = TcpListener::bind((bind_addr.as_str(), params.local_port)).map_err(|e| {
+            AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
+        })?;
+        drop(listener);
     }
 
     let mut rules = load_port_forward_rules_from_state(&state)?;
@@ -202,4 +223,30 @@ pub(super) fn set_runtime_error(state: &State<'_, AppState>, id: &str, error: Op
 
 pub(super) fn record_start_failure(state: &State<'_, AppState>, id: &str, error: AppError) {
     set_runtime_error(state, id, Some(error_message(error)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_to_loopback() {
+        assert_eq!(resolve_bind_address(None).unwrap(), "127.0.0.1");
+        assert_eq!(resolve_bind_address(Some("")).unwrap(), "127.0.0.1");
+        assert_eq!(resolve_bind_address(Some("  ")).unwrap(), "127.0.0.1");
+    }
+
+    #[test]
+    fn rejects_non_literal_addresses() {
+        assert!(resolve_bind_address(Some("localhost")).is_err());
+        assert!(resolve_bind_address(Some("example.com")).is_err());
+        assert!(resolve_bind_address(Some("224.0.0.1")).is_err());
+    }
+
+    #[test]
+    fn accepts_literal_addresses() {
+        assert_eq!(resolve_bind_address(Some("0.0.0.0")).unwrap(), "0.0.0.0");
+        assert_eq!(resolve_bind_address(Some(" 192.168.1.5 ")).unwrap(), "192.168.1.5");
+        assert_eq!(resolve_bind_address(Some("::1")).unwrap(), "::1");
+    }
 }
