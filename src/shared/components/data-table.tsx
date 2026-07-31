@@ -116,12 +116,13 @@ export function DataTable<TData, TValue = unknown>({
   }
 
   return (
-    <div className={cn('min-h-0 flex-1 bg-card', className)}>
+    <div className={cn('flex min-h-0 flex-1 flex-col bg-card', className)}>
+      {/* Virtuoso 需要能解析出高度的容器，用 flex 撑开比 height:100% 稳 */}
       <TableVirtuoso
         data={rows}
         context={context}
         components={components}
-        style={{ height: '100%' }}
+        style={{ flex: '1 1 0%', minHeight: 0 }}
         computeItemKey={(_index, row) => row.id}
         fixedHeaderContent={() =>
           table.getHeaderGroups().map((headerGroup) => (
