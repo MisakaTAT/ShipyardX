@@ -15,6 +15,8 @@ import type {
 const MAX_EVENTS = 500
 const ERROR_TOAST_THRESHOLD = 3
 const ERROR_TOAST_COOLDOWN_MS = 10_000
+/** `docker compose up` 之类操作会瞬间刷出大量事件 */
+const EVENT_FLUSH_INTERVAL_MS = 100
 
 interface UseEngineEventsOptions {
   serverId: string
@@ -41,8 +43,37 @@ export function useEngineEvents({
   const refreshDebouncers = useRef<Map<string, DebouncedFunc<() => void>>>(new Map())
   const errorStreakRef = useRef(0)
   const lastErrorToastRef = useRef<{ key: string; at: number } | null>(null)
+  const pendingEventsRef = useRef<DockerEvent[]>([])
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   onRefreshRef.current = onRefresh
+
+  const flushEvents = useCallback(() => {
+    flushTimerRef.current = null
+    const pending = pendingEventsRef.current
+    if (pending.length === 0) return
+    pendingEventsRef.current = []
+    setEventsList((prev) => {
+      // 倒序展示，新的一批整体放最前
+      const next = pending.reverse().concat(prev)
+      return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next
+    })
+  }, [])
+
+  const clearPendingEvents = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      clearTimeout(flushTimerRef.current)
+      flushTimerRef.current = null
+    }
+    pendingEventsRef.current = []
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current)
+    },
+    []
+  )
 
   const cleanup = useCallback(async () => {
     for (const unlisten of unlistensRef.current) {
@@ -56,6 +87,7 @@ export function useEngineEvents({
     refreshDebouncers.current.clear()
     errorStreakRef.current = 0
     lastErrorToastRef.current = null
+    clearPendingEvents()
     setEventsList([])
     setStatus('disconnected')
 
@@ -67,7 +99,7 @@ export function useEngineEvents({
       }
       streamIdRef.current = null
     }
-  }, [serverId])
+  }, [serverId, clearPendingEvents])
 
   useEffect(() => {
     if (!enabled) {
@@ -88,10 +120,10 @@ export function useEngineEvents({
       const pendingErrors: DockerStreamError[] = []
 
       const applyPayload = (p: DockerStreamPayload) => {
-        setEventsList((prev) => {
-          const next = [p.event, ...prev]
-          return next.length > MAX_EVENTS ? next.slice(0, MAX_EVENTS) : next
-        })
+        pendingEventsRef.current.push(p.event)
+        if (flushTimerRef.current === null) {
+          flushTimerRef.current = setTimeout(flushEvents, EVENT_FLUSH_INTERVAL_MS)
+        }
       }
       const applyStatus = (p: DockerStreamStatus) => {
         if (p.status === 'connected') {
@@ -185,9 +217,12 @@ export function useEngineEvents({
       cancelled = true
       cleanup()
     }
-  }, [serverId, enabled, cleanup])
+  }, [serverId, enabled, cleanup, flushEvents])
 
-  const clearEvents = useCallback(() => setEventsList([]), [])
+  const clearEvents = useCallback(() => {
+    clearPendingEvents()
+    setEventsList([])
+  }, [clearPendingEvents])
 
   return { events: eventsList, status, clearEvents }
 }
