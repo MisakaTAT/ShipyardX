@@ -36,6 +36,6 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> A
 
 #[tauri::command]
 #[specta::specta]
-pub async fn save_terminal_export(path: String, content: String) -> AppResult<()> {
-    services::terminal::save_terminal_export(path, content).await
+pub async fn save_terminal_export(path: String, content: String, app_handle: AppHandle) -> AppResult<()> {
+    services::terminal::save_terminal_export(&app_handle, path, content).await
 }

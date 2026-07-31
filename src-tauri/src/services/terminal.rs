@@ -1,4 +1,4 @@
-use std::fs;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use bollard::exec::{CreateExecOptions, ResizeExecOptions, StartExecOptions};
@@ -6,6 +6,7 @@ use futures_util::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use russh::ChannelMsg;
 use tauri::{AppHandle, Manager, State};
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc as tokio_mpsc;
@@ -44,9 +45,54 @@ fn ctrl_frame(json: &str) -> Vec<u8> {
 
 static WS_PORT: OnceLock<u16> = OnceLock::new();
 
-pub async fn save_terminal_export(path: String, content: String) -> AppResult<()> {
-    fs::write(&path, content)
+/// 限制导出范围，不允许写进应用自身的数据目录
+pub async fn save_terminal_export(app: &AppHandle, path: String, content: String) -> AppResult<()> {
+    let target = PathBuf::from(path.trim());
+    let content_len = content.len();
+    if !target.is_absolute() {
+        return Err(AppError::validation(
+            "terminal.export_path_invalid",
+            "导出路径必须是绝对路径",
+        ));
+    }
+
+    let Some(parent) = target.parent() else {
+        return Err(AppError::validation("terminal.export_path_invalid", "导出路径无效"));
+    };
+    if !fs::try_exists(parent).await.unwrap_or(false) {
+        return Err(AppError::validation("terminal.export_dir_missing", "导出目录不存在"));
+    }
+
+    let protected = [
+        app.path().app_data_dir().ok(),
+        app.path().app_local_data_dir().ok(),
+        app.path().app_config_dir().ok(),
+    ];
+    if protected
+        .iter()
+        .flatten()
+        .any(|dir| parent == dir || parent.starts_with(dir))
+    {
+        return Err(AppError::permission(
+            "terminal.export_path_forbidden",
+            "不能导出到应用数据目录",
+        ));
+    }
+
+    // 不跟随符号链接
+    if let Ok(metadata) = fs::symlink_metadata(&target).await
+        && metadata.file_type().is_symlink()
+    {
+        return Err(AppError::permission(
+            "terminal.export_path_forbidden",
+            "不能覆盖符号链接",
+        ));
+    }
+
+    fs::write(&target, content)
+        .await
         .map_err(|e| AppError::internal("terminal.export_write_failed", "写入终端导出文件失败").with_source(e))?;
+    info!(target: "shipyardx_lib::services::terminal", "terminal export written; path={} bytes={}", target.display(), content_len);
     Ok(())
 }
 
