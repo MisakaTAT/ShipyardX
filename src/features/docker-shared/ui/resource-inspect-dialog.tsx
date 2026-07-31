@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Editor from '@monaco-editor/react'
+import { CodeViewer } from '@/shared/components/code-viewer'
 import { Check, Copy, RefreshCw, ScanSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { StandardFullScreenDialog } from '@/shared/components/standard-fullscreen-dialog'
@@ -87,16 +87,7 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
             </div>
           </div>
         ) : null}
-        <Editor
-          height="100%"
-          language="json"
-          theme="vs-dark"
-          value={json}
-          options={editorOptions}
-          loading={
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">初始化编辑器…</div>
-          }
-        />
+        <CodeViewer height="100%" language="json" value={json} options={editorOptions} />
       </div>
     </StandardFullScreenDialog>
   )

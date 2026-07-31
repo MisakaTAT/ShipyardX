@@ -16,7 +16,7 @@ import type {
   ServerConfig,
 } from '@/types/app-bindings'
 import { listen } from '@tauri-apps/api/event'
-import Editor from '@monaco-editor/react'
+import { CodeViewer } from '@/shared/components/code-viewer'
 import { HighlightLog } from '@/features/appstore/ui/highlight-log'
 import { MarkdownViewer } from '@/features/appstore/ui/markdown-viewer'
 
@@ -358,10 +358,9 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
             <div>
               <FormFieldLabel className="mb-2">Compose</FormFieldLabel>
               <div className="overflow-hidden rounded-lg border border-border" style={{ background: '#1e1e1e' }}>
-                <Editor
+                <CodeViewer
                   height="260px"
                   language="yaml"
-                  theme="vs-dark"
                   value={selectedVersion.compose_preview}
                   options={{
                     readOnly: true,
