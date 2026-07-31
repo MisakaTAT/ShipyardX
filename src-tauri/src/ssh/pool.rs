@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use log::{debug, warn};
@@ -11,6 +12,8 @@ use crate::utils::output::floor_char_boundary;
 use super::client::{SshClientHandler, connect, disconnect};
 
 const MAX_CAPTURE_BYTES: usize = 128 * 1024;
+/// 每台服务器的连接数，单连接会让通道创建互相排队
+const SSH_POOL_SIZE: usize = 3;
 
 struct PooledConnection {
     handle: Option<client::Handle<SshClientHandler>>,
@@ -18,8 +21,13 @@ struct PooledConnection {
 
 type PoolEntry = Arc<tokio::sync::Mutex<PooledConnection>>;
 
-fn pool() -> &'static Mutex<HashMap<String, PoolEntry>> {
-    static POOL: OnceLock<Mutex<HashMap<String, PoolEntry>>> = OnceLock::new();
+struct SshPoolState {
+    slots: Vec<PoolEntry>,
+    next: AtomicUsize,
+}
+
+fn pool() -> &'static Mutex<HashMap<String, Arc<SshPoolState>>> {
+    static POOL: OnceLock<Mutex<HashMap<String, Arc<SshPoolState>>>> = OnceLock::new();
     POOL.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -37,16 +45,27 @@ fn pool_key(config: &ServerConfig) -> String {
 
 fn get_entry(config: &ServerConfig) -> PoolEntry {
     let key = pool_key(config);
-    let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    guard
-        .entry(key)
-        .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(PooledConnection { handle: None })))
-        .clone()
+    let state = {
+        let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard
+            .entry(key)
+            .or_insert_with(|| {
+                Arc::new(SshPoolState {
+                    slots: (0..SSH_POOL_SIZE)
+                        .map(|_| Arc::new(tokio::sync::Mutex::new(PooledConnection { handle: None })))
+                        .collect(),
+                    next: AtomicUsize::new(0),
+                })
+            })
+            .clone()
+    };
+    let index = state.next.fetch_add(1, Ordering::Relaxed) % state.slots.len();
+    state.slots[index].clone()
 }
 
 pub async fn invalidate_server_id(server_id: &str) {
     debug!(target: "shipyardx_lib::ssh::pool", "invalidating ssh pool entries; server_id={}", server_id);
-    let entries: Vec<PoolEntry> = {
+    let states: Vec<Arc<SshPoolState>> = {
         let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let keys: Vec<String> = guard
             .keys()
@@ -56,10 +75,12 @@ pub async fn invalidate_server_id(server_id: &str) {
         keys.into_iter().filter_map(|key| guard.remove(&key)).collect()
     };
 
-    for entry in entries {
-        let mut pooled = entry.lock().await;
-        if let Some(mut handle) = pooled.handle.take() {
-            disconnect(&mut handle).await;
+    for state in states {
+        for entry in &state.slots {
+            let mut pooled = entry.lock().await;
+            if let Some(mut handle) = pooled.handle.take() {
+                disconnect(&mut handle).await;
+            }
         }
     }
 }
