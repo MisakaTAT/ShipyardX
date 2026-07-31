@@ -1,5 +1,6 @@
-PASS_B64='__PASS_B64__'
+IFS= read -r PASS_B64 || true
 PASS="$(printf '%s' "$PASS_B64" | base64 -d)"
+PASS_B64=''
 
 has() {
   command -v "$1" >/dev/null 2>&1

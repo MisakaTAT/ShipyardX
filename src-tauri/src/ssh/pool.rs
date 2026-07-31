@@ -120,14 +120,19 @@ pub async fn open_direct_tcpip(
 }
 
 pub async fn exec(config: &ServerConfig, command: &str) -> AppResult<String> {
-    exec_internal(config, command, |_| {}).await
+    exec_internal(config, command, None, |_| {}).await
+}
+
+/// 敏感数据走标准输入下发，不进远端命令行
+pub async fn exec_with_stdin(config: &ServerConfig, command: &str, stdin: Vec<u8>) -> AppResult<String> {
+    exec_internal(config, command, Some(stdin), |_| {}).await
 }
 
 pub async fn exec_streaming<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> AppResult<String>
 where
     F: FnMut(&str),
 {
-    exec_internal(config, command, |chunk| on_chunk(chunk)).await
+    exec_internal(config, command, None, |chunk| on_chunk(chunk)).await
 }
 
 fn push_limited(buf: &mut String, chunk: &str) {
@@ -142,7 +147,12 @@ fn push_limited(buf: &mut String, chunk: &str) {
     }
 }
 
-async fn exec_internal<F>(config: &ServerConfig, command: &str, mut on_chunk: F) -> AppResult<String>
+async fn exec_internal<F>(
+    config: &ServerConfig,
+    command: &str,
+    stdin: Option<Vec<u8>>,
+    mut on_chunk: F,
+) -> AppResult<String>
 where
     F: FnMut(&str),
 {
@@ -176,6 +186,17 @@ where
         warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);
         AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
     })?;
+
+    if let Some(stdin) = stdin {
+        channel.data_bytes(stdin).await.map_err(|e| {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh stdin write failed; server_id={} error={}", config.id, e);
+            AppError::internal("ssh.stdin_write_failed", "写入远程命令输入失败").with_source(e)
+        })?;
+        channel.eof().await.map_err(|e| {
+            warn!(target: "shipyardx_lib::ssh::pool", "ssh stdin close failed; server_id={} error={}", config.id, e);
+            AppError::internal("ssh.stdin_close_failed", "关闭远程命令输入失败").with_source(e)
+        })?;
+    }
 
     collect_exec_output_with(channel, |chunk| on_chunk(chunk)).await
 }

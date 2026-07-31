@@ -1,6 +1,7 @@
 TMP_PATH=__TMP_PATH__
-PASS_B64='__PASS_B64__'
+IFS= read -r PASS_B64 || true
 PASS="$(printf '%s' "$PASS_B64" | base64 -d)"
+PASS_B64=''
 
 trap 'rm -f "$TMP_PATH"' EXIT
 

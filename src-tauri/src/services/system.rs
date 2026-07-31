@@ -21,7 +21,7 @@ use crate::scripts::{
     SYSTEM_WRITE_DAEMON_FROM_TEMP_WITHOUT_PASSWORD_SH, render, render_shell,
 };
 use crate::services::support::ServerContext;
-use crate::ssh::exec::ssh_exec;
+use crate::ssh::exec::{ssh_exec, ssh_exec_with_stdin};
 use crate::ssh::pool;
 use crate::ssh::sftp::SshSftpSession;
 use crate::state::AppState;
@@ -114,14 +114,20 @@ fn map_restart_error(err: AppError) -> AppError {
     AppError::internal("system.restart_failed", "重启 Docker 服务失败").with_detail(detail)
 }
 
+/// sudo 密码走标准输入，不进命令行（远端 `ps` 可见）
+fn sudo_password_stdin(password: &str) -> Vec<u8> {
+    let mut stdin = STANDARD.encode(password).into_bytes();
+    stdin.push(b'\n');
+    stdin
+}
+
 async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<String>) -> AppResult<()> {
-    info!(target: "shipyardx_lib::services::system", "restarting docker service; server_id={} use_sudo_password={}", server.id, sudo_password.as_ref().is_some_and(|s| !s.is_empty()));
-    let restart_cmd = if let Some(pwd) = sudo_password.filter(|s| !s.is_empty()) {
-        let pwd_b64 = STANDARD.encode(pwd);
+    let sudo_password = sudo_password.filter(|s| !s.is_empty());
+    info!(target: "shipyardx_lib::services::system", "restarting docker service; server_id={} use_sudo_password={}", server.id, sudo_password.is_some());
+    let restart_cmd = if sudo_password.is_some() {
         render(
             SYSTEM_RESTART_WITH_PASSWORD_SH,
             &[
-                ("__PASS_B64__", &pwd_b64),
                 ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
                 ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
                 ("__ERR_SYSTEMCTL__", ERR_SYSTEMCTL),
@@ -143,7 +149,11 @@ async fn restart_docker_service(server: &ServerConfig, sudo_password: Option<Str
             ],
         )
     };
-    ssh_exec(server, &restart_cmd).await.map_err(map_restart_error)?;
+    match sudo_password {
+        Some(password) => ssh_exec_with_stdin(server, &restart_cmd, sudo_password_stdin(&password)).await,
+        None => ssh_exec(server, &restart_cmd).await,
+    }
+    .map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker service restarted; server_id={}", server.id);
     Ok(())
 }
@@ -471,12 +481,11 @@ pub async fn update_docker_daemon_settings(
     let sftp = SshSftpSession::connect(ctx.server()).await?;
     let remote_tmp_path = sftp.home_path(&format!("shipyardx/system/docker/daemon-{}.json.tmp", Uuid::new_v4()));
     sftp.upload_bytes(&remote_tmp_path, json.as_bytes()).await?;
-    let write_cmd = if let Some(password) = params.sudo_password.as_deref().filter(|value| !value.is_empty()) {
-        let pwd_b64 = STANDARD.encode(password);
+    let sudo_password = params.sudo_password.as_deref().filter(|value| !value.is_empty());
+    let write_cmd = if sudo_password.is_some() {
         render_shell(
             SYSTEM_WRITE_DAEMON_FROM_TEMP_WITH_PASSWORD_SH,
             &[
-                ("__PASS_B64__", &pwd_b64),
                 ("__ERR_BAD_SUDO_PASSWORD__", ERR_BAD_SUDO_PASSWORD),
                 ("__ERR_BAD_SU_PASSWORD__", ERR_BAD_SU_PASSWORD),
                 ("__ERR_NO_SUDO__", ERR_NO_SUDO),
@@ -493,7 +502,11 @@ pub async fn update_docker_daemon_settings(
             &[("__TMP_PATH__", &remote_tmp_path)],
         )
     };
-    ssh_exec(ctx.server(), &write_cmd).await.map_err(map_restart_error)?;
+    match sudo_password {
+        Some(password) => ssh_exec_with_stdin(ctx.server(), &write_cmd, sudo_password_stdin(password)).await,
+        None => ssh_exec(ctx.server(), &write_cmd).await,
+    }
+    .map_err(map_restart_error)?;
     info!(target: "shipyardx_lib::services::system", "docker daemon settings updated; server_id={}", server_id);
     Ok(())
 }
