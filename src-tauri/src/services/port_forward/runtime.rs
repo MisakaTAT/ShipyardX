@@ -67,8 +67,8 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
         return Ok(());
     }
 
-    // 磁盘上的旧规则可能带着未经校验的绑定地址，启动前再过一遍。
-    let bind_addr = super::rules::resolve_bind_address(Some(&rule.bind_address))?;
+    // 旧规则可能带着未校验的绑定地址
+    let bind_addr = super::rules::resolve_bind_address(Some(rule.bind_address.as_str()))?;
     let listener = TcpListener::bind((bind_addr.as_str(), rule.local_port)).map_err(|e| {
         AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
     })?;
