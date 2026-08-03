@@ -39,8 +39,8 @@ fn master_key() -> AppResult<[u8; 32]> {
         return Ok(*key);
     }
 
-    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        .map_err(|e| keyring_error("访问系统钥匙串", e))?;
+    let entry =
+        keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map_err(|e| keyring_error("访问系统钥匙串", e))?;
     let key = match entry.get_password() {
         Ok(encoded) => decode_key(&encoded).ok_or_else(|| {
             AppError::internal("config.master_key_invalid", "钥匙串中的主密钥格式无效")

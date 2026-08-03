@@ -26,9 +26,9 @@ pub fn init(app: &AppHandle, data_dir: &Path) {
 }
 
 fn store_path() -> AppResult<&'static PathBuf> {
-    KNOWN_HOSTS_PATH.get().ok_or_else(|| {
-        AppError::internal("ssh.known_hosts_uninitialized", "主机密钥存储尚未初始化")
-    })
+    KNOWN_HOSTS_PATH
+        .get()
+        .ok_or_else(|| AppError::internal("ssh.known_hosts_uninitialized", "主机密钥存储尚未初始化"))
 }
 
 /// 大小写和空白差异视为同一条目
@@ -50,8 +50,9 @@ fn load() -> AppResult<BTreeMap<String, String>> {
 
 fn persist(entries: &BTreeMap<String, String>) -> AppResult<()> {
     let path = store_path()?;
-    let payload = serde_json::to_vec_pretty(entries)
-        .map_err(|e| AppError::internal("ssh.known_hosts_serialize_failed", "序列化已信任主机密钥失败").with_source(e))?;
+    let payload = serde_json::to_vec_pretty(entries).map_err(|e| {
+        AppError::internal("ssh.known_hosts_serialize_failed", "序列化已信任主机密钥失败").with_source(e)
+    })?;
     atomic_write(path, &payload)
 }
 

@@ -279,19 +279,20 @@ fn is_valid_env_key(key: &str) -> bool {
 fn validate_env_values(env_values: &HashMap<String, String>) -> AppResult<()> {
     for (key, value) in env_values {
         if !is_valid_env_key(key) {
-            return Err(AppError::validation(
-                "appstore.env_key_invalid",
-                format!("环境变量名不合法：{key}"),
-            )
-            .with_action("变量名只能包含字母、数字和下划线，且不能以数字开头"));
+            return Err(
+                AppError::validation("appstore.env_key_invalid", format!("环境变量名不合法：{key}"))
+                    .with_action("变量名只能包含字母、数字和下划线，且不能以数字开头"),
+            );
         }
-        if let Some(bad) = value.chars().find(|c| *c == '\n' || *c == '\r' || (c.is_control() && *c != '\t')) {
-            return Err(AppError::validation(
-                "appstore.env_value_invalid",
-                format!("环境变量 {key} 的值包含非法字符"),
-            )
-            .with_detail(format!("字符编码：U+{:04X}", bad as u32))
-            .with_action("请去掉值中的换行和控制字符"));
+        if let Some(bad) = value
+            .chars()
+            .find(|c| *c == '\n' || *c == '\r' || (c.is_control() && *c != '\t'))
+        {
+            return Err(
+                AppError::validation("appstore.env_value_invalid", format!("环境变量 {key} 的值包含非法字符"))
+                    .with_detail(format!("字符编码：U+{:04X}", bad as u32))
+                    .with_action("请去掉值中的换行和控制字符"),
+            );
         }
     }
     Ok(())
