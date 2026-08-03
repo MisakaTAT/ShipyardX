@@ -8,10 +8,10 @@ import type { WorkspaceTab } from '@/pages/workspace'
 import { KeepAlive } from '@/shared/components/keep-alive'
 import { APP_PATHS, appMemoryLocation } from '@/shared/lib/app-router'
 
-// 这些页面各自拖着 xterm、monaco、highlight.js，拆出去后首屏只留连接列表
 const Workspace = lazy(() => import('@/pages/workspace'))
 const AppStore = lazy(() => import('@/pages/app-store'))
 const PortForward = lazy(() => import('@/pages/port-forward'))
+const HostKeys = lazy(() => import('@/pages/host-keys'))
 const SettingsPage = lazy(() => import('@/pages/settings'))
 
 function PageFallback() {
@@ -40,6 +40,7 @@ function LayoutContent() {
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('overview')
   const isStore = location === APP_PATHS.store
   const isPortForward = location === APP_PATHS.portForward
+  const isHostKeys = location === APP_PATHS.hostKeys
   const isWorkspace = location === APP_PATHS.workspace
   const isSettings = location === APP_PATHS.settings
 
@@ -77,6 +78,14 @@ function LayoutContent() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <LazyPage>
               <PortForward />
+            </LazyPage>
+          </div>
+        ) : null}
+
+        {isHostKeys ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <LazyPage>
+              <HostKeys />
             </LazyPage>
           </div>
         ) : null}

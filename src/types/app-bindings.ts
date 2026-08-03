@@ -16,6 +16,10 @@ export const commands = {
 	known_fingerprint: string | null,
 } | null>("get_pending_host_key"),
 	trustHostKey: (host: string, port: number, fingerprint: string) => __TAURI_INVOKE<null>("trust_host_key", { host, port, fingerprint }),
+	listKnownHosts: () => __TAURI_INVOKE<KnownHostEntry[]>("list_known_hosts"),
+	forgetHostKey: (host: string, port: number) => __TAURI_INVOKE<boolean>("forget_host_key", { host, port }),
+	clearKnownHosts: () => __TAURI_INVOKE<number>("clear_known_hosts"),
+	probeHostKey: (host: string, port: number) => __TAURI_INVOKE<string>("probe_host_key", { host, port }),
 	testConnection: (serverId: string) => __TAURI_INVOKE<string>("test_connection", { serverId }),
 	testServerConnection: (serverId: string) => __TAURI_INVOKE<string>("test_server_connection", { serverId }),
 	testConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<string>("test_connection_direct", { server }),
@@ -493,6 +497,12 @@ export type InstallStepEvent = {
 	status: string,
 	message: string,
 	output_chunk: string | null,
+};
+
+export type KnownHostEntry = {
+	host: string,
+	port: number,
+	fingerprint: string,
 };
 
 export type LocalAddress = {

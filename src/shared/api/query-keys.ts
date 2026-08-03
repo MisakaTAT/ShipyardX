@@ -25,6 +25,8 @@ export const qk = {
 
   portForwards: () => ['port-forwards'] as const,
 
+  knownHosts: () => ['known-hosts'] as const,
+
   localAddresses: () => ['local-addresses'] as const,
 
   appstoreSettings: () => ['appstore', 'settings'] as const,
@@ -51,6 +53,7 @@ export type QkKey =
   | ReturnType<typeof qk.dockerAccess>
   | ReturnType<typeof qk.dockerDaemon>
   | ReturnType<typeof qk.portForwards>
+  | ReturnType<typeof qk.knownHosts>
   | ReturnType<typeof qk.localAddresses>
   | ReturnType<typeof qk.appstoreSettings>
   | ReturnType<typeof qk.appstoreCacheInfo>

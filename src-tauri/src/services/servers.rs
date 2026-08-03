@@ -4,9 +4,10 @@ use bollard::models::SystemVersion;
 use log::info;
 
 use crate::docker::client::map_bollard_error;
-use crate::dto::server::{HostKeyPrompt, ServerConfig};
+use crate::dto::server::{HostKeyPrompt, KnownHostEntry, ServerConfig};
 use crate::error::AppResult;
 use crate::services::{server_store, support::ServerContext};
+use crate::ssh::client;
 use crate::ssh::client::{connect, disconnect};
 use crate::ssh::known_hosts;
 use crate::state::AppState;
@@ -45,6 +46,24 @@ pub async fn trust_host_key(host: String, port: u16, fingerprint: String) -> App
     known_hosts::trust(&host, port, &fingerprint)?;
     info!(target: "shipyardx_lib::services::servers", "host key trusted; host={} port={}", host, port);
     Ok(())
+}
+
+pub async fn list_known_hosts() -> AppResult<Vec<KnownHostEntry>> {
+    let entries = known_hosts::list()?;
+    info!(target: "shipyardx_lib::services::servers", "listed known hosts; count={}", entries.len());
+    Ok(entries)
+}
+
+pub async fn forget_host_key(host: String, port: u16) -> AppResult<bool> {
+    known_hosts::forget(&host, port)
+}
+
+pub async fn clear_known_hosts() -> AppResult<u32> {
+    Ok(known_hosts::clear()? as u32)
+}
+
+pub async fn probe_host_key(host: String, port: u16) -> AppResult<String> {
+    client::probe_host_key(&host, port).await
 }
 
 pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {

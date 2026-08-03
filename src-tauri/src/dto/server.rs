@@ -10,6 +10,13 @@ pub struct HostKeyPrompt {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
+pub struct KnownHostEntry {
+    pub host: String,
+    pub port: u16,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct ServerConfig {
     pub id: String,
     pub name: String,

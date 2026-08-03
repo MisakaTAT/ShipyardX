@@ -8,7 +8,7 @@ use tauri_specta::Event;
 
 use crate::config::store::atomic_write;
 use crate::dto::events::HostKeyPromptRequired;
-use crate::dto::server::HostKeyPrompt;
+use crate::dto::server::{HostKeyPrompt, KnownHostEntry};
 use crate::error::{AppError, AppResult};
 
 const KNOWN_HOSTS_FILE: &str = "known_hosts.json";
@@ -54,6 +54,46 @@ fn persist(entries: &BTreeMap<String, String>) -> AppResult<()> {
         AppError::internal("ssh.known_hosts_serialize_failed", "序列化已信任主机密钥失败").with_source(e)
     })?;
     atomic_write(path, &payload)
+}
+
+/// 端口固定在末段，IPv6 地址里的冒号不会被误切
+fn split_entry_key(key: &str) -> Option<(String, u16)> {
+    let (host, port) = key.rsplit_once(':')?;
+    Some((host.to_string(), port.parse().ok()?))
+}
+
+pub fn list() -> AppResult<Vec<KnownHostEntry>> {
+    let entries = load()?;
+    Ok(entries
+        .into_iter()
+        .filter_map(|(key, fingerprint)| {
+            let (host, port) = split_entry_key(&key)?;
+            Some(KnownHostEntry {
+                host,
+                port,
+                fingerprint,
+            })
+        })
+        .collect())
+}
+
+pub fn forget(host: &str, port: u16) -> AppResult<bool> {
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut entries = load()?;
+    let removed = entries.remove(&entry_key(host, port)).is_some();
+    if removed {
+        persist(&entries)?;
+        info!(target: "shipyardx_lib::ssh::known_hosts", "host key forgotten; host={} port={}", host, port);
+    }
+    Ok(removed)
+}
+
+pub fn clear() -> AppResult<usize> {
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let count = load()?.len();
+    persist(&BTreeMap::new())?;
+    info!(target: "shipyardx_lib::ssh::known_hosts", "all host keys cleared; count={}", count);
+    Ok(count)
 }
 
 pub fn lookup(host: &str, port: u16) -> Option<String> {
@@ -124,5 +164,13 @@ mod tests {
         assert_eq!(entry_key(" Example.COM ", 22), "example.com:22");
         assert_eq!(entry_key("example.com", 2222), "example.com:2222");
         assert_ne!(entry_key("example.com", 22), entry_key("example.com", 2222));
+    }
+
+    #[test]
+    fn splits_entry_keys_back() {
+        assert_eq!(split_entry_key("example.com:22"), Some(("example.com".into(), 22)));
+        assert_eq!(split_entry_key("::1:2222"), Some(("::1".into(), 2222)));
+        assert_eq!(split_entry_key("example.com"), None);
+        assert_eq!(split_entry_key("example.com:port"), None);
     }
 }

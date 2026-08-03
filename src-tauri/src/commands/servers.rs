@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::dto::server::{HostKeyPrompt, ServerConfig};
+use crate::dto::server::{HostKeyPrompt, KnownHostEntry, ServerConfig};
 use crate::error::AppResult;
 use crate::services;
 use crate::state::AppState;
@@ -39,6 +39,30 @@ pub async fn get_pending_host_key() -> AppResult<Option<HostKeyPrompt>> {
 #[specta::specta]
 pub async fn trust_host_key(host: String, port: u16, fingerprint: String) -> AppResult<()> {
     services::servers::trust_host_key(host, port, fingerprint).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_known_hosts() -> AppResult<Vec<KnownHostEntry>> {
+    services::servers::list_known_hosts().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn forget_host_key(host: String, port: u16) -> AppResult<bool> {
+    services::servers::forget_host_key(host, port).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_known_hosts() -> AppResult<u32> {
+    services::servers::clear_known_hosts().await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn probe_host_key(host: String, port: u16) -> AppResult<String> {
+    services::servers::probe_host_key(host, port).await
 }
 
 #[tauri::command]

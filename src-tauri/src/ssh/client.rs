@@ -128,15 +128,13 @@ where
     Ok(ssh_runtime()?.handle().spawn(future))
 }
 
-fn map_ssh_connect_error(config: &ServerConfig, error: RusshError) -> AppError {
+fn map_ssh_connect_error(host: &str, port: u16, error: RusshError) -> AppError {
     use std::io::ErrorKind;
 
     match error {
-        RusshError::ConnectionTimeout => AppError::timeout(
-            "ssh.connect_timeout",
-            format!("连接 {}:{} 超时", config.host, config.port),
-        )
-        .retryable(true),
+        RusshError::ConnectionTimeout => {
+            AppError::timeout("ssh.connect_timeout", format!("连接 {host}:{port} 超时")).retryable(true)
+        }
         RusshError::KeepaliveTimeout | RusshError::InactivityTimeout => {
             AppError::timeout("ssh.connection_lost", "连接已超时中断")
                 .with_action("请检查网络连通性后重试")
@@ -182,12 +180,9 @@ fn map_ssh_connect_error(config: &ServerConfig, error: RusshError) -> AppError {
             let base = match io_error.kind() {
                 ErrorKind::ConnectionRefused => AppError::unavailable("ssh.connection_refused", "服务器拒绝连接")
                     .with_action("请确认目标主机 SSH 服务已启动，端口配置正确"),
-                ErrorKind::TimedOut => AppError::timeout(
-                    "ssh.connect_timeout",
-                    format!("连接 {}:{} 超时", config.host, config.port),
-                )
-                .with_action("请检查目标主机是否可达，以及安全组或防火墙设置")
-                .retryable(true),
+                ErrorKind::TimedOut => AppError::timeout("ssh.connect_timeout", format!("连接 {host}:{port} 超时"))
+                    .with_action("请检查目标主机是否可达，以及安全组或防火墙设置")
+                    .retryable(true),
                 ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
                     AppError::unavailable("ssh.connection_interrupted", "连接已中断")
                         .with_action("请检查网络连通性后重试")
@@ -240,7 +235,7 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
             .ok()
             .and_then(|mut slot| slot.take())
             .and_then(|verdict| host_key_error(config, verdict))
-            .unwrap_or_else(|| map_ssh_connect_error(config, e))
+            .unwrap_or_else(|| map_ssh_connect_error(&config.host, config.port, e))
     })?;
 
     let auth = match config.auth_type.as_str() {
@@ -299,6 +294,51 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
 
     info!(target: "shipyardx_lib::ssh::client", "ssh connection authenticated; server_id={} username={}", config.id, config.username);
     Ok(handle)
+}
+
+struct HostKeyProbeHandler {
+    fingerprint: Arc<Mutex<Option<String>>>,
+}
+
+impl client::Handler for HostKeyProbeHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        server_public_key: &russh::keys::ssh_key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        if let Ok(mut slot) = self.fingerprint.lock() {
+            *slot = Some(fingerprint_of(server_public_key));
+        }
+        Ok(true)
+    }
+}
+
+/// 读取服务器当前指纹：只做密钥交换就断开，不认证、不比对、不写入信任记录
+pub async fn probe_host_key(host: &str, port: u16) -> AppResult<String> {
+    info!(target: "shipyardx_lib::ssh::client", "probing host key; host={} port={}", host, port);
+    let client_config = Arc::new(client::Config {
+        inactivity_timeout: Some(SSH_SOCKET_IO_TIMEOUT),
+        ..Default::default()
+    });
+
+    let fingerprint: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let handler = HostKeyProbeHandler {
+        fingerprint: Arc::clone(&fingerprint),
+    };
+
+    let mut handle = tokio::time::timeout(SSH_CONNECT_TIMEOUT, client::connect(client_config, (host, port), handler))
+        .await
+        .map_err(|_| AppError::timeout("ssh.connect_timeout", format!("连接 {host}:{port} 超时")).retryable(true))?
+        .map_err(|e| map_ssh_connect_error(host, port, e))?;
+
+    disconnect(&mut handle).await;
+
+    fingerprint
+        .lock()
+        .ok()
+        .and_then(|slot| slot.clone())
+        .ok_or_else(|| AppError::internal("ssh.host_key_probe_failed", "未能读取服务器主机密钥"))
 }
 
 pub async fn disconnect<H: client::Handler>(handle: &mut client::Handle<H>) {
