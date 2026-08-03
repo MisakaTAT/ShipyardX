@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { Fingerprint, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ChevronRight, Fingerprint, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { KnownHostEntry, ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import {
@@ -29,26 +29,45 @@ interface Row {
   servers: ServerConfig[]
 }
 
-function Section({
-  title,
+function OrphanGroup({
   count,
-  action,
+  expanded,
+  onToggle,
+  onClear,
   children,
 }: {
-  title: string
   count: number
-  action?: ReactNode
+  expanded: boolean
+  onToggle: () => void
+  onClear: () => void
   children: ReactNode
 }) {
   return (
-    <section>
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-[13px] font-medium text-foreground">{title}</h2>
-        <span className="text-[13px] text-muted-foreground">{count}</span>
-        {action ? <div className="ml-auto">{action}</div> : null}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 rounded-xl border border-dashed border-border px-3.5 py-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+        >
+          <ChevronRight
+            className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')}
+          />
+          <span className="truncate text-[13px] text-muted-foreground">{count} 条指纹没有对应的服务器配置</span>
+        </button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="shrink-0 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+          onClick={onClear}
+        >
+          <Trash2 />
+          清理
+        </Button>
       </div>
-      <div className="space-y-2">{children}</div>
-    </section>
+      {expanded ? <div className="space-y-2">{children}</div> : null}
+    </div>
   )
 }
 
@@ -66,6 +85,7 @@ export default function HostKeysPage() {
   const [pendingDelete, setPendingDelete] = useState<KnownHostEntry | null>(null)
   const [showClearAll, setShowClearAll] = useState(false)
   const [showClearOrphans, setShowClearOrphans] = useState(false)
+  const [orphansOpen, setOrphansOpen] = useState(false)
   const [probingAll, setProbingAll] = useState(false)
 
   const rows: Row[] = useMemo(
@@ -85,6 +105,8 @@ export default function HostKeysPage() {
 
   const linked = filtered.filter((row) => row.servers.length > 0)
   const orphans = filtered.filter((row) => row.servers.length === 0)
+  // 搜索只命中残留项时强制展开，否则整页只剩一条折叠带，像是什么都没搜到
+  const orphansExpanded = orphansOpen || linked.length === 0
 
   // 串行探测：每条都是一次真实 SSH 握手，并发会同时打满所有服务器
   const probeAll = useCallback(async () => {
@@ -144,7 +166,7 @@ export default function HostKeysPage() {
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">主机指纹</h1>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    管理已信任的 SSH 主机密钥，删除后下次连接会重新要求确认指纹。
+                    管理已信任的 SSH 主机密钥，指纹变化时会中断连接并要求重新确认。
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -212,32 +234,20 @@ export default function HostKeysPage() {
             ) : filtered.length === 0 ? (
               <EmptyState icon={Search} title={`没有匹配「${search}」的指纹`} />
             ) : (
-              <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-                {linked.length > 0 ? (
-                  <Section title="已关联服务器" count={linked.length}>
-                    {linked.map(renderCard)}
-                  </Section>
-                ) : null}
-
+              <div className="flex flex-col gap-4">
                 {orphans.length > 0 ? (
-                  <Section
-                    title="无关联服务器"
+                  <OrphanGroup
                     count={orphans.length}
-                    action={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-                        onClick={() => setShowClearOrphans(true)}
-                      >
-                        <Trash2 />
-                        清理这些
-                      </Button>
-                    }
+                    expanded={orphansExpanded}
+                    onToggle={() => setOrphansOpen((open) => !open)}
+                    onClear={() => setShowClearOrphans(true)}
                   >
                     {orphans.map(renderCard)}
-                  </Section>
+                  </OrphanGroup>
+                ) : null}
+
+                {!orphansExpanded && linked.length > 0 ? (
+                  <div className="space-y-2">{linked.map(renderCard)}</div>
                 ) : null}
               </div>
             )}

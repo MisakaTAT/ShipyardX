@@ -83,9 +83,11 @@ export function HostKeyCard({
           <div className="truncate text-[14px] font-medium text-foreground" title={names || undefined}>
             {names || `${entry.host}:${entry.port}`}
           </div>
-          <div className="truncate font-mono text-[12px] text-muted-foreground">
-            {names ? `${entry.host}:${entry.port}` : '无关联服务器'}
-          </div>
+          {names ? (
+            <div className="truncate font-mono text-[12px] text-muted-foreground">
+              {entry.host}:{entry.port}
+            </div>
+          ) : null}
         </div>
 
         <StatusLabel state={state} />
