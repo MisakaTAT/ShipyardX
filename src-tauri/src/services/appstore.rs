@@ -475,8 +475,14 @@ mod tests {
     fn quotes_env_values_that_need_it() {
         assert_eq!(quote_env_value("simple"), "simple");
         assert_eq!(quote_env_value("with space"), "\"with space\"");
-        assert_eq!(quote_env_value("p@ss$word"), "\"p@ss$$word\"");
         assert_eq!(quote_env_value("say \"hi\""), "\"say \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn escapes_dollar_without_adding_quotes() {
+        // $$ 才是 compose 里的字面量 $，值本身不含空白或元字符时无需加引号
+        assert_eq!(quote_env_value("p@ss$word"), "p@ss$$word");
+        assert_eq!(quote_env_value("a $b c"), "\"a $$b c\"");
     }
 
     #[test]
