@@ -141,7 +141,7 @@ export default function PortForwardPage() {
               </div>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
               {filteredRules.length === 0 && rules.length > 0 ? (
                 <EmptyState icon={Search} title={`没有匹配「${search}」的规则`} />
               ) : (
