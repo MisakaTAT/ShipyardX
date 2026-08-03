@@ -5,10 +5,11 @@ import { toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
-export function useImages(serverId: string) {
+export function useImages(serverId: string, enabled = true) {
   return useQuery({
     queryKey: qk.images(serverId),
     queryFn: () => commands.listImages(serverId),
+    enabled: enabled && Boolean(serverId),
   })
 }
 

@@ -177,6 +177,7 @@ pub async fn export_image(
     let export_dir = PathBuf::from(directory);
     ensure_export_directory(&export_dir)?;
 
+    ensure_plain_file_name(file_name)?;
     let export_name = ensure_tar_extension(file_name);
     let export_path = export_dir.join(&export_name);
     info!(
@@ -682,6 +683,23 @@ async fn ensure_import_file(path: &Path) -> AppResult<u64> {
     Ok(metadata.len())
 }
 
+/// 文件名是表单里的自由文本，必须挡住路径分隔符和 `..`，否则能写到所选目录之外。
+fn ensure_plain_file_name(file_name: &str) -> AppResult<()> {
+    let invalid = file_name.is_empty()
+        || file_name == "."
+        || file_name == ".."
+        || file_name.contains('/')
+        || file_name.contains('\\')
+        || file_name.contains('\0');
+    if invalid {
+        return Err(AppError::validation(
+            "image.export_file_name_invalid",
+            "文件名不能为空，也不能包含路径分隔符",
+        ));
+    }
+    Ok(())
+}
+
 fn ensure_tar_extension(file_name: &str) -> String {
     if file_name.to_ascii_lowercase().ends_with(".tar") {
         file_name.to_string()
@@ -842,4 +860,26 @@ pub async fn cancel_stream(stream_id: String, state: State<'_, AppState>) -> App
         warn!(target: "shipyardx_lib::services::images", "cancel requested for missing image pull; pull_id={}", stream_id);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_file_names_that_escape_the_directory() {
+        assert!(ensure_plain_file_name("../evil").is_err());
+        assert!(ensure_plain_file_name("a/b").is_err());
+        assert!(ensure_plain_file_name("a\\b").is_err());
+        assert!(ensure_plain_file_name("").is_err());
+        assert!(ensure_plain_file_name("..").is_err());
+    }
+
+    #[test]
+    fn accepts_plain_file_names() {
+        assert!(ensure_plain_file_name("nginx.tar").is_ok());
+        assert!(ensure_plain_file_name("my image 1").is_ok());
+        assert_eq!(ensure_tar_extension("nginx"), "nginx.tar");
+        assert_eq!(ensure_tar_extension("nginx.tar"), "nginx.tar");
+    }
 }

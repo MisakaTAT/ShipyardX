@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, RotateCcw } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
-import { XTERM_THEME_MAP, XTERM_THEME_NAMES } from '@/themes/xtermjs'
+import { XTERM_THEME_MAP } from '@/themes/xtermjs'
+import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -324,7 +325,7 @@ function SearchablePicker<T extends string>({
   renderOption,
 }: {
   value: T
-  options: T[]
+  options: readonly T[]
   onChange: (value: T) => void
   placeholder: string
   renderValue?: (value: T) => ReactNode

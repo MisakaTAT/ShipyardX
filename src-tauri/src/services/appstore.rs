@@ -67,6 +67,7 @@ pub async fn clear_appstore_cache(app: &AppHandle) -> AppResult<()> {
 
 pub async fn get_app_detail(app: &AppHandle, source_id: Option<&str>, app_key: &str) -> AppResult<AppDetail> {
     debug!(target: "shipyardx_lib::services::appstore", "fetching app detail; source_id={:?} app_key={}", source_id, app_key);
+    AppstoreRepo::ensure_safe_component("应用标识", app_key)?;
     let repo = match source_id {
         Some(source_id) => {
             let settings = AppstoreRepo::new(app)?.load_settings().await?;
@@ -138,6 +139,8 @@ fn flush_buffered_output(app: &AppHandle, step: &str, buffer: &mut TextOutputBuf
 
 pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &InstallApp) -> AppResult<()> {
     info!(target: "shipyardx_lib::services::appstore", "installing app; server_id={} app_key={} version={} env_keys={}", server.id, req.app_key, req.version, req.env_values.len());
+    AppstoreRepo::ensure_safe_component("应用标识", &req.app_key)?;
+    AppstoreRepo::ensure_safe_component("版本号", &req.version)?;
     let repo = AppstoreRepo::new(app)?;
     let version_dir = repo.version_dir(&req.app_key, &req.version);
 

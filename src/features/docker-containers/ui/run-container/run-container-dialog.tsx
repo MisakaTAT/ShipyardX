@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, type ComponentProps, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { Box, Play, Plus, Trash2 } from 'lucide-react'
-import { commands, type Image, type Network } from '@/types/app-bindings'
+import { useImages } from '@/features/docker-images/api/use-images'
+import { useNetworks } from '@/features/docker-networks/api/use-networks'
 import {
   runContainerFormDefaultValues,
   runContainerFormSchema,
@@ -283,10 +284,12 @@ interface RunContainerDialogProps {
 }
 
 export default function RunContainerDialog({ open, onOpenChange, serverId, onSuccess }: RunContainerDialogProps) {
-  const [images, setImages] = useState<Image[]>([])
-  const [imagesLoading, setImagesLoading] = useState(false)
-  const [networks, setNetworks] = useState<Network[]>([])
-  const [networksLoading, setNetworksLoading] = useState(false)
+  const imagesQuery = useImages(serverId, open)
+  const networksQuery = useNetworks(serverId, open)
+  const images = useMemo(() => imagesQuery.data ?? [], [imagesQuery.data])
+  const networks = networksQuery.data ?? []
+  const imagesLoading = imagesQuery.isPending
+  const networksLoading = networksQuery.isPending
   const imageDatalistId = useId()
 
   const form = useForm<RunContainerFormValues>({
@@ -347,39 +350,16 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
     if (!open) return
     flow.reset()
     resetForm(runContainerFormDefaultValues)
-
-    let alive = true
-    setImagesLoading(true)
-    void commands
-      .listImages(serverId)
-      .then((data) => {
-        if (alive) setImages(data)
-      })
-      .catch(() => {
-        if (alive) setImages([])
-      })
-      .finally(() => {
-        if (alive) setImagesLoading(false)
-      })
-
-    setNetworksLoading(true)
-    void commands
-      .listNetworks(serverId)
-      .then((data) => {
-        if (alive) setNetworks(data)
-      })
-      .catch(() => {
-        if (alive) setNetworks([])
-      })
-      .finally(() => {
-        if (alive) setNetworksLoading(false)
-      })
-
-    return () => {
-      alive = false
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, serverId])
+
+  useEffect(() => {
+    if (imagesQuery.error) toastAppError(imagesQuery.error, '加载镜像列表失败')
+  }, [imagesQuery.error])
+
+  useEffect(() => {
+    if (networksQuery.error) toastAppError(networksQuery.error, '加载网络列表失败')
+  }, [networksQuery.error])
 
   const imageOptions = useMemo(() => listSelectableImageRefs(images), [images])
 

@@ -1,13 +1,13 @@
 import { createContext, useContext } from 'react'
 import { DEFAULT_APPSTORE_SOURCES } from '@/shared/lib/appstore-settings'
-import { XTERM_THEME_MAP } from '@/themes/xtermjs'
+import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
 import { normalizeHotkey } from '@/shared/lib/hotkeys'
 
 export const APP_SETTINGS_STORAGE_KEY = 'shipyardx-settings'
 
 export type TerminalFrontend = 'xterm-canvas' | 'xterm-webgl'
 export type TerminalCursorStyle = 'block' | 'underline' | 'bar'
-export type TerminalThemeName = keyof typeof XTERM_THEME_MAP
+export type TerminalThemeName = (typeof XTERM_THEME_NAMES)[number]
 
 export interface AppSettings {
   hotkeys: {
@@ -97,9 +97,11 @@ export function normalizeFontFamily(value: unknown) {
   return trimmed || DEFAULT_SETTINGS.terminal.fontFamily
 }
 
+const THEME_NAME_SET: ReadonlySet<string> = new Set(XTERM_THEME_NAMES)
+
 export function normalizeTerminalTheme(value: unknown): TerminalThemeName {
   if (typeof value !== 'string') return DEFAULT_SETTINGS.terminal.theme
-  return value in XTERM_THEME_MAP ? (value as TerminalThemeName) : DEFAULT_SETTINGS.terminal.theme
+  return THEME_NAME_SET.has(value) ? (value as TerminalThemeName) : DEFAULT_SETTINGS.terminal.theme
 }
 
 function normalizeString(value: unknown, fallback: string) {

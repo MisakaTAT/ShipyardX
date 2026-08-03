@@ -474,6 +474,5 @@ const xtermThemes = {
 }
 
 export const XTERM_THEME_MAP = xtermThemes
-export const XTERM_THEME_NAMES = Object.keys(xtermThemes) as Array<keyof typeof xtermThemes>
 
 export default xtermThemes

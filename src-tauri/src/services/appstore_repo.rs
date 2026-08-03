@@ -80,6 +80,16 @@ impl AppstoreRepo {
         cache_dir.join("apps")
     }
 
+    pub(crate) fn ensure_safe_component(kind: &str, value: &str) -> AppResult<()> {
+        if is_safe_path_component(value) {
+            return Ok(());
+        }
+        Err(AppError::validation(
+            "appstore.path_component_invalid",
+            format!("{kind}包含非法字符：{value}"),
+        ))
+    }
+
     fn app_dir(&self, cache_dir: &Path, app_key: &str) -> PathBuf {
         self.apps_dir(cache_dir).join(app_key)
     }
@@ -689,12 +699,23 @@ fn default_appstore_sources() -> Vec<AppstoreSource> {
     ]
 }
 
+/// 这些值会被拼进缓存目录路径，必须挡住 `..` 和分隔符，否则能读写缓存目录之外的地方。
+fn is_safe_path_component(value: &str) -> bool {
+    !value.is_empty()
+        && value != "."
+        && value != ".."
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
 fn normalize_appstore_source(source: AppstoreSource) -> AppstoreSource {
+    let id = source.id.trim();
     AppstoreSource {
-        id: if source.id.trim().is_empty() {
-            Uuid::new_v4().to_string()
+        id: if is_safe_path_component(id) {
+            id.to_string()
         } else {
-            source.id.trim().to_string()
+            Uuid::new_v4().to_string()
         },
         name: if source.name.trim().is_empty() {
             "未命名源".to_string()
@@ -736,5 +757,40 @@ fn ensure_enabled_source(sources: &mut [AppstoreSource]) {
     }
     if let Some(first) = sources.first_mut() {
         first.enabled = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_path_traversal_components() {
+        assert!(!is_safe_path_component(".."));
+        assert!(!is_safe_path_component("."));
+        assert!(!is_safe_path_component(""));
+        assert!(!is_safe_path_component("../etc"));
+        assert!(!is_safe_path_component("a/b"));
+        assert!(!is_safe_path_component("a\\b"));
+    }
+
+    #[test]
+    fn accepts_normal_app_and_version_names() {
+        assert!(is_safe_path_component("nginx"));
+        assert!(is_safe_path_component("1.25.3"));
+        assert!(is_safe_path_component("my_app-2"));
+    }
+
+    #[test]
+    fn replaces_unsafe_source_ids() {
+        let source = AppstoreSource {
+            id: "../../escape".to_string(),
+            name: "x".to_string(),
+            repo_url: "https://example.com/a.git".to_string(),
+            enabled: true,
+        };
+        let normalized = normalize_appstore_source(source);
+        assert!(is_safe_path_component(&normalized.id));
+        assert_ne!(normalized.id, "../../escape");
     }
 }

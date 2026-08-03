@@ -4,10 +4,11 @@ import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
-export function useNetworks(serverId: string) {
+export function useNetworks(serverId: string, enabled = true) {
   return useQuery({
     queryKey: qk.networks(serverId),
     queryFn: () => commands.listNetworks(serverId),
+    enabled: enabled && Boolean(serverId),
   })
 }
 
