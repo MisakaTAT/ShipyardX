@@ -35,3 +35,7 @@ export function formatDateTimeString(raw: string): string {
 export function formatNowTime(date?: Date | number): string {
   return dayjs(date).format('HH:mm:ss')
 }
+
+export function formatRelativeTime(date: Date | number): string {
+  return dayjs(date).fromNow()
+}

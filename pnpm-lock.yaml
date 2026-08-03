@@ -125,6 +125,9 @@ importers:
       shadcn:
         specifier: ^4.11.0
         version: 4.11.0(typescript@6.0.3)
+      simple-icons:
+        specifier: ^16.28.0
+        version: 16.28.0
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -2534,6 +2537,10 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==, tarball: https://registry.npmmirror.com/signal-exit/-/signal-exit-4.1.0.tgz}
     engines: {node: '>=14'}
+
+  simple-icons@16.28.0:
+    resolution: {integrity: sha512-sQPR5AtK/ijRjou7zw7mlLp08oB6FH7i0lOy5XJ2zp9mJs/yejgiOn7KvQoe2q4YJIx6VmgUSW5AOefebPt5kg==, tarball: https://registry.npmmirror.com/simple-icons/-/simple-icons-16.28.0.tgz}
+    engines: {node: '>=0.12.18'}
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==, tarball: https://registry.npmmirror.com/sisteransi/-/sisteransi-1.0.5.tgz}
@@ -5101,6 +5108,8 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  simple-icons@16.28.0: {}
 
   sisteransi@1.0.5: {}
 

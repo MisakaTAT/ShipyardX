@@ -22,6 +22,7 @@ import DockerManagePanel from '@/features/docker-engine/ui/docker-manage-panel'
 import EventPanel from '@/features/docker-events/ui/event-panel'
 import { useDockerAccess } from '@/features/docker-engine/api/use-docker-access'
 import { useServerConnection } from '@/features/servers/api/use-server-connection'
+import { useRecordServerSnapshot } from '@/features/servers/api/use-server-snapshot'
 import { useDockerEventInvalidation } from '@/shared/api/events'
 import { DockerAccessGuide } from '@/pages/workspace/docker-access-guide'
 import { WorkspaceTabs, type WorkspaceTabItem } from '@/pages/workspace/workspace-tabs'
@@ -60,8 +61,21 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ selectedServer, onDisconnect, activeTab, onActiveTabChange }: WorkspaceProps) {
-  const { status: serverStatus, ok: serverOk, recheck: recheckServer } = useServerConnection(selectedServer.id)
-  const { status: dockerStatus, ok: dockerOk, recheck: recheckDocker } = useDockerAccess(selectedServer.id, serverOk)
+  const {
+    status: serverStatus,
+    ok: serverOk,
+    recheck: recheckServer,
+    error: serverError,
+  } = useServerConnection(selectedServer.id)
+  const {
+    status: dockerStatus,
+    ok: dockerOk,
+    recheck: recheckDocker,
+    info: dockerInfo,
+    error: dockerError,
+  } = useDockerAccess(selectedServer.id, serverOk)
+
+  useRecordServerSnapshot(selectedServer.id, dockerInfo, serverError ?? dockerError)
 
   const { events, status: eventStatus, clearEvents } = useDockerEventInvalidation(selectedServer.id, dockerOk)
 

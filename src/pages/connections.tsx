@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/button'
 import { ConfirmDialog, SearchInput, EmptyState } from '@/shared/components'
 import { ServerCard } from '@/features/servers/ui/server-card'
 import { useDeleteServer, useServers } from '@/features/servers/api/use-servers'
+import { forgetSnapshot, useServerSnapshots } from '@/features/servers/api/use-server-snapshot'
 
 interface ConnectionsProps {
   onConnect: (server: ServerConfig) => void
@@ -14,6 +15,7 @@ interface ConnectionsProps {
 export default function Connections({ onConnect }: ConnectionsProps) {
   const { data: servers = [], isLoading, isFetching } = useServers()
   const deleteServer = useDeleteServer()
+  const { snapshots, refresh, refreshing } = useServerSnapshots()
 
   const [search, setSearch] = useState('')
   const [showDialog, setShowDialog] = useState(false)
@@ -85,17 +87,20 @@ export default function Connections({ onConnect }: ConnectionsProps) {
             ) : filtered.length === 0 ? (
               <EmptyState icon={Search} title="没有找到匹配的服务器" />
             ) : (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
                 {filtered.map((server) => (
                   <ServerCard
                     key={server.id}
                     server={server}
+                    snapshot={snapshots[server.id]}
+                    refreshing={refreshing.has(server.id)}
                     onConnect={() => onConnect(server)}
                     onEdit={() => {
                       setEditingServer(server)
                       setShowDialog(true)
                     }}
                     onDelete={() => setDeleteServerId(server.id)}
+                    onRefresh={() => void refresh(server.id)}
                   />
                 ))}
               </div>
@@ -127,6 +132,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
         onConfirm={() => {
           if (!deleteServerId) return
           deleteServer.mutate(deleteServerId)
+          forgetSnapshot(deleteServerId)
         }}
       />
     </>

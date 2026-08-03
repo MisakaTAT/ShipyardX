@@ -48,7 +48,7 @@ export function useDockerAccess(serverId: string, enabled = true) {
           : 'error'
       : 'ok'
 
-  return { status, recheck: check, ok: status === 'ok' }
+  return { status, recheck: check, ok: status === 'ok', info: query.data, error: query.error }
 }
 
 export function useDockerDaemonSettings(serverId: string, enabled = true) {
