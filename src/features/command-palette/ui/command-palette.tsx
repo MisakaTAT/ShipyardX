@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'wouter'
-import { ArrowRight, CornerDownLeft, Search } from 'lucide-react'
+import { useAppSettings } from '@/app/settings-store'
+import { formatHotkeyLabel } from '@/shared/lib/hotkeys'
+import { ChevronRight, CornerDownLeft, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { cn } from '@/shared/lib/utils'
 import {
@@ -9,45 +11,36 @@ import {
   withQuery,
   GROUP_LABELS,
   GROUP_PATHS,
-  type PaletteItem,
 } from '@/features/command-palette/model/palette-item'
 import { usePaletteItems } from '@/features/command-palette/api/use-palette-items'
 
 interface CommandPaletteProps {
   open: boolean
+  initialQuery?: string
   onOpenChange: (open: boolean) => void
 }
 
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({ open, initialQuery = '', onOpenChange }: CommandPaletteProps) {
   const [, navigate] = useLocation()
+  const {
+    settings: {
+      hotkeys: { commandPalette },
+    },
+  } = useAppSettings()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
   const items = usePaletteItems(query, open)
 
-  const groups = useMemo(() => {
-    return groupItems(filterItems(items, query)).map(({ group, items: visible, hidden }) => {
-      const path = GROUP_PATHS[group]
-      if (!hidden || !path) return { group, items: visible }
-      const more: PaletteItem = {
-        id: `more:${group}`,
-        group,
-        title: `跳转到${GROUP_LABELS[group]}`,
-        icon: ArrowRight,
-        variant: 'more',
-        run: () => navigate(withQuery(path, query)),
-      }
-      return { group, items: [...visible, more], hidden }
-    })
-  }, [items, query, navigate])
+  const groups = useMemo(() => groupItems(filterItems(items, query)), [items, query])
 
   // 截断发生在分组内，索引必须基于截断后的结果，否则键盘会选到没渲染出来的条目
   const matched = useMemo(() => groups.flatMap((group) => group.items), [groups])
 
   useEffect(() => {
-    if (!open) setQuery('')
-  }, [open])
+    setQuery(open ? initialQuery : '')
+  }, [open, initialQuery])
 
   // 查询变化后旧的选中位置没有意义了
   useEffect(() => {
@@ -110,52 +103,94 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           {matched.length === 0 ? (
             <div className="px-3 py-10 text-center text-[13px] text-muted-foreground">没有匹配的结果</div>
           ) : (
-            groups.map(({ group, items: groupItems, hidden }) => (
-              <div key={group} className="mb-1 last:mb-0">
-                <div className="flex items-baseline gap-1.5 px-2.5 py-1.5 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                  <span>{GROUP_LABELS[group]}</span>
-                  {hidden ? <span className="tabular-nums opacity-70">+{hidden}</span> : null}
-                </div>
-                {groupItems.map((item) => {
-                  cursor += 1
-                  const index = cursor
-                  const Icon = item.icon
-                  const isActive = index === active
-                  return (
+            groups.map(({ group, items: groupItems }) => {
+              const path = GROUP_PATHS[group]
+              return (
+                <div key={group} className="mb-1 last:mb-0">
+                  {path ? (
                     <button
-                      key={item.id}
                       type="button"
-                      data-active={isActive}
-                      onMouseMove={() => setActive(index)}
-                      onClick={() => run(index)}
-                      className={cn(
-                        'flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
-                        isActive ? 'bg-muted text-foreground' : 'text-muted-foreground'
-                      )}
+                      className="flex cursor-pointer items-center gap-0.5 px-2.5 py-1.5 text-[11px] leading-none font-medium text-muted-foreground uppercase transition-colors hover:text-foreground"
+                      onClick={() => {
+                        onOpenChange(false)
+                        navigate(withQuery(path, query))
+                      }}
                     >
-                      <Icon className="size-4 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            'block truncate text-[13px]',
-                            item.variant === 'more' ? 'text-muted-foreground' : 'text-foreground'
-                          )}
-                        >
-                          {item.title}
-                        </span>
-                        {item.subtitle ? (
-                          <span className="block truncate text-[11px] text-muted-foreground">{item.subtitle}</span>
-                        ) : null}
-                      </span>
-                      {isActive ? <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+                      <span className="mr-[-0.08em] tracking-[0.08em]">{GROUP_LABELS[group]}</span>
+                      <ChevronRight className="size-3" />
                     </button>
-                  )
-                })}
-              </div>
-            ))
+                  ) : (
+                    <div className="flex items-center px-2.5 py-1.5 text-[11px] leading-none font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                      {GROUP_LABELS[group]}
+                    </div>
+                  )}
+                  {groupItems.map((item) => {
+                    cursor += 1
+                    const index = cursor
+                    const Icon = item.icon
+                    const isActive = index === active
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        data-active={isActive}
+                        onMouseMove={() => setActive(index)}
+                        onClick={() => run(index)}
+                        className={cn(
+                          'flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
+                          isActive ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] text-foreground">{item.title}</span>
+                          {item.subtitle ? (
+                            <span className="block truncate text-[11px] text-muted-foreground">{item.subtitle}</span>
+                          ) : null}
+                        </span>
+                        {isActive ? <CornerDownLeft className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })
           )}
+        </div>
+
+        <div className="flex h-10 shrink-0 items-center gap-4 border-t border-border bg-muted/30 px-3.5 text-[11px] text-muted-foreground">
+          <Hint label="选择">
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+          </Hint>
+          <Hint label="打开">
+            <Kbd>↵</Kbd>
+          </Hint>
+          <Hint label="关闭">
+            <Kbd>Esc</Kbd>
+          </Hint>
+          <Hint label="打开面板" className="ml-auto">
+            <Kbd>{formatHotkeyLabel(commandPalette)}</Kbd>
+          </Hint>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-border bg-background px-1 font-sans text-[11px] text-muted-foreground">
+      {children}
+    </kbd>
+  )
+}
+
+function Hint({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <span className={cn('flex items-center gap-1', className)}>
+      {label}
+      {children}
+    </span>
   )
 }

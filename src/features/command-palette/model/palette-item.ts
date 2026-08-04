@@ -5,10 +5,10 @@ import { APP_PATHS } from '@/shared/lib/app-router'
 export type PaletteGroup = 'server' | 'forward' | 'hostKey' | 'app' | 'command'
 
 export const GROUP_LABELS: Record<PaletteGroup, string> = {
-  server: '连接',
-  forward: '转发',
-  hostKey: '指纹',
-  app: '应用',
+  server: '服务器',
+  forward: '端口转发',
+  hostKey: '主机指纹',
+  app: '应用商店',
   command: '命令',
 }
 
@@ -29,8 +29,6 @@ export interface PaletteItem {
   icon: ComponentType<LucideProps>
   /** 参与匹配但不显示，例如主机地址、指纹、拼音无关的英文别名 */
   keywords?: string
-  /** more 是每组末尾的「查看全部」，样式和数据条目区分开 */
-  variant?: 'more'
   run: () => void
 }
 
@@ -67,14 +65,11 @@ export function filterItems(items: PaletteItem[], query: string): PaletteItem[] 
 export interface PaletteGroupResult {
   group: PaletteGroup
   items: PaletteItem[]
-  /** 被截断掉的条数，供「查看全部」显示 */
-  hidden: number
 }
 
 export function groupItems(items: PaletteItem[], perGroupLimit = 3): PaletteGroupResult[] {
   return GROUP_ORDER.map((group) => {
     const all = items.filter((item) => item.group === group)
-    const limit = group === 'command' ? all.length : perGroupLimit
-    return { group, items: all.slice(0, limit), hidden: Math.max(0, all.length - limit) }
+    return { group, items: group === 'command' ? all : all.slice(0, perGroupLimit) }
   }).filter(({ items }) => items.length > 0)
 }

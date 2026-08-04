@@ -10,6 +10,7 @@ import { Badge } from '@/shared/ui/badge'
 import { Spinner } from '@/shared/ui/spinner'
 import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
+import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { AppDetailDialog } from '@/features/appstore/ui/app-detail-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { qk } from '@/shared/api/query-keys'
@@ -106,6 +107,7 @@ export default function AppStorePage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <CommandPaletteButton />
               {enabledSources.length > 0 ? (
                 <Select
                   value={activeSourceId}

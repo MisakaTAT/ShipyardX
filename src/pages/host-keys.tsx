@@ -24,6 +24,7 @@ import {
   useTrustHostKey,
 } from '@/features/host-keys/api/use-host-keys'
 import { hostKeyId, matchServers } from '@/features/host-keys/model/host-key'
+import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { HostKeyCard } from '@/features/host-keys/ui/host-key-card'
 import HostKeyAddDialog from '@/features/host-keys/ui/host-key-add-dialog'
 
@@ -175,6 +176,7 @@ export default function HostKeysPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <CommandPaletteButton />
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={

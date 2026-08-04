@@ -17,7 +17,9 @@ function read() {
 function write(sourceId: string) {
   try {
     localStorage.setItem(STORAGE_KEY, sourceId)
-  } catch {}
+  } catch {
+    /* ignore */
+  }
   for (const listener of listeners) listener()
 }
 

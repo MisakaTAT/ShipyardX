@@ -1,13 +1,7 @@
 const MODIFIER_ORDER = ['Mod', 'Shift', 'Alt'] as const
 
-type ModifierToken = (typeof MODIFIER_ORDER)[number] | 'Ctrl' | 'Meta'
-
-const MODIFIER_LABELS: Record<ModifierToken, string> = {
-  Mod: 'Mod',
-  Shift: 'Shift',
-  Alt: 'Alt',
-  Ctrl: 'Ctrl',
-  Meta: 'Cmd',
+export function isMacPlatform() {
+  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 }
 
 function normalizeKeyToken(token: string): string {
@@ -49,18 +43,17 @@ export function normalizeHotkey(value: unknown): string | null {
 }
 
 export function formatHotkeyLabel(value: string | null | undefined) {
-  if (!value) return '未设置'
-  return value
+  const normalized = normalizeHotkey(value)
+  if (!normalized) return '未设置'
+
+  const symbols: Record<string, string> = isMacPlatform()
+    ? { Mod: '\u2318', Meta: '\u2318', Ctrl: '\u2303', Alt: '\u2325', Shift: '\u21e7' }
+    : { Mod: 'Ctrl', Meta: 'Win', Ctrl: 'Ctrl', Alt: 'Alt', Shift: 'Shift' }
+
+  return normalized
     .split('+')
-    .map((token) => {
-      const normalized = normalizeKeyToken(token) as ModifierToken | string
-      return normalized in MODIFIER_LABELS
-        ? MODIFIER_LABELS[normalized as ModifierToken]
-        : normalized === ' '
-          ? 'Space'
-          : normalized
-    })
-    .join(' + ')
+    .map((token) => symbols[token] ?? token)
+    .join('+')
 }
 
 export function matchHotkey(event: KeyboardEvent, hotkey: string | null | undefined) {
@@ -76,7 +69,7 @@ export function matchHotkey(event: KeyboardEvent, hotkey: string | null | undefi
   const expectsCtrl = modifiers.has('Ctrl')
   const expectsMeta = modifiers.has('Meta')
 
-  const platformIsMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+  const platformIsMac = isMacPlatform()
   const modPressed = platformIsMac ? event.metaKey : event.ctrlKey
 
   if (expectsMod !== modPressed) return false
@@ -102,7 +95,7 @@ export function hotkeyFromKeyboardEvent(event: KeyboardEvent): string | null {
   if (key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta') return null
 
   const tokens: string[] = []
-  const platformIsMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+  const platformIsMac = isMacPlatform()
 
   if (platformIsMac ? event.metaKey : event.ctrlKey) tokens.push('Mod')
   if (event.shiftKey) tokens.push('Shift')

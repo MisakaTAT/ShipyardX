@@ -16,6 +16,7 @@ import {
   useStartAllPortForwards,
   useStopAllPortForwards,
 } from '@/features/port-forward/api/use-port-forwards'
+import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { buildPortForwardColumns } from '@/features/port-forward/ui/port-forward-columns'
 
 export default function PortForwardPage() {
@@ -95,6 +96,7 @@ export default function PortForwardPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <CommandPaletteButton />
                   {runningCount > 0 ? (
                     <Button
                       type="button"

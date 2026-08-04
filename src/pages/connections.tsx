@@ -7,6 +7,7 @@ import { ConfirmDialog, EmptyState } from '@/shared/components'
 import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
 import { usePageQuery } from '@/shared/hooks/use-page-query'
 import { APP_PATHS } from '@/shared/lib/app-router'
+import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { ServerCard } from '@/features/servers/ui/server-card'
 import { useDeleteServer, useServers } from '@/features/servers/api/use-servers'
 import { forgetSnapshot, useServerSnapshots } from '@/features/servers/api/use-server-snapshot'
@@ -53,10 +54,13 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                   <h1 className="text-lg font-semibold text-foreground">服务器</h1>
                   <p className="mt-0.5 text-xs text-muted-foreground">管理远程服务器连接，选择一个服务器进入工作区。</p>
                 </div>
-                <Button onClick={openAdd}>
-                  <Plus />
-                  添加服务器
-                </Button>
+                <div className="flex items-center gap-2">
+                  <CommandPaletteButton />
+                  <Button onClick={openAdd}>
+                    <Plus />
+                    添加服务器
+                  </Button>
+                </div>
               </div>
 
               {search ? <ActiveFilterChip query={search} count={filtered.length} onClear={clearQuery} /> : null}
