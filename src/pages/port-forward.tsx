@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ArrowLeftRight, Loader2, Play, Plus, Search, Square } from 'lucide-react'
 import type { PortForward } from '@/types/app-bindings'
 import PortForwardCreateDialog from '@/features/port-forward/ui/port-forward-create-dialog'
 import { Button } from '@/shared/ui/button'
-import { DataTable, EmptyState, SearchInput } from '@/shared/components'
+import { DataTable, EmptyState } from '@/shared/components'
+import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
+import { usePageQuery } from '@/shared/hooks/use-page-query'
+import { APP_PATHS } from '@/shared/lib/app-router'
 import { useServers } from '@/features/servers/api/use-servers'
 import {
   useDeletePortForward,
@@ -23,8 +26,10 @@ export default function PortForwardPage() {
   const startAll = useStartAllPortForwards()
   const stopAll = useStopAllPortForwards()
 
-  const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+
+  const openCreate = useCallback(() => setShowCreate(true), [])
+  const { query: search, clearQuery } = usePageQuery(APP_PATHS.portForward, openCreate)
 
   const serverById = useMemo(() => {
     const m = new Map<string, (typeof servers)[number]>()
@@ -113,12 +118,7 @@ export default function PortForwardPage() {
                 </div>
               </div>
 
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="搜索主机、容器、端口或错误信息…"
-                className="mt-3 w-full"
-              />
+              {search ? <ActiveFilterChip query={search} count={filteredRules.length} onClear={clearQuery} /> : null}
             </div>
           ) : null}
 

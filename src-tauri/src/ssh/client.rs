@@ -327,10 +327,13 @@ pub async fn probe_host_key(host: &str, port: u16) -> AppResult<String> {
         fingerprint: Arc::clone(&fingerprint),
     };
 
-    let mut handle = tokio::time::timeout(SSH_CONNECT_TIMEOUT, client::connect(client_config, (host, port), handler))
-        .await
-        .map_err(|_| AppError::timeout("ssh.connect_timeout", format!("连接 {host}:{port} 超时")).retryable(true))?
-        .map_err(|e| map_ssh_connect_error(host, port, e))?;
+    let mut handle = tokio::time::timeout(
+        SSH_CONNECT_TIMEOUT,
+        client::connect(client_config, (host, port), handler),
+    )
+    .await
+    .map_err(|_| AppError::timeout("ssh.connect_timeout", format!("连接 {host}:{port} 超时")).retryable(true))?
+    .map_err(|e| map_ssh_connect_error(host, port, e))?;
 
     disconnect(&mut handle).await;
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { qk } from '@/shared/api/query-keys'
 import {
   commands,
@@ -52,12 +52,34 @@ export function useAppStoreSyncIndicator(active: boolean) {
   return progress
 }
 
-export function useApps(sourceId: string | null) {
+export function useApps(sourceId: string | null, enabled = true) {
   return useQuery({
     queryKey: qk.apps(sourceId),
     queryFn: () => commands.listApps(sourceId),
+    enabled,
     placeholderData: [] as AppListItem[],
   })
+}
+
+/**
+ * 并行读取所有启用源的目录。查询键和 useApps 一致，和应用商店页共享缓存，
+ * 切到某个源时不会重复请求。
+ */
+export function useAllApps(sources: { id: string; name: string }[], enabled = true) {
+  const results = useQueries({
+    queries: sources.map((source) => ({
+      queryKey: qk.apps(source.id),
+      queryFn: () => commands.listApps(source.id),
+      enabled,
+      placeholderData: [] as AppListItem[],
+    })),
+  })
+
+  return sources.map((source, index) => ({
+    sourceId: source.id,
+    sourceName: source.name,
+    apps: results[index]?.data ?? [],
+  }))
 }
 
 export function useAppDetail(sourceId: string | null, appKey: string | null) {

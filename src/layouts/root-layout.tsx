@@ -6,6 +6,7 @@ import Sider from '@/layouts/sider/sider'
 import Connections from '@/pages/connections'
 import type { WorkspaceTab } from '@/pages/workspace'
 import { KeepAlive } from '@/shared/components/keep-alive'
+import { CommandPaletteHost } from '@/features/command-palette/ui/command-palette-host'
 import { APP_PATHS, appMemoryLocation } from '@/shared/lib/app-router'
 
 const Workspace = lazy(() => import('@/pages/workspace'))
@@ -50,6 +51,7 @@ function LayoutContent() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground select-none">
+      <CommandPaletteHost />
       <Sider />
 
       <main className="flex flex-1 flex-col overflow-hidden bg-background">

@@ -6,10 +6,11 @@ import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 const EMPTY_SERVERS: ServerConfig[] = []
 
-export function useServers() {
+export function useServers(enabled = true) {
   return useQuery({
     queryKey: qk.servers(),
     queryFn: () => commands.getServers(),
+    enabled,
     placeholderData: EMPTY_SERVERS,
   })
 }

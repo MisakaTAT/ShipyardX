@@ -7,10 +7,11 @@ import { getErrorMessage } from '@/shared/lib/errors'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 import { hostKeyId, type ProbeState } from '@/features/host-keys/model/host-key'
 
-export function useKnownHosts() {
+export function useKnownHosts(enabled = true) {
   return useQuery({
     queryKey: qk.knownHosts(),
     queryFn: () => commands.listKnownHosts(),
+    enabled,
     refetchOnMount: true,
     placeholderData: [],
   })
@@ -26,7 +27,6 @@ export function useForgetHostKey() {
   })
 }
 
-/** 后端只提供了删单条，批量清理逐条调用后统一失效一次，避免刷 N 遍列表 */
 export function useForgetHostKeys() {
   return useInvalidatingMutation({
     mutationFn: async (targets: { host: string; port: number }[]) => {

@@ -9,7 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu'
-import { ConfirmDialog, EmptyState, SearchInput, toast } from '@/shared/components'
+import { ConfirmDialog, EmptyState, toast } from '@/shared/components'
+import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
+import { usePageQuery } from '@/shared/hooks/use-page-query'
+import { APP_PATHS } from '@/shared/lib/app-router'
 import { cn } from '@/shared/lib/utils'
 import { useServers } from '@/features/servers/api/use-servers'
 import {
@@ -80,13 +83,15 @@ export default function HostKeysPage() {
   const trust = useTrustHostKey()
   const { results, probe, clear: clearProbe } = useHostKeyProbe()
 
-  const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<KnownHostEntry | null>(null)
   const [showClearAll, setShowClearAll] = useState(false)
   const [showClearOrphans, setShowClearOrphans] = useState(false)
   const [orphansOpen, setOrphansOpen] = useState(false)
   const [probingAll, setProbingAll] = useState(false)
+
+  const openAdd = useCallback(() => setShowAdd(true), [])
+  const { query: search, clearQuery } = usePageQuery(APP_PATHS.hostKeys, openAdd)
 
   const rows: Row[] = useMemo(
     () => entries.map((entry) => ({ entry, servers: matchServers(entry, servers) })),
@@ -203,12 +208,7 @@ export default function HostKeysPage() {
                 </div>
               </div>
 
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="搜索主机、指纹或服务器名称…"
-                className="mt-3 w-full"
-              />
+              {search ? <ActiveFilterChip query={search} count={filtered.length} onClear={clearQuery} /> : null}
             </div>
           ) : null}
 

@@ -8,12 +8,12 @@ import { Button } from '@/shared/ui/button'
 export function HotkeySettingsPanel() {
   const {
     settings: {
-      hotkeys: { focusSearch, openTerminalSearch },
+      hotkeys: { commandPalette, openTerminalSearch },
     },
     updateHotkeySettings,
     resetHotkeySettings,
   } = useAppSettings()
-  const [recordingHotkey, setRecordingHotkey] = useState<'focusSearch' | 'openTerminalSearch' | null>(null)
+  const [recordingHotkey, setRecordingHotkey] = useState<'commandPalette' | 'openTerminalSearch' | null>(null)
 
   useEffect(() => {
     if (!recordingHotkey) return
@@ -44,16 +44,16 @@ export function HotkeySettingsPanel() {
 
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title="搜索聚焦"
-          description="快速聚焦列表页搜索框"
+          title="命令面板"
+          description="搜索服务器、转发规则、主机指纹，或直接执行命令"
           action={
             <div className="flex items-center justify-end gap-2">
               <Button
                 type="button"
-                variant={recordingHotkey === 'focusSearch' ? 'default' : 'outline'}
-                onClick={() => setRecordingHotkey((value) => (value === 'focusSearch' ? null : 'focusSearch'))}
+                variant={recordingHotkey === 'commandPalette' ? 'default' : 'outline'}
+                onClick={() => setRecordingHotkey((value) => (value === 'commandPalette' ? null : 'commandPalette'))}
               >
-                {recordingHotkey === 'focusSearch' ? '按下快捷键…' : formatHotkeyLabel(focusSearch)}
+                {recordingHotkey === 'commandPalette' ? '按下快捷键…' : formatHotkeyLabel(commandPalette)}
               </Button>
               <Button
                 type="button"

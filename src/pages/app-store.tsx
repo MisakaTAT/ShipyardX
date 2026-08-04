@@ -8,13 +8,15 @@ import { useAppSettings } from '@/app/settings-store'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
 import { Spinner } from '@/shared/ui/spinner'
-import { SearchInput } from '@/shared/components'
+import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import { AppDetailDialog } from '@/features/appstore/ui/app-detail-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { qk } from '@/shared/api/query-keys'
 import { AppListItem, type AppstoreSyncProgress } from '@/types/app-bindings'
 import { APP_PATHS } from '@/shared/lib/app-router'
+import { usePageQuery } from '@/shared/hooks/use-page-query'
+import { useSelectedAppSource } from '@/features/appstore/model/source-selection'
 import { cn } from '@/shared/lib/utils'
 
 export default function AppStorePage() {
@@ -27,14 +29,12 @@ export default function AppStorePage() {
     () => appSettings.appstore.sources.filter((source) => source.enabled && source.repoUrl.trim()),
     [appSettings.appstore.sources]
   )
-  const [selectedSourceId, setSelectedSourceId] = useState('')
-  const activeSourceId =
-    enabledSources.find((source) => source.id === selectedSourceId)?.id ?? enabledSources[0]?.id ?? ''
+  const [activeSourceId, setSelectedSourceId] = useSelectedAppSource(enabledSources)
   const activeSource = enabledSources.find((source) => source.id === activeSourceId) ?? null
   const { data: apps = [], isLoading, isFetching } = useApps(activeSourceId || null)
   const { data: servers = [] } = useServers()
   const [switchingSource, setSwitchingSource] = useState(false)
-  const [search, setSearch] = useState('')
+  const { query: search, clearQuery } = usePageQuery(APP_PATHS.store)
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [selectedAppKey, setSelectedAppKey] = useState<string | null>(null)
   const [dialogMode, setDialogMode] = useState<'readme' | 'install'>('readme')
@@ -148,12 +148,7 @@ export default function AppStorePage() {
             </div>
           </div>
 
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="搜索应用 (名称、关键词)..."
-            className="mt-3 w-full"
-          />
+          {search ? <ActiveFilterChip query={search} count={filtered.length} onClear={clearQuery} /> : null}
 
           {allTags.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">

@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Loader2, Plus, Search, Server as ServerIcon } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import ServerDialog from '@/features/servers/ui/server-dialog'
 import { Button } from '@/shared/ui/button'
-import { ConfirmDialog, SearchInput, EmptyState } from '@/shared/components'
+import { ConfirmDialog, EmptyState } from '@/shared/components'
+import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
+import { usePageQuery } from '@/shared/hooks/use-page-query'
+import { APP_PATHS } from '@/shared/lib/app-router'
 import { ServerCard } from '@/features/servers/ui/server-card'
 import { useDeleteServer, useServers } from '@/features/servers/api/use-servers'
 import { forgetSnapshot, useServerSnapshots } from '@/features/servers/api/use-server-snapshot'
@@ -17,19 +20,19 @@ export default function Connections({ onConnect }: ConnectionsProps) {
   const deleteServer = useDeleteServer()
   const { snapshots, refresh, refreshing } = useServerSnapshots()
 
-  const [search, setSearch] = useState('')
   const [showDialog, setShowDialog] = useState(false)
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null)
   const [deleteServerId, setDeleteServerId] = useState<string | null>(null)
 
+  const openAdd = useCallback(() => {
+    setEditingServer(null)
+    setShowDialog(true)
+  }, [])
+  const { query: search, clearQuery } = usePageQuery(APP_PATHS.workspace, openAdd)
+
   const filtered = servers.filter(
     (s) => s.name.toLowerCase().includes(search.toLowerCase()) || s.host.toLowerCase().includes(search.toLowerCase())
   )
-
-  const openAdd = () => {
-    setEditingServer(null)
-    setShowDialog(true)
-  }
 
   if (isLoading || (isFetching && servers.length === 0)) {
     return (
@@ -56,12 +59,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                 </Button>
               </div>
 
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="搜索服务器名称或地址"
-                className="mt-3 w-full"
-              />
+              {search ? <ActiveFilterChip query={search} count={filtered.length} onClear={clearQuery} /> : null}
             </div>
           ) : null}
 

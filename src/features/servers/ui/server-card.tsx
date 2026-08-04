@@ -80,7 +80,7 @@ function SnapshotFooter({
   )
 
   return (
-    <div className="mt-3 border-t border-border pt-2.5 text-[12px] leading-4.5 text-muted-foreground">
+    <div className="mt-2.5 border-t border-border pt-2 text-[12px] leading-4 text-muted-foreground">
       {snapshot ? (
         <>
           {snapshot.ok ? (
@@ -97,13 +97,13 @@ function SnapshotFooter({
               {snapshot.error || '连接失败'}
             </div>
           )}
-          <div className="mt-1 flex items-center gap-2.5">
+          <div className="mt-0.5 flex items-center gap-2.5">
             <span className="min-w-0 truncate">{formatRelativeTime(snapshot.at)}</span>
             {refreshButton}
           </div>
         </>
       ) : (
-        <div className="flex h-10 items-center gap-2.5">
+        <div className="flex h-8.5 items-center gap-2.5">
           <span className="min-w-0 truncate">从未连接</span>
           {refreshButton}
         </div>

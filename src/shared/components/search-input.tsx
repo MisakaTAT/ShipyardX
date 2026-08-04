@@ -1,10 +1,8 @@
 import { forwardRef, useRef, useImperativeHandle, type KeyboardEventHandler } from 'react'
 import { Search, X } from 'lucide-react'
-import { useAppSettings } from '@/app/settings-store'
 import { Input } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
 import { cn } from '@/shared/lib/utils'
-import { useSearchHotkey } from '@/shared/hooks/use-search-hotkey'
 
 interface SearchInputProps {
   value: string
@@ -13,7 +11,6 @@ interface SearchInputProps {
   className?: string
   inputClassName?: string
   clearButtonClassName?: string
-  hotkey?: string | false
   clearable?: boolean
   autoFocus?: boolean
   name?: string
@@ -28,7 +25,6 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
     className,
     inputClassName,
     clearButtonClassName,
-    hotkey,
     clearable = true,
     autoFocus,
     name,
@@ -36,16 +32,8 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   },
   forwardedRef
 ) {
-  const {
-    settings: {
-      hotkeys: { focusSearch },
-    },
-  } = useAppSettings()
   const innerRef = useRef<HTMLInputElement>(null)
   useImperativeHandle(forwardedRef, () => innerRef.current as HTMLInputElement)
-
-  const effectiveHotkey = hotkey === false ? null : typeof hotkey === 'string' ? hotkey : focusSearch
-  useSearchHotkey(innerRef, { enabled: hotkey !== false, hotkey: effectiveHotkey })
 
   return (
     <div className={cn('relative', className)}>

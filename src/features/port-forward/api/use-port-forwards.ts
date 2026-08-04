@@ -5,10 +5,11 @@ import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
-export function usePortForwards() {
+export function usePortForwards(enabled = true) {
   return useQuery({
     queryKey: qk.portForwards(),
     queryFn: () => commands.listPortForwardsAll(),
+    enabled,
     refetchOnMount: true,
     placeholderData: [],
   })

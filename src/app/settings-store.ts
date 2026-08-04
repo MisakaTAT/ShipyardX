@@ -11,7 +11,7 @@ export type TerminalThemeName = (typeof XTERM_THEME_NAMES)[number]
 
 export interface AppSettings {
   hotkeys: {
-    focusSearch: string | null
+    commandPalette: string | null
     openTerminalSearch: string | null
   }
   appstore: {
@@ -39,7 +39,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   hotkeys: {
-    focusSearch: '/',
+    commandPalette: 'Mod+K',
     openTerminalSearch: 'Mod+F',
   },
   appstore: {
@@ -119,7 +119,7 @@ export function normalizeSettings(input: unknown): AppSettings {
 
   const raw = input as {
     hotkeys?: {
-      focusSearch?: unknown
+      commandPalette?: unknown
       openTerminalSearch?: unknown
     }
     appstore?: unknown
@@ -149,7 +149,7 @@ export function normalizeSettings(input: unknown): AppSettings {
 
   return {
     hotkeys: {
-      focusSearch: normalizeHotkey(raw.hotkeys?.focusSearch) ?? DEFAULT_SETTINGS.hotkeys.focusSearch,
+      commandPalette: normalizeHotkey(raw.hotkeys?.commandPalette) ?? DEFAULT_SETTINGS.hotkeys.commandPalette,
       openTerminalSearch:
         normalizeHotkey(raw.hotkeys?.openTerminalSearch) ?? DEFAULT_SETTINGS.hotkeys.openTerminalSearch,
     },

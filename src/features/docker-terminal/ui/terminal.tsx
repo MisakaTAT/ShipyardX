@@ -737,7 +737,6 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     setSearchQuery(nextQuery)
                     runSearch(nextQuery)
                   }}
-                  hotkey={false}
                   clearable
                   placeholder="搜索终端内容"
                   className="w-48"

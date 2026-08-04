@@ -8,7 +8,6 @@ export interface PanelHeaderSearchProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  hotkey?: string | false
   className?: string
 }
 
@@ -45,7 +44,6 @@ export function PanelHeader({ icon: Icon, title, stats, search, lastUpdated, act
           value={search.value}
           onChange={search.onChange}
           placeholder={search.placeholder}
-          hotkey={search.hotkey}
           className={search.className ?? 'w-56'}
         />
       ) : null}
