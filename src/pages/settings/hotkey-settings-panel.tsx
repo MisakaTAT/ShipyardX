@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppSettings } from '@/app/settings-store'
 import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
-import { formatHotkeyLabel, hotkeyFromKeyboardEvent } from '@/shared/lib/hotkeys'
+import { formatHotkeyLabel, hotkeyFromKeyboardEvent, setHotkeyCapturing } from '@/shared/lib/hotkeys'
 import { Button } from '@/shared/ui/button'
 
 export function HotkeySettingsPanel() {
@@ -17,6 +17,7 @@ export function HotkeySettingsPanel() {
 
   useEffect(() => {
     if (!recordingHotkey) return
+    setHotkeyCapturing(true)
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -35,7 +36,10 @@ export function HotkeySettingsPanel() {
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      setHotkeyCapturing(false)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [recordingHotkey, updateHotkeySettings])
 
   return (

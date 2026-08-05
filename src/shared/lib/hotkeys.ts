@@ -56,7 +56,19 @@ export function formatHotkeyLabel(value: string | null | undefined) {
     .join('+')
 }
 
+/**
+ * 录制热键时，录制器和所有热键消费者都挂在 window 上，同一个事件两边都收得到 ——
+ * preventDefault 只阻止默认行为，拦不住其他监听器。所以录制期间统一让匹配失效。
+ */
+let capturing = false
+
+export function setHotkeyCapturing(value: boolean) {
+  capturing = value
+}
+
 export function matchHotkey(event: KeyboardEvent, hotkey: string | null | undefined) {
+  if (capturing) return false
+
   const normalized = normalizeHotkey(hotkey)
   if (!normalized) return false
 
