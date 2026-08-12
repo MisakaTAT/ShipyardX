@@ -51,13 +51,8 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-sidebar/60 px-4 py-5">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">设置</h1>
-          <p className="mt-1 text-xs text-muted-foreground">调整应用偏好设置与行为</p>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-1">
+      <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar/60 p-3">
+        <div className="flex flex-col gap-1">
           {SETTINGS_SECTIONS.map((section) => {
             const Icon = section.icon
             const active = section.key === activeSection

@@ -132,6 +132,22 @@
 }
 
 /**
+ * 快捷键标签专用字体。Geist 不含 ⌘ ⌥ ⇧ ⌃（U+2318/2325/21E7/2303），
+ * 这些字形会回退到系统字体，跟同一行里的字母粗细对不上。
+ * 把系统 UI 字体排在最前，让符号和字母出自同一套字。
+ */
+@utility font-hotkey {
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/**
  * 关掉表单控件的 focus/invalid 3px 柔光环（Tailwind ring 本质是 box-shadow），
  * 聚焦与报错改由 border 颜色提示。
  */

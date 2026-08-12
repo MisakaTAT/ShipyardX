@@ -180,7 +180,7 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
 
 function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-border bg-background px-1 font-sans text-[11px] text-muted-foreground">
+    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-border bg-background px-1 font-hotkey text-[11px] text-muted-foreground">
       {children}
     </kbd>
   )

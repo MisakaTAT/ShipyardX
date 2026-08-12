@@ -1,26 +1,55 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { RotateCcw } from 'lucide-react'
+import { ConfirmDialog } from '@/shared/components/confirm-dialog'
+import { Button } from '@/shared/ui/button'
 
 export function SettingsPanelShell({ children }: { children: ReactNode }) {
-  return <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 py-7">{children}</div>
+  return <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-8 pt-2 pb-10">{children}</div>
 }
 
-export function SettingsPanelHeader({
-  eyebrow,
-  title,
-  actions,
+export function SettingsResetRow({
+  description,
+  confirmDescription,
+  onReset,
+  disabled,
+  label = '恢复默认',
 }: {
-  eyebrow: string
-  title: string
-  actions?: ReactNode
+  description: string
+  confirmDescription?: string
+  onReset: () => void
+  disabled?: boolean
+  label?: string
 }) {
+  const [confirming, setConfirming] = useState(false)
+
   return (
-    <div className="border-b border-border/70 pb-4">
-      <p className="text-xs font-medium tracking-[0.08em] text-muted-foreground uppercase">{eyebrow}</p>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
-      </div>
-    </div>
+    <>
+      <SettingsActionRow
+        title="恢复默认"
+        description={description}
+        action={
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setConfirming(true)}
+            disabled={disabled}
+            className="w-full max-w-xs justify-center"
+          >
+            <RotateCcw className="size-4" />
+            <span>{label}</span>
+          </Button>
+        }
+      />
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title="恢复默认设置？"
+        description={`${confirmDescription ?? description}，此操作无法撤销。`}
+        confirmText="恢复默认"
+        destructive
+        onConfirm={onReset}
+      />
+    </>
   )
 }
 

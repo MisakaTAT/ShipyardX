@@ -3,7 +3,7 @@ import { appLogDir } from '@tauri-apps/api/path'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { Bug, FolderOpen } from 'lucide-react'
 import { useState } from 'react'
-import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
+import { SettingsActionRow, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
@@ -44,8 +44,6 @@ export function DebugSettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Debug" title="调试" />
-
       <div className="divide-y divide-border/70">
         <SettingsActionRow
           title="开发者工具"

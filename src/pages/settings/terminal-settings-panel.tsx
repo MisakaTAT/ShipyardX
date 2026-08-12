@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronDown, RotateCcw } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
-import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
+import { SettingsActionRow, SettingsPanelShell, SettingsResetRow } from '@/pages/settings/settings-panel-shell'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
-import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
@@ -115,17 +114,6 @@ export function TerminalSettingsPanel({
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader
-        eyebrow="Terminal"
-        title="终端设置"
-        actions={
-          <Button type="button" size="sm" onClick={onReset}>
-            <RotateCcw className="size-3.5" />
-            恢复默认
-          </Button>
-        }
-      />
-
       <div className="divide-y divide-border/70">
         <SettingsActionRow
           title="前端"
@@ -307,6 +295,8 @@ export function TerminalSettingsPanel({
             </div>
           }
         />
+
+        <SettingsResetRow description="将终端的全部选项还原为初始值" onReset={onReset} />
       </div>
     </SettingsPanelShell>
   )

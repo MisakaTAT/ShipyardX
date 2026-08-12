@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppSettings } from '@/app/settings-store'
-import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
+import { SettingsActionRow, SettingsPanelShell, SettingsResetRow } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
 import { formatHotkeyLabel, hotkeyFromKeyboardEvent, setHotkeyCapturing } from '@/shared/lib/hotkeys'
 import { Button } from '@/shared/ui/button'
@@ -44,32 +44,19 @@ export function HotkeySettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="Hotkeys" title="热键管理" />
-
       <div className="divide-y divide-border/70">
         <SettingsActionRow
           title="命令面板"
           description="搜索服务器、转发规则、主机指纹，或直接执行命令"
           action={
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant={recordingHotkey === 'commandPalette' ? 'default' : 'outline'}
-                onClick={() => setRecordingHotkey((value) => (value === 'commandPalette' ? null : 'commandPalette'))}
-              >
-                {recordingHotkey === 'commandPalette' ? '按下快捷键…' : formatHotkeyLabel(commandPalette)}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  resetHotkeySettings()
-                  setRecordingHotkey(null)
-                  toast.success('热键设置已恢复默认')
-                }}
-              >
-                恢复默认
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant={recordingHotkey === 'commandPalette' ? 'default' : 'outline'}
+              className="w-full max-w-xs justify-center font-hotkey"
+              onClick={() => setRecordingHotkey((value) => (value === 'commandPalette' ? null : 'commandPalette'))}
+            >
+              {recordingHotkey === 'commandPalette' ? '按下快捷键…' : formatHotkeyLabel(commandPalette)}
+            </Button>
           }
         />
 
@@ -77,30 +64,26 @@ export function HotkeySettingsPanel() {
           title="终端搜索"
           description="显示终端内搜索工具条并聚焦输入框"
           action={
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant={recordingHotkey === 'openTerminalSearch' ? 'default' : 'outline'}
-                onClick={() =>
-                  setRecordingHotkey((value) => (value === 'openTerminalSearch' ? null : 'openTerminalSearch'))
-                }
-              >
-                {recordingHotkey === 'openTerminalSearch'
-                  ? '请按下快捷键来录制'
-                  : formatHotkeyLabel(openTerminalSearch)}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  resetHotkeySettings()
-                  setRecordingHotkey(null)
-                  toast.success('热键设置已恢复默认')
-                }}
-              >
-                恢复默认
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant={recordingHotkey === 'openTerminalSearch' ? 'default' : 'outline'}
+              className="w-full max-w-xs justify-center font-hotkey"
+              onClick={() =>
+                setRecordingHotkey((value) => (value === 'openTerminalSearch' ? null : 'openTerminalSearch'))
+              }
+            >
+              {recordingHotkey === 'openTerminalSearch' ? '按下快捷键…' : formatHotkeyLabel(openTerminalSearch)}
+            </Button>
           }
+        />
+
+        <SettingsResetRow
+          description="将全部快捷键还原为初始组合"
+          onReset={() => {
+            resetHotkeySettings()
+            setRecordingHotkey(null)
+            toast.success('热键设置已恢复默认')
+          }}
         />
       </div>
     </SettingsPanelShell>

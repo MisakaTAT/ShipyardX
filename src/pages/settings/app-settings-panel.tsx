@@ -3,7 +3,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { runThemeTransition, useTheme } from '@/app/theme'
-import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
+import { SettingsActionRow, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
 import { formatDateTimeString } from '@/shared/lib/datetime'
 import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
@@ -161,8 +161,6 @@ export function GeneralSettingsPanel() {
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader eyebrow="General" title="通用" />
-
       <div className="divide-y divide-border/70">
         <SettingsActionRow
           title="主题设置"

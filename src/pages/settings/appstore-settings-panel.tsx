@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react'
-import { SettingsActionRow, SettingsPanelHeader, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
+import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { SettingsActionRow, SettingsPanelShell, SettingsResetRow } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
 import {
   DEFAULT_APPSTORE_SOURCES,
@@ -20,8 +20,8 @@ import {
 } from '@/features/appstore/api/use-appstore'
 import { useSavedDraft } from '@/shared/hooks/use-saved-draft'
 
-const SETTINGS_CONTROL_CLASSNAME = 'h-6 rounded-sm border-border bg-card px-2 text-xs leading-none shadow-none'
-const SETTINGS_TOGGLE_CLASSNAME = 'flex h-6 w-fit items-center gap-2'
+const SETTINGS_CONTROL_CLASSNAME = 'h-8 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
+const SETTINGS_TOGGLE_CLASSNAME = 'flex h-8 w-fit items-center gap-3'
 
 export type AppStorePanelSettings = LocalAppstoreSettings
 type AppStoreSource = AppStorePanelSettings['sources'][number]
@@ -182,27 +182,16 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
 
   return (
     <SettingsPanelShell>
-      <SettingsPanelHeader
-        eyebrow="App Store"
-        title="应用商店"
-        actions={
-          <Button size="sm" onClick={() => void handleReset()} disabled={saving}>
-            <RotateCcw className="size-3.5" />
-            恢复默认
-          </Button>
-        }
-      />
-
       <div className="divide-y divide-border/70">
-        <div className="py-2">
-          <div className="mb-1.5">
+        <div className="py-5">
+          <div className="mb-3">
             <h3 className="text-sm font-medium text-foreground">应用源</h3>
-            <p className="mt-1 text-xs text-muted-foreground">维护可用仓库列表，商店页面再选择当前使用的源</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">维护可用仓库列表，商店页面再选择当前使用的源</p>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2">
             {draft.sources.map((source) => (
-              <div key={source.id} className="grid grid-cols-[128px_minmax(0,1fr)_44px_28px] gap-1.5 px-0.5">
+              <div key={source.id} className="grid grid-cols-[140px_minmax(0,1fr)_44px_32px] gap-2 px-0.5">
                 <Input
                   value={source.name}
                   onChange={(event) => patchSource(source.id, { name: event.target.value })}
@@ -221,37 +210,34 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                   disabled={saving}
                   className={SETTINGS_CONTROL_CLASSNAME}
                 />
-                <div className="flex h-6 items-center justify-center">
+                <div className="flex h-8 items-center justify-center">
                   <Switch
                     checked={source.enabled}
                     onCheckedChange={(checked) => void handleToggleSourceEnabled(source.id, checked)}
                     disabled={saving}
                   />
                 </div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handleRemoveSource(source.id)}
-                    disabled={saving || draft.sources.length <= 1}
-                    className="h-6 w-6 px-0"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  aria-label="删除源"
+                  onClick={() => void handleRemoveSource(source.id)}
+                  disabled={saving || draft.sources.length <= 1}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
               </div>
             ))}
           </div>
 
-          <div className="mt-1.5 px-0.5">
+          <div className="mt-2 px-0.5">
             <Button
-              size="sm"
               variant="outline"
               onClick={() => void handleAddSource()}
               disabled={saving}
-              className="h-7 w-full border-dashed px-2 text-xs text-muted-foreground hover:text-foreground"
+              className="w-full border-dashed text-muted-foreground hover:text-foreground"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-4" />
               添加源
             </Button>
           </div>
@@ -320,7 +306,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
           action={
             <Button
               variant="outline"
-              className="h-7 w-full max-w-xs justify-center px-2.5"
+              className="w-full max-w-xs justify-center"
               onClick={() => void handleClearCache()}
               disabled={clearing}
             >
@@ -328,6 +314,12 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
               <span>{clearing ? '正在清除…' : '清除缓存'}</span>
             </Button>
           }
+        />
+
+        <SettingsResetRow
+          description="将应用源与代理设置还原为初始值"
+          onReset={() => void handleReset()}
+          disabled={saving}
         />
       </div>
     </SettingsPanelShell>
