@@ -31,7 +31,7 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
   const [active, setActive] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const items = usePaletteItems(query, open)
+  const items = usePaletteItems(open)
 
   const groups = useMemo(() => groupItems(filterItems(items, query)), [items, query])
 

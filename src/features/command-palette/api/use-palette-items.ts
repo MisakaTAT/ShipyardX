@@ -21,7 +21,7 @@ import { useSelectedAppSource } from '@/features/appstore/model/source-selection
 import { useAppSettings } from '@/app/settings-store'
 import { withQuery, type PaletteItem } from '@/features/command-palette/model/palette-item'
 
-export function usePaletteItems(query: string, enabled: boolean): PaletteItem[] {
+export function usePaletteItems(enabled: boolean): PaletteItem[] {
   const [, navigate] = useLocation()
   const { setTheme } = useTheme()
   const light = useIsLightMode()
@@ -52,20 +52,21 @@ export function usePaletteItems(query: string, enabled: boolean): PaletteItem[] 
         subtitle: `${server.username}@${server.host}:${server.port}`,
         icon: ServerIcon,
         keywords: server.host,
-        run: () => navigate(withQuery(APP_PATHS.workspace, query)),
+        run: () => navigate(withQuery(APP_PATHS.workspace, server.name)),
       })
     }
 
     for (const forward of forwards) {
       const server = serverById.get(forward.server_id)
+      const forwardTitle = forward.container_name ?? forward.container_id.slice(0, 12)
       items.push({
         id: `forward:${forward.id}`,
         group: 'forward',
-        title: forward.container_name ?? forward.container_id.slice(0, 12),
+        title: forwardTitle,
         subtitle: `${server?.name ?? forward.server_id} · ${forward.bind_address}:${forward.local_port} → ${forward.remote_host}:${forward.remote_port}`,
         icon: ArrowLeftRight,
         keywords: `${forward.container_id} ${forward.local_port} ${forward.remote_port}`,
-        run: () => navigate(withQuery(APP_PATHS.portForward, query)),
+        run: () => navigate(withQuery(APP_PATHS.portForward, forwardTitle)),
       })
     }
 
@@ -76,7 +77,7 @@ export function usePaletteItems(query: string, enabled: boolean): PaletteItem[] 
         title: `${entry.host}:${entry.port}`,
         subtitle: entry.fingerprint,
         icon: Fingerprint,
-        run: () => navigate(withQuery(APP_PATHS.hostKeys, query)),
+        run: () => navigate(withQuery(APP_PATHS.hostKeys, `${entry.host}:${entry.port}`)),
       })
     }
 
@@ -94,7 +95,7 @@ export function usePaletteItems(query: string, enabled: boolean): PaletteItem[] 
           // 先切源再跳转，否则落到应用商店页看到的还是原来那个源
           run: () => {
             setSourceId(sourceId)
-            navigate(withQuery(APP_PATHS.store, query))
+            navigate(withQuery(APP_PATHS.store, app.name))
           },
         })
       }
@@ -152,5 +153,5 @@ export function usePaletteItems(query: string, enabled: boolean): PaletteItem[] 
     )
 
     return items
-  }, [servers, forwards, hostKeys, appsBySource, serverById, navigate, setSourceId, query, light, setTheme])
+  }, [servers, forwards, hostKeys, appsBySource, serverById, navigate, setSourceId, light, setTheme])
 }
