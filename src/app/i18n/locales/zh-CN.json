@@ -1,0 +1,212 @@
+{
+  "common": {
+    "restoreDefaults": "恢复默认",
+    "cancel": "取消",
+    "confirm": "确定",
+    "opening": "正在打开…",
+    "open": "打开",
+    "loading": "正在读取…",
+    "noMatch": "没有匹配项",
+    "placeholder": "—"
+  },
+  "settings": {
+    "nav": {
+      "general": "通用",
+      "appstore": "应用商店",
+      "hotkeys": "热键管理",
+      "terminal": "终端设置",
+      "debug": "调试",
+      "about": "关于"
+    },
+    "reset": {
+      "title": "恢复默认",
+      "confirmTitle": "恢复默认设置？",
+      "confirmSuffix": "，此操作无法撤销。"
+    },
+    "general": {
+      "theme": {
+        "title": "主题设置",
+        "light": "浅色",
+        "dark": "深色",
+        "system": "跟随系统",
+        "lightDesc": "始终使用浅色界面",
+        "darkDesc": "始终使用深色界面",
+        "systemDesc": "根据系统外观自动切换"
+      },
+      "language": {
+        "title": "语言",
+        "description": "选择界面显示语言",
+        "system": "跟随系统"
+      },
+      "version": {
+        "title": "版本信息",
+        "current": "当前版本 {{version}}",
+        "notChecked": "尚未检查",
+        "checking": "正在检查更新",
+        "downloading": "正在下载更新",
+        "installed": "等待重启",
+        "available": "发现新版本 {{version}}",
+        "error": "检查更新失败",
+        "latest": "已是最新版本"
+      },
+      "update": {
+        "title": "检查更新",
+        "description": "检查并安装最新版本",
+        "check": "检查更新",
+        "checking": "正在检查…",
+        "downloadingAction": "正在下载安装…",
+        "install": "安装 {{version}}",
+        "progressPreparing": "准备下载…",
+        "progressDownloaded": "已下载 {{size}}",
+        "downloadingDesc": "正在下载更新包，{{progress}}",
+        "installedDesc": "新版本已准备完成，重启应用后即可生效",
+        "latestDesc": "当前已经是最新版本",
+        "availableDesc": "发现新版本 {{version}}",
+        "availableDescWithDate": "发现新版本 {{version}}，发布于 {{date}}",
+        "toastLatest": "当前已经是最新版本",
+        "toastFound": "发现新版本 {{version}}",
+        "toastFoundDesc": "可以开始下载并安装更新",
+        "toastCheckFailed": "检查更新失败",
+        "toastCheckFailedDesc": "请确认 updater 已正确配置后再试",
+        "toastInstalled": "{{name}} {{version}} 已安装",
+        "toastInstalledDesc": "更新包已经安装完成，请重启应用以使用新版本",
+        "toastInstallFailed": "安装更新失败",
+        "toastInstallFailedDesc": "安装过程中出现问题，请稍后重试"
+      }
+    },
+    "appstore": {
+      "sources": {
+        "title": "应用源",
+        "description": "维护可用仓库列表，商店页面再选择当前使用的源",
+        "namePlaceholder": "仓库名称",
+        "add": "添加源",
+        "delete": "删除源"
+      },
+      "proxy": {
+        "enableTitle": "启用代理",
+        "enableDesc": "同步应用商店时统一走全局代理",
+        "urlTitle": "代理地址",
+        "urlDesc": "支持 HTTP 代理地址，例如 http://127.0.0.1:7890"
+      },
+      "cache": {
+        "dirTitle": "缓存目录",
+        "dirDesc": "应用商店仓库与元数据的本地缓存位置",
+        "sizeTitle": "缓存大小",
+        "sizeDesc": "当前本地缓存占用空间",
+        "clearTitle": "清除缓存",
+        "clearDesc": "删除本地缓存，下次进入商店时会重新拉取",
+        "clear": "清除缓存",
+        "clearing": "正在清除…"
+      },
+      "resetDesc": "将应用源与代理设置还原为初始值",
+      "toast": {
+        "saved": "应用商店设置已保存",
+        "saveFailed": "保存应用商店设置失败",
+        "sourceEnabled": "应用商店源已启用",
+        "sourceDisabled": "应用商店源已禁用",
+        "sourceRemoved": "应用商店源已删除",
+        "keepOneEnabled": "至少保留一个启用源",
+        "keepOneSource": "至少保留一个应用商店源",
+        "reset": "应用商店设置已恢复默认",
+        "cacheCleared": "应用商店缓存已清除",
+        "cacheClearFailed": "清除应用商店缓存失败"
+      }
+    },
+    "hotkeys": {
+      "commandPalette": {
+        "title": "命令面板",
+        "description": "搜索服务器、转发规则、主机指纹，或直接执行命令"
+      },
+      "terminalSearch": {
+        "title": "终端搜索",
+        "description": "显示终端内搜索工具条并聚焦输入框"
+      },
+      "recording": "按下快捷键…",
+      "unset": "未设置",
+      "resetDesc": "将全部快捷键还原为初始组合",
+      "toast": {
+        "updated": "热键已更新为 {{hotkey}}",
+        "reset": "热键设置已恢复默认"
+      }
+    },
+    "terminal": {
+      "frontend": {
+        "title": "前端",
+        "description": "切换终端渲染路径"
+      },
+      "ligatures": {
+        "title": "启用连结字",
+        "description": "为编程字体里的 ligatures 启用合字渲染"
+      },
+      "theme": {
+        "title": "配色",
+        "description": "切换终端主题配色",
+        "searchPlaceholder": "搜索配色"
+      },
+      "scrollback": {
+        "title": "回滚",
+        "description": "保存在缓冲区的行数"
+      },
+      "fontFamily": {
+        "title": "终端字体",
+        "description": "设置终端使用的等宽字体",
+        "searchPlaceholder": "搜索字体"
+      },
+      "fontSize": {
+        "title": "字体大小",
+        "description": "控制终端字符的显示尺寸"
+      },
+      "cursorStyle": {
+        "title": "光标形状",
+        "description": "设置终端光标的形态",
+        "block": "方块",
+        "underline": "下划线",
+        "bar": "竖线"
+      },
+      "cursorBlink": {
+        "title": "光标闪烁",
+        "description": "启用或关闭光标闪烁动画"
+      },
+      "lineHeight": {
+        "title": "行间距",
+        "description": "调整终端行高，影响整体纵向密度"
+      },
+      "resetDesc": "将终端的全部选项还原为初始值",
+      "toast": {
+        "reset": "终端设置已恢复默认"
+      }
+    },
+    "debug": {
+      "devtools": {
+        "title": "开发者工具",
+        "description": "打开当前主窗口的开发者工具",
+        "action": "打开开发者工具",
+        "toastOpened": "已打开 DevTools",
+        "toastFailed": "打开 DevTools 失败"
+      },
+      "logs": {
+        "title": "日志目录",
+        "description": "打开当前应用的日志落盘目录",
+        "action": "打开日志目录",
+        "toastOpened": "已打开日志目录",
+        "toastFailed": "打开日志目录失败"
+      }
+    },
+    "about": {
+      "description": "基于 Tauri 构建的桌面 Docker 管理客户端，支持 Windows、macOS 和 Linux，提供一致的本地与远程容器工作流。",
+      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+      "releaseNotes": "更新说明",
+      "releaseNotesDesc": "查看最新版本发布记录",
+      "website": "官网",
+      "websiteDesc": "前往项目主页",
+      "feedback": "反馈建议",
+      "feedbackDesc": "提交 issue 或功能建议",
+      "sourceCode": "源代码",
+      "sourceCodeDesc": "浏览项目源码仓库",
+      "contributors": "开发者名单",
+      "contributorsDesc": "查看项目贡献者",
+      "toastMetadataFailed": "读取应用信息失败",
+      "toastOpenLinkFailed": "打开链接失败"
+    }
+  }
+}

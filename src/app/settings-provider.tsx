@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { applyLanguage } from '@/app/i18n'
 import {
   APP_SETTINGS_STORAGE_KEY,
   AppSettingsContext,
@@ -14,6 +15,22 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     window.localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   }, [settings])
+
+  useEffect(() => {
+    applyLanguage(settings.language)
+  }, [settings.language])
+
+  // 跟随系统时，系统语言在运行中变化也要跟上
+  useEffect(() => {
+    if (settings.language !== 'system') return
+    const handler = () => applyLanguage('system')
+    window.addEventListener('languagechange', handler)
+    return () => window.removeEventListener('languagechange', handler)
+  }, [settings.language])
+
+  const updateLanguage: AppSettingsContextValue['updateLanguage'] = (language) => {
+    setSettings((current) => ({ ...current, language }))
+  }
 
   const updateHotkeySettings: AppSettingsContextValue['updateHotkeySettings'] = (patch) => {
     setSettings((current) =>
@@ -76,6 +93,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     <AppSettingsContext.Provider
       value={{
         settings,
+        updateLanguage,
         updateHotkeySettings,
         updateAppStoreSettings,
         updateTerminalSettings,

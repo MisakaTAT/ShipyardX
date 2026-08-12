@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getVersion } from '@tauri-apps/api/app'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type LanguageSetting } from '@/app/i18n'
+import { useAppSettings } from '@/app/settings-store'
 import { runThemeTransition, useTheme } from '@/app/theme'
 import { SettingsActionRow, SettingsPanelShell } from '@/pages/settings/settings-panel-shell'
 import { toast } from '@/shared/components/toast'
@@ -10,28 +13,34 @@ import { getErrorDescription, getErrorMessage } from '@/shared/lib/errors'
 import { formatBytes } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/button'
 import { ButtonGroup } from '@/shared/ui/button-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 
 type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'downloading' | 'installed' | 'error'
 
 type AppearanceTheme = 'light' | 'dark' | 'system'
 
-const THEME_OPTIONS: Array<{ value: AppearanceTheme; label: string; description: string }> = [
-  { value: 'light', label: '浅色', description: '始终使用浅色界面' },
-  { value: 'dark', label: '深色', description: '始终使用深色界面' },
-  { value: 'system', label: '跟随系统', description: '根据系统外观自动切换' },
-]
+const THEME_OPTIONS = [
+  { value: 'light', labelKey: 'settings.general.theme.light', descKey: 'settings.general.theme.lightDesc' },
+  { value: 'dark', labelKey: 'settings.general.theme.dark', descKey: 'settings.general.theme.darkDesc' },
+  { value: 'system', labelKey: 'settings.general.theme.system', descKey: 'settings.general.theme.systemDesc' },
+] as const satisfies ReadonlyArray<{ value: AppearanceTheme; labelKey: string; descKey: string }>
 
-function formatProgress(downloadedBytes: number, totalBytes: number | null) {
-  if (!Number.isFinite(downloadedBytes) || downloadedBytes <= 0) return '准备下载…'
-  if (totalBytes && Number.isFinite(totalBytes) && totalBytes > 0) {
-    const progress = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
-    return `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)} (${progress}%)`
-  }
-  return `已下载 ${formatBytes(downloadedBytes)}`
-}
+const SETTINGS_CONTROL_CLASSNAME = 'h-8 w-full rounded-lg border-border bg-card px-3 py-0 text-sm shadow-none'
 
 export function GeneralSettingsPanel() {
+  const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
+  const { settings, updateLanguage } = useAppSettings()
+
+  const formatProgress = (downloadedBytes: number, totalBytes: number | null) => {
+    if (!Number.isFinite(downloadedBytes) || downloadedBytes <= 0) return t('settings.general.update.progressPreparing')
+    if (totalBytes && Number.isFinite(totalBytes) && totalBytes > 0) {
+      const progress = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
+      return `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)} (${progress}%)`
+    }
+    return t('settings.general.update.progressDownloaded', { size: formatBytes(downloadedBytes) })
+  }
+
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null)
   const [downloadedBytes, setDownloadedBytes] = useState(0)
@@ -73,19 +82,19 @@ export function GeneralSettingsPanel() {
       const update = await check()
       if (!update) {
         setUpdateStatus('latest')
-        toast.success('当前已经是最新版本')
+        toast.success(t('settings.general.update.toastLatest'))
         return
       }
 
       setPendingUpdate(update)
       setUpdateStatus('available')
-      toast.info(`发现新版本 ${update.version}`, {
-        description: update.body?.trim() || '可以开始下载并安装更新',
+      toast.info(t('settings.general.update.toastFound', { version: update.version }), {
+        description: update.body?.trim() || t('settings.general.update.toastFoundDesc'),
       })
     } catch (error) {
       setUpdateStatus('error')
-      toast.error(getErrorMessage(error, '检查更新失败'), {
-        description: getErrorDescription(error, '请确认 updater 已正确配置后再试'),
+      toast.error(getErrorMessage(error, t('settings.general.update.toastCheckFailed')), {
+        description: getErrorDescription(error, t('settings.general.update.toastCheckFailedDesc')),
       })
     }
   }
@@ -110,61 +119,69 @@ export function GeneralSettingsPanel() {
       })
 
       setUpdateStatus('installed')
-      toast.success(`ShipyardX ${pendingUpdate.version} 已安装`, {
-        description: '更新包已经安装完成，请重启应用以使用新版本',
-      })
+      toast.success(
+        t('settings.general.update.toastInstalled', { name: 'ShipyardX', version: pendingUpdate.version }),
+        {
+          description: t('settings.general.update.toastInstalledDesc'),
+        }
+      )
     } catch (error) {
       setUpdateStatus('error')
-      toast.error(getErrorMessage(error, '安装更新失败'), {
-        description: getErrorDescription(error, '安装过程中出现问题，请稍后重试'),
+      toast.error(getErrorMessage(error, t('settings.general.update.toastInstallFailed')), {
+        description: getErrorDescription(error, t('settings.general.update.toastInstallFailedDesc')),
       })
     }
   }
 
   const updateDescription =
     updateStatus === 'downloading'
-      ? `正在下载更新包，${formatProgress(downloadedBytes, totalBytes)}`
+      ? t('settings.general.update.downloadingDesc', { progress: formatProgress(downloadedBytes, totalBytes) })
       : updateStatus === 'installed'
-        ? '新版本已准备完成，重启应用后即可生效'
+        ? t('settings.general.update.installedDesc')
         : updateStatus === 'latest'
-          ? '当前已经是最新版本'
+          ? t('settings.general.update.latestDesc')
           : pendingUpdate
-            ? `发现新版本 ${pendingUpdate.version}${pendingUpdate.date ? `，发布于 ${formatDateTimeString(pendingUpdate.date)}` : ''}`
-            : '检查并安装最新版本'
+            ? pendingUpdate.date
+              ? t('settings.general.update.availableDescWithDate', {
+                  version: pendingUpdate.version,
+                  date: formatDateTimeString(pendingUpdate.date),
+                })
+              : t('settings.general.update.availableDesc', { version: pendingUpdate.version })
+            : t('settings.general.update.description')
 
   const updateActionLabel =
     updateStatus === 'checking'
-      ? '正在检查…'
+      ? t('settings.general.update.checking')
       : updateStatus === 'downloading'
-        ? '正在下载安装…'
+        ? t('settings.general.update.downloadingAction')
         : pendingUpdate
-          ? `安装 ${pendingUpdate.version}`
-          : '检查更新'
+          ? t('settings.general.update.install', { version: pendingUpdate.version })
+          : t('settings.general.update.check')
 
   const currentTheme = (theme ?? 'system') as AppearanceTheme
-  const themeDescription =
-    THEME_OPTIONS.find((option) => option.value === currentTheme)?.description ?? '根据系统外观自动切换'
+  const themeDescriptionKey =
+    THEME_OPTIONS.find((option) => option.value === currentTheme)?.descKey ?? 'settings.general.theme.systemDesc'
   const updateSummary =
     updateStatus === 'checking'
-      ? '正在检查更新'
+      ? t('settings.general.version.checking')
       : updateStatus === 'downloading'
-        ? '正在下载更新'
+        ? t('settings.general.version.downloading')
         : updateStatus === 'installed'
-          ? '等待重启'
+          ? t('settings.general.version.installed')
           : updateStatus === 'available'
-            ? `发现新版本 ${pendingUpdate?.version ?? ''}`.trim()
+            ? t('settings.general.version.available', { version: pendingUpdate?.version ?? '' }).trim()
             : updateStatus === 'error'
-              ? '检查更新失败'
+              ? t('settings.general.version.error')
               : updateStatus === 'latest'
-                ? '已是最新版本'
-                : '尚未检查'
+                ? t('settings.general.version.latest')
+                : t('settings.general.version.notChecked')
 
   return (
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title="主题设置"
-          description={themeDescription}
+          title={t('settings.general.theme.title')}
+          description={t(themeDescriptionKey)}
           action={
             <ButtonGroup className="w-full max-w-xs">
               {THEME_OPTIONS.map((option) => {
@@ -186,7 +203,7 @@ export function GeneralSettingsPanel() {
                     variant={active ? 'default' : 'outline'}
                     className="flex-1"
                   >
-                    {option.label}
+                    {t(option.labelKey)}
                   </Button>
                 )
               })}
@@ -195,19 +212,47 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsActionRow
-          title="版本信息"
+          title={t('settings.general.language.title')}
+          description={t('settings.general.language.description')}
+          action={
+            <div className="w-full max-w-xs">
+              <Select value={settings.language} onValueChange={(value) => updateLanguage(value as LanguageSetting)}>
+                <SelectTrigger className={SETTINGS_CONTROL_CLASSNAME}>
+                  <SelectValue>
+                    {settings.language === 'system'
+                      ? t('settings.general.language.system')
+                      : LANGUAGE_LABELS[settings.language]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system">{t('settings.general.language.system')}</SelectItem>
+                  {SUPPORTED_LANGUAGES.map((language) => (
+                    <SelectItem key={language} value={language}>
+                      {LANGUAGE_LABELS[language]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          }
+        />
+
+        <SettingsActionRow
+          title={t('settings.general.version.title')}
           description={updateDescription}
           action={
             <div className="w-full max-w-xs text-right">
-              <div className="text-sm font-medium text-foreground">当前版本 {currentVersion}</div>
+              <div className="text-sm font-medium text-foreground">
+                {t('settings.general.version.current', { version: currentVersion })}
+              </div>
               <div className="mt-1 text-xs text-muted-foreground">{updateSummary}</div>
             </div>
           }
         />
 
         <SettingsActionRow
-          title="检查更新"
-          description="检查并安装最新版本"
+          title={t('settings.general.update.title')}
+          description={t('settings.general.update.description')}
           action={
             <div className="flex w-full max-w-xs justify-end">
               <Button

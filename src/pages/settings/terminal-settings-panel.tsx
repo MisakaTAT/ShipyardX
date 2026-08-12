@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
 import { SettingsActionRow, SettingsPanelShell, SettingsResetRow } from '@/pages/settings/settings-panel-shell'
@@ -13,11 +14,11 @@ const TERMINAL_FRONTEND_OPTIONS: Array<{ value: TerminalFrontend; label: string 
   { value: 'xterm-canvas', label: 'xterm (Canvas)' },
 ]
 
-const CURSOR_STYLE_OPTIONS: Array<{ value: TerminalCursorStyle; label: string }> = [
-  { value: 'block', label: '方块' },
-  { value: 'underline', label: '下划线' },
-  { value: 'bar', label: '竖线' },
-]
+const CURSOR_STYLE_OPTIONS = [
+  { value: 'block', labelKey: 'settings.terminal.cursorStyle.block' },
+  { value: 'underline', labelKey: 'settings.terminal.cursorStyle.underline' },
+  { value: 'bar', labelKey: 'settings.terminal.cursorStyle.bar' },
+] as const satisfies ReadonlyArray<{ value: TerminalCursorStyle; labelKey: string }>
 
 const SETTINGS_CONTROL_CLASSNAME = 'h-8 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
 
@@ -68,6 +69,7 @@ export function TerminalSettingsPanel({
   onLineHeightChange,
   onReset,
 }: TerminalSettingsPanelProps) {
+  const { t } = useTranslation()
   const [scrollbackDraft, setScrollbackDraft] = useState(String(scrollback))
   const [fontSizeDraft, setFontSizeDraft] = useState(String(fontSize))
   const [lineHeightDraft, setLineHeightDraft] = useState(String(lineHeight))
@@ -116,8 +118,8 @@ export function TerminalSettingsPanel({
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title="前端"
-          description="切换终端渲染路径"
+          title={t('settings.terminal.frontend.title')}
+          description={t('settings.terminal.frontend.description')}
           action={
             <div className="w-full max-w-xs">
               <Select value={frontend} onValueChange={(value) => onFrontendChange(value as TerminalFrontend)}>
@@ -139,8 +141,8 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="启用连结字"
-          description="为编程字体里的 ligatures 启用合字渲染"
+          title={t('settings.terminal.ligatures.title')}
+          description={t('settings.terminal.ligatures.description')}
           action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch checked={ligatures} onCheckedChange={onLigaturesChange} />
@@ -149,8 +151,8 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="配色"
-          description="切换终端主题配色"
+          title={t('settings.terminal.theme.title')}
+          description={t('settings.terminal.theme.description')}
           action={
             <SearchablePicker<TerminalThemeName>
               value={theme}
@@ -176,14 +178,14 @@ export function TerminalSettingsPanel({
                   </div>
                 )
               }}
-              placeholder="搜索配色"
+              placeholder={t('settings.terminal.theme.searchPlaceholder')}
             />
           }
         />
 
         <SettingsActionRow
-          title="回滚"
-          description="保存在缓冲区的行数"
+          title={t('settings.terminal.scrollback.title')}
+          description={t('settings.terminal.scrollback.description')}
           action={
             <div className="w-full max-w-xs">
               <Input
@@ -205,21 +207,21 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="终端字体"
-          description="设置终端使用的等宽字体"
+          title={t('settings.terminal.fontFamily.title')}
+          description={t('settings.terminal.fontFamily.description')}
           action={
             <SearchablePicker
               value={fontFamily}
               options={fontChoices}
               onChange={onFontFamilyChange}
-              placeholder="搜索字体"
+              placeholder={t('settings.terminal.fontFamily.searchPlaceholder')}
             />
           }
         />
 
         <SettingsActionRow
-          title="字体大小"
-          description="控制终端字符的显示尺寸"
+          title={t('settings.terminal.fontSize.title')}
+          description={t('settings.terminal.fontSize.description')}
           action={
             <div className="w-full max-w-xs">
               <Input
@@ -241,20 +243,23 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="光标形状"
-          description="设置终端光标的形态"
+          title={t('settings.terminal.cursorStyle.title')}
+          description={t('settings.terminal.cursorStyle.description')}
           action={
             <div className="w-full max-w-xs">
               <Select value={cursorStyle} onValueChange={(value) => onCursorStyleChange(value as TerminalCursorStyle)}>
                 <SelectTrigger className={`w-full ${SETTINGS_CONTROL_CLASSNAME}`}>
                   <SelectValue>
-                    {CURSOR_STYLE_OPTIONS.find((option) => option.value === cursorStyle)?.label}
+                    {(() => {
+                      const option = CURSOR_STYLE_OPTIONS.find((item) => item.value === cursorStyle)
+                      return option ? t(option.labelKey) : null
+                    })()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {CURSOR_STYLE_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {t(option.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -264,8 +269,8 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="光标闪烁"
-          description="启用或关闭光标闪烁动画"
+          title={t('settings.terminal.cursorBlink.title')}
+          description={t('settings.terminal.cursorBlink.description')}
           action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch checked={cursorBlink} onCheckedChange={onCursorBlinkChange} />
@@ -274,8 +279,8 @@ export function TerminalSettingsPanel({
         />
 
         <SettingsActionRow
-          title="行间距"
-          description="调整终端行高，影响整体纵向密度"
+          title={t('settings.terminal.lineHeight.title')}
+          description={t('settings.terminal.lineHeight.description')}
           action={
             <div className="w-full max-w-xs">
               <Input
@@ -296,7 +301,7 @@ export function TerminalSettingsPanel({
           }
         />
 
-        <SettingsResetRow description="将终端的全部选项还原为初始值" onReset={onReset} />
+        <SettingsResetRow description={t('settings.terminal.resetDesc')} onReset={onReset} />
       </div>
     </SettingsPanelShell>
   )
@@ -321,6 +326,7 @@ function SearchablePicker<T extends string>({
   renderValue?: (value: T) => ReactNode
   renderOption?: (value: T) => ReactNode
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -389,7 +395,7 @@ function SearchablePicker<T extends string>({
               </button>
             ))}
             {filteredOptions.length === 0 ? (
-              <div className="px-2 py-2 text-sm text-muted-foreground">没有匹配项</div>
+              <div className="px-2 py-2 text-sm text-muted-foreground">{t('common.noMatch')}</div>
             ) : null}
           </div>
         </div>

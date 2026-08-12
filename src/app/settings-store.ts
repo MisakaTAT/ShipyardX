@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import { isSupportedLanguage, type LanguageSetting } from '@/app/i18n'
 import { DEFAULT_APPSTORE_SOURCES } from '@/shared/lib/appstore-settings'
 import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
 import { normalizeHotkey } from '@/shared/lib/hotkeys'
@@ -10,6 +11,7 @@ export type TerminalCursorStyle = 'block' | 'underline' | 'bar'
 export type TerminalThemeName = (typeof XTERM_THEME_NAMES)[number]
 
 export interface AppSettings {
+  language: LanguageSetting
   hotkeys: {
     commandPalette: string | null
     openTerminalSearch: string | null
@@ -38,6 +40,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: 'system',
   hotkeys: {
     commandPalette: 'Mod+K',
     openTerminalSearch: 'Mod+F',
@@ -62,6 +65,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export interface AppSettingsContextValue {
   settings: AppSettings
+  updateLanguage: (language: LanguageSetting) => void
   updateHotkeySettings: (patch: Partial<AppSettings['hotkeys']>) => void
   updateAppStoreSettings: (next: AppSettings['appstore']) => void
   updateTerminalSettings: (patch: Partial<AppSettings['terminal']>) => void
@@ -104,6 +108,11 @@ export function normalizeTerminalTheme(value: unknown): TerminalThemeName {
   return THEME_NAME_SET.has(value) ? (value as TerminalThemeName) : DEFAULT_SETTINGS.terminal.theme
 }
 
+export function normalizeLanguage(value: unknown): LanguageSetting {
+  if (value === 'system' || isSupportedLanguage(value)) return value
+  return DEFAULT_SETTINGS.language
+}
+
 function normalizeString(value: unknown, fallback: string) {
   if (typeof value !== 'string') return fallback
   const trimmed = value.trim()
@@ -118,6 +127,7 @@ export function normalizeSettings(input: unknown): AppSettings {
   if (!input || typeof input !== 'object') return DEFAULT_SETTINGS
 
   const raw = input as {
+    language?: unknown
     hotkeys?: {
       commandPalette?: unknown
       openTerminalSearch?: unknown
@@ -148,6 +158,7 @@ export function normalizeSettings(input: unknown): AppSettings {
       : DEFAULT_SETTINGS.terminal.cursorStyle
 
   return {
+    language: normalizeLanguage(raw.language),
     hotkeys: {
       commandPalette: normalizeHotkey(raw.hotkeys?.commandPalette) ?? DEFAULT_SETTINGS.hotkeys.commandPalette,
       openTerminalSearch:

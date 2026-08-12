@@ -1,0 +1,212 @@
+{
+  "common": {
+    "restoreDefaults": "デフォルトに戻す",
+    "cancel": "キャンセル",
+    "confirm": "確定",
+    "opening": "開いています…",
+    "open": "開く",
+    "loading": "読み込み中…",
+    "noMatch": "一致する項目がありません",
+    "placeholder": "—"
+  },
+  "settings": {
+    "nav": {
+      "general": "一般",
+      "appstore": "アプリストア",
+      "hotkeys": "ホットキー",
+      "terminal": "ターミナル",
+      "debug": "デバッグ",
+      "about": "このアプリについて"
+    },
+    "reset": {
+      "title": "デフォルトに戻す",
+      "confirmTitle": "設定をデフォルトに戻しますか？",
+      "confirmSuffix": "。この操作は取り消せません。"
+    },
+    "general": {
+      "theme": {
+        "title": "テーマ",
+        "light": "ライト",
+        "dark": "ダーク",
+        "system": "システムに従う",
+        "lightDesc": "常にライト表示を使用します",
+        "darkDesc": "常にダーク表示を使用します",
+        "systemDesc": "システムの外観に合わせて自動で切り替えます"
+      },
+      "language": {
+        "title": "言語",
+        "description": "表示言語を選択します",
+        "system": "システムに従う"
+      },
+      "version": {
+        "title": "バージョン情報",
+        "current": "バージョン {{version}}",
+        "notChecked": "未確認",
+        "checking": "更新を確認しています",
+        "downloading": "更新をダウンロードしています",
+        "installed": "再起動待ち",
+        "available": "新しいバージョン {{version}} があります",
+        "error": "更新の確認に失敗しました",
+        "latest": "最新の状態です"
+      },
+      "update": {
+        "title": "更新を確認",
+        "description": "最新バージョンを確認してインストールします",
+        "check": "更新を確認",
+        "checking": "確認中…",
+        "downloadingAction": "ダウンロード中…",
+        "install": "{{version}} をインストール",
+        "progressPreparing": "ダウンロードの準備中…",
+        "progressDownloaded": "{{size}} をダウンロード済み",
+        "downloadingDesc": "更新をダウンロードしています。{{progress}}",
+        "installedDesc": "更新の準備が完了しました。アプリを再起動すると適用されます",
+        "latestDesc": "すでに最新バージョンです",
+        "availableDesc": "新しいバージョン {{version}} があります",
+        "availableDescWithDate": "新しいバージョン {{version}} があります（{{date}} 公開）",
+        "toastLatest": "すでに最新バージョンです",
+        "toastFound": "新しいバージョン {{version}} があります",
+        "toastFoundDesc": "ダウンロードしてインストールできます",
+        "toastCheckFailed": "更新の確認に失敗しました",
+        "toastCheckFailedDesc": "updater の設定を確認してから再試行してください",
+        "toastInstalled": "{{name}} {{version}} をインストールしました",
+        "toastInstalledDesc": "インストールが完了しました。アプリを再起動して新しいバージョンをご利用ください",
+        "toastInstallFailed": "更新のインストールに失敗しました",
+        "toastInstallFailedDesc": "インストール中に問題が発生しました。しばらくしてから再試行してください"
+      }
+    },
+    "appstore": {
+      "sources": {
+        "title": "アプリソース",
+        "description": "利用可能なリポジトリを管理します。使用するソースはストアページで選択します",
+        "namePlaceholder": "リポジトリ名",
+        "add": "ソースを追加",
+        "delete": "ソースを削除"
+      },
+      "proxy": {
+        "enableTitle": "プロキシを使用",
+        "enableDesc": "アプリストアの同期をグローバルプロキシ経由にします",
+        "urlTitle": "プロキシアドレス",
+        "urlDesc": "HTTP プロキシに対応しています。例: http://127.0.0.1:7890"
+      },
+      "cache": {
+        "dirTitle": "キャッシュディレクトリ",
+        "dirDesc": "ストアのリポジトリとメタデータをローカルに保存する場所",
+        "sizeTitle": "キャッシュサイズ",
+        "sizeDesc": "ローカルキャッシュが使用している容量",
+        "clearTitle": "キャッシュを削除",
+        "clearDesc": "ローカルキャッシュを削除します。次回ストアを開くと再取得されます",
+        "clear": "キャッシュを削除",
+        "clearing": "削除中…"
+      },
+      "resetDesc": "アプリソースとプロキシ設定を初期値に戻します",
+      "toast": {
+        "saved": "アプリストアの設定を保存しました",
+        "saveFailed": "アプリストアの設定を保存できませんでした",
+        "sourceEnabled": "ソースを有効にしました",
+        "sourceDisabled": "ソースを無効にしました",
+        "sourceRemoved": "ソースを削除しました",
+        "keepOneEnabled": "有効なソースを 1 つ以上残してください",
+        "keepOneSource": "ソースを 1 つ以上残してください",
+        "reset": "アプリストアの設定をデフォルトに戻しました",
+        "cacheCleared": "アプリストアのキャッシュを削除しました",
+        "cacheClearFailed": "アプリストアのキャッシュを削除できませんでした"
+      }
+    },
+    "hotkeys": {
+      "commandPalette": {
+        "title": "コマンドパレット",
+        "description": "サーバー、転送ルール、ホストキーを検索したり、コマンドを実行します"
+      },
+      "terminalSearch": {
+        "title": "ターミナル内検索",
+        "description": "ターミナル内の検索バーを表示して入力欄にフォーカスします"
+      },
+      "recording": "キーを押してください…",
+      "unset": "未設定",
+      "resetDesc": "すべてのショートカットを初期の組み合わせに戻します",
+      "toast": {
+        "updated": "ショートカットを {{hotkey}} に変更しました",
+        "reset": "ショートカットをデフォルトに戻しました"
+      }
+    },
+    "terminal": {
+      "frontend": {
+        "title": "レンダラー",
+        "description": "ターミナルの描画方式を切り替えます"
+      },
+      "ligatures": {
+        "title": "合字",
+        "description": "対応するプログラミングフォントで合字を有効にします"
+      },
+      "theme": {
+        "title": "配色",
+        "description": "ターミナルの配色テーマを切り替えます",
+        "searchPlaceholder": "配色を検索"
+      },
+      "scrollback": {
+        "title": "スクロールバック",
+        "description": "バッファに保持する行数"
+      },
+      "fontFamily": {
+        "title": "フォント",
+        "description": "ターミナルで使用する等幅フォントを設定します",
+        "searchPlaceholder": "フォントを検索"
+      },
+      "fontSize": {
+        "title": "フォントサイズ",
+        "description": "ターミナル文字の表示サイズを調整します"
+      },
+      "cursorStyle": {
+        "title": "カーソルの形状",
+        "description": "ターミナルカーソルの形を設定します",
+        "block": "ブロック",
+        "underline": "アンダーライン",
+        "bar": "バー"
+      },
+      "cursorBlink": {
+        "title": "カーソルの点滅",
+        "description": "カーソルの点滅アニメーションを切り替えます"
+      },
+      "lineHeight": {
+        "title": "行の高さ",
+        "description": "行の高さを調整します。全体の縦方向の密度に影響します"
+      },
+      "resetDesc": "ターミナルのすべての項目を初期値に戻します",
+      "toast": {
+        "reset": "ターミナル設定をデフォルトに戻しました"
+      }
+    },
+    "debug": {
+      "devtools": {
+        "title": "開発者ツール",
+        "description": "現在のメインウィンドウの DevTools を開きます",
+        "action": "開発者ツールを開く",
+        "toastOpened": "DevTools を開きました",
+        "toastFailed": "DevTools を開けませんでした"
+      },
+      "logs": {
+        "title": "ログディレクトリ",
+        "description": "アプリのログが書き出されるディレクトリを開きます",
+        "action": "ログディレクトリを開く",
+        "toastOpened": "ログディレクトリを開きました",
+        "toastFailed": "ログディレクトリを開けませんでした"
+      }
+    },
+    "about": {
+      "description": "Tauri で構築したデスクトップ向け Docker 管理クライアントです。Windows、macOS、Linux に対応し、ローカルとリモートで一貫したコンテナ操作を提供します。",
+      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+      "releaseNotes": "リリースノート",
+      "releaseNotesDesc": "最新のリリース履歴を確認します",
+      "website": "公式サイト",
+      "websiteDesc": "プロジェクトのホームページを開きます",
+      "feedback": "フィードバック",
+      "feedbackDesc": "issue の報告や機能の提案をします",
+      "sourceCode": "ソースコード",
+      "sourceCodeDesc": "プロジェクトのリポジトリを閲覧します",
+      "contributors": "コントリビューター",
+      "contributorsDesc": "プロジェクトの貢献者を確認します",
+      "toastMetadataFailed": "アプリ情報を読み取れませんでした",
+      "toastOpenLinkFailed": "リンクを開けませんでした"
+    }
+  }
+}

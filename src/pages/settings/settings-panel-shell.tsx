@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RotateCcw } from 'lucide-react'
 import { ConfirmDialog } from '@/shared/components/confirm-dialog'
 import { Button } from '@/shared/ui/button'
@@ -12,7 +13,7 @@ export function SettingsResetRow({
   confirmDescription,
   onReset,
   disabled,
-  label = '恢复默认',
+  label,
 }: {
   description: string
   confirmDescription?: string
@@ -20,12 +21,14 @@ export function SettingsResetRow({
   disabled?: boolean
   label?: string
 }) {
+  const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
+  const buttonLabel = label ?? t('common.restoreDefaults')
 
   return (
     <>
       <SettingsActionRow
-        title="恢复默认"
+        title={t('settings.reset.title')}
         description={description}
         action={
           <Button
@@ -36,16 +39,16 @@ export function SettingsResetRow({
             className="w-full max-w-xs justify-center"
           >
             <RotateCcw className="size-4" />
-            <span>{label}</span>
+            <span>{buttonLabel}</span>
           </Button>
         }
       />
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title="恢复默认设置？"
-        description={`${confirmDescription ?? description}，此操作无法撤销。`}
-        confirmText="恢复默认"
+        title={t('settings.reset.confirmTitle')}
+        description={`${confirmDescription ?? description}${t('settings.reset.confirmSuffix')}`}
+        confirmText={buttonLabel}
         destructive
         onConfirm={onReset}
       />

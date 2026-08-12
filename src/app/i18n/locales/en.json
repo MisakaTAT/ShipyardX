@@ -1,0 +1,212 @@
+{
+  "common": {
+    "restoreDefaults": "Restore defaults",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "opening": "Opening…",
+    "open": "Open",
+    "loading": "Loading…",
+    "noMatch": "No matches",
+    "placeholder": "—"
+  },
+  "settings": {
+    "nav": {
+      "general": "General",
+      "appstore": "App store",
+      "hotkeys": "Hotkeys",
+      "terminal": "Terminal",
+      "debug": "Debug",
+      "about": "About"
+    },
+    "reset": {
+      "title": "Restore defaults",
+      "confirmTitle": "Restore default settings?",
+      "confirmSuffix": ". This can't be undone."
+    },
+    "general": {
+      "theme": {
+        "title": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System",
+        "lightDesc": "Always use the light interface",
+        "darkDesc": "Always use the dark interface",
+        "systemDesc": "Follow the system appearance"
+      },
+      "language": {
+        "title": "Language",
+        "description": "Choose the interface language",
+        "system": "System"
+      },
+      "version": {
+        "title": "Version",
+        "current": "Version {{version}}",
+        "notChecked": "Not checked yet",
+        "checking": "Checking for updates",
+        "downloading": "Downloading update",
+        "installed": "Restart pending",
+        "available": "Update {{version}} available",
+        "error": "Update check failed",
+        "latest": "Up to date"
+      },
+      "update": {
+        "title": "Check for updates",
+        "description": "Check for and install the latest version",
+        "check": "Check for updates",
+        "checking": "Checking…",
+        "downloadingAction": "Downloading…",
+        "install": "Install {{version}}",
+        "progressPreparing": "Preparing download…",
+        "progressDownloaded": "Downloaded {{size}}",
+        "downloadingDesc": "Downloading the update, {{progress}}",
+        "installedDesc": "The update is ready. Restart the app to apply it",
+        "latestDesc": "You're on the latest version",
+        "availableDesc": "Update {{version}} available",
+        "availableDescWithDate": "Update {{version}} available, released {{date}}",
+        "toastLatest": "You're on the latest version",
+        "toastFound": "Update {{version}} available",
+        "toastFoundDesc": "You can download and install it now",
+        "toastCheckFailed": "Update check failed",
+        "toastCheckFailedDesc": "Make sure the updater is configured, then try again",
+        "toastInstalled": "{{name}} {{version}} installed",
+        "toastInstalledDesc": "The update is installed. Restart the app to use the new version",
+        "toastInstallFailed": "Update install failed",
+        "toastInstallFailedDesc": "Something went wrong during install. Try again later"
+      }
+    },
+    "appstore": {
+      "sources": {
+        "title": "Sources",
+        "description": "Maintain the list of available repositories, then pick the active one on the store page",
+        "namePlaceholder": "Repository name",
+        "add": "Add source",
+        "delete": "Delete source"
+      },
+      "proxy": {
+        "enableTitle": "Use proxy",
+        "enableDesc": "Route app store syncing through the global proxy",
+        "urlTitle": "Proxy address",
+        "urlDesc": "Accepts an HTTP proxy address, e.g. http://127.0.0.1:7890"
+      },
+      "cache": {
+        "dirTitle": "Cache directory",
+        "dirDesc": "Where store repositories and metadata are cached locally",
+        "sizeTitle": "Cache size",
+        "sizeDesc": "Space currently used by the local cache",
+        "clearTitle": "Clear cache",
+        "clearDesc": "Delete the local cache; it will be fetched again next visit",
+        "clear": "Clear cache",
+        "clearing": "Clearing…"
+      },
+      "resetDesc": "Restore sources and proxy settings to their initial values",
+      "toast": {
+        "saved": "App store settings saved",
+        "saveFailed": "Couldn't save app store settings",
+        "sourceEnabled": "Source enabled",
+        "sourceDisabled": "Source disabled",
+        "sourceRemoved": "Source deleted",
+        "keepOneEnabled": "Keep at least one source enabled",
+        "keepOneSource": "Keep at least one source",
+        "reset": "App store settings restored to defaults",
+        "cacheCleared": "App store cache cleared",
+        "cacheClearFailed": "Couldn't clear the app store cache"
+      }
+    },
+    "hotkeys": {
+      "commandPalette": {
+        "title": "Command palette",
+        "description": "Search servers, forwarding rules and host keys, or run a command"
+      },
+      "terminalSearch": {
+        "title": "Terminal search",
+        "description": "Show the in-terminal search bar and focus the input"
+      },
+      "recording": "Press a shortcut…",
+      "unset": "Not set",
+      "resetDesc": "Restore all shortcuts to their original combinations",
+      "toast": {
+        "updated": "Shortcut changed to {{hotkey}}",
+        "reset": "Shortcuts restored to defaults"
+      }
+    },
+    "terminal": {
+      "frontend": {
+        "title": "Renderer",
+        "description": "Switch the terminal rendering path"
+      },
+      "ligatures": {
+        "title": "Ligatures",
+        "description": "Render ligatures for programming fonts that provide them"
+      },
+      "theme": {
+        "title": "Color scheme",
+        "description": "Switch the terminal color scheme",
+        "searchPlaceholder": "Search schemes"
+      },
+      "scrollback": {
+        "title": "Scrollback",
+        "description": "Number of lines kept in the buffer"
+      },
+      "fontFamily": {
+        "title": "Font",
+        "description": "Set the monospace font used by the terminal",
+        "searchPlaceholder": "Search fonts"
+      },
+      "fontSize": {
+        "title": "Font size",
+        "description": "Control how large terminal characters appear"
+      },
+      "cursorStyle": {
+        "title": "Cursor shape",
+        "description": "Set the shape of the terminal cursor",
+        "block": "Block",
+        "underline": "Underline",
+        "bar": "Bar"
+      },
+      "cursorBlink": {
+        "title": "Cursor blink",
+        "description": "Turn the cursor blinking animation on or off"
+      },
+      "lineHeight": {
+        "title": "Line height",
+        "description": "Adjust line height, which affects overall vertical density"
+      },
+      "resetDesc": "Restore every terminal option to its initial value",
+      "toast": {
+        "reset": "Terminal settings restored to defaults"
+      }
+    },
+    "debug": {
+      "devtools": {
+        "title": "Developer tools",
+        "description": "Open DevTools for the current main window",
+        "action": "Open DevTools",
+        "toastOpened": "DevTools opened",
+        "toastFailed": "Couldn't open DevTools"
+      },
+      "logs": {
+        "title": "Log directory",
+        "description": "Open the directory where app logs are written",
+        "action": "Open log directory",
+        "toastOpened": "Log directory opened",
+        "toastFailed": "Couldn't open the log directory"
+      }
+    },
+    "about": {
+      "description": "A desktop Docker management client built with Tauri. Runs on Windows, macOS and Linux with a consistent local and remote container workflow.",
+      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+      "releaseNotes": "Release notes",
+      "releaseNotesDesc": "See the latest release history",
+      "website": "Website",
+      "websiteDesc": "Go to the project home page",
+      "feedback": "Feedback",
+      "feedbackDesc": "File an issue or suggest a feature",
+      "sourceCode": "Source code",
+      "sourceCodeDesc": "Browse the project repository",
+      "contributors": "Contributors",
+      "contributorsDesc": "See who contributed to the project",
+      "toastMetadataFailed": "Couldn't read app information",
+      "toastOpenLinkFailed": "Couldn't open the link"
+    }
+  }
+}

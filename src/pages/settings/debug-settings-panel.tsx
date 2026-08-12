@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
 import { appLogDir } from '@tauri-apps/api/path'
 import { openPath } from '@tauri-apps/plugin-opener'
@@ -9,16 +10,17 @@ import { toast } from '@/shared/components/toast'
 import { Button } from '@/shared/ui/button'
 
 export function DebugSettingsPanel() {
+  const { t } = useTranslation()
   const [pendingAction, setPendingAction] = useState<'devtools' | 'logs' | null>(null)
 
   const handleOpenDevtools = async () => {
     setPendingAction('devtools')
     try {
       await invoke('open_devtools')
-      toast.success('已打开 DevTools')
+      toast.success(t('settings.debug.devtools.toastOpened'))
     } catch (error) {
-      toast.error(getErrorMessage(error, '打开 DevTools 失败'), {
-        description: getErrorDescription(error, '打开 DevTools 失败'),
+      toast.error(getErrorMessage(error, t('settings.debug.devtools.toastFailed')), {
+        description: getErrorDescription(error, t('settings.debug.devtools.toastFailed')),
       })
     } finally {
       setPendingAction(null)
@@ -30,12 +32,12 @@ export function DebugSettingsPanel() {
     try {
       const logDir = await appLogDir()
       await openPath(logDir)
-      toast.success('已打开日志目录', {
+      toast.success(t('settings.debug.logs.toastOpened'), {
         description: logDir,
       })
     } catch (error) {
-      toast.error(getErrorMessage(error, '打开日志目录失败'), {
-        description: getErrorDescription(error, '打开日志目录失败'),
+      toast.error(getErrorMessage(error, t('settings.debug.logs.toastFailed')), {
+        description: getErrorDescription(error, t('settings.debug.logs.toastFailed')),
       })
     } finally {
       setPendingAction(null)
@@ -46,8 +48,8 @@ export function DebugSettingsPanel() {
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title="开发者工具"
-          description="打开当前主窗口的开发者工具"
+          title={t('settings.debug.devtools.title')}
+          description={t('settings.debug.devtools.description')}
           action={
             <Button
               variant="outline"
@@ -56,14 +58,14 @@ export function DebugSettingsPanel() {
               disabled={pendingAction !== null}
             >
               <Bug className="size-4" />
-              <span>{pendingAction === 'devtools' ? '正在打开…' : '打开开发者工具'}</span>
+              <span>{pendingAction === 'devtools' ? t('common.opening') : t('settings.debug.devtools.action')}</span>
             </Button>
           }
         />
 
         <SettingsActionRow
-          title="日志目录"
-          description="打开当前应用的日志落盘目录"
+          title={t('settings.debug.logs.title')}
+          description={t('settings.debug.logs.description')}
           action={
             <Button
               variant="outline"
@@ -72,7 +74,7 @@ export function DebugSettingsPanel() {
               disabled={pendingAction !== null}
             >
               <FolderOpen className="size-4" />
-              <span>{pendingAction === 'logs' ? '正在打开…' : '打开日志目录'}</span>
+              <span>{pendingAction === 'logs' ? t('common.opening') : t('settings.debug.logs.action')}</span>
             </Button>
           }
         />

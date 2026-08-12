@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearch } from 'wouter'
 import { useAppSettings } from '@/app/settings-store'
 import { commands } from '@/types/app-bindings'
@@ -13,6 +14,7 @@ import { SETTINGS_SECTIONS, type SettingsSectionKey } from '@/pages/settings/set
 import { TerminalSettingsPanel } from '@/pages/settings/terminal-settings-panel'
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const { settings, updateTerminalSettings, resetTerminalSettings, updateAppStoreSettings } = useAppSettings()
   const search = useSearch()
   const initialSection = useMemo<SettingsSectionKey>(() => {
@@ -42,7 +44,7 @@ export default function SettingsPage() {
 
   const handleResetTerminalSettings = () => {
     resetTerminalSettings()
-    toast.success('终端设置已恢复默认')
+    toast.success(t('settings.terminal.toast.reset'))
   }
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function SettingsPage() {
                 onClick={() => setActiveSection(section.key)}
               >
                 <Icon className="size-4 shrink-0" />
-                <span>{section.title}</span>
+                <span>{t(section.titleKey)}</span>
               </button>
             )
           })}

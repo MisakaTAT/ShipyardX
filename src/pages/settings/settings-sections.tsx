@@ -4,15 +4,15 @@ export type SettingsSectionKey = 'general' | 'appstore' | 'hotkeys' | 'terminal'
 
 export interface SettingsSection {
   key: SettingsSectionKey
-  title: string
+  titleKey: `settings.nav.${SettingsSectionKey}`
   icon: LucideIcon
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
-  { key: 'general', title: '通用', icon: AppWindow },
-  { key: 'appstore', title: '应用商店', icon: Stone },
-  { key: 'hotkeys', title: '热键管理', icon: Keyboard },
-  { key: 'terminal', title: '终端设置', icon: TerminalSquare },
-  { key: 'debug', title: '调试', icon: Bug },
-  { key: 'about', title: '关于', icon: CircleHelp },
+  { key: 'general', titleKey: 'settings.nav.general', icon: AppWindow },
+  { key: 'appstore', titleKey: 'settings.nav.appstore', icon: Stone },
+  { key: 'hotkeys', titleKey: 'settings.nav.hotkeys', icon: Keyboard },
+  { key: 'terminal', titleKey: 'settings.nav.terminal', icon: TerminalSquare },
+  { key: 'debug', titleKey: 'settings.nav.debug', icon: Bug },
+  { key: 'about', titleKey: 'settings.nav.about', icon: CircleHelp },
 ]

@@ -42,9 +42,12 @@ export function normalizeHotkey(value: unknown): string | null {
   return ordered.length ? ordered.join('+') : null
 }
 
-export function formatHotkeyLabel(value: string | null | undefined) {
+/**
+ * 纯函数拿不到 t()，未设置时的文案由调用方传入；默认给一个语言无关的破折号。
+ */
+export function formatHotkeyLabel(value: string | null | undefined, unsetLabel = '—') {
   const normalized = normalizeHotkey(value)
-  if (!normalized) return '未设置'
+  if (!normalized) return unsetLabel
 
   const symbols: Record<string, string> = isMacPlatform()
     ? { Mod: '\u2318', Meta: '\u2318', Ctrl: '\u2303', Alt: '\u2325', Shift: '\u21e7' }
