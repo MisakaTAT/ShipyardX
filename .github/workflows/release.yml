@@ -151,6 +151,7 @@ jobs:
       - name: Run frontend checks
         run: |
           pnpm typecheck
+          pnpm check:i18n
           pnpm test
 
       - name: Run Rust checks

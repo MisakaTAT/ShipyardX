@@ -42,9 +42,7 @@ pub fn run() {
             commands::servers::forget_host_key,
             commands::servers::clear_known_hosts,
             commands::servers::probe_host_key,
-            commands::servers::test_connection,
             commands::servers::test_server_connection,
-            commands::servers::test_connection_direct,
             commands::servers::test_server_connection_direct,
             commands::containers::list_containers,
             commands::containers::start_container,
@@ -170,7 +168,7 @@ pub fn run() {
         .setup(move |app| {
             specta_builder.mount_events(app);
             let data_file = get_data_file(app.handle()).map_err(|error| {
-                let detail = error.detail.unwrap_or(error.message);
+                let detail = error.detail.unwrap_or(error.code);
                 Box::<dyn std::error::Error>::from(detail)
             })?;
             ssh::known_hosts::init(app.handle(), &config::store::data_dir_from_file(&data_file));

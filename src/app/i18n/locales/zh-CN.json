@@ -1,212 +1,1009 @@
 {
-  "common": {
-    "restoreDefaults": "恢复默认",
-    "cancel": "取消",
-    "confirm": "确定",
-    "opening": "正在打开…",
-    "open": "打开",
-    "loading": "正在读取…",
-    "noMatch": "没有匹配项",
-    "placeholder": "—"
-  },
-  "settings": {
-    "nav": {
-      "general": "通用",
-      "appstore": "应用商店",
-      "hotkeys": "热键管理",
-      "terminal": "终端设置",
-      "debug": "调试",
-      "about": "关于"
-    },
-    "reset": {
-      "title": "恢复默认",
-      "confirmTitle": "恢复默认设置？",
-      "confirmSuffix": "，此操作无法撤销。"
-    },
-    "general": {
-      "theme": {
-        "title": "主题设置",
-        "light": "浅色",
-        "dark": "深色",
-        "system": "跟随系统",
-        "lightDesc": "始终使用浅色界面",
-        "darkDesc": "始终使用深色界面",
-        "systemDesc": "根据系统外观自动切换"
-      },
-      "language": {
-        "title": "语言",
-        "description": "选择界面显示语言",
-        "system": "跟随系统"
-      },
-      "version": {
-        "title": "版本信息",
-        "current": "当前版本 {{version}}",
-        "notChecked": "尚未检查",
-        "checking": "正在检查更新",
-        "downloading": "正在下载更新",
-        "installed": "等待重启",
-        "available": "发现新版本 {{version}}",
-        "error": "检查更新失败",
-        "latest": "已是最新版本"
-      },
-      "update": {
-        "title": "检查更新",
-        "description": "检查并安装最新版本",
-        "check": "检查更新",
-        "checking": "正在检查…",
-        "downloadingAction": "正在下载安装…",
-        "install": "安装 {{version}}",
-        "progressPreparing": "准备下载…",
-        "progressDownloaded": "已下载 {{size}}",
-        "downloadingDesc": "正在下载更新包，{{progress}}",
-        "installedDesc": "新版本已准备完成，重启应用后即可生效",
-        "latestDesc": "当前已经是最新版本",
-        "availableDesc": "发现新版本 {{version}}",
-        "availableDescWithDate": "发现新版本 {{version}}，发布于 {{date}}",
-        "toastLatest": "当前已经是最新版本",
-        "toastFound": "发现新版本 {{version}}",
-        "toastFoundDesc": "可以开始下载并安装更新",
-        "toastCheckFailed": "检查更新失败",
-        "toastCheckFailedDesc": "请确认 updater 已正确配置后再试",
-        "toastInstalled": "{{name}} {{version}} 已安装",
-        "toastInstalledDesc": "更新包已经安装完成，请重启应用以使用新版本",
-        "toastInstallFailed": "安装更新失败",
-        "toastInstallFailedDesc": "安装过程中出现问题，请稍后重试"
-      }
-    },
+  "backend": {
     "appstore": {
-      "sources": {
-        "title": "应用源",
-        "description": "维护可用仓库列表，商店页面再选择当前使用的源",
-        "namePlaceholder": "仓库名称",
-        "add": "添加源",
-        "delete": "删除源"
+      "unnamed_source": "未命名源"
+    },
+    "errors": {
+      "app": {
+        "main_window_missing": {
+          "message": "未找到主窗口"
+        }
       },
-      "proxy": {
-        "enableTitle": "启用代理",
-        "enableDesc": "同步应用商店时统一走全局代理",
-        "urlTitle": "代理地址",
-        "urlDesc": "支持 HTTP 代理地址，例如 http://127.0.0.1:7890"
+      "appstore": {
+        "app_key_invalid": {
+          "message": "应用标识包含非法字符：{{value}}"
+        },
+        "app_not_found": {
+          "message": "应用 {{app}} 不存在"
+        },
+        "apps_dir_entry_failed": {
+          "message": "读取应用目录项失败"
+        },
+        "apps_dir_entry_type_failed": {
+          "message": "读取应用目录类型失败"
+        },
+        "apps_dir_read_failed": {
+          "message": "读取 apps 目录失败"
+        },
+        "cache_clear_failed": {
+          "message": "清除应用商店缓存失败"
+        },
+        "cache_clear_join_failed": {
+          "message": "清除应用商店缓存失败"
+        },
+        "cache_dir_name_invalid": {
+          "message": "应用商店缓存目录名称无效"
+        },
+        "cache_entry_failed": {
+          "message": "读取应用商店缓存目录项失败"
+        },
+        "cache_info_join_failed": {
+          "message": "读取应用商店缓存信息失败"
+        },
+        "cache_parent_missing": {
+          "message": "无法定位应用商店缓存目录的父目录"
+        },
+        "cache_read_failed": {
+          "message": "读取应用商店缓存目录失败"
+        },
+        "cache_recover_rename_failed": {
+          "action": "请关闭占用该目录的程序后重试",
+          "message": "清理未完成的应用商店缓存失败"
+        },
+        "cache_stat_failed": {
+          "message": "读取应用商店缓存信息失败"
+        },
+        "cache_state_join_failed": {
+          "message": "检查应用商店缓存状态失败"
+        },
+        "compose_render_invalid": {
+          "action": "请检查填写的变量值是否包含引号、冒号等会破坏 YAML 结构的字符",
+          "message": "渲染后的 docker-compose.yml 不是合法 YAML"
+        },
+        "compose_template_read_failed": {
+          "message": "读取部署模板失败"
+        },
+        "compose_up_failed": {
+          "message": "容器启动失败"
+        },
+        "data_dir_entry_failed": {
+          "message": "读取数据目录项失败"
+        },
+        "data_dir_read_failed": {
+          "message": "读取数据目录失败"
+        },
+        "data_dir_stat_failed": {
+          "message": "读取数据目录信息失败"
+        },
+        "data_dir_unavailable": {
+          "message": "无法获取应用数据目录"
+        },
+        "env_key_invalid": {
+          "action": "变量名只能包含字母、数字和下划线，且不能以数字开头",
+          "message": "环境变量名不合法：{{key}}"
+        },
+        "env_value_invalid": {
+          "action": "请去掉值中的换行和控制字符",
+          "message": "环境变量 {{key}} 的值包含非法字符"
+        },
+        "manifest_not_found": {
+          "message": "应用 {{app}} 的 data.yml 不存在"
+        },
+        "manifest_parse_failed": {
+          "message": "解析 data.yml 失败"
+        },
+        "manifest_read_failed": {
+          "message": "读取 data.yml 失败"
+        },
+        "no_enabled_source": {
+          "message": "没有已启用的应用商店源"
+        },
+        "settings_parse_failed": {
+          "message": "解析应用商店设置失败"
+        },
+        "settings_read_failed": {
+          "message": "读取应用商店设置失败"
+        },
+        "settings_serialize_failed": {
+          "message": "序列化应用商店设置失败"
+        },
+        "settings_write_join_failed": {
+          "message": "写入应用商店设置失败"
+        },
+        "source_missing": {
+          "message": "应用商店源配置为空"
+        },
+        "source_not_found": {
+          "message": "应用商店源不存在: {{source_id}}"
+        },
+        "sync_failed": {
+          "message": "同步应用商店失败"
+        },
+        "sync_join_failed": {
+          "message": "等待应用商店同步任务失败"
+        },
+        "version_invalid": {
+          "message": "版本号包含非法字符：{{value}}"
+        },
+        "version_not_found": {
+          "message": "应用 {{app}} 版本 {{version}} 的 docker-compose.yml 不存在"
+        }
       },
-      "cache": {
-        "dirTitle": "缓存目录",
-        "dirDesc": "应用商店仓库与元数据的本地缓存位置",
-        "sizeTitle": "缓存大小",
-        "sizeDesc": "当前本地缓存占用空间",
-        "clearTitle": "清除缓存",
-        "clearDesc": "删除本地缓存，下次进入商店时会重新拉取",
-        "clear": "清除缓存",
-        "clearing": "正在清除…"
+      "base64": {
+        "decode": {
+          "message": "Base64 解码失败"
+        }
       },
-      "resetDesc": "将应用源与代理设置还原为初始值",
-      "toast": {
-        "saved": "应用商店设置已保存",
-        "saveFailed": "保存应用商店设置失败",
-        "sourceEnabled": "应用商店源已启用",
-        "sourceDisabled": "应用商店源已禁用",
-        "sourceRemoved": "应用商店源已删除",
-        "keepOneEnabled": "至少保留一个启用源",
-        "keepOneSource": "至少保留一个应用商店源",
-        "reset": "应用商店设置已恢复默认",
-        "cacheCleared": "应用商店缓存已清除",
-        "cacheClearFailed": "清除应用商店缓存失败"
+      "config": {
+        "base64_decode_failed": {
+          "message": "解码已保存凭据失败"
+        },
+        "cipher_decrypt_init_failed": {
+          "message": "初始化解密器失败"
+        },
+        "cipher_encrypt_init_failed": {
+          "message": "初始化加密器失败"
+        },
+        "data_dir_create_failed": {
+          "message": "创建配置目录失败"
+        },
+        "data_dir_unavailable": {
+          "message": "无法获取应用数据目录"
+        },
+        "decrypt_failed": {
+          "message": "解密服务器密码失败"
+        },
+        "encrypt_failed": {
+          "message": "加密服务器密码失败"
+        },
+        "encrypted_data_invalid": {
+          "message": "已保存凭据格式无效"
+        },
+        "file_replace_failed": {
+          "message": "替换配置文件失败"
+        },
+        "keyring_access_failed": {
+          "action": "请确认系统钥匙串服务可用（Linux 需要 gnome-keyring、KWallet 等 Secret Service 实现）",
+          "message": "访问系统钥匙串失败"
+        },
+        "keyring_read_failed": {
+          "action": "请确认系统钥匙串服务可用（Linux 需要 gnome-keyring、KWallet 等 Secret Service 实现）",
+          "message": "读取系统钥匙串失败"
+        },
+        "keyring_write_failed": {
+          "action": "请确认系统钥匙串服务可用（Linux 需要 gnome-keyring、KWallet 等 Secret Service 实现）",
+          "message": "写入系统钥匙串失败"
+        },
+        "master_key_invalid": {
+          "action": "请在钥匙串中删除「{{account}}」条目后重试",
+          "message": "钥匙串中的主密钥格式无效"
+        },
+        "password_utf8_invalid": {
+          "message": "解密后的密码数据无效"
+        },
+        "server_serialize_failed": {
+          "message": "序列化服务器配置失败"
+        },
+        "server_write_failed": {
+          "message": "写入服务器配置失败"
+        },
+        "tempfile_create_failed": {
+          "message": "创建临时配置文件失败"
+        },
+        "tempfile_sync_failed": {
+          "message": "同步临时配置文件失败"
+        },
+        "tempfile_write_failed": {
+          "message": "写入临时配置文件失败"
+        }
+      },
+      "container": {
+        "stats_empty": {
+          "message": "容器统计信息为空"
+        }
+      },
+      "daemon": {
+        "serialize_failed": {
+          "message": "序列化 Docker daemon 配置失败"
+        }
+      },
+      "docker": {
+        "api_client_error": {
+          "message": "Docker API 请求无效（HTTP {{status}}）"
+        },
+        "api_request_failed": {
+          "message": "Docker API 请求失败（HTTP {{status}}）"
+        },
+        "api_server_error": {
+          "message": "Docker 服务暂时不可用（HTTP {{status}}）"
+        },
+        "api_version_cache_lock_failed": {
+          "message": "更新 Docker API 版本缓存失败"
+        },
+        "connect_failed": {
+          "message": "无法连接 Docker"
+        },
+        "endpoint_cache_lock_failed": {
+          "message": "更新 Docker endpoint 缓存失败"
+        },
+        "events_start_failed": {
+          "message": "启动 Docker 事件流失败"
+        },
+        "hijack_closed": {
+          "message": "Docker hijack 连接已关闭"
+        },
+        "hijack_error_timeout": {
+          "message": "读取 Docker 错误响应超时"
+        },
+        "hijack_head_too_large": {
+          "message": "Docker hijack 响应头超出长度限制"
+        },
+        "hijack_status_invalid": {
+          "message": "解析 Docker hijack 状态失败"
+        },
+        "hijack_timeout": {
+          "message": "等待 Docker hijack 响应超时"
+        },
+        "host_unsupported": {
+          "message": "暂不支持的 Docker Host: {{raw}}"
+        },
+        "http_handshake_failed": {
+          "message": "建立 Docker HTTP 连接失败"
+        },
+        "http_pool_lock_failed": {
+          "message": "更新 Docker HTTP 连接池失败"
+        },
+        "permission_denied": {
+          "message": "当前用户没有访问 Docker Socket 的权限：{{path}}"
+        },
+        "pooled_connection_missing": {
+          "message": "Docker HTTP 连接池状态异常：连接缺失"
+        },
+        "request_encode_failed": {
+          "message": "序列化 Docker 请求体失败"
+        },
+        "request_failed": {
+          "message": "Docker 请求失败"
+        },
+        "request_send_failed": {
+          "message": "发送 Docker HTTP 请求失败"
+        },
+        "request_timeout": {
+          "message": "Docker 请求超时"
+        },
+        "response_format_failed": {
+          "message": "格式化 JSON 失败"
+        },
+        "response_read_failed": {
+          "message": "读取 Docker HTTP 响应失败"
+        },
+        "socket_open_failed": {
+          "message": "打开 Docker Socket 通道失败"
+        },
+        "socket_path_empty": {
+          "message": "Docker Unix Socket 路径不能为空"
+        },
+        "stream_error": {
+          "message": "Docker 流式请求失败"
+        },
+        "tcp_host_invalid": {
+          "message": "无效的 Docker TCP Host：{{raw}}"
+        },
+        "tcp_open_failed": {
+          "message": "打开 Docker TCP 通道失败"
+        },
+        "tcp_port_invalid": {
+          "message": "无效的 Docker TCP 端口：{{raw}}"
+        },
+        "tcp_unreachable": {
+          "message": "Docker TCP Host 不可达：{{host}}:{{port}}"
+        },
+        "unavailable": {
+          "message": "Docker 未安装、未运行，或 {{path}} 不可用"
+        },
+        "version_missing": {
+          "message": "Docker 未返回 API 版本信息"
+        }
+      },
+      "docker_events": {
+        "status_lock_failed": {
+          "message": "读取事件流状态失败"
+        },
+        "streams_lock_failed": {
+          "message": "读取事件流状态失败"
+        }
+      },
+      "image": {
+        "export_dir_invalid": {
+          "message": "所选路径不是文件夹"
+        },
+        "export_dir_missing": {
+          "message": "所选目录不存在"
+        },
+        "export_exists": {
+          "action": "请更换导出文件名",
+          "message": "目标文件已存在"
+        },
+        "export_file_name_invalid": {
+          "action": "文件名不能为空，也不能包含路径分隔符",
+          "message": "文件名无效"
+        },
+        "export_flush_failed": {
+          "message": "保存镜像导出文件失败"
+        },
+        "export_open_failed": {
+          "message": "创建镜像导出文件失败"
+        },
+        "export_permission_denied": {
+          "message": "没有权限写入所选目录"
+        },
+        "export_write_failed": {
+          "message": "写入镜像导出文件失败"
+        },
+        "import_file_denied": {
+          "message": "没有权限读取所选镜像文件"
+        },
+        "import_file_invalid": {
+          "message": "所选路径不是文件"
+        },
+        "import_file_missing": {
+          "message": "所选镜像文件不存在"
+        },
+        "import_open_failed": {
+          "message": "打开镜像文件失败"
+        },
+        "import_stat_failed": {
+          "message": "读取镜像文件信息失败"
+        },
+        "pull_cancelled": {
+          "message": "镜像拉取已取消"
+        },
+        "pull_event_parse_failed": {
+          "message": "解析镜像拉取进度失败"
+        },
+        "pull_failed": {
+          "message": "镜像拉取失败"
+        },
+        "pull_streams_lock_failed": {
+          "message": "记录镜像拉取状态失败"
+        }
+      },
+      "io": {
+        "error": {
+          "message": "本地 I/O 操作失败"
+        }
+      },
+      "log_stream": {
+        "start_lock_failed": {
+          "message": "记录日志流状态失败"
+        },
+        "stop_lock_failed": {
+          "message": "停止日志流失败"
+        }
+      },
+      "port_forward": {
+        "bind_address_invalid": {
+          "action": "请从本机地址列表中选择，或填写 127.0.0.1",
+          "message": "绑定地址必须是 IP 字面量：{{bind_addr}}"
+        },
+        "bind_address_multicast": {
+          "message": "绑定地址不能是组播地址"
+        },
+        "config_dir_create_failed": {
+          "message": "创建端口转发配置目录失败"
+        },
+        "connect_failed": {
+          "message": "SSH 连接失败"
+        },
+        "data_file_lock_failed": {
+          "message": "读取端口转发配置路径失败"
+        },
+        "interfaces_list_failed": {
+          "message": "读取本地网卡地址失败"
+        },
+        "local_addr_read_failed": {
+          "message": "读取本地端口失败"
+        },
+        "local_port_conflict": {
+          "message": "本地端口 {{port}} 已被其他规则占用"
+        },
+        "local_port_unavailable": {
+          "message": "本地端口被占用或无法绑定"
+        },
+        "local_socket_config_failed": {
+          "message": "本地 socket 设置失败"
+        },
+        "local_socket_takeover_failed": {
+          "message": "接管本地连接失败"
+        },
+        "not_found": {
+          "message": "端口转发不存在"
+        },
+        "read_failed": {
+          "message": "读取端口转发数据失败"
+        },
+        "remote_unreachable": {
+          "message": "目标端口不可达"
+        },
+        "rule_disabled": {
+          "message": "该规则已被禁用"
+        },
+        "rules_parse_failed": {
+          "message": "解析 port_forwards.json 失败"
+        },
+        "rules_serialize_failed": {
+          "message": "序列化端口转发配置失败"
+        },
+        "rules_write_failed": {
+          "message": "写入 port_forwards.json 失败"
+        },
+        "runtime_lock_failed": {
+          "message": "更新端口转发运行时状态失败"
+        },
+        "shutdown_failed": {
+          "message": "关闭端口转发写入端失败"
+        },
+        "write_failed": {
+          "message": "写入端口转发数据失败"
+        }
+      },
+      "serde": {
+        "json": {
+          "message": "JSON 处理失败"
+        },
+        "yaml": {
+          "message": "YAML 处理失败"
+        }
+      },
+      "server": {
+        "not_found": {
+          "message": "服务器不存在"
+        }
+      },
+      "servers": {
+        "add_lock_failed": {
+          "message": "写入服务器列表失败"
+        },
+        "data_file_lock_failed": {
+          "message": "读取服务器配置路径失败"
+        },
+        "delete_lock_failed": {
+          "message": "写入服务器列表失败"
+        },
+        "list_lock_failed": {
+          "message": "读取服务器列表失败"
+        },
+        "store_lock_failed": {
+          "message": "更新服务器配置失败"
+        },
+        "update_lock_failed": {
+          "message": "写入服务器列表失败"
+        }
+      },
+      "sftp": {
+        "channel_open_failed": {
+          "message": "打开 SFTP 会话失败"
+        },
+        "create_file_failed": {
+          "message": "创建远程文件失败：{{path}}"
+        },
+        "local_dir_entry_failed": {
+          "message": "读取本地目录项失败"
+        },
+        "local_dir_read_failed": {
+          "message": "读取本地目录失败"
+        },
+        "local_file_open_failed": {
+          "message": "读取本地文件失败"
+        },
+        "local_file_read_failed": {
+          "message": "读取本地文件失败"
+        },
+        "local_metadata_failed": {
+          "message": "读取本地文件信息失败"
+        },
+        "mkdir_failed": {
+          "message": "创建远程目录失败：{{path}}"
+        },
+        "remote_path_conflict": {
+          "message": "远程路径已存在且不是目录：{{path}}"
+        },
+        "resolve_home_failed": {
+          "message": "解析远程 HOME 目录失败"
+        },
+        "session_init_failed": {
+          "message": "初始化 SFTP 会话失败"
+        },
+        "shutdown_failed": {
+          "message": "关闭远程文件失败"
+        },
+        "stat_failed": {
+          "message": "检查远程目录失败"
+        },
+        "subsystem_request_failed": {
+          "message": "启动 SFTP 子系统失败"
+        },
+        "write_failed": {
+          "message": "写入远程文件失败"
+        }
+      },
+      "ssh": {
+        "address_invalid": {
+          "message": "地址或端口无效"
+        },
+        "auth_incomplete": {
+          "action": "请检查用户名、密码或密钥配置",
+          "message": "认证未完成"
+        },
+        "auth_method_unsupported": {
+          "action": "请切换为服务端支持的认证方式",
+          "message": "认证方式不受支持"
+        },
+        "auth_type_invalid": {
+          "message": "不支持的认证类型：{{authType}}"
+        },
+        "channel_open_failed": {
+          "message": "创建 SSH 通道失败"
+        },
+        "command_failed": {
+          "message": "远程命令执行失败"
+        },
+        "config_invalid": {
+          "message": "配置无效"
+        },
+        "connect_failed": {
+          "message": "连接失败"
+        },
+        "connect_timeout": {
+          "action": "请检查目标主机是否可达，以及安全组或防火墙设置",
+          "message": "连接 {{host}}:{{port}} 超时"
+        },
+        "connection_interrupted": {
+          "action": "请检查网络连通性后重试",
+          "message": "连接已中断"
+        },
+        "connection_lost": {
+          "action": "请检查网络连通性后重试",
+          "message": "连接已超时中断"
+        },
+        "connection_refused": {
+          "action": "请确认目标主机 SSH 服务已启动，端口配置正确",
+          "message": "服务器拒绝连接"
+        },
+        "disconnected": {
+          "message": "连接被远端关闭"
+        },
+        "exec_failed": {
+          "message": "执行远程命令失败"
+        },
+        "handshake_failed": {
+          "action": "请检查 SSH 服务端配置和协议兼容性",
+          "message": "握手失败"
+        },
+        "host_key_changed": {
+          "action": "这可能是中间人攻击。请确认服务器确实更换了密钥后再重新信任",
+          "message": "{{host}}:{{port}} 的主机密钥已变更"
+        },
+        "host_key_probe_failed": {
+          "message": "未能读取服务器主机密钥"
+        },
+        "host_key_unknown": {
+          "action": "请核对服务器指纹后确认信任",
+          "message": "{{host}}:{{port}} 的主机密钥尚未被信任"
+        },
+        "host_key_verification_failed": {
+          "action": "请确认连接到的是正确的服务器，并检查主机密钥是否发生变化",
+          "message": "主机身份校验失败"
+        },
+        "key_not_found": {
+          "message": "密钥文件不存在或不可读：{{path}}"
+        },
+        "key_parse_failed": {
+          "action": "请检查私钥格式是否正确，或重新选择密钥文件",
+          "message": "密钥无法解析"
+        },
+        "key_read_failed": {
+          "message": "读取私钥失败"
+        },
+        "known_hosts_parse_failed": {
+          "message": "解析已信任主机密钥失败"
+        },
+        "known_hosts_serialize_failed": {
+          "message": "序列化已信任主机密钥失败"
+        },
+        "known_hosts_uninitialized": {
+          "message": "主机密钥存储尚未初始化"
+        },
+        "no_common_algo": {
+          "action": "请调整 SSH 服务端或客户端支持的算法后重试",
+          "message": "算法不兼容"
+        },
+        "not_authenticated": {
+          "action": "请检查用户名、密码或密钥配置",
+          "message": "尚未完成认证"
+        },
+        "password_auth_failed": {
+          "message": "密码认证失败"
+        },
+        "pool_handle_missing": {
+          "message": "SSH 连接池状态异常：连接句柄缺失"
+        },
+        "public_key_auth_failed": {
+          "message": "密钥认证失败"
+        },
+        "rsa_probe_failed": {
+          "message": "探测 RSA 签名算法失败"
+        },
+        "runtime_init_failed": {
+          "message": "初始化 SSH 运行时失败"
+        },
+        "stdin_close_failed": {
+          "message": "关闭远程命令输入失败"
+        },
+        "stdin_write_failed": {
+          "message": "写入远程命令输入失败"
+        }
+      },
+      "state": {
+        "servers_lock_failed": {
+          "message": "读取服务器列表失败"
+        }
+      },
+      "system": {
+        "fonts_list_failed": {
+          "message": "读取系统字体失败"
+        },
+        "restart_failed": {
+          "message": "重启 Docker 服务失败"
+        },
+        "service_manager_missing": {
+          "action": "systemctl、rc-service、service 均不可用，请在服务器上手动重启 Docker",
+          "message": "未检测到可用的服务管理器"
+        },
+        "service_operation_failed": {
+          "action": "请检查服务名称与当前用户的权限",
+          "message": "服务管理器执行 docker restart 失败"
+        },
+        "service_restart_failed": {
+          "action": "可能是权限、单元名或服务状态问题。若本机可执行 systemctl restart docker.service，请在连接中填写 sudo 密码",
+          "message": "systemctl 重启 docker 未成功"
+        },
+        "su_password_invalid": {
+          "action": "请重新输入 root 密码",
+          "message": "root 密码错误"
+        },
+        "sudo_password_invalid": {
+          "action": "请重新输入 sudo 密码",
+          "message": "sudo 密码错误"
+        },
+        "sudo_password_required": {
+          "action": "请在服务器连接中填写 sudo 密码，或在 sudoers 中为该用户配置 NOPASSWD",
+          "message": "无法非交互执行 sudo"
+        },
+        "sudo_unavailable": {
+          "action": "请改用 root 或具备 sudo 权限的账户",
+          "message": "当前用户非 root 且未找到 sudo"
+        }
+      },
+      "task": {
+        "join": {
+          "message": "后台任务执行失败"
+        }
+      },
+      "terminal": {
+        "channel_open_failed": {
+          "message": "终端通道创建失败"
+        },
+        "container_id_invalid": {
+          "message": "容器 ID/名称包含非法字符"
+        },
+        "exec_read_failed": {
+          "message": "读取容器终端失败"
+        },
+        "exec_write_failed": {
+          "message": "写入容器终端失败"
+        },
+        "export_dir_missing": {
+          "message": "导出目录不存在"
+        },
+        "export_path_forbidden": {
+          "message": "不能导出到应用数据目录"
+        },
+        "export_path_invalid": {
+          "message": "导出路径无效"
+        },
+        "export_path_not_absolute": {
+          "message": "导出路径必须是绝对路径"
+        },
+        "export_path_symlink": {
+          "message": "不能覆盖符号链接"
+        },
+        "export_write_failed": {
+          "message": "写入终端导出文件失败"
+        },
+        "handshake_lock_failed": {
+          "message": "移除终端握手状态失败"
+        },
+        "pty_request_failed": {
+          "message": "请求终端 PTY 失败"
+        },
+        "sessions_lock_failed": {
+          "message": "关闭终端会话失败"
+        },
+        "shell_start_failed": {
+          "message": "启动远程 Shell 失败"
+        },
+        "ws_addr_failed": {
+          "message": "读取终端 WebSocket 地址失败"
+        },
+        "ws_bind_failed": {
+          "message": "启动终端 WebSocket 服务失败"
+        },
+        "ws_clients_lock_failed": {
+          "message": "移除终端 WebSocket 客户端失败"
+        },
+        "ws_not_initialized": {
+          "message": "终端 WebSocket 服务尚未初始化"
+        }
+      },
+      "unknown": {
+        "message": "操作失败"
       }
     },
-    "hotkeys": {
-      "commandPalette": {
-        "title": "命令面板",
-        "description": "搜索服务器、转发规则、主机指纹，或直接执行命令"
-      },
-      "terminalSearch": {
-        "title": "终端搜索",
-        "description": "显示终端内搜索工具条并聚焦输入框"
-      },
-      "recording": "按下快捷键…",
-      "unset": "未设置",
-      "resetDesc": "将全部快捷键还原为初始组合",
-      "toast": {
-        "updated": "热键已更新为 {{hotkey}}",
-        "reset": "热键设置已恢复默认"
-      }
+    "image_pull": {
+      "cancelled": "已取消拉取",
+      "cancelled_detail": "用户取消了当前镜像拉取",
+      "docker_connect_failed": "连接 Docker API 失败",
+      "done": "拉取完成",
+      "done_detail": "镜像已就绪",
+      "failed": "拉取失败",
+      "preparing": "准备拉取镜像"
     },
-    "terminal": {
-      "frontend": {
-        "title": "前端",
-        "description": "切换终端渲染路径"
-      },
-      "ligatures": {
-        "title": "启用连结字",
-        "description": "为编程字体里的 ligatures 启用合字渲染"
-      },
-      "theme": {
-        "title": "配色",
-        "description": "切换终端主题配色",
-        "searchPlaceholder": "搜索配色"
-      },
-      "scrollback": {
-        "title": "回滚",
-        "description": "保存在缓冲区的行数"
-      },
-      "fontFamily": {
-        "title": "终端字体",
-        "description": "设置终端使用的等宽字体",
-        "searchPlaceholder": "搜索字体"
-      },
-      "fontSize": {
-        "title": "字体大小",
-        "description": "控制终端字符的显示尺寸"
-      },
-      "cursorStyle": {
-        "title": "光标形状",
-        "description": "设置终端光标的形态",
-        "block": "方块",
-        "underline": "下划线",
-        "bar": "竖线"
-      },
-      "cursorBlink": {
-        "title": "光标闪烁",
-        "description": "启用或关闭光标闪烁动画"
-      },
-      "lineHeight": {
-        "title": "行间距",
-        "description": "调整终端行高，影响整体纵向密度"
-      },
-      "resetDesc": "将终端的全部选项还原为初始值",
-      "toast": {
-        "reset": "终端设置已恢复默认"
-      }
+    "install": {
+      "compose_upload_failed": "上传 docker-compose.yml 失败",
+      "data_copy_done": "数据目录复制完成，共 {{total}}",
+      "data_copy_done_unknown": "数据目录复制完成",
+      "data_copy_failed": "复制数据失败",
+      "data_copy_progress": "已上传 {{transferred}} / {{total}}（{{percent}}%）",
+      "data_copy_progress_unknown": "已上传 {{transferred}}",
+      "data_copy_running": "正在复制数据目录…",
+      "deploy_done": "文件部署完成",
+      "deploy_running": "正在部署文件到远程服务器…",
+      "env_upload_failed": "上传 .env 失败",
+      "env_validate_failed": "变量校验失败",
+      "network_done": "Docker 网络就绪",
+      "network_running": "正在创建 Docker 网络…",
+      "prepare_done": "部署模板准备完成",
+      "prepare_running": "正在准备部署模板…",
+      "remote_mkdir_failed": "创建远程目录失败",
+      "sftp_connect_failed": "建立 SFTP 连接失败",
+      "start_done": "容器服务已启动",
+      "start_failed": "容器启动失败",
+      "start_running": "正在启动容器服务…",
+      "template_read_failed": "读取模板失败",
+      "template_render_failed": "渲染模板失败"
     },
-    "debug": {
-      "devtools": {
-        "title": "开发者工具",
-        "description": "打开当前主窗口的开发者工具",
-        "action": "打开开发者工具",
-        "toastOpened": "已打开 DevTools",
-        "toastFailed": "打开 DevTools 失败"
-      },
-      "logs": {
-        "title": "日志目录",
-        "description": "打开当前应用的日志落盘目录",
-        "action": "打开日志目录",
-        "toastOpened": "已打开日志目录",
-        "toastFailed": "打开日志目录失败"
-      }
+    "port_forward": {
+      "all_interfaces": "所有网卡 (0.0.0.0)"
+    }
+  },
+  "ui": {
+    "appstore": {
+      "syncDone": "同步完成"
     },
-    "about": {
-      "description": "基于 Tauri 构建的桌面 Docker 管理客户端，支持 Windows、macOS 和 Linux，提供一致的本地与远程容器工作流。",
-      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
-      "releaseNotes": "更新说明",
-      "releaseNotesDesc": "查看最新版本发布记录",
-      "website": "官网",
-      "websiteDesc": "前往项目主页",
-      "feedback": "反馈建议",
-      "feedbackDesc": "提交 issue 或功能建议",
-      "sourceCode": "源代码",
-      "sourceCodeDesc": "浏览项目源码仓库",
-      "contributors": "开发者名单",
-      "contributorsDesc": "查看项目贡献者",
-      "toastMetadataFailed": "读取应用信息失败",
-      "toastOpenLinkFailed": "打开链接失败"
+    "common": {
+      "cancel": "取消",
+      "confirm": "确定",
+      "loading": "正在读取…",
+      "noMatch": "没有匹配项",
+      "open": "打开",
+      "opening": "正在打开…",
+      "placeholder": "—",
+      "restoreDefaults": "恢复默认"
+    },
+    "servers": {
+      "connectOk": "服务器连接成功",
+      "testFailed": "连接测试失败"
+    },
+    "settings": {
+      "about": {
+        "contributors": "开发者名单",
+        "contributorsDesc": "查看项目贡献者",
+        "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+        "description": "基于 Tauri 构建的桌面 Docker 管理客户端，支持 Windows、macOS 和 Linux，提供一致的本地与远程容器工作流。",
+        "feedback": "反馈建议",
+        "feedbackDesc": "提交 issue 或功能建议",
+        "releaseNotes": "更新说明",
+        "releaseNotesDesc": "查看最新版本发布记录",
+        "sourceCode": "源代码",
+        "sourceCodeDesc": "浏览项目源码仓库",
+        "toastMetadataFailed": "读取应用信息失败",
+        "toastOpenLinkFailed": "打开链接失败",
+        "website": "官网",
+        "websiteDesc": "前往项目主页"
+      },
+      "appstore": {
+        "cache": {
+          "clear": "清除缓存",
+          "clearDesc": "删除本地缓存，下次进入商店时会重新拉取",
+          "clearTitle": "清除缓存",
+          "clearing": "正在清除…",
+          "dirDesc": "应用商店仓库与元数据的本地缓存位置",
+          "dirTitle": "缓存目录",
+          "sizeDesc": "当前本地缓存占用空间",
+          "sizeTitle": "缓存大小"
+        },
+        "proxy": {
+          "enableDesc": "同步应用商店时统一走全局代理",
+          "enableTitle": "启用代理",
+          "urlDesc": "支持 HTTP 代理地址，例如 http://127.0.0.1:7890",
+          "urlTitle": "代理地址"
+        },
+        "resetDesc": "将应用源与代理设置还原为初始值",
+        "sources": {
+          "add": "添加源",
+          "delete": "删除源",
+          "description": "维护可用仓库列表，商店页面再选择当前使用的源",
+          "namePlaceholder": "仓库名称",
+          "title": "应用源"
+        },
+        "toast": {
+          "cacheClearFailed": "清除应用商店缓存失败",
+          "cacheCleared": "应用商店缓存已清除",
+          "keepOneEnabled": "至少保留一个启用源",
+          "keepOneSource": "至少保留一个应用商店源",
+          "reset": "应用商店设置已恢复默认",
+          "saveFailed": "保存应用商店设置失败",
+          "saved": "应用商店设置已保存",
+          "sourceDisabled": "应用商店源已禁用",
+          "sourceEnabled": "应用商店源已启用",
+          "sourceRemoved": "应用商店源已删除"
+        }
+      },
+      "debug": {
+        "devtools": {
+          "action": "打开开发者工具",
+          "description": "打开当前主窗口的开发者工具",
+          "title": "开发者工具",
+          "toastFailed": "打开 DevTools 失败",
+          "toastOpened": "已打开 DevTools"
+        },
+        "logs": {
+          "action": "打开日志目录",
+          "description": "打开当前应用的日志落盘目录",
+          "title": "日志目录",
+          "toastFailed": "打开日志目录失败",
+          "toastOpened": "已打开日志目录"
+        }
+      },
+      "general": {
+        "language": {
+          "description": "选择界面显示语言",
+          "system": "跟随系统",
+          "title": "语言"
+        },
+        "theme": {
+          "dark": "深色",
+          "darkDesc": "始终使用深色界面",
+          "light": "浅色",
+          "lightDesc": "始终使用浅色界面",
+          "system": "跟随系统",
+          "systemDesc": "根据系统外观自动切换",
+          "title": "主题设置"
+        },
+        "update": {
+          "availableDesc": "发现新版本 {{version}}",
+          "availableDescWithDate": "发现新版本 {{version}}，发布于 {{date}}",
+          "check": "检查更新",
+          "checking": "正在检查…",
+          "description": "检查并安装最新版本",
+          "downloadingAction": "正在下载安装…",
+          "downloadingDesc": "正在下载更新包，{{progress}}",
+          "install": "安装 {{version}}",
+          "installedDesc": "新版本已准备完成，重启应用后即可生效",
+          "latestDesc": "当前已经是最新版本",
+          "progressDownloaded": "已下载 {{size}}",
+          "progressPreparing": "准备下载…",
+          "title": "检查更新",
+          "toastCheckFailed": "检查更新失败",
+          "toastCheckFailedDesc": "请确认 updater 已正确配置后再试",
+          "toastFound": "发现新版本 {{version}}",
+          "toastFoundDesc": "可以开始下载并安装更新",
+          "toastInstallFailed": "安装更新失败",
+          "toastInstallFailedDesc": "安装过程中出现问题，请稍后重试",
+          "toastInstalled": "{{name}} {{version}} 已安装",
+          "toastInstalledDesc": "更新包已经安装完成，请重启应用以使用新版本",
+          "toastLatest": "当前已经是最新版本"
+        },
+        "version": {
+          "available": "发现新版本 {{version}}",
+          "checking": "正在检查更新",
+          "current": "当前版本 {{version}}",
+          "downloading": "正在下载更新",
+          "error": "检查更新失败",
+          "installed": "等待重启",
+          "latest": "已是最新版本",
+          "notChecked": "尚未检查",
+          "title": "版本信息"
+        }
+      },
+      "hotkeys": {
+        "commandPalette": {
+          "description": "搜索服务器、转发规则、主机指纹，或直接执行命令",
+          "title": "命令面板"
+        },
+        "recording": "按下快捷键…",
+        "resetDesc": "将全部快捷键还原为初始组合",
+        "terminalSearch": {
+          "description": "显示终端内搜索工具条并聚焦输入框",
+          "title": "终端搜索"
+        },
+        "toast": {
+          "reset": "热键设置已恢复默认",
+          "updated": "热键已更新为 {{hotkey}}"
+        },
+        "unset": "未设置"
+      },
+      "nav": {
+        "about": "关于",
+        "appstore": "应用商店",
+        "debug": "调试",
+        "general": "通用",
+        "hotkeys": "热键管理",
+        "terminal": "终端设置"
+      },
+      "reset": {
+        "confirmSuffix": "，此操作无法撤销。",
+        "confirmTitle": "恢复默认设置？",
+        "title": "恢复默认"
+      },
+      "terminal": {
+        "cursorBlink": {
+          "description": "启用或关闭光标闪烁动画",
+          "title": "光标闪烁"
+        },
+        "cursorStyle": {
+          "bar": "竖线",
+          "block": "方块",
+          "description": "设置终端光标的形态",
+          "title": "光标形状",
+          "underline": "下划线"
+        },
+        "fontFamily": {
+          "description": "设置终端使用的等宽字体",
+          "searchPlaceholder": "搜索字体",
+          "title": "终端字体"
+        },
+        "fontSize": {
+          "description": "控制终端字符的显示尺寸",
+          "title": "字体大小"
+        },
+        "frontend": {
+          "description": "切换终端渲染路径",
+          "title": "前端"
+        },
+        "ligatures": {
+          "description": "为编程字体里的 ligatures 启用合字渲染",
+          "title": "启用连结字"
+        },
+        "lineHeight": {
+          "description": "调整终端行高，影响整体纵向密度",
+          "title": "行间距"
+        },
+        "resetDesc": "将终端的全部选项还原为初始值",
+        "scrollback": {
+          "description": "保存在缓冲区的行数",
+          "title": "回滚"
+        },
+        "theme": {
+          "description": "切换终端主题配色",
+          "searchPlaceholder": "搜索配色",
+          "title": "配色"
+        },
+        "toast": {
+          "reset": "终端设置已恢复默认"
+        }
+      }
     }
   }
 }

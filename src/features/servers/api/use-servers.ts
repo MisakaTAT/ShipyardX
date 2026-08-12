@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { commands, type ServerConfig } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
+import i18n from '@/app/i18n'
 import { toastAppError } from '@/shared/lib/errors'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
@@ -38,6 +39,6 @@ export function useSaveServer() {
 export function useTestServerConnection() {
   return useMutation({
     mutationFn: (server: ServerConfig) => commands.testServerConnectionDirect(server),
-    onError: (err) => toastAppError(err, '连接测试失败'),
+    onError: (err) => toastAppError(err, i18n.t('ui.servers.testFailed')),
   })
 }

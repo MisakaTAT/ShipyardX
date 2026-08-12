@@ -37,7 +37,7 @@ pub enum WsClientCtrl {
 impl WsServerMsg {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_else(|_| {
-            "{\"type\":\"error\",\"error\":{\"code\":\"terminal.ws_message_serialize_failed\",\"kind\":\"Internal\",\"message\":\"序列化终端控制消息失败\",\"detail\":null,\"retryable\":false,\"action\":null}}".to_string()
+            "{\"type\":\"error\",\"error\":{\"code\":\"terminal.ws_message_serialize_failed\",\"kind\":\"internal\",\"params\":{},\"detail\":null,\"retryable\":false}}".to_string()
         })
     }
 }

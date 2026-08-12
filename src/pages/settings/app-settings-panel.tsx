@@ -20,9 +20,9 @@ type UpdateStatus = 'idle' | 'checking' | 'available' | 'latest' | 'downloading'
 type AppearanceTheme = 'light' | 'dark' | 'system'
 
 const THEME_OPTIONS = [
-  { value: 'light', labelKey: 'settings.general.theme.light', descKey: 'settings.general.theme.lightDesc' },
-  { value: 'dark', labelKey: 'settings.general.theme.dark', descKey: 'settings.general.theme.darkDesc' },
-  { value: 'system', labelKey: 'settings.general.theme.system', descKey: 'settings.general.theme.systemDesc' },
+  { value: 'light', labelKey: 'ui.settings.general.theme.light', descKey: 'ui.settings.general.theme.lightDesc' },
+  { value: 'dark', labelKey: 'ui.settings.general.theme.dark', descKey: 'ui.settings.general.theme.darkDesc' },
+  { value: 'system', labelKey: 'ui.settings.general.theme.system', descKey: 'ui.settings.general.theme.systemDesc' },
 ] as const satisfies ReadonlyArray<{ value: AppearanceTheme; labelKey: string; descKey: string }>
 
 const SETTINGS_CONTROL_CLASSNAME = 'h-8 w-full rounded-lg border-border bg-card px-3 py-0 text-sm shadow-none'
@@ -33,12 +33,13 @@ export function GeneralSettingsPanel() {
   const { settings, updateLanguage } = useAppSettings()
 
   const formatProgress = (downloadedBytes: number, totalBytes: number | null) => {
-    if (!Number.isFinite(downloadedBytes) || downloadedBytes <= 0) return t('settings.general.update.progressPreparing')
+    if (!Number.isFinite(downloadedBytes) || downloadedBytes <= 0)
+      return t('ui.settings.general.update.progressPreparing')
     if (totalBytes && Number.isFinite(totalBytes) && totalBytes > 0) {
       const progress = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100))
       return `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)} (${progress}%)`
     }
-    return t('settings.general.update.progressDownloaded', { size: formatBytes(downloadedBytes) })
+    return t('ui.settings.general.update.progressDownloaded', { size: formatBytes(downloadedBytes) })
   }
 
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
@@ -82,19 +83,19 @@ export function GeneralSettingsPanel() {
       const update = await check()
       if (!update) {
         setUpdateStatus('latest')
-        toast.success(t('settings.general.update.toastLatest'))
+        toast.success(t('ui.settings.general.update.toastLatest'))
         return
       }
 
       setPendingUpdate(update)
       setUpdateStatus('available')
-      toast.info(t('settings.general.update.toastFound', { version: update.version }), {
-        description: update.body?.trim() || t('settings.general.update.toastFoundDesc'),
+      toast.info(t('ui.settings.general.update.toastFound', { version: update.version }), {
+        description: update.body?.trim() || t('ui.settings.general.update.toastFoundDesc'),
       })
     } catch (error) {
       setUpdateStatus('error')
-      toast.error(getErrorMessage(error, t('settings.general.update.toastCheckFailed')), {
-        description: getErrorDescription(error, t('settings.general.update.toastCheckFailedDesc')),
+      toast.error(getErrorMessage(error, t('ui.settings.general.update.toastCheckFailed')), {
+        description: getErrorDescription(error, t('ui.settings.general.update.toastCheckFailedDesc')),
       })
     }
   }
@@ -120,67 +121,67 @@ export function GeneralSettingsPanel() {
 
       setUpdateStatus('installed')
       toast.success(
-        t('settings.general.update.toastInstalled', { name: 'ShipyardX', version: pendingUpdate.version }),
+        t('ui.settings.general.update.toastInstalled', { name: 'ShipyardX', version: pendingUpdate.version }),
         {
-          description: t('settings.general.update.toastInstalledDesc'),
+          description: t('ui.settings.general.update.toastInstalledDesc'),
         }
       )
     } catch (error) {
       setUpdateStatus('error')
-      toast.error(getErrorMessage(error, t('settings.general.update.toastInstallFailed')), {
-        description: getErrorDescription(error, t('settings.general.update.toastInstallFailedDesc')),
+      toast.error(getErrorMessage(error, t('ui.settings.general.update.toastInstallFailed')), {
+        description: getErrorDescription(error, t('ui.settings.general.update.toastInstallFailedDesc')),
       })
     }
   }
 
   const updateDescription =
     updateStatus === 'downloading'
-      ? t('settings.general.update.downloadingDesc', { progress: formatProgress(downloadedBytes, totalBytes) })
+      ? t('ui.settings.general.update.downloadingDesc', { progress: formatProgress(downloadedBytes, totalBytes) })
       : updateStatus === 'installed'
-        ? t('settings.general.update.installedDesc')
+        ? t('ui.settings.general.update.installedDesc')
         : updateStatus === 'latest'
-          ? t('settings.general.update.latestDesc')
+          ? t('ui.settings.general.update.latestDesc')
           : pendingUpdate
             ? pendingUpdate.date
-              ? t('settings.general.update.availableDescWithDate', {
+              ? t('ui.settings.general.update.availableDescWithDate', {
                   version: pendingUpdate.version,
                   date: formatDateTimeString(pendingUpdate.date),
                 })
-              : t('settings.general.update.availableDesc', { version: pendingUpdate.version })
-            : t('settings.general.update.description')
+              : t('ui.settings.general.update.availableDesc', { version: pendingUpdate.version })
+            : t('ui.settings.general.update.description')
 
   const updateActionLabel =
     updateStatus === 'checking'
-      ? t('settings.general.update.checking')
+      ? t('ui.settings.general.update.checking')
       : updateStatus === 'downloading'
-        ? t('settings.general.update.downloadingAction')
+        ? t('ui.settings.general.update.downloadingAction')
         : pendingUpdate
-          ? t('settings.general.update.install', { version: pendingUpdate.version })
-          : t('settings.general.update.check')
+          ? t('ui.settings.general.update.install', { version: pendingUpdate.version })
+          : t('ui.settings.general.update.check')
 
   const currentTheme = (theme ?? 'system') as AppearanceTheme
   const themeDescriptionKey =
-    THEME_OPTIONS.find((option) => option.value === currentTheme)?.descKey ?? 'settings.general.theme.systemDesc'
+    THEME_OPTIONS.find((option) => option.value === currentTheme)?.descKey ?? 'ui.settings.general.theme.systemDesc'
   const updateSummary =
     updateStatus === 'checking'
-      ? t('settings.general.version.checking')
+      ? t('ui.settings.general.version.checking')
       : updateStatus === 'downloading'
-        ? t('settings.general.version.downloading')
+        ? t('ui.settings.general.version.downloading')
         : updateStatus === 'installed'
-          ? t('settings.general.version.installed')
+          ? t('ui.settings.general.version.installed')
           : updateStatus === 'available'
-            ? t('settings.general.version.available', { version: pendingUpdate?.version ?? '' }).trim()
+            ? t('ui.settings.general.version.available', { version: pendingUpdate?.version ?? '' }).trim()
             : updateStatus === 'error'
-              ? t('settings.general.version.error')
+              ? t('ui.settings.general.version.error')
               : updateStatus === 'latest'
-                ? t('settings.general.version.latest')
-                : t('settings.general.version.notChecked')
+                ? t('ui.settings.general.version.latest')
+                : t('ui.settings.general.version.notChecked')
 
   return (
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title={t('settings.general.theme.title')}
+          title={t('ui.settings.general.theme.title')}
           description={t(themeDescriptionKey)}
           action={
             <ButtonGroup className="w-full max-w-xs">
@@ -212,20 +213,20 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsActionRow
-          title={t('settings.general.language.title')}
-          description={t('settings.general.language.description')}
+          title={t('ui.settings.general.language.title')}
+          description={t('ui.settings.general.language.description')}
           action={
             <div className="w-full max-w-xs">
               <Select value={settings.language} onValueChange={(value) => updateLanguage(value as LanguageSetting)}>
                 <SelectTrigger className={SETTINGS_CONTROL_CLASSNAME}>
                   <SelectValue>
                     {settings.language === 'system'
-                      ? t('settings.general.language.system')
+                      ? t('ui.settings.general.language.system')
                       : LANGUAGE_LABELS[settings.language]}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="system">{t('settings.general.language.system')}</SelectItem>
+                  <SelectItem value="system">{t('ui.settings.general.language.system')}</SelectItem>
                   {SUPPORTED_LANGUAGES.map((language) => (
                     <SelectItem key={language} value={language}>
                       {LANGUAGE_LABELS[language]}
@@ -238,12 +239,12 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsActionRow
-          title={t('settings.general.version.title')}
+          title={t('ui.settings.general.version.title')}
           description={updateDescription}
           action={
             <div className="w-full max-w-xs text-right">
               <div className="text-sm font-medium text-foreground">
-                {t('settings.general.version.current', { version: currentVersion })}
+                {t('ui.settings.general.version.current', { version: currentVersion })}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">{updateSummary}</div>
             </div>
@@ -251,8 +252,8 @@ export function GeneralSettingsPanel() {
         />
 
         <SettingsActionRow
-          title={t('settings.general.update.title')}
-          description={t('settings.general.update.description')}
+          title={t('ui.settings.general.update.title')}
+          description={t('ui.settings.general.update.description')}
           action={
             <div className="flex w-full max-w-xs justify-end">
               <Button

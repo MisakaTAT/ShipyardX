@@ -23,12 +23,12 @@ export function SettingsResetRow({
 }) {
   const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
-  const buttonLabel = label ?? t('common.restoreDefaults')
+  const buttonLabel = label ?? t('ui.common.restoreDefaults')
 
   return (
     <>
       <SettingsActionRow
-        title={t('settings.reset.title')}
+        title={t('ui.settings.reset.title')}
         description={description}
         action={
           <Button
@@ -46,8 +46,8 @@ export function SettingsResetRow({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={t('settings.reset.confirmTitle')}
-        description={`${confirmDescription ?? description}${t('settings.reset.confirmSuffix')}`}
+        title={t('ui.settings.reset.confirmTitle')}
+        description={`${confirmDescription ?? description}${t('ui.settings.reset.confirmSuffix')}`}
         confirmText={buttonLabel}
         destructive
         onConfirm={onReset}

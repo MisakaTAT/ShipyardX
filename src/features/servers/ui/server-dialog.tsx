@@ -17,6 +17,7 @@ import { Input } from '@/shared/ui/input'
 import { FieldGroup } from '@/shared/ui/field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { toast } from '@/shared/components/toast'
+import { useTranslation } from 'react-i18next'
 import { useSaveServer, useTestServerConnection } from '@/features/servers/api/use-servers'
 
 interface ServerDialogProps {
@@ -30,6 +31,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
   const [showPassword, setShowPassword] = useState(false)
   const isEdit = !!server
   const saveServer = useSaveServer()
+  const { t } = useTranslation()
   const testConnection = useTestServerConnection()
 
   const form = useForm<ServerFormValues>({
@@ -87,8 +89,9 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
       key_path: full.key_path || null,
     }
     testConnection.mutate(testPayload, {
-      onSuccess: (msg) => {
-        toast.success(msg)
+      onSuccess: () => {
+        // 走的是 test_server_connection_direct，只验 SSH 可达，不查 Docker
+        toast.success(t('ui.servers.connectOk'))
       },
     })
   }

@@ -66,7 +66,7 @@ pub async fn restart_docker_daemon(
 pub async fn open_devtools(app: AppHandle) -> AppResult<()> {
     let webview = app
         .get_webview_window("main")
-        .ok_or_else(|| AppError::not_found("app.main_window_missing", "未找到主窗口"))?;
+        .ok_or_else(|| AppError::not_found("app.main_window_missing"))?;
 
     webview.open_devtools();
     Ok(())

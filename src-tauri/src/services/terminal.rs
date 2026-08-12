@@ -50,17 +50,14 @@ pub async fn save_terminal_export(app: &AppHandle, path: String, content: String
     let target = PathBuf::from(path.trim());
     let content_len = content.len();
     if !target.is_absolute() {
-        return Err(AppError::validation(
-            "terminal.export_path_invalid",
-            "导出路径必须是绝对路径",
-        ));
+        return Err(AppError::validation("terminal.export_path_not_absolute"));
     }
 
     let Some(parent) = target.parent() else {
-        return Err(AppError::validation("terminal.export_path_invalid", "导出路径无效"));
+        return Err(AppError::validation("terminal.export_path_invalid"));
     };
     if !fs::try_exists(parent).await.unwrap_or(false) {
-        return Err(AppError::validation("terminal.export_dir_missing", "导出目录不存在"));
+        return Err(AppError::validation("terminal.export_dir_missing"));
     }
 
     let protected = [
@@ -73,25 +70,19 @@ pub async fn save_terminal_export(app: &AppHandle, path: String, content: String
         .flatten()
         .any(|dir| parent == dir || parent.starts_with(dir))
     {
-        return Err(AppError::permission(
-            "terminal.export_path_forbidden",
-            "不能导出到应用数据目录",
-        ));
+        return Err(AppError::permission("terminal.export_path_forbidden"));
     }
 
     // 不跟随符号链接
     if let Ok(metadata) = fs::symlink_metadata(&target).await
         && metadata.file_type().is_symlink()
     {
-        return Err(AppError::permission(
-            "terminal.export_path_forbidden",
-            "不能覆盖符号链接",
-        ));
+        return Err(AppError::permission("terminal.export_path_symlink"));
     }
 
     fs::write(&target, content)
         .await
-        .map_err(|e| AppError::internal("terminal.export_write_failed", "写入终端导出文件失败").with_source(e))?;
+        .map_err(|e| AppError::internal("terminal.export_write_failed").with_source(e))?;
     info!(target: "shipyardx_lib::services::terminal", "terminal export written; path={} bytes={}", target.display(), content_len);
     Ok(())
 }
@@ -108,7 +99,6 @@ fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
     if let Ok(clients) = lock_read(
         &app.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
-        "读取终端 WebSocket 客户端失败",
     ) {
         if let Some(tx) = clients.get(session_id).cloned() {
             let _ = tx.send(frame);
@@ -128,7 +118,6 @@ fn maybe_send_ready(app: &AppHandle, session_id: &str) {
     let should_send = lock_read(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
-        "读取终端握手状态失败",
     )
     .ok()
     .and_then(|handshakes| {
@@ -147,7 +136,6 @@ fn mark_backend_ready(app: &AppHandle, session_id: &str) {
     if let Ok(mut handshakes) = lock_write(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
-        "更新终端握手状态失败",
     ) {
         handshakes
             .entry(session_id.to_string())
@@ -161,7 +149,6 @@ fn mark_client_ready(app: &AppHandle, session_id: &str) {
     if let Ok(mut handshakes) = lock_write(
         &app.state::<AppState>().terminal_handshakes,
         "terminal.handshake_lock_failed",
-        "更新终端握手状态失败",
     ) {
         handshakes
             .entry(session_id.to_string())
@@ -178,7 +165,7 @@ fn fail_terminal(app: &AppHandle, session_id: &str, error: impl Into<AppError>) 
         "terminal session failed; session_id={} code={} message={} detail={:?}",
         session_id,
         error.code,
-        error.message,
+        error,
         error.detail
     );
     send_control(app, session_id, WsServerMsg::Error { error });
@@ -226,16 +213,16 @@ async fn run_terminal_thread(
     let channel = handle
         .channel_open_session()
         .await
-        .map_err(|e| AppError::internal("terminal.channel_open_failed", "终端通道创建失败").with_source(e))?;
+        .map_err(|e| AppError::internal("terminal.channel_open_failed").with_source(e))?;
 
     channel
         .request_pty(true, "xterm-256color", cols, rows, 0, 0, &[])
         .await
-        .map_err(|e| AppError::internal("terminal.pty_request_failed", "请求终端 PTY 失败").with_source(e))?;
+        .map_err(|e| AppError::internal("terminal.pty_request_failed").with_source(e))?;
     channel
         .request_shell(true)
         .await
-        .map_err(|e| AppError::internal("terminal.shell_start_failed", "启动远程 Shell 失败").with_source(e))?;
+        .map_err(|e| AppError::internal("terminal.shell_start_failed").with_source(e))?;
 
     mark_backend_ready(&ah, &session_id);
     run_terminal_io_loop(session_id.clone(), rx, ah, &mut handle, channel, cols, rows).await;
@@ -273,10 +260,7 @@ async fn run_container_exec_thread(ctx: ContainerExecThreadCtx) -> AppResult<()>
     } = ctx;
 
     if !is_safe_docker_ident(&container_id) {
-        return Err(AppError::validation(
-            "terminal.container_id_invalid",
-            "容器 ID/名称包含非法字符",
-        ));
+        return Err(AppError::validation("terminal.container_id_invalid"));
     }
 
     info!(
@@ -408,7 +392,7 @@ async fn run_docker_exec_io_loop(
                     &ah,
                     &session_id,
                     WsServerMsg::Error {
-                        error: AppError::unavailable("terminal.exec_write_failed", "写入容器终端失败")
+                        error: AppError::unavailable("terminal.exec_write_failed")
                             .with_detail(error.to_string())
                             .retryable(true),
                     },
@@ -455,7 +439,7 @@ async fn run_docker_exec_io_loop(
                             &ah,
                             &session_id,
                             WsServerMsg::Error {
-                                error: AppError::unavailable("terminal.exec_read_failed", "读取容器终端失败")
+                                error: AppError::unavailable("terminal.exec_read_failed")
                                     .with_detail(error.to_string())
                                     .retryable(true),
                             },
@@ -532,11 +516,7 @@ async fn run_terminal_io_loop(
 
 fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
     let app_state = ah.state::<AppState>();
-    if let Ok(terminals) = lock_read(
-        &app_state.terminals,
-        "terminal.sessions_lock_failed",
-        "读取终端会话失败",
-    ) {
+    if let Ok(terminals) = lock_read(&app_state.terminals, "terminal.sessions_lock_failed") {
         if let Some(handle) = terminals.get(session_id) {
             let _ = handle.tx.send(msg);
         }
@@ -546,21 +526,13 @@ fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
 fn remove_terminal_session(ah: &AppHandle, session_id: &str) -> Option<TerminalHandle> {
     let app_state = ah.state::<AppState>();
 
-    if let Ok(mut handshakes) = lock_write(
-        &app_state.terminal_handshakes,
-        "terminal.handshake_lock_failed",
-        "移除终端握手状态失败",
-    ) {
+    if let Ok(mut handshakes) = lock_write(&app_state.terminal_handshakes, "terminal.handshake_lock_failed") {
         handshakes.remove(session_id);
     }
 
-    lock_write(
-        &app_state.terminals,
-        "terminal.sessions_lock_failed",
-        "移除终端会话失败",
-    )
-    .ok()
-    .and_then(|mut terminals| terminals.remove(session_id))
+    lock_write(&app_state.terminals, "terminal.sessions_lock_failed")
+        .ok()
+        .and_then(|mut terminals| terminals.remove(session_id))
 }
 
 fn handle_client_frame(ah: &AppHandle, session_id: &str, frame: &[u8]) {
@@ -632,13 +604,9 @@ fn is_allowed_ws_origin(origin: Option<&str>) -> bool {
 }
 
 fn session_exists(ah: &AppHandle, session_id: &str) -> bool {
-    lock_read(
-        &ah.state::<AppState>().terminals,
-        "terminal.sessions_lock_failed",
-        "读取终端会话失败",
-    )
-    .map(|terminals| terminals.contains_key(session_id))
-    .unwrap_or(false)
+    lock_read(&ah.state::<AppState>().terminals, "terminal.sessions_lock_failed")
+        .map(|terminals| terminals.contains_key(session_id))
+        .unwrap_or(false)
 }
 
 async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
@@ -697,7 +665,6 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     let registered = match lock_write(
         &ah.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
-        "记录终端 WebSocket 客户端失败",
     ) {
         // 已有客户端时拒绝，不让后来者顶掉终端
         Ok(mut clients) if !clients.contains_key(&session_id) => {
@@ -747,7 +714,6 @@ async fn run_ws_client(stream: tokio::net::TcpStream, ah: AppHandle) {
     if let Ok(mut clients) = lock_write(
         &ah.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
-        "移除终端 WebSocket 客户端失败",
     ) {
         clients.remove(&session_id);
     }
@@ -773,10 +739,10 @@ async fn start_terminal_ws_server_once(app_handle: AppHandle) -> AppResult<()> {
 
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
-        .map_err(|e| AppError::internal("terminal.ws_bind_failed", "启动终端 WebSocket 服务失败").with_source(e))?;
+        .map_err(|e| AppError::internal("terminal.ws_bind_failed").with_source(e))?;
     let port = listener
         .local_addr()
-        .map_err(|e| AppError::internal("terminal.ws_addr_failed", "读取终端 WebSocket 地址失败").with_source(e))?
+        .map_err(|e| AppError::internal("terminal.ws_addr_failed").with_source(e))?
         .port();
     info!(
         target: "shipyardx_lib::services::terminal",
@@ -804,7 +770,7 @@ fn terminal_ws_port() -> AppResult<u16> {
     WS_PORT
         .get()
         .copied()
-        .ok_or_else(|| AppError::internal("terminal.ws_not_initialized", "终端 WebSocket 服务尚未初始化"))
+        .ok_or_else(|| AppError::internal("terminal.ws_not_initialized"))
 }
 
 pub async fn open_terminal(
@@ -820,14 +786,9 @@ pub async fn open_terminal(
     let session_id = generate_id();
     let (tx, rx) = tokio_mpsc::unbounded_channel::<TerminalMsg>();
 
-    lock_write(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
-        .insert(session_id.clone(), TerminalHandle { tx });
-    lock_write(
-        &state.terminal_handshakes,
-        "terminal.handshake_lock_failed",
-        "记录终端握手状态失败",
-    )?
-    .insert(session_id.clone(), TerminalHandshakeState::default());
+    lock_write(&state.terminals, "terminal.sessions_lock_failed")?.insert(session_id.clone(), TerminalHandle { tx });
+    lock_write(&state.terminal_handshakes, "terminal.handshake_lock_failed")?
+        .insert(session_id.clone(), TerminalHandshakeState::default());
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
@@ -838,14 +799,10 @@ pub async fn open_terminal(
             fail_terminal(&fail_handle, &fail_session_id, error);
         }
     }) {
-        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed")
             .map(|mut terminals| terminals.remove(&session_id));
-        let _ = lock_write(
-            &state.terminal_handshakes,
-            "terminal.handshake_lock_failed",
-            "移除终端握手状态失败",
-        )
-        .map(|mut handshakes| handshakes.remove(&session_id));
+        let _ = lock_write(&state.terminal_handshakes, "terminal.handshake_lock_failed")
+            .map(|mut handshakes| handshakes.remove(&session_id));
         return Err(error);
     }
     info!(
@@ -875,14 +832,9 @@ pub async fn open_container_exec_terminal(
 
     let sid = session_id.clone();
     let ah = app_handle.clone();
-    lock_write(&state.terminals, "terminal.sessions_lock_failed", "记录终端会话失败")?
-        .insert(session_id.clone(), TerminalHandle { tx });
-    lock_write(
-        &state.terminal_handshakes,
-        "terminal.handshake_lock_failed",
-        "记录终端握手状态失败",
-    )?
-    .insert(session_id.clone(), TerminalHandshakeState::default());
+    lock_write(&state.terminals, "terminal.sessions_lock_failed")?.insert(session_id.clone(), TerminalHandle { tx });
+    lock_write(&state.terminal_handshakes, "terminal.handshake_lock_failed")?
+        .insert(session_id.clone(), TerminalHandshakeState::default());
 
     if let Err(error) = spawn_on_runtime(async move {
         let fail_session_id = sid.clone();
@@ -903,14 +855,10 @@ pub async fn open_container_exec_terminal(
             fail_terminal(&fail_handle, &fail_session_id, error);
         }
     }) {
-        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed", "移除终端会话失败")
+        let _ = lock_write(&state.terminals, "terminal.sessions_lock_failed")
             .map(|mut terminals| terminals.remove(&session_id));
-        let _ = lock_write(
-            &state.terminal_handshakes,
-            "terminal.handshake_lock_failed",
-            "移除终端握手状态失败",
-        )
-        .map(|mut handshakes| handshakes.remove(&session_id));
+        let _ = lock_write(&state.terminal_handshakes, "terminal.handshake_lock_failed")
+            .map(|mut handshakes| handshakes.remove(&session_id));
         return Err(error);
     }
     info!(
@@ -925,14 +873,10 @@ pub async fn open_container_exec_terminal(
 }
 
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let mut terminals = lock_write(&state.terminals, "terminal.sessions_lock_failed", "关闭终端会话失败")?;
+    let mut terminals = lock_write(&state.terminals, "terminal.sessions_lock_failed")?;
     if let Some(handle) = terminals.remove(&session_id) {
         let _ = handle.tx.send(TerminalMsg::Close);
-        if let Ok(mut handshakes) = lock_write(
-            &state.terminal_handshakes,
-            "terminal.handshake_lock_failed",
-            "移除终端握手状态失败",
-        ) {
+        if let Ok(mut handshakes) = lock_write(&state.terminal_handshakes, "terminal.handshake_lock_failed") {
             handshakes.remove(&session_id);
         }
         info!(

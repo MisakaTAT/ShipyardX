@@ -19,7 +19,7 @@ import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { commands, type AppError } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
 import { timeouts } from '@/shared/config/timeouts'
-import { normalizeAppError } from '@/shared/lib/errors'
+import { resolveAppError, type ResolvedAppError } from '@/shared/lib/errors'
 import { matchHotkey } from '@/shared/lib/hotkeys'
 import { Input } from '@/shared/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
@@ -82,14 +82,14 @@ type TransportCallbacks = {
   onClose: () => void
 }
 
-function normalizeTerminalError(error: unknown): AppError | null {
-  const normalized = normalizeAppError(error, '')
-  const message = normalized.message.trim()
-  const detail = normalized.detail?.trim()
-  const action = normalized.action?.trim()
+function normalizeTerminalError(error: unknown): ResolvedAppError | null {
+  const resolved = resolveAppError(error, '')
+  const message = resolved.message.trim()
+  const detail = resolved.detail?.trim()
+  const action = resolved.action?.trim()
   if (!message && !detail && !action) return null
   return {
-    ...normalized,
+    ...resolved,
     message,
     detail: detail || null,
     action: action || null,
@@ -228,7 +228,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
   const mountAliveRef = useRef(true)
   const serverEpochRef = useRef(0)
   const [phase, setPhase] = useState<ConnectionPhase>('disconnected')
-  const [terminalError, setTerminalError] = useState<AppError | null>(null)
+  const [terminalError, setTerminalError] = useState<ResolvedAppError | null>(null)
   const [wasEverConnected, setWasEverConnected] = useState(false)
   const [errorDetailsExpanded, setErrorDetailsExpanded] = useState(false)
   const [overlayMounted, setOverlayMounted] = useState(true)
@@ -463,7 +463,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
       if (opts.updateUi && mountAliveRef.current) {
         if (opts.reason === 'error') {
           setPhase('error')
-          setTerminalError(opts.error ?? null)
+          setTerminalError(opts.error ? resolveAppError(opts.error) : null)
           setWasEverConnected(true)
         } else {
           setPhase('disconnected')

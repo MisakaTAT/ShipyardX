@@ -1,212 +1,1009 @@
 {
-  "common": {
-    "restoreDefaults": "Restore defaults",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "opening": "Opening…",
-    "open": "Open",
-    "loading": "Loading…",
-    "noMatch": "No matches",
-    "placeholder": "—"
-  },
-  "settings": {
-    "nav": {
-      "general": "General",
-      "appstore": "App store",
-      "hotkeys": "Hotkeys",
-      "terminal": "Terminal",
-      "debug": "Debug",
-      "about": "About"
-    },
-    "reset": {
-      "title": "Restore defaults",
-      "confirmTitle": "Restore default settings?",
-      "confirmSuffix": ". This can't be undone."
-    },
-    "general": {
-      "theme": {
-        "title": "Theme",
-        "light": "Light",
-        "dark": "Dark",
-        "system": "System",
-        "lightDesc": "Always use the light interface",
-        "darkDesc": "Always use the dark interface",
-        "systemDesc": "Follow the system appearance"
-      },
-      "language": {
-        "title": "Language",
-        "description": "Choose the interface language",
-        "system": "System"
-      },
-      "version": {
-        "title": "Version",
-        "current": "Version {{version}}",
-        "notChecked": "Not checked yet",
-        "checking": "Checking for updates",
-        "downloading": "Downloading update",
-        "installed": "Restart pending",
-        "available": "Update {{version}} available",
-        "error": "Update check failed",
-        "latest": "Up to date"
-      },
-      "update": {
-        "title": "Check for updates",
-        "description": "Check for and install the latest version",
-        "check": "Check for updates",
-        "checking": "Checking…",
-        "downloadingAction": "Downloading…",
-        "install": "Install {{version}}",
-        "progressPreparing": "Preparing download…",
-        "progressDownloaded": "Downloaded {{size}}",
-        "downloadingDesc": "Downloading the update, {{progress}}",
-        "installedDesc": "The update is ready. Restart the app to apply it",
-        "latestDesc": "You're on the latest version",
-        "availableDesc": "Update {{version}} available",
-        "availableDescWithDate": "Update {{version}} available, released {{date}}",
-        "toastLatest": "You're on the latest version",
-        "toastFound": "Update {{version}} available",
-        "toastFoundDesc": "You can download and install it now",
-        "toastCheckFailed": "Update check failed",
-        "toastCheckFailedDesc": "Make sure the updater is configured, then try again",
-        "toastInstalled": "{{name}} {{version}} installed",
-        "toastInstalledDesc": "The update is installed. Restart the app to use the new version",
-        "toastInstallFailed": "Update install failed",
-        "toastInstallFailedDesc": "Something went wrong during install. Try again later"
-      }
-    },
+  "backend": {
     "appstore": {
-      "sources": {
-        "title": "Sources",
-        "description": "Maintain the list of available repositories, then pick the active one on the store page",
-        "namePlaceholder": "Repository name",
-        "add": "Add source",
-        "delete": "Delete source"
+      "unnamed_source": "Unnamed source"
+    },
+    "errors": {
+      "app": {
+        "main_window_missing": {
+          "message": "Main window not found"
+        }
       },
-      "proxy": {
-        "enableTitle": "Use proxy",
-        "enableDesc": "Route app store syncing through the global proxy",
-        "urlTitle": "Proxy address",
-        "urlDesc": "Accepts an HTTP proxy address, e.g. http://127.0.0.1:7890"
+      "appstore": {
+        "app_key_invalid": {
+          "message": "The app identifier contains invalid characters: {{value}}"
+        },
+        "app_not_found": {
+          "message": "App {{app}} not found"
+        },
+        "apps_dir_entry_failed": {
+          "message": "Couldn't read an entry in the apps directory"
+        },
+        "apps_dir_entry_type_failed": {
+          "message": "Couldn't read the type of an apps directory entry"
+        },
+        "apps_dir_read_failed": {
+          "message": "Couldn't read the apps directory"
+        },
+        "cache_clear_failed": {
+          "message": "Couldn't clear the app store cache"
+        },
+        "cache_clear_join_failed": {
+          "message": "Couldn't clear the app store cache"
+        },
+        "cache_dir_name_invalid": {
+          "message": "Invalid app store cache directory name"
+        },
+        "cache_entry_failed": {
+          "message": "Couldn't read an entry in the app store cache directory"
+        },
+        "cache_info_join_failed": {
+          "message": "Couldn't read the app store cache info"
+        },
+        "cache_parent_missing": {
+          "message": "Couldn't locate the parent of the app store cache directory"
+        },
+        "cache_read_failed": {
+          "message": "Couldn't read the app store cache directory"
+        },
+        "cache_recover_rename_failed": {
+          "action": "Close any program using that directory, then try again",
+          "message": "Couldn't clean up an unfinished app store cache"
+        },
+        "cache_stat_failed": {
+          "message": "Couldn't read the app store cache info"
+        },
+        "cache_state_join_failed": {
+          "message": "Couldn't check the app store cache state"
+        },
+        "compose_render_invalid": {
+          "action": "Check whether any value you entered contains quotes, colons or other characters that break YAML",
+          "message": "The rendered docker-compose.yml isn't valid YAML"
+        },
+        "compose_template_read_failed": {
+          "message": "Couldn't read the deployment template"
+        },
+        "compose_up_failed": {
+          "message": "The containers failed to start"
+        },
+        "data_dir_entry_failed": {
+          "message": "Couldn't read an entry in the data directory"
+        },
+        "data_dir_read_failed": {
+          "message": "Couldn't read the data directory"
+        },
+        "data_dir_stat_failed": {
+          "message": "Couldn't read the data directory info"
+        },
+        "data_dir_unavailable": {
+          "message": "Couldn't locate the app data directory"
+        },
+        "env_key_invalid": {
+          "action": "Names may only contain letters, digits and underscores, and can't start with a digit",
+          "message": "Invalid environment variable name: {{key}}"
+        },
+        "env_value_invalid": {
+          "action": "Remove line breaks and control characters from the value",
+          "message": "The value of {{key}} contains invalid characters"
+        },
+        "manifest_not_found": {
+          "message": "No data.yml for app {{app}}"
+        },
+        "manifest_parse_failed": {
+          "message": "Couldn't parse data.yml"
+        },
+        "manifest_read_failed": {
+          "message": "Couldn't read data.yml"
+        },
+        "no_enabled_source": {
+          "message": "No app store source is enabled"
+        },
+        "settings_parse_failed": {
+          "message": "Couldn't parse the app store settings"
+        },
+        "settings_read_failed": {
+          "message": "Couldn't read the app store settings"
+        },
+        "settings_serialize_failed": {
+          "message": "Couldn't serialize the app store settings"
+        },
+        "settings_write_join_failed": {
+          "message": "Couldn't write the app store settings"
+        },
+        "source_missing": {
+          "message": "No app store sources configured"
+        },
+        "source_not_found": {
+          "message": "App store source not found: {{source_id}}"
+        },
+        "sync_failed": {
+          "message": "Couldn't sync the app store"
+        },
+        "sync_join_failed": {
+          "message": "The app store sync task failed"
+        },
+        "version_invalid": {
+          "message": "The version contains invalid characters: {{value}}"
+        },
+        "version_not_found": {
+          "message": "No docker-compose.yml for {{app}} version {{version}}"
+        }
       },
-      "cache": {
-        "dirTitle": "Cache directory",
-        "dirDesc": "Where store repositories and metadata are cached locally",
-        "sizeTitle": "Cache size",
-        "sizeDesc": "Space currently used by the local cache",
-        "clearTitle": "Clear cache",
-        "clearDesc": "Delete the local cache; it will be fetched again next visit",
-        "clear": "Clear cache",
-        "clearing": "Clearing…"
+      "base64": {
+        "decode": {
+          "message": "Couldn't decode Base64 data"
+        }
       },
-      "resetDesc": "Restore sources and proxy settings to their initial values",
-      "toast": {
-        "saved": "App store settings saved",
-        "saveFailed": "Couldn't save app store settings",
-        "sourceEnabled": "Source enabled",
-        "sourceDisabled": "Source disabled",
-        "sourceRemoved": "Source deleted",
-        "keepOneEnabled": "Keep at least one source enabled",
-        "keepOneSource": "Keep at least one source",
-        "reset": "App store settings restored to defaults",
-        "cacheCleared": "App store cache cleared",
-        "cacheClearFailed": "Couldn't clear the app store cache"
+      "config": {
+        "base64_decode_failed": {
+          "message": "Couldn't decode the saved credentials"
+        },
+        "cipher_decrypt_init_failed": {
+          "message": "Couldn't initialize the decrypter"
+        },
+        "cipher_encrypt_init_failed": {
+          "message": "Couldn't initialize the encrypter"
+        },
+        "data_dir_create_failed": {
+          "message": "Couldn't create the config directory"
+        },
+        "data_dir_unavailable": {
+          "message": "Couldn't locate the app data directory"
+        },
+        "decrypt_failed": {
+          "message": "Couldn't decrypt the server password"
+        },
+        "encrypt_failed": {
+          "message": "Couldn't encrypt the server password"
+        },
+        "encrypted_data_invalid": {
+          "message": "The saved credentials are malformed"
+        },
+        "file_replace_failed": {
+          "message": "Couldn't replace the config file"
+        },
+        "keyring_access_failed": {
+          "action": "Make sure a keychain service is available. On Linux this needs a Secret Service implementation such as gnome-keyring or KWallet",
+          "message": "Couldn't access the system keychain"
+        },
+        "keyring_read_failed": {
+          "action": "Make sure a keychain service is available. On Linux this needs a Secret Service implementation such as gnome-keyring or KWallet",
+          "message": "Couldn't read from the system keychain"
+        },
+        "keyring_write_failed": {
+          "action": "Make sure a keychain service is available. On Linux this needs a Secret Service implementation such as gnome-keyring or KWallet",
+          "message": "Couldn't write to the system keychain"
+        },
+        "master_key_invalid": {
+          "action": "Delete the “{{account}}” entry from your keychain, then try again",
+          "message": "The master key in the keychain is malformed"
+        },
+        "password_utf8_invalid": {
+          "message": "The decrypted password data is invalid"
+        },
+        "server_serialize_failed": {
+          "message": "Couldn't serialize the server config"
+        },
+        "server_write_failed": {
+          "message": "Couldn't write the server config"
+        },
+        "tempfile_create_failed": {
+          "message": "Couldn't create a temporary config file"
+        },
+        "tempfile_sync_failed": {
+          "message": "Couldn't flush the temporary config file"
+        },
+        "tempfile_write_failed": {
+          "message": "Couldn't write the temporary config file"
+        }
+      },
+      "container": {
+        "stats_empty": {
+          "message": "No container stats available"
+        }
+      },
+      "daemon": {
+        "serialize_failed": {
+          "message": "Couldn't serialize the Docker daemon config"
+        }
+      },
+      "docker": {
+        "api_client_error": {
+          "message": "Invalid Docker API request (HTTP {{status}})"
+        },
+        "api_request_failed": {
+          "message": "The Docker API request failed (HTTP {{status}})"
+        },
+        "api_server_error": {
+          "message": "Docker is temporarily unavailable (HTTP {{status}})"
+        },
+        "api_version_cache_lock_failed": {
+          "message": "Couldn't update the Docker API version cache"
+        },
+        "connect_failed": {
+          "message": "Couldn't connect to Docker"
+        },
+        "endpoint_cache_lock_failed": {
+          "message": "Couldn't update the Docker endpoint cache"
+        },
+        "events_start_failed": {
+          "message": "Couldn't start the Docker event stream"
+        },
+        "hijack_closed": {
+          "message": "The Docker hijack connection closed"
+        },
+        "hijack_error_timeout": {
+          "message": "Timed out reading the Docker error response"
+        },
+        "hijack_head_too_large": {
+          "message": "The Docker hijack response header is too large"
+        },
+        "hijack_status_invalid": {
+          "message": "Couldn't parse the Docker hijack status"
+        },
+        "hijack_timeout": {
+          "message": "Timed out waiting for the Docker hijack response"
+        },
+        "host_unsupported": {
+          "message": "Unsupported Docker host: {{raw}}"
+        },
+        "http_handshake_failed": {
+          "message": "Couldn't establish the Docker HTTP connection"
+        },
+        "http_pool_lock_failed": {
+          "message": "Couldn't update the Docker HTTP connection pool"
+        },
+        "permission_denied": {
+          "message": "No permission to access the Docker socket at {{path}}"
+        },
+        "pooled_connection_missing": {
+          "message": "Docker HTTP connection pool is in a bad state: connection missing"
+        },
+        "request_encode_failed": {
+          "message": "Couldn't serialize the Docker request body"
+        },
+        "request_failed": {
+          "message": "The Docker request failed"
+        },
+        "request_send_failed": {
+          "message": "Couldn't send the Docker HTTP request"
+        },
+        "request_timeout": {
+          "message": "The Docker request timed out"
+        },
+        "response_format_failed": {
+          "message": "Couldn't format the JSON response"
+        },
+        "response_read_failed": {
+          "message": "Couldn't read the Docker HTTP response"
+        },
+        "socket_open_failed": {
+          "message": "Couldn't open the Docker socket channel"
+        },
+        "socket_path_empty": {
+          "message": "The Docker Unix socket path can't be empty"
+        },
+        "stream_error": {
+          "message": "The Docker streaming request failed"
+        },
+        "tcp_host_invalid": {
+          "message": "Invalid Docker TCP host: {{raw}}"
+        },
+        "tcp_open_failed": {
+          "message": "Couldn't open the Docker TCP channel"
+        },
+        "tcp_port_invalid": {
+          "message": "Invalid Docker TCP port: {{raw}}"
+        },
+        "tcp_unreachable": {
+          "message": "Docker TCP host unreachable: {{host}}:{{port}}"
+        },
+        "unavailable": {
+          "message": "Docker isn't installed, isn't running, or {{path}} is unavailable"
+        },
+        "version_missing": {
+          "message": "Docker didn't return an API version"
+        }
+      },
+      "docker_events": {
+        "status_lock_failed": {
+          "message": "Couldn't read the event stream state"
+        },
+        "streams_lock_failed": {
+          "message": "Couldn't read the event stream state"
+        }
+      },
+      "image": {
+        "export_dir_invalid": {
+          "message": "The selected path isn't a folder"
+        },
+        "export_dir_missing": {
+          "message": "The selected directory doesn't exist"
+        },
+        "export_exists": {
+          "action": "Pick a different export file name",
+          "message": "That file already exists"
+        },
+        "export_file_name_invalid": {
+          "action": "The name can't be empty or contain path separators",
+          "message": "Invalid file name"
+        },
+        "export_flush_failed": {
+          "message": "Couldn't save the exported image file"
+        },
+        "export_open_failed": {
+          "message": "Couldn't create the image export file"
+        },
+        "export_permission_denied": {
+          "message": "No permission to write to the selected directory"
+        },
+        "export_write_failed": {
+          "message": "Couldn't write the image export file"
+        },
+        "import_file_denied": {
+          "message": "No permission to read the selected image file"
+        },
+        "import_file_invalid": {
+          "message": "The selected path isn't a file"
+        },
+        "import_file_missing": {
+          "message": "The selected image file doesn't exist"
+        },
+        "import_open_failed": {
+          "message": "Couldn't open the image file"
+        },
+        "import_stat_failed": {
+          "message": "Couldn't read the image file info"
+        },
+        "pull_cancelled": {
+          "message": "Image pull cancelled"
+        },
+        "pull_event_parse_failed": {
+          "message": "Couldn't parse the image pull progress"
+        },
+        "pull_failed": {
+          "message": "Image pull failed"
+        },
+        "pull_streams_lock_failed": {
+          "message": "Couldn't record the image pull state"
+        }
+      },
+      "io": {
+        "error": {
+          "message": "Local file operation failed"
+        }
+      },
+      "log_stream": {
+        "start_lock_failed": {
+          "message": "Couldn't record the log stream state"
+        },
+        "stop_lock_failed": {
+          "message": "Couldn't stop the log stream"
+        }
+      },
+      "port_forward": {
+        "bind_address_invalid": {
+          "action": "Pick one from the local address list, or enter 127.0.0.1",
+          "message": "The bind address must be an IP literal: {{bind_addr}}"
+        },
+        "bind_address_multicast": {
+          "message": "The bind address can't be a multicast address"
+        },
+        "config_dir_create_failed": {
+          "message": "Couldn't create the port forwarding config directory"
+        },
+        "connect_failed": {
+          "message": "SSH connection failed"
+        },
+        "data_file_lock_failed": {
+          "message": "Couldn't read the port forwarding config path"
+        },
+        "interfaces_list_failed": {
+          "message": "Couldn't read the local network interfaces"
+        },
+        "local_addr_read_failed": {
+          "message": "Couldn't read the local port"
+        },
+        "local_port_conflict": {
+          "message": "Local port {{port}} is already used by another rule"
+        },
+        "local_port_unavailable": {
+          "message": "The local port is in use or can't be bound"
+        },
+        "local_socket_config_failed": {
+          "message": "Couldn't configure the local socket"
+        },
+        "local_socket_takeover_failed": {
+          "message": "Couldn't take over the local connection"
+        },
+        "not_found": {
+          "message": "Port forwarding rule not found"
+        },
+        "read_failed": {
+          "message": "Couldn't read port forwarding data"
+        },
+        "remote_unreachable": {
+          "message": "The target port is unreachable"
+        },
+        "rule_disabled": {
+          "message": "This rule is disabled"
+        },
+        "rules_parse_failed": {
+          "message": "Couldn't parse port_forwards.json"
+        },
+        "rules_serialize_failed": {
+          "message": "Couldn't serialize the port forwarding config"
+        },
+        "rules_write_failed": {
+          "message": "Couldn't write port_forwards.json"
+        },
+        "runtime_lock_failed": {
+          "message": "Couldn't update the port forwarding runtime state"
+        },
+        "shutdown_failed": {
+          "message": "Couldn't close the port forwarding writer"
+        },
+        "write_failed": {
+          "message": "Couldn't write port forwarding data"
+        }
+      },
+      "serde": {
+        "json": {
+          "message": "Couldn't process JSON"
+        },
+        "yaml": {
+          "message": "Couldn't process YAML"
+        }
+      },
+      "server": {
+        "not_found": {
+          "message": "Server not found"
+        }
+      },
+      "servers": {
+        "add_lock_failed": {
+          "message": "Couldn't write the server list"
+        },
+        "data_file_lock_failed": {
+          "message": "Couldn't read the server config path"
+        },
+        "delete_lock_failed": {
+          "message": "Couldn't write the server list"
+        },
+        "list_lock_failed": {
+          "message": "Couldn't read the server list"
+        },
+        "store_lock_failed": {
+          "message": "Couldn't update the server config"
+        },
+        "update_lock_failed": {
+          "message": "Couldn't write the server list"
+        }
+      },
+      "sftp": {
+        "channel_open_failed": {
+          "message": "Couldn't open an SFTP session"
+        },
+        "create_file_failed": {
+          "message": "Couldn't create the remote file {{path}}"
+        },
+        "local_dir_entry_failed": {
+          "message": "Couldn't read a local directory entry"
+        },
+        "local_dir_read_failed": {
+          "message": "Couldn't read the local directory"
+        },
+        "local_file_open_failed": {
+          "message": "Couldn't open the local file"
+        },
+        "local_file_read_failed": {
+          "message": "Couldn't read the local file"
+        },
+        "local_metadata_failed": {
+          "message": "Couldn't read the local file info"
+        },
+        "mkdir_failed": {
+          "message": "Couldn't create the remote directory {{path}}"
+        },
+        "remote_path_conflict": {
+          "message": "{{path}} already exists and is not a directory"
+        },
+        "resolve_home_failed": {
+          "message": "Couldn't resolve the remote home directory"
+        },
+        "session_init_failed": {
+          "message": "Couldn't initialize the SFTP session"
+        },
+        "shutdown_failed": {
+          "message": "Couldn't close the remote file"
+        },
+        "stat_failed": {
+          "message": "Couldn't inspect the remote directory"
+        },
+        "subsystem_request_failed": {
+          "message": "Couldn't start the SFTP subsystem"
+        },
+        "write_failed": {
+          "message": "Couldn't write to the remote file"
+        }
+      },
+      "ssh": {
+        "address_invalid": {
+          "message": "Invalid address or port"
+        },
+        "auth_incomplete": {
+          "action": "Check the username, password or key configuration",
+          "message": "Authentication didn't complete"
+        },
+        "auth_method_unsupported": {
+          "action": "Switch to a method the server accepts",
+          "message": "Authentication method not supported"
+        },
+        "auth_type_invalid": {
+          "message": "Unsupported authentication type: {{authType}}"
+        },
+        "channel_open_failed": {
+          "message": "Couldn't open an SSH channel"
+        },
+        "command_failed": {
+          "message": "The remote command failed"
+        },
+        "config_invalid": {
+          "message": "Invalid configuration"
+        },
+        "connect_failed": {
+          "message": "Couldn't connect"
+        },
+        "connect_timeout": {
+          "action": "Check that the host is reachable and review security group or firewall rules",
+          "message": "Timed out connecting to {{host}}:{{port}}"
+        },
+        "connection_interrupted": {
+          "action": "Check your network, then try again",
+          "message": "The connection was interrupted"
+        },
+        "connection_lost": {
+          "action": "Check your network, then try again",
+          "message": "The connection timed out"
+        },
+        "connection_refused": {
+          "action": "Make sure the SSH service is running and the port is correct",
+          "message": "The server refused the connection"
+        },
+        "disconnected": {
+          "message": "The remote end closed the connection"
+        },
+        "exec_failed": {
+          "message": "Couldn't run the remote command"
+        },
+        "handshake_failed": {
+          "action": "Check the SSH server configuration and protocol compatibility",
+          "message": "Handshake failed"
+        },
+        "host_key_changed": {
+          "action": "This could be a man-in-the-middle attack. Confirm the server really rotated its key before trusting it again",
+          "message": "The host key for {{host}}:{{port}} has changed"
+        },
+        "host_key_probe_failed": {
+          "message": "Couldn't read the server host key"
+        },
+        "host_key_unknown": {
+          "action": "Verify the server fingerprint before trusting it",
+          "message": "The host key for {{host}}:{{port}} isn't trusted yet"
+        },
+        "host_key_verification_failed": {
+          "action": "Make sure you're connecting to the right server and check whether the host key changed",
+          "message": "Host identity verification failed"
+        },
+        "key_not_found": {
+          "message": "Key file missing or unreadable: {{path}}"
+        },
+        "key_parse_failed": {
+          "action": "Check the private key format, or pick a different key file",
+          "message": "Couldn't parse the key"
+        },
+        "key_read_failed": {
+          "message": "Couldn't read the private key"
+        },
+        "known_hosts_parse_failed": {
+          "message": "Couldn't parse the trusted host keys"
+        },
+        "known_hosts_serialize_failed": {
+          "message": "Couldn't serialize the trusted host keys"
+        },
+        "known_hosts_uninitialized": {
+          "message": "The host key store isn't initialized yet"
+        },
+        "no_common_algo": {
+          "action": "Adjust the algorithms supported by the SSH server or client, then try again",
+          "message": "No compatible algorithm"
+        },
+        "not_authenticated": {
+          "action": "Check the username, password or key configuration",
+          "message": "Not authenticated yet"
+        },
+        "password_auth_failed": {
+          "message": "Password authentication failed"
+        },
+        "pool_handle_missing": {
+          "message": "SSH connection pool is in a bad state: handle missing"
+        },
+        "public_key_auth_failed": {
+          "message": "Key authentication failed"
+        },
+        "rsa_probe_failed": {
+          "message": "Couldn't probe RSA signature algorithms"
+        },
+        "runtime_init_failed": {
+          "message": "Couldn't initialize the SSH runtime"
+        },
+        "stdin_close_failed": {
+          "message": "Couldn't close the remote command's input"
+        },
+        "stdin_write_failed": {
+          "message": "Couldn't write to the remote command's input"
+        }
+      },
+      "state": {
+        "servers_lock_failed": {
+          "message": "Couldn't read the server list"
+        }
+      },
+      "system": {
+        "fonts_list_failed": {
+          "message": "Couldn't read the system fonts"
+        },
+        "restart_failed": {
+          "message": "Couldn't restart the Docker service"
+        },
+        "service_manager_missing": {
+          "action": "None of systemctl, rc-service or service is available. Restart Docker manually on the server",
+          "message": "No service manager detected"
+        },
+        "service_operation_failed": {
+          "action": "Check the service name and the current user's permissions",
+          "message": "The service manager couldn't run docker restart"
+        },
+        "service_restart_failed": {
+          "action": "This may be a permission, unit name or service state issue. If systemctl restart docker.service works on the host, add a sudo password to the connection",
+          "message": "systemctl couldn't restart docker"
+        },
+        "su_password_invalid": {
+          "action": "Enter the root password again",
+          "message": "Wrong root password"
+        },
+        "sudo_password_invalid": {
+          "action": "Enter the sudo password again",
+          "message": "Wrong sudo password"
+        },
+        "sudo_password_required": {
+          "action": "Add a sudo password to the server connection, or configure NOPASSWD for this user in sudoers",
+          "message": "Can't run sudo non-interactively"
+        },
+        "sudo_unavailable": {
+          "action": "Use root or an account with sudo access",
+          "message": "The current user isn't root and sudo isn't available"
+        }
+      },
+      "task": {
+        "join": {
+          "message": "A background task failed"
+        }
+      },
+      "terminal": {
+        "channel_open_failed": {
+          "message": "Couldn't open the terminal channel"
+        },
+        "container_id_invalid": {
+          "message": "The container ID or name contains invalid characters"
+        },
+        "exec_read_failed": {
+          "message": "Couldn't read from the container terminal"
+        },
+        "exec_write_failed": {
+          "message": "Couldn't write to the container terminal"
+        },
+        "export_dir_missing": {
+          "message": "The export directory doesn't exist"
+        },
+        "export_path_forbidden": {
+          "message": "Can't export into the app data directory"
+        },
+        "export_path_invalid": {
+          "message": "Invalid export path"
+        },
+        "export_path_not_absolute": {
+          "message": "The export path must be absolute"
+        },
+        "export_path_symlink": {
+          "message": "Can't overwrite a symbolic link"
+        },
+        "export_write_failed": {
+          "message": "Couldn't write the terminal export file"
+        },
+        "handshake_lock_failed": {
+          "message": "Couldn't clear the terminal handshake state"
+        },
+        "pty_request_failed": {
+          "message": "Couldn't request a terminal PTY"
+        },
+        "sessions_lock_failed": {
+          "message": "Couldn't close the terminal session"
+        },
+        "shell_start_failed": {
+          "message": "Couldn't start the remote shell"
+        },
+        "ws_addr_failed": {
+          "message": "Couldn't read the terminal WebSocket address"
+        },
+        "ws_bind_failed": {
+          "message": "Couldn't start the terminal WebSocket server"
+        },
+        "ws_clients_lock_failed": {
+          "message": "Couldn't remove the terminal WebSocket client"
+        },
+        "ws_not_initialized": {
+          "message": "The terminal WebSocket server isn't initialized yet"
+        }
+      },
+      "unknown": {
+        "message": "Something went wrong"
       }
     },
-    "hotkeys": {
-      "commandPalette": {
-        "title": "Command palette",
-        "description": "Search servers, forwarding rules and host keys, or run a command"
-      },
-      "terminalSearch": {
-        "title": "Terminal search",
-        "description": "Show the in-terminal search bar and focus the input"
-      },
-      "recording": "Press a shortcut…",
-      "unset": "Not set",
-      "resetDesc": "Restore all shortcuts to their original combinations",
-      "toast": {
-        "updated": "Shortcut changed to {{hotkey}}",
-        "reset": "Shortcuts restored to defaults"
-      }
+    "image_pull": {
+      "cancelled": "Pull cancelled",
+      "cancelled_detail": "You cancelled this image pull",
+      "docker_connect_failed": "Couldn't connect to the Docker API",
+      "done": "Pull complete",
+      "done_detail": "The image is ready",
+      "failed": "Pull failed",
+      "preparing": "Preparing to pull"
     },
-    "terminal": {
-      "frontend": {
-        "title": "Renderer",
-        "description": "Switch the terminal rendering path"
-      },
-      "ligatures": {
-        "title": "Ligatures",
-        "description": "Render ligatures for programming fonts that provide them"
-      },
-      "theme": {
-        "title": "Color scheme",
-        "description": "Switch the terminal color scheme",
-        "searchPlaceholder": "Search schemes"
-      },
-      "scrollback": {
-        "title": "Scrollback",
-        "description": "Number of lines kept in the buffer"
-      },
-      "fontFamily": {
-        "title": "Font",
-        "description": "Set the monospace font used by the terminal",
-        "searchPlaceholder": "Search fonts"
-      },
-      "fontSize": {
-        "title": "Font size",
-        "description": "Control how large terminal characters appear"
-      },
-      "cursorStyle": {
-        "title": "Cursor shape",
-        "description": "Set the shape of the terminal cursor",
-        "block": "Block",
-        "underline": "Underline",
-        "bar": "Bar"
-      },
-      "cursorBlink": {
-        "title": "Cursor blink",
-        "description": "Turn the cursor blinking animation on or off"
-      },
-      "lineHeight": {
-        "title": "Line height",
-        "description": "Adjust line height, which affects overall vertical density"
-      },
-      "resetDesc": "Restore every terminal option to its initial value",
-      "toast": {
-        "reset": "Terminal settings restored to defaults"
-      }
+    "install": {
+      "compose_upload_failed": "Couldn't upload docker-compose.yml",
+      "data_copy_done": "Data directory copied, {{total}} total",
+      "data_copy_done_unknown": "Data directory copied",
+      "data_copy_failed": "Couldn't copy the data",
+      "data_copy_progress": "Uploaded {{transferred}} / {{total}} ({{percent}}%)",
+      "data_copy_progress_unknown": "Uploaded {{transferred}}",
+      "data_copy_running": "Copying the data directory…",
+      "deploy_done": "Files deployed",
+      "deploy_running": "Deploying files to the remote server…",
+      "env_upload_failed": "Couldn't upload .env",
+      "env_validate_failed": "Variable validation failed",
+      "network_done": "Docker network ready",
+      "network_running": "Creating the Docker network…",
+      "prepare_done": "Deployment template ready",
+      "prepare_running": "Preparing the deployment template…",
+      "remote_mkdir_failed": "Couldn't create the remote directory",
+      "sftp_connect_failed": "Couldn't establish the SFTP connection",
+      "start_done": "Containers started",
+      "start_failed": "The containers failed to start",
+      "start_running": "Starting the containers…",
+      "template_read_failed": "Couldn't read the template",
+      "template_render_failed": "Couldn't render the template"
     },
-    "debug": {
-      "devtools": {
-        "title": "Developer tools",
-        "description": "Open DevTools for the current main window",
-        "action": "Open DevTools",
-        "toastOpened": "DevTools opened",
-        "toastFailed": "Couldn't open DevTools"
-      },
-      "logs": {
-        "title": "Log directory",
-        "description": "Open the directory where app logs are written",
-        "action": "Open log directory",
-        "toastOpened": "Log directory opened",
-        "toastFailed": "Couldn't open the log directory"
-      }
+    "port_forward": {
+      "all_interfaces": "All interfaces (0.0.0.0)"
+    }
+  },
+  "ui": {
+    "appstore": {
+      "syncDone": "Sync complete"
     },
-    "about": {
-      "description": "A desktop Docker management client built with Tauri. Runs on Windows, macOS and Linux with a consistent local and remote container workflow.",
-      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
-      "releaseNotes": "Release notes",
-      "releaseNotesDesc": "See the latest release history",
-      "website": "Website",
-      "websiteDesc": "Go to the project home page",
-      "feedback": "Feedback",
-      "feedbackDesc": "File an issue or suggest a feature",
-      "sourceCode": "Source code",
-      "sourceCodeDesc": "Browse the project repository",
-      "contributors": "Contributors",
-      "contributorsDesc": "See who contributed to the project",
-      "toastMetadataFailed": "Couldn't read app information",
-      "toastOpenLinkFailed": "Couldn't open the link"
+    "common": {
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "loading": "Loading…",
+      "noMatch": "No matches",
+      "open": "Open",
+      "opening": "Opening…",
+      "placeholder": "—",
+      "restoreDefaults": "Restore defaults"
+    },
+    "servers": {
+      "connectOk": "Connected to the server",
+      "testFailed": "Connection test failed"
+    },
+    "settings": {
+      "about": {
+        "contributors": "Contributors",
+        "contributorsDesc": "See who contributed to the project",
+        "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+        "description": "A desktop Docker management client built with Tauri. Runs on Windows, macOS and Linux with a consistent local and remote container workflow.",
+        "feedback": "Feedback",
+        "feedbackDesc": "File an issue or suggest a feature",
+        "releaseNotes": "Release notes",
+        "releaseNotesDesc": "See the latest release history",
+        "sourceCode": "Source code",
+        "sourceCodeDesc": "Browse the project repository",
+        "toastMetadataFailed": "Couldn't read app information",
+        "toastOpenLinkFailed": "Couldn't open the link",
+        "website": "Website",
+        "websiteDesc": "Go to the project home page"
+      },
+      "appstore": {
+        "cache": {
+          "clear": "Clear cache",
+          "clearDesc": "Delete the local cache; it will be fetched again next visit",
+          "clearTitle": "Clear cache",
+          "clearing": "Clearing…",
+          "dirDesc": "Where store repositories and metadata are cached locally",
+          "dirTitle": "Cache directory",
+          "sizeDesc": "Space currently used by the local cache",
+          "sizeTitle": "Cache size"
+        },
+        "proxy": {
+          "enableDesc": "Route app store syncing through the global proxy",
+          "enableTitle": "Use proxy",
+          "urlDesc": "Accepts an HTTP proxy address, e.g. http://127.0.0.1:7890",
+          "urlTitle": "Proxy address"
+        },
+        "resetDesc": "Restore sources and proxy settings to their initial values",
+        "sources": {
+          "add": "Add source",
+          "delete": "Delete source",
+          "description": "Maintain the list of available repositories, then pick the active one on the store page",
+          "namePlaceholder": "Repository name",
+          "title": "Sources"
+        },
+        "toast": {
+          "cacheClearFailed": "Couldn't clear the app store cache",
+          "cacheCleared": "App store cache cleared",
+          "keepOneEnabled": "Keep at least one source enabled",
+          "keepOneSource": "Keep at least one source",
+          "reset": "App store settings restored to defaults",
+          "saveFailed": "Couldn't save app store settings",
+          "saved": "App store settings saved",
+          "sourceDisabled": "Source disabled",
+          "sourceEnabled": "Source enabled",
+          "sourceRemoved": "Source deleted"
+        }
+      },
+      "debug": {
+        "devtools": {
+          "action": "Open DevTools",
+          "description": "Open DevTools for the current main window",
+          "title": "Developer tools",
+          "toastFailed": "Couldn't open DevTools",
+          "toastOpened": "DevTools opened"
+        },
+        "logs": {
+          "action": "Open log directory",
+          "description": "Open the directory where app logs are written",
+          "title": "Log directory",
+          "toastFailed": "Couldn't open the log directory",
+          "toastOpened": "Log directory opened"
+        }
+      },
+      "general": {
+        "language": {
+          "description": "Choose the interface language",
+          "system": "System",
+          "title": "Language"
+        },
+        "theme": {
+          "dark": "Dark",
+          "darkDesc": "Always use the dark interface",
+          "light": "Light",
+          "lightDesc": "Always use the light interface",
+          "system": "System",
+          "systemDesc": "Follow the system appearance",
+          "title": "Theme"
+        },
+        "update": {
+          "availableDesc": "Update {{version}} available",
+          "availableDescWithDate": "Update {{version}} available, released {{date}}",
+          "check": "Check for updates",
+          "checking": "Checking…",
+          "description": "Check for and install the latest version",
+          "downloadingAction": "Downloading…",
+          "downloadingDesc": "Downloading the update, {{progress}}",
+          "install": "Install {{version}}",
+          "installedDesc": "The update is ready. Restart the app to apply it",
+          "latestDesc": "You're on the latest version",
+          "progressDownloaded": "Downloaded {{size}}",
+          "progressPreparing": "Preparing download…",
+          "title": "Check for updates",
+          "toastCheckFailed": "Update check failed",
+          "toastCheckFailedDesc": "Make sure the updater is configured, then try again",
+          "toastFound": "Update {{version}} available",
+          "toastFoundDesc": "You can download and install it now",
+          "toastInstallFailed": "Update install failed",
+          "toastInstallFailedDesc": "Something went wrong during install. Try again later",
+          "toastInstalled": "{{name}} {{version}} installed",
+          "toastInstalledDesc": "The update is installed. Restart the app to use the new version",
+          "toastLatest": "You're on the latest version"
+        },
+        "version": {
+          "available": "Update {{version}} available",
+          "checking": "Checking for updates",
+          "current": "Version {{version}}",
+          "downloading": "Downloading update",
+          "error": "Update check failed",
+          "installed": "Restart pending",
+          "latest": "Up to date",
+          "notChecked": "Not checked yet",
+          "title": "Version"
+        }
+      },
+      "hotkeys": {
+        "commandPalette": {
+          "description": "Search servers, forwarding rules and host keys, or run a command",
+          "title": "Command palette"
+        },
+        "recording": "Press a shortcut…",
+        "resetDesc": "Restore all shortcuts to their original combinations",
+        "terminalSearch": {
+          "description": "Show the in-terminal search bar and focus the input",
+          "title": "Terminal search"
+        },
+        "toast": {
+          "reset": "Shortcuts restored to defaults",
+          "updated": "Shortcut changed to {{hotkey}}"
+        },
+        "unset": "Not set"
+      },
+      "nav": {
+        "about": "About",
+        "appstore": "App store",
+        "debug": "Debug",
+        "general": "General",
+        "hotkeys": "Hotkeys",
+        "terminal": "Terminal"
+      },
+      "reset": {
+        "confirmSuffix": ". This can't be undone.",
+        "confirmTitle": "Restore default settings?",
+        "title": "Restore defaults"
+      },
+      "terminal": {
+        "cursorBlink": {
+          "description": "Turn the cursor blinking animation on or off",
+          "title": "Cursor blink"
+        },
+        "cursorStyle": {
+          "bar": "Bar",
+          "block": "Block",
+          "description": "Set the shape of the terminal cursor",
+          "title": "Cursor shape",
+          "underline": "Underline"
+        },
+        "fontFamily": {
+          "description": "Set the monospace font used by the terminal",
+          "searchPlaceholder": "Search fonts",
+          "title": "Font"
+        },
+        "fontSize": {
+          "description": "Control how large terminal characters appear",
+          "title": "Font size"
+        },
+        "frontend": {
+          "description": "Switch the terminal rendering path",
+          "title": "Renderer"
+        },
+        "ligatures": {
+          "description": "Render ligatures for programming fonts that provide them",
+          "title": "Ligatures"
+        },
+        "lineHeight": {
+          "description": "Adjust line height, which affects overall vertical density",
+          "title": "Line height"
+        },
+        "resetDesc": "Restore every terminal option to its initial value",
+        "scrollback": {
+          "description": "Number of lines kept in the buffer",
+          "title": "Scrollback"
+        },
+        "theme": {
+          "description": "Switch the terminal color scheme",
+          "searchPlaceholder": "Search schemes",
+          "title": "Color scheme"
+        },
+        "toast": {
+          "reset": "Terminal settings restored to defaults"
+        }
+      }
     }
   }
 }

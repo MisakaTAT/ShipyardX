@@ -110,7 +110,9 @@ pub struct ImageImportProgress {
 pub struct InstallStepEvent {
     pub step: String,
     pub status: String,
-    pub message: String,
+    /// 词条 key（install.<name>），文案与插值由前端决定
+    pub message_code: String,
+    pub params: std::collections::BTreeMap<String, String>,
     pub output_chunk: Option<String>,
 }
 

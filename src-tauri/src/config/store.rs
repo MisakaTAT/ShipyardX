@@ -18,10 +18,9 @@ const KEYRING_ACCOUNT: &str = "ShipyardX Safe Storage";
 
 static MASTER_KEY: OnceLock<[u8; 32]> = OnceLock::new();
 
-fn keyring_error(action: &str, error: keyring::Error) -> AppError {
-    AppError::internal("config.keyring_unavailable", format!("{action}失败"))
-        .with_detail(error.to_string())
-        .with_action("请确认系统钥匙串服务可用（Linux 需要 gnome-keyring、KWallet 等 Secret Service 实现）")
+/// 钥匙串的读/写/访问各自成 code：原先把中文动词拼进文案，无法翻译。
+fn keyring_error(code: &'static str, error: keyring::Error) -> AppError {
+    AppError::internal(code).with_detail(error.to_string())
 }
 
 fn decode_key(encoded: &str) -> Option<[u8; 32]> {
@@ -39,22 +38,20 @@ fn master_key() -> AppResult<[u8; 32]> {
         return Ok(*key);
     }
 
-    let entry =
-        keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT).map_err(|e| keyring_error("访问系统钥匙串", e))?;
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| keyring_error("config.keyring_access_failed", e))?;
     let key = match entry.get_password() {
-        Ok(encoded) => decode_key(&encoded).ok_or_else(|| {
-            AppError::internal("config.master_key_invalid", "钥匙串中的主密钥格式无效")
-                .with_action(format!("请在钥匙串中删除「{KEYRING_ACCOUNT}」条目后重试"))
-        })?,
+        Ok(encoded) => decode_key(&encoded)
+            .ok_or_else(|| AppError::internal("config.master_key_invalid").param("account", KEYRING_ACCOUNT))?,
         Err(keyring::Error::NoEntry) => {
             let key = generate_key();
             entry
                 .set_password(&BASE64.encode(key))
-                .map_err(|e| keyring_error("写入系统钥匙串", e))?;
+                .map_err(|e| keyring_error("config.keyring_write_failed", e))?;
             info!(target: "shipyardx_lib::config::store", "created master key in system keyring");
             key
         }
-        Err(error) => return Err(keyring_error("读取系统钥匙串", error)),
+        Err(error) => return Err(keyring_error("config.keyring_read_failed", error)),
     };
 
     let _ = MASTER_KEY.set(key);
@@ -63,11 +60,11 @@ fn master_key() -> AppResult<[u8; 32]> {
 
 fn encrypt(key: &[u8; 32], plaintext: &str) -> AppResult<String> {
     let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| AppError::internal("config.cipher_init_failed", "初始化加密器失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.cipher_encrypt_init_failed").with_source(e))?;
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let ciphertext = cipher
         .encrypt(&nonce, plaintext.as_bytes())
-        .map_err(|e| AppError::internal("config.encrypt_failed", "加密服务器密码失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.encrypt_failed").with_source(e))?;
     let mut buf = nonce.to_vec();
     buf.extend_from_slice(&ciphertext);
     Ok(BASE64.encode(&buf))
@@ -76,31 +73,27 @@ fn encrypt(key: &[u8; 32], plaintext: &str) -> AppResult<String> {
 fn decrypt(key: &[u8; 32], encoded: &str) -> AppResult<String> {
     let data = BASE64
         .decode(encoded)
-        .map_err(|e| AppError::internal("config.base64_decode_failed", "解码已保存凭据失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.base64_decode_failed").with_source(e))?;
     if data.len() < 12 {
-        return Err(AppError::internal(
-            "config.encrypted_data_invalid",
-            "已保存凭据格式无效",
-        ));
+        return Err(AppError::internal("config.encrypted_data_invalid"));
     }
     let (nonce_bytes, ciphertext) = data.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| AppError::internal("config.cipher_init_failed", "初始化解密器失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.cipher_decrypt_init_failed").with_source(e))?;
     let nonce = Nonce::from_slice(nonce_bytes);
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|e| AppError::internal("config.decrypt_failed", "解密服务器密码失败").with_source(e))?;
-    String::from_utf8(plaintext)
-        .map_err(|e| AppError::internal("config.password_utf8_invalid", "解密后的密码数据无效").with_source(e))
+        .map_err(|e| AppError::internal("config.decrypt_failed").with_source(e))?;
+    String::from_utf8(plaintext).map_err(|e| AppError::internal("config.password_utf8_invalid").with_source(e))
 }
 
 pub fn get_data_file(app: &AppHandle) -> AppResult<std::path::PathBuf> {
     let data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| AppError::internal("config.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
+        .map_err(|e| AppError::internal("config.data_dir_unavailable").with_source(e))?;
     std::fs::create_dir_all(&data_dir)
-        .map_err(|e| AppError::internal("config.data_dir_create_failed", "创建配置目录失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.data_dir_create_failed").with_source(e))?;
     Ok(data_dir.join("servers.json"))
 }
 
@@ -110,19 +103,18 @@ pub fn data_dir_from_file(data_file: &Path) -> PathBuf {
 
 pub fn atomic_write(path: &Path, contents: &[u8]) -> AppResult<()> {
     let dir = data_dir_from_file(path);
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| AppError::internal("config.data_dir_create_failed", "创建配置目录失败").with_source(e))?;
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::internal("config.data_dir_create_failed").with_source(e))?;
 
-    let mut temp = NamedTempFile::new_in(&dir)
-        .map_err(|e| AppError::internal("config.tempfile_create_failed", "创建临时配置文件失败").with_source(e))?;
+    let mut temp =
+        NamedTempFile::new_in(&dir).map_err(|e| AppError::internal("config.tempfile_create_failed").with_source(e))?;
     use std::io::Write;
     temp.write_all(contents)
-        .map_err(|e| AppError::internal("config.tempfile_write_failed", "写入临时配置文件失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.tempfile_write_failed").with_source(e))?;
     temp.as_file_mut()
         .sync_all()
-        .map_err(|e| AppError::internal("config.tempfile_sync_failed", "同步临时配置文件失败").with_source(e))?;
+        .map_err(|e| AppError::internal("config.tempfile_sync_failed").with_source(e))?;
     temp.persist(path)
-        .map_err(|e| AppError::internal("config.file_replace_failed", "替换配置文件失败").with_source(e.error))?;
+        .map_err(|e| AppError::internal("config.file_replace_failed").with_source(e.error))?;
 
     if let Ok(dir_file) = std::fs::File::open(&dir) {
         let _ = dir_file.sync_all();
@@ -140,7 +132,7 @@ pub fn load_servers(path: &Path) -> Vec<ServerConfig> {
     let key = match master_key() {
         Ok(key) => Some(key),
         Err(error) => {
-            warn!(target: "shipyardx_lib::config::store", "master key unavailable, saved passwords stay unreadable; message={}", error.message);
+            warn!(target: "shipyardx_lib::config::store", "master key unavailable, saved passwords stay unreadable; error={}", error);
             None
         }
     };
@@ -181,9 +173,7 @@ pub fn save_servers(path: &Path, servers: &[ServerConfig]) -> AppResult<()> {
         .collect::<AppResult<Vec<_>>>()?;
 
     let json = serde_json::to_string_pretty(&sanitized)
-        .map_err(|e| AppError::internal("config.server_serialize_failed", "序列化服务器配置失败").with_source(e))?;
-    atomic_write(path, json.as_bytes()).map_err(|e| {
-        AppError::internal("config.server_write_failed", "写入服务器配置失败")
-            .with_detail(e.detail.unwrap_or(e.message))
-    })
+        .map_err(|e| AppError::internal("config.server_serialize_failed").with_source(e))?;
+    atomic_write(path, json.as_bytes())
+        .map_err(|e| AppError::internal("config.server_write_failed").with_detail(e.detail.unwrap_or(e.code)))
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { CheckCircle2, Circle, Globe, Loader2, Stone, XCircle } from 'lucide-react'
 import { useAppDetail, useInstallApp } from '@/features/appstore/api/use-appstore'
+import { translateStep } from '@/features/appstore/model/install-step'
 import { FormFieldLabel, FormFieldRow } from '@/shared/components/form-field'
 import { StandardDialog } from '@/shared/components/standard-dialog'
 import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
@@ -300,8 +301,10 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
                     <Circle className="size-3.5 shrink-0" />
                   )}
                   <span>{label}</span>
-                  {step?.message && !hasOutput && (
-                    <span className="ml-auto max-w-50 truncate text-[11px]">{step.message}</span>
+                  {step?.message_code && !hasOutput && (
+                    <span className="ml-auto max-w-50 truncate text-[11px]">
+                      {translateStep(step.message_code, step.params)}
+                    </span>
                   )}
                 </div>
                 {/* 实时输出日志 */}

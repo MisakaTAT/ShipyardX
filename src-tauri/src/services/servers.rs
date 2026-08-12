@@ -1,9 +1,7 @@
 use tauri::State;
 
-use bollard::models::SystemVersion;
 use log::info;
 
-use crate::docker::client::map_bollard_error;
 use crate::dto::server::{HostKeyPrompt, KnownHostEntry, ServerConfig};
 use crate::error::AppResult;
 use crate::services::{server_store, support::ServerContext};
@@ -66,25 +64,16 @@ pub async fn probe_host_key(host: String, port: u16) -> AppResult<String> {
     client::probe_host_key(&host, port).await
 }
 
-pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
-    let ctx = ServerContext::from_state(&state, &server_id)?;
-    test_connection_with_context(ctx).await
-}
-
-pub async fn test_server_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
+pub async fn test_server_connection(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     let ctx = ServerContext::from_state(&state, &server_id)?;
     test_server_connection_with_context(ctx).await
 }
 
-pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
-    test_connection_with_context(ServerContext::from_server(server)).await
-}
-
-pub async fn test_server_connection_direct(server: ServerConfig) -> AppResult<String> {
+pub async fn test_server_connection_direct(server: ServerConfig) -> AppResult<()> {
     test_server_connection_with_context(ServerContext::from_server(server)).await
 }
 
-async fn test_server_connection_with_context(ctx: ServerContext) -> AppResult<String> {
+async fn test_server_connection_with_context(ctx: ServerContext) -> AppResult<()> {
     info!(
         target: "shipyardx_lib::services::servers",
         "testing ssh connection; server_id={} host={} port={}",
@@ -99,17 +88,5 @@ async fn test_server_connection_with_context(ctx: ServerContext) -> AppResult<St
         "ssh connection succeeded; server_id={}",
         ctx.server_id()
     );
-    Ok("服务器连接成功".to_string())
-}
-
-async fn test_connection_with_context(ctx: ServerContext) -> AppResult<String> {
-    info!(target: "shipyardx_lib::services::servers", "testing server connection; server_id={} host={} port={}", ctx.server().id, ctx.server().host, ctx.server().port);
-    let version: SystemVersion = ctx.docker().await?.version().await.map_err(map_bollard_error)?;
-    let display = if version.version.as_deref().unwrap_or_default().trim().is_empty() {
-        version.api_version.unwrap_or_default()
-    } else {
-        version.version.unwrap_or_default()
-    };
-    info!(target: "shipyardx_lib::services::servers", "server connection succeeded; server_id={}", ctx.server_id());
-    Ok(format!("连接成功！Docker {}", display.trim()))
+    Ok(())
 }

@@ -17,10 +17,10 @@ export function DebugSettingsPanel() {
     setPendingAction('devtools')
     try {
       await invoke('open_devtools')
-      toast.success(t('settings.debug.devtools.toastOpened'))
+      toast.success(t('ui.settings.debug.devtools.toastOpened'))
     } catch (error) {
-      toast.error(getErrorMessage(error, t('settings.debug.devtools.toastFailed')), {
-        description: getErrorDescription(error, t('settings.debug.devtools.toastFailed')),
+      toast.error(getErrorMessage(error, t('ui.settings.debug.devtools.toastFailed')), {
+        description: getErrorDescription(error, t('ui.settings.debug.devtools.toastFailed')),
       })
     } finally {
       setPendingAction(null)
@@ -32,12 +32,12 @@ export function DebugSettingsPanel() {
     try {
       const logDir = await appLogDir()
       await openPath(logDir)
-      toast.success(t('settings.debug.logs.toastOpened'), {
+      toast.success(t('ui.settings.debug.logs.toastOpened'), {
         description: logDir,
       })
     } catch (error) {
-      toast.error(getErrorMessage(error, t('settings.debug.logs.toastFailed')), {
-        description: getErrorDescription(error, t('settings.debug.logs.toastFailed')),
+      toast.error(getErrorMessage(error, t('ui.settings.debug.logs.toastFailed')), {
+        description: getErrorDescription(error, t('ui.settings.debug.logs.toastFailed')),
       })
     } finally {
       setPendingAction(null)
@@ -48,8 +48,8 @@ export function DebugSettingsPanel() {
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title={t('settings.debug.devtools.title')}
-          description={t('settings.debug.devtools.description')}
+          title={t('ui.settings.debug.devtools.title')}
+          description={t('ui.settings.debug.devtools.description')}
           action={
             <Button
               variant="outline"
@@ -58,14 +58,16 @@ export function DebugSettingsPanel() {
               disabled={pendingAction !== null}
             >
               <Bug className="size-4" />
-              <span>{pendingAction === 'devtools' ? t('common.opening') : t('settings.debug.devtools.action')}</span>
+              <span>
+                {pendingAction === 'devtools' ? t('ui.common.opening') : t('ui.settings.debug.devtools.action')}
+              </span>
             </Button>
           }
         />
 
         <SettingsActionRow
-          title={t('settings.debug.logs.title')}
-          description={t('settings.debug.logs.description')}
+          title={t('ui.settings.debug.logs.title')}
+          description={t('ui.settings.debug.logs.description')}
           action={
             <Button
               variant="outline"
@@ -74,7 +76,7 @@ export function DebugSettingsPanel() {
               disabled={pendingAction !== null}
             >
               <FolderOpen className="size-4" />
-              <span>{pendingAction === 'logs' ? t('common.opening') : t('settings.debug.logs.action')}</span>
+              <span>{pendingAction === 'logs' ? t('ui.common.opening') : t('ui.settings.debug.logs.action')}</span>
             </Button>
           }
         />

@@ -12,50 +12,31 @@ use super::bridge::{error_message, normalize_host};
 use super::metrics::runtime_state_to_port_forward;
 
 pub(super) fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<PortForwardRule>> {
-    let data_file = lock_mutex(
-        &state.data_file,
-        "port_forward.data_file_lock_failed",
-        "读取端口转发配置路径失败",
-    )?
-    .clone();
+    let data_file = lock_mutex(&state.data_file, "port_forward.data_file_lock_failed")?.clone();
     let path = crate::config::store::data_dir_from_file(&data_file).join("port_forwards.json");
     let rules_raw = std::fs::read_to_string(&path).unwrap_or_default();
     if rules_raw.trim().is_empty() {
         return Ok(vec![]);
     }
-    serde_json::from_str::<Vec<PortForwardRule>>(&rules_raw).map_err(|e| {
-        AppError::internal("port_forward.rules_parse_failed", "解析 port_forwards.json 失败").with_source(e)
-    })
+    serde_json::from_str::<Vec<PortForwardRule>>(&rules_raw)
+        .map_err(|e| AppError::internal("port_forward.rules_parse_failed").with_source(e))
 }
 
 pub(super) fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwardRule]) -> AppResult<()> {
-    let data_file = lock_mutex(
-        &state.data_file,
-        "port_forward.data_file_lock_failed",
-        "读取端口转发配置路径失败",
-    )?
-    .clone();
+    let data_file = lock_mutex(&state.data_file, "port_forward.data_file_lock_failed")?.clone();
     let dir = crate::config::store::data_dir_from_file(&data_file);
-    std::fs::create_dir_all(&dir).map_err(|e| {
-        AppError::internal("port_forward.config_dir_create_failed", "创建端口转发配置目录失败").with_source(e)
-    })?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| AppError::internal("port_forward.config_dir_create_failed").with_source(e))?;
     let path = dir.join("port_forwards.json");
-    let json = serde_json::to_string_pretty(rules).map_err(|e| {
-        AppError::internal("port_forward.rules_serialize_failed", "序列化端口转发配置失败").with_source(e)
-    })?;
-    crate::config::store::atomic_write(&path, json.as_bytes()).map_err(|e| {
-        AppError::internal("port_forward.rules_write_failed", "写入 port_forwards.json 失败")
-            .with_detail(e.detail.unwrap_or(e.message))
-    })
+    let json = serde_json::to_string_pretty(rules)
+        .map_err(|e| AppError::internal("port_forward.rules_serialize_failed").with_source(e))?;
+    crate::config::store::atomic_write(&path, json.as_bytes())
+        .map_err(|e| AppError::internal("port_forward.rules_write_failed").with_detail(e.detail.unwrap_or(e.code)))
 }
 
 pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let mut runtime = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "读取端口转发运行时状态失败",
-    )?;
+    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
 
     Ok(rules
         .into_iter()
@@ -75,18 +56,11 @@ pub(super) fn resolve_bind_address(raw: Option<&str>) -> AppResult<String> {
     if bind_addr.is_empty() {
         return Ok(PORT_FORWARD_BIND_IP.to_string());
     }
-    let parsed = bind_addr.parse::<IpAddr>().map_err(|_| {
-        AppError::validation(
-            "port_forward.bind_address_invalid",
-            format!("绑定地址必须是 IP 字面量：{bind_addr}"),
-        )
-        .with_action("请从本机地址列表中选择，或填写 127.0.0.1")
-    })?;
+    let parsed = bind_addr
+        .parse::<IpAddr>()
+        .map_err(|_| AppError::validation("port_forward.bind_address_invalid").param("bind_addr", bind_addr))?;
     if parsed.is_multicast() {
-        return Err(AppError::validation(
-            "port_forward.bind_address_invalid",
-            "绑定地址不能是组播地址",
-        ));
+        return Err(AppError::validation("port_forward.bind_address_multicast"));
     }
     if !parsed.is_loopback() {
         // 非回环地址会把远端服务暴露到局域网
@@ -115,15 +89,11 @@ pub async fn create_port_forward_rule(
             .iter()
             .any(|rule| rule.local_port == params.local_port && rule.bind_address == bind_addr)
         {
-            return Err(AppError::conflict(
-                "port_forward.local_port_conflict",
-                format!("本地端口 {} 已被其他规则占用", params.local_port),
-            ));
+            return Err(AppError::conflict("port_forward.local_port_conflict").param("port", params.local_port));
         }
 
-        let listener = TcpListener::bind((bind_addr.as_str(), params.local_port)).map_err(|e| {
-            AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
-        })?;
+        let listener = TcpListener::bind((bind_addr.as_str(), params.local_port))
+            .map_err(|e| AppError::conflict("port_forward.local_port_unavailable").with_source(e))?;
         drop(listener);
     }
 
@@ -170,13 +140,7 @@ pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_
 }
 
 pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if let Some(handle) = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "更新端口转发运行时状态失败",
-    )?
-    .remove(&id)
-    {
+    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id) {
         if let Some(runtime) = handle.handle {
             let _ = runtime.stop_tx.send(true);
         }
@@ -191,11 +155,7 @@ pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppR
 
 pub async fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = load_port_forward_rules_from_state(&state)?;
-    let mut runtime = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "读取端口转发运行时状态失败",
-    )?;
+    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
 
     Ok(rules
         .into_iter()
@@ -209,11 +169,7 @@ pub async fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec
 }
 
 pub(super) fn set_runtime_error(state: &State<'_, AppState>, id: &str, error: Option<String>) {
-    if let Ok(mut runtime) = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "更新端口转发运行时状态失败",
-    ) {
+    if let Ok(mut runtime) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed") {
         runtime
             .entry(id.to_string())
             .or_insert_with(PortForwardRuntimeState::default)

@@ -23,7 +23,7 @@ import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@
 import { Input } from '@/shared/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 import { Textarea } from '@/shared/ui/textarea'
-import { isPermissionRelatedError, normalizeAppError, toastAppError } from '@/shared/lib/errors'
+import { isPermissionRelatedError, resolveAppError, toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
 
 interface Props {
@@ -86,7 +86,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     try {
       await restartDaemon.mutateAsync(password ?? null)
 
-      let lastError: ReturnType<typeof normalizeAppError> | null = null
+      let lastError: ReturnType<typeof resolveAppError> | null = null
       let recovered = false
       for (let i = 0; i < 20; i += 1) {
         try {
@@ -94,7 +94,7 @@ export default function DockerManagePanel({ serverId }: Props) {
           recovered = true
           break
         } catch (e) {
-          lastError = normalizeAppError(e, 'Docker 尚未恢复连接')
+          lastError = resolveAppError(e)
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }
       }

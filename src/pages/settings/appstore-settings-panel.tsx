@@ -81,10 +81,10 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
         lastSyncedHashRef.current = fingerprint(normalized)
         onSavedChange(normalized)
         if (!options?.silent) {
-          toast.success(options?.successMessage ?? t('settings.appstore.toast.saved'))
+          toast.success(options?.successMessage ?? t('ui.settings.appstore.toast.saved'))
         }
       } catch (error) {
-        toast.error(getErrorMessage(error, t('settings.appstore.toast.saveFailed')), {
+        toast.error(getErrorMessage(error, t('ui.settings.appstore.toast.saveFailed')), {
           description: getErrorDescription(error),
         })
       }
@@ -126,7 +126,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
   const handleToggleSourceEnabled = async (sourceId: string, enabled: boolean) => {
     const enabledCount = draft.sources.filter((source) => source.enabled).length
     if (!enabled && enabledCount <= 1) {
-      toast.error(t('settings.appstore.toast.keepOneEnabled'))
+      toast.error(t('ui.settings.appstore.toast.keepOneEnabled'))
       return
     }
 
@@ -137,14 +137,14 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
     setDraft(next)
     await persistSettings(next, {
       successMessage: enabled
-        ? t('settings.appstore.toast.sourceEnabled')
-        : t('settings.appstore.toast.sourceDisabled'),
+        ? t('ui.settings.appstore.toast.sourceEnabled')
+        : t('ui.settings.appstore.toast.sourceDisabled'),
     })
   }
 
   const handleRemoveSource = async (sourceId: string) => {
     if (draft.sources.length <= 1) {
-      toast.error(t('settings.appstore.toast.keepOneSource'))
+      toast.error(t('ui.settings.appstore.toast.keepOneSource'))
       return
     }
 
@@ -158,7 +158,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
       sources: nextSources,
     }
     setDraft(next)
-    await persistSettings(next, { successMessage: t('settings.appstore.toast.sourceRemoved') })
+    await persistSettings(next, { successMessage: t('ui.settings.appstore.toast.sourceRemoved') })
   }
 
   const handleReset = async () => {
@@ -168,16 +168,16 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
       proxyUrl: 'http://127.0.0.1:7890',
     }
     setDraft(next)
-    await persistSettings(next, { successMessage: t('settings.appstore.toast.reset') })
+    await persistSettings(next, { successMessage: t('ui.settings.appstore.toast.reset') })
   }
 
   const handleClearCache = async () => {
     try {
       await clearCache.mutateAsync()
-      toast.success(t('settings.appstore.toast.cacheCleared'))
+      toast.success(t('ui.settings.appstore.toast.cacheCleared'))
       await refreshCacheInfo()
     } catch (error) {
-      toast.error(getErrorMessage(error, t('settings.appstore.toast.cacheClearFailed')), {
+      toast.error(getErrorMessage(error, t('ui.settings.appstore.toast.cacheClearFailed')), {
         description: getErrorDescription(error),
       })
     }
@@ -191,8 +191,10 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
       <div className="divide-y divide-border/70">
         <div className="py-5">
           <div className="mb-3">
-            <h3 className="text-sm font-medium text-foreground">{t('settings.appstore.sources.title')}</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.appstore.sources.description')}</p>
+            <h3 className="text-sm font-medium text-foreground">{t('ui.settings.appstore.sources.title')}</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {t('ui.settings.appstore.sources.description')}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -204,7 +206,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                   onBlur={(event) =>
                     void persistSettings(buildPatchedSettings(source.id, { name: event.target.value }))
                   }
-                  placeholder={t('settings.appstore.sources.namePlaceholder')}
+                  placeholder={t('ui.settings.appstore.sources.namePlaceholder')}
                   disabled={saving}
                   className={SETTINGS_CONTROL_CLASSNAME}
                 />
@@ -226,7 +228,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                 <Button
                   size="icon"
                   variant="outline"
-                  aria-label={t('settings.appstore.sources.delete')}
+                  aria-label={t('ui.settings.appstore.sources.delete')}
                   onClick={() => void handleRemoveSource(source.id)}
                   disabled={saving || draft.sources.length <= 1}
                 >
@@ -244,14 +246,14 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
               className="w-full border-dashed text-muted-foreground hover:text-foreground"
             >
               <Plus className="size-4" />
-              {t('settings.appstore.sources.add')}
+              {t('ui.settings.appstore.sources.add')}
             </Button>
           </div>
         </div>
 
         <SettingsActionRow
-          title={t('settings.appstore.proxy.enableTitle')}
-          description={t('settings.appstore.proxy.enableDesc')}
+          title={t('ui.settings.appstore.proxy.enableTitle')}
+          description={t('ui.settings.appstore.proxy.enableDesc')}
           action={
             <label className={SETTINGS_TOGGLE_CLASSNAME}>
               <Switch
@@ -267,8 +269,8 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
         />
 
         <SettingsActionRow
-          title={t('settings.appstore.proxy.urlTitle')}
-          description={t('settings.appstore.proxy.urlDesc')}
+          title={t('ui.settings.appstore.proxy.urlTitle')}
+          description={t('ui.settings.appstore.proxy.urlDesc')}
           action={
             <div className="w-full max-w-xs">
               <Input
@@ -284,21 +286,21 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
         />
 
         <SettingsActionRow
-          title={t('settings.appstore.cache.dirTitle')}
-          description={t('settings.appstore.cache.dirDesc')}
+          title={t('ui.settings.appstore.cache.dirTitle')}
+          description={t('ui.settings.appstore.cache.dirDesc')}
           action={
             <div className="w-full max-w-xs text-sm break-all text-foreground">{cacheInfo?.cache_dir ?? '-'}</div>
           }
         />
 
         <SettingsActionRow
-          title={t('settings.appstore.cache.sizeTitle')}
-          description={t('settings.appstore.cache.sizeDesc')}
+          title={t('ui.settings.appstore.cache.sizeTitle')}
+          description={t('ui.settings.appstore.cache.sizeDesc')}
           action={
             loading ? (
               <div className="flex h-8 w-full max-w-xs items-center text-sm text-muted-foreground">
                 <Loader2 className="mr-2 size-4 animate-spin" />
-                {t('common.loading')}
+                {t('ui.common.loading')}
               </div>
             ) : (
               <div className="w-full max-w-xs text-sm text-foreground">{cacheInfo?.size ?? '0 B'}</div>
@@ -307,8 +309,8 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
         />
 
         <SettingsActionRow
-          title={t('settings.appstore.cache.clearTitle')}
-          description={t('settings.appstore.cache.clearDesc')}
+          title={t('ui.settings.appstore.cache.clearTitle')}
+          description={t('ui.settings.appstore.cache.clearDesc')}
           action={
             <Button
               variant="outline"
@@ -317,13 +319,13 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
               disabled={clearing}
             >
               {clearing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              <span>{clearing ? t('settings.appstore.cache.clearing') : t('settings.appstore.cache.clear')}</span>
+              <span>{clearing ? t('ui.settings.appstore.cache.clearing') : t('ui.settings.appstore.cache.clear')}</span>
             </Button>
           }
         />
 
         <SettingsResetRow
-          description={t('settings.appstore.resetDesc')}
+          description={t('ui.settings.appstore.resetDesc')}
           onReset={() => void handleReset()}
           disabled={saving}
         />

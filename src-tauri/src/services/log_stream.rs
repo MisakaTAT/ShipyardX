@@ -42,12 +42,12 @@ async fn run_log_stream_task(
                 config.id,
                 container_id,
                 error.code,
-                error.message,
+                error,
                 error.detail
             );
             let _ = ah.emit(
                 &format!("log-data:{}", stream_id),
-                format!("\x1b[31m连接失败: {}\x1b[0m\r\n", error.message).into_bytes(),
+                format!("\x1b[31m{}\x1b[0m\r\n", error).into_bytes(),
             );
             let _ = ah.emit(&format!("log-done:{}", stream_id), ());
             return;
@@ -112,11 +112,11 @@ async fn run_log_stream_task(
                             config.id,
                             container_id,
                             error.code,
-                            error.message,
+                            error,
                             error.detail
                         );
                         emit_buffered(
-                            &format!("\x1b[31m日志流中断: {}\x1b[0m\r\n", error.message),
+                            &format!("\x1b[31m{}\x1b[0m\r\n", error),
                             &ah,
                             &stream_id,
                             &mut output_buffer,
@@ -155,14 +155,13 @@ pub async fn start_log_stream(
             run_log_stream_task(server, sid, cid, tail, timestamps, stop_rx, ah).await;
         },
         "log_stream.start_lock_failed",
-        "记录日志流状态失败",
     )?;
     debug!(target: "shipyardx_lib::services::log_stream", "log stream registered; stream_id={}", stream_id);
     Ok(stream_id)
 }
 
 pub async fn stop_log_stream(stream_id: String, state: State<'_, AppState>) -> crate::error::AppResult<()> {
-    if stop_managed_stream(&state, &stream_id, "log_stream.stop_lock_failed", "停止日志流失败")? {
+    if stop_managed_stream(&state, &stream_id, "log_stream.stop_lock_failed")? {
         info!(target: "shipyardx_lib::services::log_stream", "stopping log stream; stream_id={}", stream_id);
     } else {
         warn!(target: "shipyardx_lib::services::log_stream", "stop requested for missing log stream; stream_id={}", stream_id);

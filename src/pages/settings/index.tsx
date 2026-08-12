@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
   const handleResetTerminalSettings = () => {
     resetTerminalSettings()
-    toast.success(t('settings.terminal.toast.reset'))
+    toast.success(t('ui.settings.terminal.toast.reset'))
   }
 
   useEffect(() => {

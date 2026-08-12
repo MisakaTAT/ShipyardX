@@ -38,12 +38,8 @@ pub fn invalidate_api_version(config: &ServerConfig) {
         config.host,
         config.port
     );
-    let _ = lock_mutex(
-        api_version_cache(),
-        "docker.api_version_cache_lock_failed",
-        "更新 Docker API 版本缓存失败",
-    )
-    .map(|mut cache| cache.remove(&cache_key(config)));
+    let _ = lock_mutex(api_version_cache(), "docker.api_version_cache_lock_failed")
+        .map(|mut cache| cache.remove(&cache_key(config)));
 }
 
 pub fn invalidate_api_version_server_id(server_id: &str) {
@@ -52,12 +48,8 @@ pub fn invalidate_api_version_server_id(server_id: &str) {
         "invalidating docker api version cache by server id; server_id={}",
         server_id
     );
-    let _ = lock_mutex(
-        api_version_cache(),
-        "docker.api_version_cache_lock_failed",
-        "更新 Docker API 版本缓存失败",
-    )
-    .map(|mut cache| cache.retain(|key, _| !key.starts_with(&format!("{server_id}|"))));
+    let _ = lock_mutex(api_version_cache(), "docker.api_version_cache_lock_failed")
+        .map(|mut cache| cache.retain(|key, _| !key.starts_with(&format!("{server_id}|"))));
 }
 
 fn parse_client_version(raw: &str) -> Option<ClientVersion> {
@@ -97,13 +89,9 @@ fn build_dedicated_docker(config: &ServerConfig, client_version: &ClientVersion)
 }
 
 pub async fn resolve_api_version(config: &ServerConfig) -> AppResult<String> {
-    if let Some(version) = lock_mutex(
-        api_version_cache(),
-        "docker.api_version_cache_lock_failed",
-        "读取 Docker API 版本缓存失败",
-    )?
-    .get(&cache_key(config))
-    .cloned()
+    if let Some(version) = lock_mutex(api_version_cache(), "docker.api_version_cache_lock_failed")?
+        .get(&cache_key(config))
+        .cloned()
     {
         return Ok(version);
     }
@@ -119,13 +107,8 @@ pub async fn resolve_api_version(config: &ServerConfig) -> AppResult<String> {
     let version = docker.version().await.map_err(map_bollard_error)?;
     let version = version
         .api_version
-        .ok_or_else(|| AppError::internal("docker.version_missing", "Docker 未返回 API 版本信息"))?;
-    lock_mutex(
-        api_version_cache(),
-        "docker.api_version_cache_lock_failed",
-        "更新 Docker API 版本缓存失败",
-    )?
-    .insert(cache_key(config), version.clone());
+        .ok_or_else(|| AppError::internal("docker.version_missing"))?;
+    lock_mutex(api_version_cache(), "docker.api_version_cache_lock_failed")?.insert(cache_key(config), version.clone());
     Ok(version)
 }
 
@@ -142,53 +125,52 @@ pub async fn docker_streaming(config: &ServerConfig) -> AppResult<Docker> {
 }
 
 pub fn pretty_json<T: Serialize>(value: &T) -> AppResult<String> {
-    serde_json::to_string_pretty(value).map_err(|e| {
-        AppError::wrap(
-            "docker.response_format_failed",
-            AppErrorKind::Internal,
-            "格式化 JSON 失败",
-            e,
-        )
-    })
+    serde_json::to_string_pretty(value)
+        .map_err(|e| AppError::wrap("docker.response_format_failed", AppErrorKind::Internal, e))
+}
+
+/// HTTP 状态码原先直接拼进 code，会产生无法穷举的词条 key；按类别归三个固定 code，
+/// 具体状态码以 param 形式带给文案。
+fn docker_api_code(status_code: u16) -> &'static str {
+    match status_code {
+        400..=499 => "docker.api_client_error",
+        500..=599 => "docker.api_server_error",
+        _ => "docker.api_request_failed",
+    }
+}
+
+fn docker_api_kind(status_code: u16) -> AppErrorKind {
+    match status_code {
+        400 => AppErrorKind::Validation,
+        401 => AppErrorKind::Auth,
+        403 => AppErrorKind::Permission,
+        404 => AppErrorKind::NotFound,
+        409 => AppErrorKind::Conflict,
+        408 | 504 => AppErrorKind::Timeout,
+        500..=599 => AppErrorKind::Unavailable,
+        _ => AppErrorKind::Internal,
+    }
+}
+
+/// Docker HTTP 错误的统一构造：bollard 和自建 transport 两条路径都走这里，
+/// 否则状态码分类、retryable 规则会各写一份、改的时候漏一处。
+pub(crate) fn docker_api_error(status_code: u16, detail: Option<String>) -> AppError {
+    AppError::new(docker_api_code(status_code), docker_api_kind(status_code))
+        .param("status", status_code)
+        .with_detail(detail.unwrap_or_else(|| format!("HTTP {status_code}")))
+        .retryable(status_code >= 500 || status_code == 429)
 }
 
 pub fn map_bollard_error(error: BollardError) -> AppError {
     match error {
-        BollardError::DockerResponseServerError { status_code, message } => AppError::new(
-            format!("docker.api_http_{status_code}"),
-            match status_code {
-                400 => AppErrorKind::Validation,
-                401 => AppErrorKind::Auth,
-                403 => AppErrorKind::Permission,
-                404 => AppErrorKind::NotFound,
-                409 => AppErrorKind::Conflict,
-                408 | 504 => AppErrorKind::Timeout,
-                500..=599 => AppErrorKind::Unavailable,
-                _ => AppErrorKind::Internal,
-            },
-            if (400..500).contains(&status_code) {
-                "Docker API 请求无效"
-            } else if (500..600).contains(&status_code) {
-                "Docker 服务暂时不可用"
-            } else {
-                "Docker API 请求失败"
-            },
-        )
-        .with_detail(if message.trim().is_empty() {
-            format!("HTTP {status_code}")
-        } else {
-            message
-        })
-        .retryable(status_code >= 500 || status_code == 429),
-        BollardError::RequestTimeoutError => {
-            AppError::timeout("docker.request_timeout", "Docker 请求超时").retryable(true)
+        BollardError::DockerResponseServerError { status_code, message } => {
+            docker_api_error(status_code, (!message.trim().is_empty()).then_some(message))
         }
-        BollardError::DockerStreamError { error } => {
-            AppError::unavailable("docker.stream_error", "Docker 流式请求失败")
-                .with_detail(error)
-                .retryable(true)
-        }
-        other => AppError::unavailable("docker.request_failed", "Docker 请求失败")
+        BollardError::RequestTimeoutError => AppError::timeout("docker.request_timeout").retryable(true),
+        BollardError::DockerStreamError { error } => AppError::unavailable("docker.stream_error")
+            .with_detail(error)
+            .retryable(true),
+        other => AppError::unavailable("docker.request_failed")
             .with_detail(other.to_string())
             .retryable(true),
     }

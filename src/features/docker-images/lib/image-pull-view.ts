@@ -1,4 +1,20 @@
+import i18n from '@/app/i18n'
 import type { ImagePullProgress } from '@/types/app-bindings'
+
+/**
+ * summary 这条通道混了两种来源：Docker API 原样透传的英文状态，
+ * 以及我们自己写入的 image_pull.* 词条 key。命中词条就翻译，否则原样显示。
+ */
+const translate = i18n.t.bind(i18n) as (key: string, params?: Record<string, string>) => string
+
+const PREPARING = 'image_pull.preparing'
+const DONE = 'image_pull.done'
+
+export function localizePullStatus(value: string | null): string {
+  if (!value) return ''
+  const key = `backend.${value}`
+  return value.startsWith('image_pull.') && i18n.exists(key) ? translate(key) : value
+}
 
 export interface ImagePullLayerViewModel {
   id: string
@@ -36,16 +52,16 @@ export function toImagePullViewModel(progress: ImagePullProgress): ImagePullView
     })
 
   const activeLayer = layers.find((layer) => !layer.done && layer.status.trim().length > 0)
-  const headerStatus = progress.status === '准备拉取镜像' && activeLayer ? activeLayer.status : progress.status
+  const headerStatus = progress.status === PREPARING && activeLayer ? activeLayer.status : progress.status
   const headerDetail =
-    progress.status === '准备拉取镜像' && activeLayer
+    progress.status === PREPARING && activeLayer
       ? [activeLayer.current, activeLayer.total].filter(Boolean).join(' / ') || progress.detail
       : progress.detail
 
   const denominator = Math.max(progress.total_layers, layers.length)
   const progressSum = layers.reduce((sum, layer) => sum + (layer.percent ?? (layer.done ? 100 : 0)), 0)
   const percent =
-    headerStatus === '拉取完成'
+    headerStatus === DONE
       ? 100
       : denominator > 0
         ? Math.round(progressSum / denominator)
@@ -55,8 +71,8 @@ export function toImagePullViewModel(progress: ImagePullProgress): ImagePullView
 
   return {
     image: progress.image,
-    status: headerStatus,
-    detail: headerDetail,
+    status: localizePullStatus(headerStatus),
+    detail: localizePullStatus(headerDetail),
     completedLayers: progress.completed_layers,
     totalLayers: progress.total_layers,
     percent,

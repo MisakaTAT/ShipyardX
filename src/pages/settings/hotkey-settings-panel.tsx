@@ -34,7 +34,7 @@ export function HotkeySettingsPanel() {
       event.preventDefault()
       updateHotkeySettings({ [recordingHotkey]: nextHotkey })
       setRecordingHotkey(null)
-      toast.success(t('settings.hotkeys.toast.updated', { hotkey: formatHotkeyLabel(nextHotkey) }))
+      toast.success(t('ui.settings.hotkeys.toast.updated', { hotkey: formatHotkeyLabel(nextHotkey) }))
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -48,8 +48,8 @@ export function HotkeySettingsPanel() {
     <SettingsPanelShell>
       <div className="divide-y divide-border/70">
         <SettingsActionRow
-          title={t('settings.hotkeys.commandPalette.title')}
-          description={t('settings.hotkeys.commandPalette.description')}
+          title={t('ui.settings.hotkeys.commandPalette.title')}
+          description={t('ui.settings.hotkeys.commandPalette.description')}
           action={
             <Button
               type="button"
@@ -58,15 +58,15 @@ export function HotkeySettingsPanel() {
               onClick={() => setRecordingHotkey((value) => (value === 'commandPalette' ? null : 'commandPalette'))}
             >
               {recordingHotkey === 'commandPalette'
-                ? t('settings.hotkeys.recording')
-                : formatHotkeyLabel(commandPalette, t('settings.hotkeys.unset'))}
+                ? t('ui.settings.hotkeys.recording')
+                : formatHotkeyLabel(commandPalette, t('ui.settings.hotkeys.unset'))}
             </Button>
           }
         />
 
         <SettingsActionRow
-          title={t('settings.hotkeys.terminalSearch.title')}
-          description={t('settings.hotkeys.terminalSearch.description')}
+          title={t('ui.settings.hotkeys.terminalSearch.title')}
+          description={t('ui.settings.hotkeys.terminalSearch.description')}
           action={
             <Button
               type="button"
@@ -77,18 +77,18 @@ export function HotkeySettingsPanel() {
               }
             >
               {recordingHotkey === 'openTerminalSearch'
-                ? t('settings.hotkeys.recording')
-                : formatHotkeyLabel(openTerminalSearch, t('settings.hotkeys.unset'))}
+                ? t('ui.settings.hotkeys.recording')
+                : formatHotkeyLabel(openTerminalSearch, t('ui.settings.hotkeys.unset'))}
             </Button>
           }
         />
 
         <SettingsResetRow
-          description={t('settings.hotkeys.resetDesc')}
+          description={t('ui.settings.hotkeys.resetDesc')}
           onReset={() => {
             resetHotkeySettings()
             setRecordingHotkey(null)
-            toast.success(t('settings.hotkeys.toast.reset'))
+            toast.success(t('ui.settings.hotkeys.toast.reset'))
           }}
         />
       </div>

@@ -41,7 +41,7 @@ impl AppstoreRepo {
         let app_data_dir = app
             .path()
             .app_data_dir()
-            .map_err(|e| AppError::internal("appstore.data_dir_unavailable", "无法获取应用数据目录").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.data_dir_unavailable").with_source(e))?;
         let cache_root_dir = app_data_dir.join("appstore_cache");
         Ok(Self {
             app_data_dir,
@@ -62,10 +62,7 @@ impl AppstoreRepo {
         let enabled_sources: Vec<AppstoreSource> =
             settings.sources.into_iter().filter(|source| source.enabled).collect();
         if enabled_sources.is_empty() {
-            return Err(AppError::validation(
-                "appstore.source_missing",
-                "没有可同步的启用应用商店源",
-            ));
+            return Err(AppError::validation("appstore.no_enabled_source"));
         }
 
         let mut synced_dirs = Vec::with_capacity(enabled_sources.len());
@@ -80,14 +77,12 @@ impl AppstoreRepo {
         cache_dir.join("apps")
     }
 
-    pub(crate) fn ensure_safe_component(kind: &str, value: &str) -> AppResult<()> {
+    /// `code` 直接决定文案，避免把「应用标识」这类中文名词当参数传进来
+    pub(crate) fn ensure_safe_component(code: &'static str, value: &str) -> AppResult<()> {
         if is_safe_path_component(value) {
             return Ok(());
         }
-        Err(AppError::validation(
-            "appstore.path_component_invalid",
-            format!("{kind}包含非法字符：{value}"),
-        ))
+        Err(AppError::validation(code).param("value", value))
     }
 
     fn app_dir(&self, cache_dir: &Path, app_key: &str) -> PathBuf {
@@ -162,24 +157,21 @@ impl AppstoreRepo {
 
         let raw = fs::read_to_string(&path)
             .await
-            .map_err(|e| AppError::internal("appstore.settings_read_failed", "读取应用商店设置失败").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.settings_read_failed").with_source(e))?;
         serde_json::from_str::<AppstoreSettings>(&raw)
             .map(normalize_appstore_settings)
-            .map_err(|e| AppError::internal("appstore.settings_parse_failed", "解析应用商店设置失败").with_source(e))
+            .map_err(|e| AppError::internal("appstore.settings_parse_failed").with_source(e))
     }
 
     pub(crate) async fn save_settings(&self, settings: AppstoreSettings) -> AppResult<AppstoreSettings> {
         let normalized = normalize_appstore_settings(settings);
         let path = self.settings_file();
-        let payload = serde_json::to_vec_pretty(&normalized).map_err(|e| {
-            AppError::internal("appstore.settings_serialize_failed", "序列化应用商店设置失败").with_source(e)
-        })?;
+        let payload = serde_json::to_vec_pretty(&normalized)
+            .map_err(|e| AppError::internal("appstore.settings_serialize_failed").with_source(e))?;
 
         task::spawn_blocking(move || atomic_write(&path, &payload))
             .await
-            .map_err(|e| {
-                AppError::internal("appstore.settings_write_join_failed", "写入应用商店设置失败").with_source(e)
-            })??;
+            .map_err(|e| AppError::internal("appstore.settings_write_join_failed").with_source(e))??;
         Ok(normalized)
     }
 
@@ -195,21 +187,20 @@ impl AppstoreRepo {
             })
         })
         .await
-        .map_err(|e| AppError::internal("appstore.cache_info_join_failed", "读取应用商店缓存信息失败").with_source(e))?
+        .map_err(|e| AppError::internal("appstore.cache_info_join_failed").with_source(e))?
     }
 
     pub(crate) async fn clear_cache(&self) -> AppResult<()> {
         let cache_dir = self.cache_root_dir.clone();
         task::spawn_blocking(move || {
             if cache_dir.exists() {
-                std::fs::remove_dir_all(&cache_dir).map_err(|e| {
-                    AppError::internal("appstore.cache_clear_failed", "清除应用商店缓存失败").with_source(e)
-                })?;
+                std::fs::remove_dir_all(&cache_dir)
+                    .map_err(|e| AppError::internal("appstore.cache_clear_failed").with_source(e))?;
             }
             Ok(())
         })
         .await
-        .map_err(|e| AppError::internal("appstore.cache_clear_join_failed", "清除应用商店缓存失败").with_source(e))?
+        .map_err(|e| AppError::internal("appstore.cache_clear_join_failed").with_source(e))?
     }
 
     pub(crate) async fn list_apps(&self) -> AppResult<Vec<AppListItem>> {
@@ -224,18 +215,16 @@ impl AppstoreRepo {
         let mut items = Vec::new();
         let mut entries = fs::read_dir(&apps_dir)
             .await
-            .map_err(|e| AppError::internal("appstore.apps_dir_read_failed", "读取 apps 目录失败").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.apps_dir_read_failed").with_source(e))?;
         while let Some(entry) = entries
             .next_entry()
             .await
-            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录项失败").with_source(e))?
+            .map_err(|e| AppError::internal("appstore.apps_dir_entry_failed").with_source(e))?
         {
             if !entry
                 .file_type()
                 .await
-                .map_err(|e| {
-                    AppError::internal("appstore.apps_dir_entry_failed", "读取应用目录类型失败").with_source(e)
-                })?
+                .map_err(|e| AppError::internal("appstore.apps_dir_entry_type_failed").with_source(e))?
                 .is_dir()
             {
                 continue;
@@ -275,18 +264,13 @@ impl AppstoreRepo {
         let cache_dir = self.cache_dir_for_source(&source);
         let app_dir = self.app_dir(&cache_dir, app_key);
         if !fs::try_exists(&app_dir).await.unwrap_or(false) {
-            return Err(AppError::not_found(
-                "appstore.app_not_found",
-                format!("应用 {} 不存在", app_key),
-            ));
+            return Err(AppError::not_found("appstore.app_not_found").param("app", app_key));
         }
 
-        let manifest = self.read_manifest(&app_dir).await?.ok_or_else(|| {
-            AppError::not_found(
-                "appstore.manifest_not_found",
-                format!("应用 {} 的 data.yml 不存在", app_key),
-            )
-        })?;
+        let manifest = self
+            .read_manifest(&app_dir)
+            .await?
+            .ok_or_else(|| AppError::not_found("appstore.manifest_not_found").param("app", app_key))?;
 
         let readme_zh = fs::read_to_string(app_dir.join("README.md")).await.unwrap_or_default();
         let readme_en = fs::read_to_string(app_dir.join("README_en.md"))
@@ -317,9 +301,9 @@ impl AppstoreRepo {
         }
         let yaml_str = fs::read_to_string(&data_yml)
             .await
-            .map_err(|e| AppError::internal("appstore.manifest_read_failed", "读取 data.yml 失败").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.manifest_read_failed").with_source(e))?;
         let manifest = serde_yaml::from_str(&yaml_str)
-            .map_err(|e| AppError::internal("appstore.manifest_parse_failed", "解析 data.yml 失败").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.manifest_parse_failed").with_source(e))?;
         Ok(Some(manifest))
     }
 
@@ -404,7 +388,7 @@ async fn git_sync_existing_repo(
 ) -> AppResult<()> {
     task::spawn_blocking(move || sync_existing_repo_blocking(&cache_dir, &settings, &source, app.as_ref()))
         .await
-        .map_err(|e| AppError::internal("appstore.sync_join_failed", "等待应用商店同步任务失败").with_source(e))?
+        .map_err(|e| AppError::internal("appstore.sync_join_failed").with_source(e))?
 }
 
 async fn git_clone_repo(
@@ -415,7 +399,7 @@ async fn git_clone_repo(
 ) -> AppResult<()> {
     task::spawn_blocking(move || clone_repo_blocking(&cache_dir, &settings, &source, app.as_ref()))
         .await
-        .map_err(|e| AppError::internal("appstore.sync_join_failed", "等待应用商店同步任务失败").with_source(e))?
+        .map_err(|e| AppError::internal("appstore.sync_join_failed").with_source(e))?
 }
 
 fn sync_existing_repo_blocking(
@@ -424,8 +408,7 @@ fn sync_existing_repo_blocking(
     source: &AppstoreSource,
     app: Option<&AppHandle>,
 ) -> AppResult<()> {
-    let repo = Repository::open(cache_dir)
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+    let repo = Repository::open(cache_dir).map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
 
     let current_url = repo
         .find_remote("origin")
@@ -434,24 +417,24 @@ fn sync_existing_repo_blocking(
         .unwrap_or_default();
     if current_url != source.repo_url.trim() {
         repo.remote_set_url("origin", source.repo_url.trim())
-            .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+            .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
     }
     let mut remote = repo
         .find_remote("origin")
         .or_else(|_| repo.remote("origin", &source.repo_url))
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+        .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
 
     let mut fetch_options = build_fetch_options("fetch", settings, app);
     remote
         .fetch(&["HEAD"], Some(&mut fetch_options), None)
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+        .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
 
     let target = repo
         .revparse_single("FETCH_HEAD")
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+        .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
 
     repo.reset(&target, ResetType::Hard, None)
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+        .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
     Ok(())
 }
 
@@ -466,7 +449,7 @@ fn clone_repo_blocking(
     builder.fetch_options(fetch_options);
     builder
         .clone(&source.repo_url, cache_dir)
-        .map_err(|e| AppError::unavailable("appstore.sync_failed", "同步应用商店失败").with_source(e))?;
+        .map_err(|e| AppError::unavailable("appstore.sync_failed").with_source(e))?;
     Ok(())
 }
 
@@ -552,15 +535,11 @@ fn normalize_appstore_settings(settings: AppstoreSettings) -> AppstoreSettings {
 
 fn dir_size(path: &Path) -> AppResult<u64> {
     let mut total = 0u64;
-    for entry in std::fs::read_dir(path)
-        .map_err(|e| AppError::internal("appstore.cache_read_failed", "读取应用商店缓存目录失败").with_source(e))?
-    {
-        let entry = entry.map_err(|e| {
-            AppError::internal("appstore.cache_entry_failed", "读取应用商店缓存目录项失败").with_source(e)
-        })?;
+    for entry in std::fs::read_dir(path).map_err(|e| AppError::internal("appstore.cache_read_failed").with_source(e))? {
+        let entry = entry.map_err(|e| AppError::internal("appstore.cache_entry_failed").with_source(e))?;
         let metadata = entry
             .metadata()
-            .map_err(|e| AppError::internal("appstore.cache_stat_failed", "读取应用商店缓存信息失败").with_source(e))?;
+            .map_err(|e| AppError::internal("appstore.cache_stat_failed").with_source(e))?;
         if metadata.is_dir() {
             total = total.saturating_add(dir_size(&entry.path())?);
         } else {
@@ -606,9 +585,7 @@ async fn detect_cache_repo_state(cache_dir: PathBuf, expected_repo_url: &str) ->
     let expected_repo_url = expected_repo_url.to_string();
     task::spawn_blocking(move || detect_cache_repo_state_blocking(&cache_dir, &expected_repo_url))
         .await
-        .map_err(|e| {
-            AppError::internal("appstore.cache_state_join_failed", "检查应用商店缓存状态失败").with_source(e)
-        })?
+        .map_err(|e| AppError::internal("appstore.cache_state_join_failed").with_source(e))?
 }
 
 async fn recover_incomplete_cache_dir(cache_dir: &Path) -> AppResult<()> {
@@ -622,22 +599,20 @@ async fn recover_incomplete_cache_dir(cache_dir: &Path) -> AppResult<()> {
 
     let parent = cache_dir
         .parent()
-        .ok_or_else(|| AppError::internal("appstore.cache_parent_missing", "无法定位应用商店缓存目录的父目录"))?;
+        .ok_or_else(|| AppError::internal("appstore.cache_parent_missing"))?;
     let file_name = cache_dir
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| AppError::internal("appstore.cache_dir_name_invalid", "应用商店缓存目录名称无效"))?;
+        .ok_or_else(|| AppError::internal("appstore.cache_dir_name_invalid"))?;
     let quarantine_dir = parent.join(format!("{file_name}.stale-{}", Uuid::new_v4()));
 
     fs::rename(cache_dir, &quarantine_dir).await.map_err(|e| {
-        AppError::internal("appstore.cache_recover_rename_failed", "清理未完成的应用商店缓存失败")
-            .with_detail(format!(
-                "无法重命名残留目录：{} -> {}: {}",
-                cache_dir.display(),
-                quarantine_dir.display(),
-                e
-            ))
-            .with_action("请关闭占用该目录的程序后重试")
+        AppError::internal("appstore.cache_recover_rename_failed").with_detail(format!(
+            "rename {} -> {}: {}",
+            cache_dir.display(),
+            quarantine_dir.display(),
+            e
+        ))
     })?;
 
     info!(
@@ -654,7 +629,7 @@ async fn recover_incomplete_cache_dir(cache_dir: &Path) -> AppResult<()> {
                 target: "shipyardx_lib::services::appstore_repo",
                 "failed to remove quarantined appstore cache; path={} detail={}",
                 cleanup_dir.display(),
-                error.detail.unwrap_or(error.message)
+                error.detail.unwrap_or(error.code)
             );
         }
     });
@@ -718,7 +693,7 @@ fn normalize_appstore_source(source: AppstoreSource) -> AppstoreSource {
             Uuid::new_v4().to_string()
         },
         name: if source.name.trim().is_empty() {
-            "未命名源".to_string()
+            "appstore.unnamed_source".to_string()
         } else {
             source.name.trim().to_string()
         },
@@ -748,7 +723,7 @@ fn active_source(settings: &AppstoreSettings) -> AppResult<&AppstoreSource> {
         .iter()
         .find(|source| source.enabled)
         .or_else(|| settings.sources.first())
-        .ok_or_else(|| AppError::validation("appstore.source_missing", "应用商店源配置为空"))
+        .ok_or_else(|| AppError::validation("appstore.source_missing"))
 }
 
 fn ensure_enabled_source(sources: &mut [AppstoreSource]) {

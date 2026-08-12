@@ -67,24 +67,12 @@ pub async fn probe_host_key(host: String, port: u16) -> AppResult<String> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn test_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
-    services::servers::test_connection(server_id, state).await
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn test_server_connection(server_id: String, state: State<'_, AppState>) -> AppResult<String> {
+pub async fn test_server_connection(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
     services::servers::test_server_connection(server_id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn test_connection_direct(server: ServerConfig) -> AppResult<String> {
-    services::servers::test_connection_direct(server).await
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn test_server_connection_direct(server: ServerConfig) -> AppResult<String> {
+pub async fn test_server_connection_direct(server: ServerConfig) -> AppResult<()> {
     services::servers::test_server_connection_direct(server).await
 }

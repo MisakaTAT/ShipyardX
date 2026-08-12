@@ -71,16 +71,15 @@ pub(super) fn runtime_state_to_port_forward(
 }
 
 pub async fn list_local_addresses() -> AppResult<Vec<LocalAddress>> {
-    let interfaces = NetworkInterface::show().map_err(|e| {
-        AppError::internal("port_forward.interfaces_list_failed", "读取本地网卡地址失败").with_source(e)
-    })?;
+    let interfaces = NetworkInterface::show()
+        .map_err(|e| AppError::internal("port_forward.interfaces_list_failed").with_source(e))?;
 
     let mut seen = BTreeSet::new();
     let mut result: Vec<LocalAddress> = Vec::new();
 
     result.push(LocalAddress {
         ip: "0.0.0.0".into(),
-        name: "所有网卡 (0.0.0.0)".into(),
+        name: "port_forward.all_interfaces".into(),
     });
     seen.insert("0.0.0.0".to_string());
 

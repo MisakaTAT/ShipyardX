@@ -21,9 +21,9 @@ export const commands = {
 	clearKnownHosts: () => __TAURI_INVOKE<number>("clear_known_hosts"),
 	probeHostKey: (host: string, port: number) => __TAURI_INVOKE<string>("probe_host_key", { host, port }),
 	testConnection: (serverId: string) => __TAURI_INVOKE<string>("test_connection", { serverId }),
-	testServerConnection: (serverId: string) => __TAURI_INVOKE<string>("test_server_connection", { serverId }),
+	testServerConnection: (serverId: string) => __TAURI_INVOKE<null>("test_server_connection", { serverId }),
 	testConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<string>("test_connection_direct", { server }),
-	testServerConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<string>("test_server_connection_direct", { server }),
+	testServerConnectionDirect: (server: ServerConfig) => __TAURI_INVOKE<null>("test_server_connection_direct", { server }),
 	listContainers: (serverId: string) => __TAURI_INVOKE<Container[]>("list_containers", { serverId }),
 	startContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("start_container", { serverId, containerId }),
 	stopContainer: (serverId: string, containerId: string) => __TAURI_INVOKE<null>("stop_container", { serverId, containerId }),
@@ -80,7 +80,7 @@ export const commands = {
 	openContainerExecTerminal: (serverId: string, params: ContainerExecTerminalParams) => __TAURI_INVOKE<TerminalSession>("open_container_exec_terminal", { serverId, params }),
 	closeTerminal: (sessionId: string) => __TAURI_INVOKE<null>("close_terminal", { sessionId }),
 	saveTerminalExport: (path: string, content: string) => __TAURI_INVOKE<null>("save_terminal_export", { path, content }),
-	syncAppstore: () => __TAURI_INVOKE<string>("sync_appstore"),
+	syncAppstore: () => __TAURI_INVOKE<null>("sync_appstore"),
 	listApps: (sourceId: string | null) => __TAURI_INVOKE<AppListItem[]>("list_apps", { sourceId }),
 	getAppstoreSettings: () => __TAURI_INVOKE<AppstoreSettings>("get_appstore_settings"),
 	updateAppstoreSettings: (settings: AppstoreSettings) => __TAURI_INVOKE<AppstoreSettings>("update_appstore_settings", { settings }),
@@ -140,13 +140,18 @@ export type AppDetail_Serialize = {
 	readme_en: string,
 };
 
+/**
+ *  面向前端的错误。不带任何用户可见文案：`code` 决定显示什么，
+ *  文案与建议统一放在前端词条 `errors.<code>.{message,action}` 里。
+ * 
+ *  `params` 供词条插值，`detail` 是底层库抛出的原始错误串（不翻译，原样展示）。
+ */
 export type AppError = {
 	code: string,
 	kind: AppErrorKind,
-	message: string,
+	params: { [key in string]: string },
 	detail: string | null,
 	retryable: boolean,
-	action: string | null,
 };
 
 export type AppErrorKind = "validation" | "auth" | "permission" | "not_found" | "conflict" | "unavailable" | "timeout" | "internal";
@@ -495,7 +500,9 @@ export type InstallApp = {
 export type InstallStepEvent = {
 	step: string,
 	status: string,
-	message: string,
+	/**  词条 key（install.<name>），文案与插值由前端决定 */
+	message_code: string,
+	params: { [key in string]: string },
 	output_chunk: string | null,
 };
 

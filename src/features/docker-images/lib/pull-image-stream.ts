@@ -53,10 +53,9 @@ export async function pullImage(
       ({
         code: 'image.pull_failed',
         kind: 'unavailable' as const,
-        message: result.final_status ?? '拉取失败',
-        detail: null,
+        params: {},
+        detail: result.final_status ?? null,
         retryable: false,
-        action: null,
       } satisfies AppError)
     )
   }

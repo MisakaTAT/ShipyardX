@@ -205,9 +205,9 @@ pub async fn export_image(
         loop {
             match stream.next().await {
                 Some(Ok(chunk)) => {
-                    file.write_all(&chunk).await.map_err(|e| {
-                        AppError::internal("image.export_write_failed", "写入镜像导出文件失败").with_source(e)
-                    })?;
+                    file.write_all(&chunk)
+                        .await
+                        .map_err(|e| AppError::internal("image.export_write_failed").with_source(e))?;
                     transferred_bytes = transferred_bytes.saturating_add(chunk.len() as u64);
                     if transferred_bytes.saturating_sub(emitted_bytes) >= EXPORT_PROGRESS_EMIT_BYTES {
                         emitted_bytes = transferred_bytes;
@@ -221,7 +221,7 @@ pub async fn export_image(
 
         file.flush()
             .await
-            .map_err(|e| AppError::internal("image.export_flush_failed", "保存镜像导出文件失败").with_source(e))?;
+            .map_err(|e| AppError::internal("image.export_flush_failed").with_source(e))?;
         emit_export_progress(&app_handle, &export_id, &image_id, transferred_bytes, total_bytes);
         Ok::<(), AppError>(())
     }
@@ -273,9 +273,9 @@ pub async fn import_image(
     );
 
     let file = File::open(&import_path).await.map_err(|e| match e.kind() {
-        ErrorKind::NotFound => AppError::validation("image.import_file_missing", "所选镜像文件不存在"),
-        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied", "没有权限读取所选镜像文件"),
-        _ => AppError::internal("image.import_open_failed", "打开镜像文件失败").with_source(e),
+        ErrorKind::NotFound => AppError::validation("image.import_file_missing"),
+        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied"),
+        _ => AppError::internal("image.import_open_failed").with_source(e),
     })?;
 
     emit_import_progress(&app_handle, &import_id, &file_name, 0, Some(total_bytes));
@@ -347,11 +347,11 @@ async fn run_pull_task(
                 config.id,
                 image,
                 e.code,
-                e.message,
+                e,
                 e.detail
             );
-            tracker.summary_status = "连接 Docker API 失败".to_string();
-            tracker.summary_detail = Some(e.message.clone());
+            tracker.summary_status = "image_pull.docker_connect_failed".to_string();
+            tracker.summary_detail = Some(e.to_string());
             tracker.emit(&pull_id, &ah);
             e
         })?;
@@ -366,25 +366,25 @@ async fn run_pull_task(
             tokio::select! {
                 changed = stop_rx.changed() => {
                     if changed.is_ok() && *stop_rx.borrow() {
-                        tracker.summary_status = "已取消拉取".to_string();
-                        tracker.summary_detail = Some("用户取消了当前镜像拉取".to_string());
+                        tracker.summary_status = "image_pull.cancelled".to_string();
+                        tracker.summary_detail = Some("image_pull.cancelled_detail".to_string());
                         tracker.emit(&pull_id, &ah);
                         warn!(target: "shipyardx_lib::services::images", "image pull cancelled; pull_id={} server_id={} image={}", pull_id, config.id, image);
-                        return Err(AppError::conflict("image.pull_cancelled", "镜像拉取已取消"));
+                        return Err(AppError::conflict("image.pull_cancelled"));
                     }
                 }
                 item = stream.next() => {
                     match item {
                         Some(Ok(chunk)) => {
                             let event: ImagePullEvent = serde_json::from_value(serde_json::to_value(chunk)?)
-                                .map_err(|e| AppError::internal("image.pull_event_parse_failed", "解析镜像拉取进度失败").with_source(e))?;
+                                .map_err(|e| AppError::internal("image.pull_event_parse_failed").with_source(e))?;
                             tracker.apply_event(event)?;
                             tracker.emit(&pull_id, &ah);
                         }
                         Some(Err(e)) => {
                             let e = map_bollard_error(e);
-                            tracker.summary_status = "拉取失败".to_string();
-                            tracker.summary_detail = Some(e.message.clone());
+                            tracker.summary_status = "image_pull.failed".to_string();
+                            tracker.summary_detail = Some(e.to_string());
                             tracker.emit(&pull_id, &ah);
                             error!(
                                 target: "shipyardx_lib::services::images",
@@ -393,7 +393,7 @@ async fn run_pull_task(
                                 config.id,
                                 image,
                                 e.code,
-                                e.message,
+                                e,
                                 e.detail
                             );
                             return Err(e);
@@ -422,14 +422,14 @@ async fn run_pull_task(
             config.id,
             image,
             error.code,
-            error.message,
+            error,
             error.detail
         ),
     }
 
     let final_status = match &result {
-        Ok(_) => Some("拉取完成".to_string()),
-        Err(error) => Some(error.message.clone()),
+        Ok(_) => Some("image_pull.done".to_string()),
+        Err(error) => Some(error.to_string()),
     };
 
     let _ = ImagePullDone {
@@ -522,7 +522,7 @@ impl PullProgressTracker {
     fn new(image: String) -> Self {
         Self {
             image,
-            summary_status: "准备拉取镜像".to_string(),
+            summary_status: "image_pull.preparing".to_string(),
             summary_detail: None,
             layers: BTreeMap::new(),
         }
@@ -537,7 +537,7 @@ impl PullProgressTracker {
             .filter(|message| !message.trim().is_empty())
             .map(str::to_string);
         if let Some(error) = error {
-            return Err(AppError::unavailable("image.pull_failed", "镜像拉取失败").with_detail(error));
+            return Err(AppError::unavailable("image.pull_failed").with_detail(error));
         }
 
         let status = event
@@ -582,8 +582,8 @@ impl PullProgressTracker {
     }
 
     fn finish_success(&mut self) {
-        self.summary_status = "拉取完成".to_string();
-        self.summary_detail = Some("镜像已就绪".to_string());
+        self.summary_status = "image_pull.done".to_string();
+        self.summary_detail = Some("image_pull.done_detail".to_string());
         for layer in self.layers.values_mut() {
             if !matches!(layer.status.as_str(), "Pull complete" | "Already exists") {
                 layer.status = "Pull complete".to_string();
@@ -663,22 +663,22 @@ async fn prune_images(server_id: String, dangling_only: bool, state: State<'_, A
 
 fn ensure_export_directory(path: &Path) -> AppResult<()> {
     if !path.exists() {
-        return Err(AppError::validation("image.export_dir_missing", "所选目录不存在"));
+        return Err(AppError::validation("image.export_dir_missing"));
     }
     if !path.is_dir() {
-        return Err(AppError::validation("image.export_dir_invalid", "所选路径不是文件夹"));
+        return Err(AppError::validation("image.export_dir_invalid"));
     }
     Ok(())
 }
 
 async fn ensure_import_file(path: &Path) -> AppResult<u64> {
     let metadata = tokio::fs::metadata(path).await.map_err(|e| match e.kind() {
-        ErrorKind::NotFound => AppError::validation("image.import_file_missing", "所选镜像文件不存在"),
-        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied", "没有权限读取所选镜像文件"),
-        _ => AppError::internal("image.import_stat_failed", "读取镜像文件信息失败").with_source(e),
+        ErrorKind::NotFound => AppError::validation("image.import_file_missing"),
+        ErrorKind::PermissionDenied => AppError::permission("image.import_file_denied"),
+        _ => AppError::internal("image.import_stat_failed").with_source(e),
     })?;
     if !metadata.is_file() {
-        return Err(AppError::validation("image.import_file_invalid", "所选路径不是文件"));
+        return Err(AppError::validation("image.import_file_invalid"));
     }
     Ok(metadata.len())
 }
@@ -692,10 +692,7 @@ fn ensure_plain_file_name(file_name: &str) -> AppResult<()> {
         || file_name.contains('\\')
         || file_name.contains('\0');
     if invalid {
-        return Err(AppError::validation(
-            "image.export_file_name_invalid",
-            "文件名不能为空，也不能包含路径分隔符",
-        ));
+        return Err(AppError::validation("image.export_file_name_invalid"));
     }
     Ok(())
 }
@@ -715,11 +712,9 @@ async fn create_export_file(path: &Path) -> AppResult<tokio::fs::File> {
         .open(path)
         .await
         .map_err(|e| match e.kind() {
-            ErrorKind::AlreadyExists => AppError::conflict("image.export_exists", "目标文件已存在，请更换名称"),
-            ErrorKind::PermissionDenied => {
-                AppError::permission("image.export_permission_denied", "没有权限写入所选目录")
-            }
-            _ => AppError::internal("image.export_open_failed", "创建镜像导出文件失败").with_source(e),
+            ErrorKind::AlreadyExists => AppError::conflict("image.export_exists"),
+            ErrorKind::PermissionDenied => AppError::permission("image.export_permission_denied"),
+            _ => AppError::internal("image.export_open_failed").with_source(e),
         })
 }
 
@@ -849,12 +844,11 @@ pub async fn start_image_pull(
             run_pull_task(server, pid, img, stop_rx, ah).await;
         },
         "image.pull_streams_lock_failed",
-        "记录镜像拉取状态失败",
     )
 }
 
 pub async fn cancel_stream(stream_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if stop_managed_stream(&state, &stream_id, "image.pull_streams_lock_failed", "取消镜像拉取失败")? {
+    if stop_managed_stream(&state, &stream_id, "image.pull_streams_lock_failed")? {
         info!(target: "shipyardx_lib::services::images", "cancelling image pull; pull_id={}", stream_id);
     } else {
         warn!(target: "shipyardx_lib::services::images", "cancel requested for missing image pull; pull_id={}", stream_id);

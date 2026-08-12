@@ -7,9 +7,9 @@ use crate::state::{AppState, get_server_config};
 
 #[tauri::command]
 #[specta::specta]
-pub async fn sync_appstore(app: AppHandle) -> AppResult<String> {
+pub async fn sync_appstore(app: AppHandle) -> AppResult<()> {
     services::appstore::sync_appstore(&app).await?;
-    Ok("同步完成".to_string())
+    Ok(())
 }
 
 #[tauri::command]

@@ -37,7 +37,7 @@ pub(super) struct PortForwardAcceptArgs {
 }
 
 pub(super) fn error_message(error: AppError) -> String {
-    error.detail.unwrap_or(error.message)
+    error.detail.unwrap_or(error.code)
 }
 
 /// 主机密钥错误原样上抛，包装后前端就没法提示了
@@ -45,7 +45,7 @@ fn connect_error(error: AppError) -> AppError {
     if error.is_host_key() {
         return error;
     }
-    AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(error))
+    AppError::unavailable("port_forward.connect_failed").with_detail(error_message(error))
 }
 
 pub(super) fn normalize_host(ip: &str) -> String {
@@ -76,14 +76,13 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
         let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
             .await
             .map_err(connect_error)?
-            .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
+            .map_err(|e| AppError::unavailable("port_forward.remote_unreachable").with_source(e))?;
 
-        local_stream.set_nonblocking(true).map_err(|e| {
-            AppError::internal("port_forward.local_socket_config_failed", "本地 socket 设置失败").with_source(e)
-        })?;
-        let local_stream = TokioTcpStream::from_std(local_stream).map_err(|e| {
-            AppError::internal("port_forward.local_socket_takeover_failed", "接管本地连接失败").with_source(e)
-        })?;
+        local_stream
+            .set_nonblocking(true)
+            .map_err(|e| AppError::internal("port_forward.local_socket_config_failed").with_source(e))?;
+        let local_stream = TokioTcpStream::from_std(local_stream)
+            .map_err(|e| AppError::internal("port_forward.local_socket_takeover_failed").with_source(e))?;
         let remote_stream = channel.into_stream();
 
         let (local_read, local_write) = tokio::io::split(local_stream);
@@ -108,7 +107,7 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
             log_server_id,
             log_remote_host,
             remote_port,
-            e.message,
+            e,
             e.detail
         );
         if let Ok(mut last_error_guard) = last_error.lock() {
@@ -127,17 +126,18 @@ where
         let n = reader
             .read(&mut buf)
             .await
-            .map_err(|e| AppError::internal("port_forward.read_failed", "读取端口转发数据失败").with_source(e))?;
+            .map_err(|e| AppError::internal("port_forward.read_failed").with_source(e))?;
         if n == 0 {
-            writer.shutdown().await.map_err(|e| {
-                AppError::internal("port_forward.shutdown_failed", "关闭端口转发写入端失败").with_source(e)
-            })?;
+            writer
+                .shutdown()
+                .await
+                .map_err(|e| AppError::internal("port_forward.shutdown_failed").with_source(e))?;
             return Ok(());
         }
         writer
             .write_all(&buf[..n])
             .await
-            .map_err(|e| AppError::internal("port_forward.write_failed", "写入端口转发数据失败").with_source(e))?;
+            .map_err(|e| AppError::internal("port_forward.write_failed").with_source(e))?;
         counter.fetch_add(n as u64, Ordering::Relaxed);
     }
 }
@@ -212,10 +212,8 @@ pub(super) async fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, r
     );
     let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
         .await
-        .map_err(|e| {
-            AppError::unavailable("port_forward.connect_failed", "SSH 连接失败").with_detail(error_message(e))
-        })?
-        .map_err(|e| AppError::unavailable("port_forward.remote_unreachable", "目标端口不可达").with_source(e))?;
+        .map_err(|e| AppError::unavailable("port_forward.connect_failed").with_detail(error_message(e)))?
+        .map_err(|e| AppError::unavailable("port_forward.remote_unreachable").with_source(e))?;
     drop(channel);
     Ok(())
 }

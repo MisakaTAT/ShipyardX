@@ -11,14 +11,15 @@ import {
   type InstallApp,
 } from '@/types/app-bindings'
 import { toast } from '@/shared/components/toast'
+import i18n from '@/app/i18n'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
 
 export function useAppStoreSync() {
   return useInvalidatingMutation({
     mutationFn: commands.syncAppstore,
     invalidate: [['appstore']],
-    onSuccess: (msg) => {
-      toast.success(msg)
+    onSuccess: () => {
+      toast.success(i18n.t('ui.appstore.syncDone'))
     },
   })
 }

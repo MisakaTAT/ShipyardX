@@ -167,8 +167,7 @@ fn emit_stream_status(
     status_slot: &Arc<RwLock<EventStreamStatus>>,
     status: EventStreamStatus,
 ) {
-    if let Ok(mut current) = lock_write(status_slot, "docker_events.status_lock_failed", "更新事件流状态失败")
-    {
+    if let Ok(mut current) = lock_write(status_slot, "docker_events.status_lock_failed") {
         *current = status;
     }
     let _ = DockerStreamStatus {
@@ -208,12 +207,12 @@ async fn run_event_stream_task(
                         config.id,
                         attempt + 1,
                         error.code,
-                        error.message,
+                        error,
                         error.detail
                     );
                     return Ok::<StreamLoopExit, AppError>(StreamLoopExit::Reconnect(Some(
-                        AppError::unavailable("docker.events_start_failed", "启动 Docker 事件流失败")
-                            .with_detail(error.detail.unwrap_or(error.message))
+                        AppError::unavailable("docker.events_start_failed")
+                            .with_detail(error.detail.unwrap_or(error.code))
                             .retryable(true),
                     )));
                 }
@@ -266,7 +265,7 @@ async fn run_event_stream_task(
                                     stream_id,
                                     config.id,
                                     error.code,
-                                    error.message,
+                                    error,
                                     error.detail
                                 );
                                 return Ok(StreamLoopExit::Reconnect(Some(error)));
@@ -291,7 +290,7 @@ async fn run_event_stream_task(
             Ok(StreamLoopExit::Reconnect(error)) => {
                 attempt += 1;
                 if let Some(error) = error {
-                    warn!(target: "shipyardx_lib::services::docker_events", "event stream scheduling reconnect; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt, error.code, error.message, error.detail);
+                    warn!(target: "shipyardx_lib::services::docker_events", "event stream scheduling reconnect; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt, error.code, error, error.detail);
                     let _ = DockerStreamError {
                         stream_id: stream_id.clone(),
                         error,
@@ -302,7 +301,7 @@ async fn run_event_stream_task(
                 }
             }
             Err(error) => {
-                error!(target: "shipyardx_lib::services::docker_events", "event stream loop failed; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt + 1, error.code, error.message, error.detail);
+                error!(target: "shipyardx_lib::services::docker_events", "event stream loop failed; stream_id={} server_id={} attempt={} code={} message={} detail={:?}", stream_id, config.id, attempt + 1, error.code, error, error.detail);
                 let _ = DockerStreamError {
                     stream_id: stream_id.clone(),
                     error,
@@ -344,18 +343,10 @@ pub async fn start_event_stream(
     info!(target: "shipyardx_lib::services::docker_events", "starting event stream; server_id={}", server_id);
 
     {
-        let streams = lock_read(
-            &state.event_streams,
-            "docker_events.streams_lock_failed",
-            "读取事件流状态失败",
-        )?;
+        let streams = lock_read(&state.event_streams, "docker_events.streams_lock_failed")?;
         if let Some(existing) = streams.get(&server_id) {
             debug!(target: "shipyardx_lib::services::docker_events", "reusing existing event stream; server_id={} stream_id={}", server_id, existing.stream_id);
-            let current = *lock_read(
-                &existing.status,
-                "docker_events.status_lock_failed",
-                "读取事件流状态失败",
-            )?;
+            let current = *lock_read(&existing.status, "docker_events.status_lock_failed")?;
             let _ = DockerStreamStatus {
                 stream_id: existing.stream_id.clone(),
                 status: current,
@@ -384,7 +375,6 @@ pub async fn start_event_stream(
             run_event_stream_task(server, sid, status_for_thread, stop_rx, ah).await;
         },
         "docker_events.streams_lock_failed",
-        "记录事件流状态失败",
     )?;
     info!(target: "shipyardx_lib::services::docker_events", "event stream registered; server_id={} stream_id={}", server_id, stream_id);
 
@@ -392,12 +382,7 @@ pub async fn start_event_stream(
 }
 
 pub async fn stop_event_stream(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if let Some(h) = stop_managed_event_stream(
-        &state,
-        &server_id,
-        "docker_events.streams_lock_failed",
-        "停止事件流失败",
-    )? {
+    if let Some(h) = stop_managed_event_stream(&state, &server_id, "docker_events.streams_lock_failed")? {
         info!(target: "shipyardx_lib::services::docker_events", "stopping event stream; server_id={} stream_id={}", server_id, h.stream_id);
         let _ = h.stop_tx.send(true);
     } else {

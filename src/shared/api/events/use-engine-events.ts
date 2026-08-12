@@ -139,7 +139,7 @@ export function useEngineEvents({
           return
         }
 
-        const key = `${p.error.code}:${p.error.message}`
+        const key = `${p.error.code}:${p.error.detail ?? ''}`
         const now = Date.now()
         const lastToast = lastErrorToastRef.current
         if (lastToast && lastToast.key === key && now - lastToast.at < ERROR_TOAST_COOLDOWN_MS) {

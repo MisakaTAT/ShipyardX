@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
+import i18n from '@/app/i18n'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
 import { useInvalidatingMutation } from '@/shared/api/use-invalidating-mutation'
@@ -15,13 +16,21 @@ export function usePortForwards(enabled = true) {
   })
 }
 
+export function localizeAddressName(name: string) {
+  return name === 'port_forward.all_interfaces' ? i18n.t('backend.port_forward.all_interfaces') : name
+}
+
 export function useLocalAddresses(enabled = true) {
   return useQuery({
     queryKey: qk.localAddresses(),
-    queryFn: () => commands.listLocalAddresses(),
+    queryFn: async () =>
+      (await commands.listLocalAddresses()).map((address) => ({
+        ...address,
+        name: localizeAddressName(address.name),
+      })),
     enabled,
     placeholderData: [
-      { ip: '0.0.0.0', name: '所有网卡 (0.0.0.0)' },
+      { ip: '0.0.0.0', name: i18n.t('backend.port_forward.all_interfaces') },
       { ip: '127.0.0.1', name: '127.0.0.1 (localhost)' },
     ],
   })

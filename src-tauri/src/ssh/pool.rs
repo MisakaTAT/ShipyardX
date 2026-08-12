@@ -86,7 +86,7 @@ pub async fn invalidate_server_id(server_id: &str) {
 }
 
 fn missing_pooled_handle_error() -> AppError {
-    AppError::internal("ssh.pool_handle_missing", "SSH 连接池状态异常：连接句柄缺失").retryable(true)
+    AppError::internal("ssh.pool_handle_missing").retryable(true)
 }
 
 pub async fn open_direct_streamlocal(
@@ -198,24 +198,24 @@ where
             if let Some(mut handle) = pooled.handle.take() {
                 disconnect(&mut handle).await;
             }
-            return Err(AppError::internal("ssh.channel_open_failed", "创建 SSH 通道失败").with_source(error));
+            return Err(AppError::internal("ssh.channel_open_failed").with_source(error));
         }
     };
     drop(pooled);
 
     channel.exec(true, command).await.map_err(|e| {
         warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);
-        AppError::internal("ssh.exec_failed", "执行远程命令失败").with_source(e)
+        AppError::internal("ssh.exec_failed").with_source(e)
     })?;
 
     if let Some(stdin) = stdin {
         channel.data_bytes(stdin).await.map_err(|e| {
             warn!(target: "shipyardx_lib::ssh::pool", "ssh stdin write failed; server_id={} error={}", config.id, e);
-            AppError::internal("ssh.stdin_write_failed", "写入远程命令输入失败").with_source(e)
+            AppError::internal("ssh.stdin_write_failed").with_source(e)
         })?;
         channel.eof().await.map_err(|e| {
             warn!(target: "shipyardx_lib::ssh::pool", "ssh stdin close failed; server_id={} error={}", config.id, e);
-            AppError::internal("ssh.stdin_close_failed", "关闭远程命令输入失败").with_source(e)
+            AppError::internal("ssh.stdin_close_failed").with_source(e)
         })?;
     }
 
@@ -256,9 +256,9 @@ where
         } else if !stdout.trim().is_empty() {
             stdout.trim().to_string()
         } else {
-            format!("命令失败，退出码: {}", exit_code.unwrap_or(-1))
+            format!("exit code {}", exit_code.unwrap_or(-1))
         };
-        return Err(AppError::internal("ssh.command_failed", "远程命令执行失败").with_detail(detail));
+        return Err(AppError::internal("ssh.command_failed").with_detail(detail));
     }
 
     debug!(target: "shipyardx_lib::ssh::pool", "ssh command completed; stdout_bytes={}", stdout.len());

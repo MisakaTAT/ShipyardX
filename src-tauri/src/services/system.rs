@@ -61,7 +61,7 @@ pub async fn list_system_fonts() -> AppResult<Vec<String>> {
     let source = SystemSource::new();
     let mut fonts = source
         .all_families()
-        .map_err(|e| AppError::internal("system.fonts_list_failed", "读取系统字体失败").with_source(e))?;
+        .map_err(|e| AppError::internal("system.fonts_list_failed").with_source(e))?;
     fonts.sort_unstable();
     fonts.dedup();
     info!(target: "shipyardx_lib::services::system", "listed system fonts; count={}", fonts.len());
@@ -69,49 +69,29 @@ pub async fn list_system_fonts() -> AppResult<Vec<String>> {
 }
 
 fn map_restart_error(err: AppError) -> AppError {
-    let detail = err.detail.clone().unwrap_or_else(|| err.message.clone());
+    let detail = err.detail.clone().unwrap_or_else(|| err.code.clone());
     if detail.contains(ERR_BAD_SUDO_PASSWORD) {
-        return AppError::auth("system.sudo_password_invalid", "提权失败：sudo 密码错误，请重新输入。")
-            .with_action("请重新输入正确的 sudo 密码");
+        return AppError::auth("system.sudo_password_invalid");
     }
     if detail.contains(ERR_BAD_SU_PASSWORD) {
-        return AppError::auth("system.su_password_invalid", "提权失败：root 密码错误，请重新输入。")
-            .with_action("请重新输入正确的 root 密码");
+        return AppError::auth("system.su_password_invalid");
     }
     if detail.contains(ERR_NO_MANAGER) {
-        return AppError::unavailable(
-            "system.service_manager_missing",
-            "重启失败：未检测到可用的服务管理器（systemctl / rc-service / service）。请在服务器上手动重启 Docker。",
-        );
+        return AppError::unavailable("system.service_manager_missing");
     }
     if detail.contains(ERR_SUDO_NONINTERACTIVE) {
-        return AppError::permission(
-            "system.sudo_password_required",
-            "重启失败：无法非交互使用 sudo（未配置 NOPASSWD）。请在服务器连接中填写 sudo 密码，或在 sudoers 中为该用户配置 docker/systemctl 的无密码规则。",
-        )
-        .with_action("提供 sudo 密码或配置 NOPASSWD");
+        return AppError::permission("system.sudo_password_required");
     }
     if detail.contains(ERR_NO_SUDO) {
-        return AppError::permission(
-            "system.sudo_unavailable",
-            "重启失败：当前用户非 root 且未找到 sudo，无法重启 Docker 服务。请使用 root 或具备 sudo 的账户。",
-        );
+        return AppError::permission("system.sudo_unavailable");
     }
     if detail.contains(ERR_SYSTEMCTL) {
-        return AppError::unavailable(
-            "system.service_restart_failed",
-            "重启失败：systemctl 重启 docker 未成功（可能为权限、单元名或服务状态问题）。若本机可执行 systemctl restart docker.service，请尝试在连接中填写 sudo 密码。",
-        )
-        .retryable(true);
+        return AppError::unavailable("system.service_restart_failed").retryable(true);
     }
     if detail.contains(ERR_RC_SERVICE) || detail.contains(ERR_SERVICE_OP) {
-        return AppError::unavailable(
-            "system.service_operation_failed",
-            "重启失败：已检测到服务管理器，但执行 docker restart 失败，请检查服务名称与权限。",
-        )
-        .retryable(true);
+        return AppError::unavailable("system.service_operation_failed").retryable(true);
     }
-    AppError::internal("system.restart_failed", "重启 Docker 服务失败").with_detail(detail)
+    AppError::internal("system.restart_failed").with_detail(detail)
 }
 
 /// sudo 密码走标准输入，不进命令行（远端 `ps` 可见）
@@ -290,7 +270,7 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
         }
         Err(e) => {
             let endpoint = resolve_docker_endpoint(ctx.server()).await.ok();
-            warn!(target: "shipyardx_lib::services::system", "docker access check failed; server_id={} code={} message={} detail={:?} endpoint={:?}", server_id, e.code, e.message, e.detail, endpoint);
+            warn!(target: "shipyardx_lib::services::system", "docker access check failed; server_id={} code={} message={} detail={:?} endpoint={:?}", server_id, e.code, e, e.detail, endpoint);
             match endpoint {
                 Some(DockerEndpoint::Unix { path }) => {
                     let diag = ssh_exec(
@@ -300,16 +280,10 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                     .await
                     .unwrap_or_else(|_| "ok".to_string());
                     match diag.trim() {
-                        "no_docker" => Err(AppError::unavailable(
-                            "docker.unavailable",
-                            format!("Docker 未安装、未运行，或 {path} 不可用。"),
-                        )),
-                        "no_permission" => Err(AppError::permission(
-                            "docker.permission_denied",
-                            format!("当前用户没有访问 Docker Socket 的权限：{path}"),
-                        )),
-                        _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
-                            .with_detail(e.detail.unwrap_or(e.message))
+                        "no_docker" => Err(AppError::unavailable("docker.unavailable").param("path", path)),
+                        "no_permission" => Err(AppError::permission("docker.permission_denied").param("path", path)),
+                        _ => Err(AppError::unavailable("docker.connect_failed")
+                            .with_detail(e.detail.unwrap_or(e.code))
                             .retryable(true)),
                     }
                 }
@@ -322,17 +296,16 @@ pub async fn check_docker_access(server_id: String, state: State<'_, AppState>) 
                     .await
                     .unwrap_or_else(|_| "ok".to_string());
                     match diag.trim() {
-                        "no_docker" => Err(AppError::unavailable(
-                            "docker.unavailable",
-                            format!("Docker TCP Host 不可达：{host}:{port}"),
-                        )),
-                        _ => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
-                            .with_detail(e.detail.unwrap_or(e.message))
+                        "no_docker" => Err(AppError::unavailable("docker.tcp_unreachable")
+                            .param("host", host)
+                            .param("port", port)),
+                        _ => Err(AppError::unavailable("docker.connect_failed")
+                            .with_detail(e.detail.unwrap_or(e.code))
                             .retryable(true)),
                     }
                 }
-                None => Err(AppError::unavailable("docker.connect_failed", "无法连接 Docker")
-                    .with_detail(e.detail.unwrap_or(e.message))
+                None => Err(AppError::unavailable("docker.connect_failed")
+                    .with_detail(e.detail.unwrap_or(e.code))
                     .retryable(true)),
             }
         }
@@ -353,7 +326,7 @@ pub async fn get_container_stats(
     let raw: ContainerStatsResponse = stream
         .next()
         .await
-        .ok_or_else(|| AppError::unavailable("container.stats_empty", "容器统计信息为空"))?
+        .ok_or_else(|| AppError::unavailable("container.stats_empty"))?
         .map_err(map_bollard_error)?;
     let stats = compute_stats(&format!("{server_id}|{container_id}"), raw);
     debug!(target: "shipyardx_lib::services::system", "fetched container stats; server_id={} container_id={} cpu_percent={:.2} mem_usage={}", server_id, container_id, stats.cpu_percent, stats.mem_usage);
@@ -476,8 +449,8 @@ pub async fn update_docker_daemon_settings(
         cfg.log_opts = None;
     }
 
-    let json = serde_json::to_string_pretty(&cfg)
-        .map_err(|e| AppError::internal("daemon.serialize_failed", "序列化 Docker daemon 配置失败").with_source(e))?;
+    let json =
+        serde_json::to_string_pretty(&cfg).map_err(|e| AppError::internal("daemon.serialize_failed").with_source(e))?;
     let sftp = SshSftpSession::connect(ctx.server()).await?;
     let remote_tmp_path = sftp.home_path(&format!("shipyardx/system/docker/daemon-{}.json.tmp", Uuid::new_v4()));
     sftp.upload_bytes(&remote_tmp_path, json.as_bytes()).await?;

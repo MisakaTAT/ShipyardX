@@ -97,12 +97,8 @@ pub(crate) async fn invalidate_docker_endpoint(config: &ServerConfig) {
         config.host,
         config.port
     );
-    let _ = lock_mutex(
-        endpoint_cache(),
-        "docker.endpoint_cache_lock_failed",
-        "更新 Docker endpoint 缓存失败",
-    )
-    .map(|mut cache| cache.remove(&cache_key(config)));
+    let _ = lock_mutex(endpoint_cache(), "docker.endpoint_cache_lock_failed")
+        .map(|mut cache| cache.remove(&cache_key(config)));
     invalidate_pooled_http(config).await;
 }
 
@@ -112,13 +108,9 @@ async fn invalidate_pooled_http(config: &ServerConfig) {
         "invalidating pooled docker http connections; server_id={}",
         config.id
     );
-    let state = lock_mutex(
-        http_pool(),
-        "docker.http_pool_lock_failed",
-        "更新 Docker HTTP 连接池失败",
-    )
-    .ok()
-    .and_then(|mut pool| pool.remove(&cache_key(config)));
+    let state = lock_mutex(http_pool(), "docker.http_pool_lock_failed")
+        .ok()
+        .and_then(|mut pool| pool.remove(&cache_key(config)));
     if let Some(state) = state {
         for slot in &state.slots {
             let mut pooled = slot.lock().await;
@@ -135,18 +127,10 @@ pub(crate) async fn invalidate_pooled_http_server_id(server_id: &str) {
         "invalidating pooled docker http connections by server id; server_id={}",
         server_id
     );
-    let _ = lock_mutex(
-        endpoint_cache(),
-        "docker.endpoint_cache_lock_failed",
-        "更新 Docker endpoint 缓存失败",
-    )
-    .map(|mut cache| cache.retain(|key, _| !key.starts_with(&format!("{server_id}|"))));
+    let _ = lock_mutex(endpoint_cache(), "docker.endpoint_cache_lock_failed")
+        .map(|mut cache| cache.retain(|key, _| !key.starts_with(&format!("{server_id}|"))));
     let states: Vec<Arc<HttpPoolState>> = {
-        let mut guard = match lock_mutex(
-            http_pool(),
-            "docker.http_pool_lock_failed",
-            "更新 Docker HTTP 连接池失败",
-        ) {
+        let mut guard = match lock_mutex(http_pool(), "docker.http_pool_lock_failed") {
             Ok(guard) => guard,
             Err(_) => return,
         };
@@ -172,10 +156,7 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
     if let Some(path) = raw.strip_prefix("unix://") {
         let path = path.trim();
         if path.is_empty() {
-            return Err(AppError::validation(
-                "docker.host_invalid",
-                "Docker Unix Socket 路径不能为空",
-            ));
+            return Err(AppError::validation("docker.socket_path_empty"));
         }
         return Ok(DockerEndpoint::Unix { path: path.to_string() });
     }
@@ -184,11 +165,11 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
         let target = target.trim();
         let (host, port_str) = target
             .rsplit_once(':')
-            .ok_or_else(|| AppError::validation("docker.host_invalid", format!("无效的 Docker TCP Host: {raw}")))?;
+            .ok_or_else(|| AppError::validation("docker.tcp_host_invalid").param("raw", raw))?;
         let host = host.trim_matches('[').trim_matches(']').trim();
         let port = port_str
             .parse::<u16>()
-            .map_err(|_| AppError::validation("docker.host_invalid", format!("无效的 Docker TCP 端口: {raw}")))?;
+            .map_err(|_| AppError::validation("docker.tcp_port_invalid").param("raw", raw))?;
         let host = match host {
             "" | "0.0.0.0" => "127.0.0.1".to_string(),
             "::" => "::1".to_string(),
@@ -203,20 +184,13 @@ fn parse_docker_host(raw: &str) -> AppResult<DockerEndpoint> {
         });
     }
 
-    Err(AppError::validation(
-        "docker.host_unsupported",
-        format!("暂不支持的 Docker Host: {raw}"),
-    ))
+    Err(AppError::validation("docker.host_unsupported").param("raw", raw))
 }
 
 pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<DockerEndpoint> {
-    if let Some(endpoint) = lock_mutex(
-        endpoint_cache(),
-        "docker.endpoint_cache_lock_failed",
-        "读取 Docker endpoint 缓存失败",
-    )?
-    .get(&cache_key(config))
-    .cloned()
+    if let Some(endpoint) = lock_mutex(endpoint_cache(), "docker.endpoint_cache_lock_failed")?
+        .get(&cache_key(config))
+        .cloned()
     {
         return Ok(endpoint);
     }
@@ -241,12 +215,7 @@ pub(crate) async fn resolve_docker_endpoint(config: &ServerConfig) -> AppResult<
         .map(|host| host.as_str())
         .unwrap_or(DEFAULT_DOCKER_HOST);
     let endpoint = parse_docker_host(host)?;
-    lock_mutex(
-        endpoint_cache(),
-        "docker.endpoint_cache_lock_failed",
-        "更新 Docker endpoint 缓存失败",
-    )?
-    .insert(cache_key(config), endpoint.clone());
+    lock_mutex(endpoint_cache(), "docker.endpoint_cache_lock_failed")?.insert(cache_key(config), endpoint.clone());
     debug!(
         target: "shipyardx_lib::docker::transport",
         "resolved docker endpoint; server_id={} endpoint={:?}",
@@ -288,7 +257,7 @@ async fn open_direct_channel(config: &ServerConfig) -> AppResult<ChannelStream<r
             .await?
             .map(|channel| channel.into_stream())
             .map_err(|e| {
-                AppError::unavailable("docker.socket_open_failed", "打开 Docker Socket 通道失败")
+                AppError::unavailable("docker.socket_open_failed")
                     .with_detail(e.to_string())
                     .retryable(true)
             }),
@@ -296,7 +265,7 @@ async fn open_direct_channel(config: &ServerConfig) -> AppResult<ChannelStream<r
             .await?
             .map(|channel| channel.into_stream())
             .map_err(|e| {
-                AppError::unavailable("docker.tcp_open_failed", "打开 Docker TCP 通道失败")
+                AppError::unavailable("docker.tcp_open_failed")
                     .with_detail(e.to_string())
                     .retryable(true)
             }),
@@ -312,7 +281,7 @@ async fn open_pooled_http_sender(config: &ServerConfig) -> AppResult<PooledHttpC
     let channel = open_direct_channel(config).await?;
     let stream = TokioIo::new(channel);
     let (sender, connection) = http1::handshake(stream).await.map_err(|e| {
-        AppError::unavailable("docker.http_handshake_failed", "建立 Docker HTTP 连接失败")
+        AppError::unavailable("docker.http_handshake_failed")
             .with_detail(e.to_string())
             .retryable(true)
     })?;
@@ -343,42 +312,21 @@ fn get_http_pool_state(config: &ServerConfig) -> Arc<HttpPoolState> {
 }
 
 fn as_bollard_error(error: AppError) -> BollardError {
-    std::io::Error::other(error.detail.unwrap_or(error.message)).into()
+    std::io::Error::other(error.detail.unwrap_or(error.code)).into()
 }
 
-fn docker_api_error(status: StatusCode, body: &[u8]) -> AppError {
+/// 从 Docker 响应体里挑出可读的错误细节，再交给统一构造
+fn docker_api_error_from_body(status: StatusCode, body: &[u8]) -> AppError {
     let detail_text = String::from_utf8_lossy(body).trim().to_string();
     let docker_message = serde_json::from_slice::<DockerErrorBody>(body)
         .ok()
         .and_then(|error| error.message)
         .filter(|message| !message.trim().is_empty());
 
-    AppError::new(
-        format!("docker.api_http_{}", status.as_u16()),
-        match status.as_u16() {
-            400 => crate::error::AppErrorKind::Validation,
-            401 => crate::error::AppErrorKind::Auth,
-            403 => crate::error::AppErrorKind::Permission,
-            404 => crate::error::AppErrorKind::NotFound,
-            409 => crate::error::AppErrorKind::Conflict,
-            408 | 504 => crate::error::AppErrorKind::Timeout,
-            500..=599 => crate::error::AppErrorKind::Unavailable,
-            _ => crate::error::AppErrorKind::Internal,
-        },
-        if status.is_client_error() {
-            "Docker API 请求无效"
-        } else if status.is_server_error() {
-            "Docker 服务暂时不可用"
-        } else {
-            "Docker API 请求失败"
-        },
+    crate::docker::client::docker_api_error(
+        status.as_u16(),
+        docker_message.or_else(|| (!detail_text.is_empty()).then_some(detail_text)),
     )
-    .with_detail(
-        docker_message
-            .or_else(|| (!detail_text.is_empty()).then_some(detail_text))
-            .unwrap_or_else(|| format!("HTTP {}", status.as_u16())),
-    )
-    .retryable(status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS)
 }
 
 fn normalize_request(mut request: BollardRequest) -> Result<BollardRequest, BollardError> {
@@ -414,8 +362,8 @@ pub(crate) async fn open_hijack_json<T: serde::Serialize>(
     path: &str,
     body: &T,
 ) -> AppResult<DockerHijackConnection> {
-    let body = serde_json::to_vec(body)
-        .map_err(|e| AppError::internal("docker.request_encode_failed", "序列化 Docker 请求体失败").with_source(e))?;
+    let body =
+        serde_json::to_vec(body).map_err(|e| AppError::internal("docker.request_encode_failed").with_source(e))?;
     debug!(
         target: "shipyardx_lib::docker::transport",
         "opening docker hijack connection; server_id={} method={} path={} body_bytes={}",
@@ -434,17 +382,17 @@ pub(crate) async fn open_hijack_json<T: serde::Serialize>(
         body.len()
     );
     io.write_all(request_head.as_bytes()).await.map_err(|e| {
-        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+        AppError::unavailable("docker.request_send_failed")
             .with_detail(e.to_string())
             .retryable(true)
     })?;
     io.write_all(&body).await.map_err(|e| {
-        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+        AppError::unavailable("docker.request_send_failed")
             .with_detail(e.to_string())
             .retryable(true)
     })?;
     io.flush().await.map_err(|e| {
-        AppError::unavailable("docker.request_send_failed", "发送 Docker HTTP 请求失败")
+        AppError::unavailable("docker.request_send_failed")
             .with_detail(e.to_string())
             .retryable(true)
     })?;
@@ -452,7 +400,7 @@ pub(crate) async fn open_hijack_json<T: serde::Serialize>(
     let (status, headers, pending) = read_hijack_response_head(&mut io).await?;
     if !status.is_success() && status != StatusCode::SWITCHING_PROTOCOLS {
         let body = read_hijack_error_body(&mut io, &headers, pending).await?;
-        return Err(docker_api_error(status, &body));
+        return Err(docker_api_error_from_body(status, &body));
     }
 
     Ok(DockerHijackConnection { io, pending })
@@ -492,15 +440,9 @@ pub(crate) async fn send_pooled_request(
     }
 
     let ready_result = {
-        let connection = pooled.as_mut().ok_or_else(|| {
-            as_bollard_error(
-                AppError::internal(
-                    "docker.pooled_connection_missing",
-                    "Docker HTTP 连接池状态异常：连接缺失",
-                )
-                .retryable(true),
-            )
-        })?;
+        let connection = pooled
+            .as_mut()
+            .ok_or_else(|| as_bollard_error(AppError::internal("docker.pooled_connection_missing").retryable(true)))?;
         connection.sender.ready().await
     };
     if let Err(error) = ready_result {
@@ -518,15 +460,9 @@ pub(crate) async fn send_pooled_request(
     }
 
     let response = {
-        let connection = pooled.as_mut().ok_or_else(|| {
-            as_bollard_error(
-                AppError::internal(
-                    "docker.pooled_connection_missing",
-                    "Docker HTTP 连接池状态异常：连接缺失",
-                )
-                .retryable(true),
-            )
-        })?;
+        let connection = pooled
+            .as_mut()
+            .ok_or_else(|| as_bollard_error(AppError::internal("docker.pooled_connection_missing").retryable(true)))?;
         connection.sender.send_request(request).await
     };
     match response {
@@ -558,21 +494,18 @@ async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppRe
         }
         scanned = received.len().saturating_sub(3);
         if received.len() > MAX_HIJACK_HEAD_BYTES {
-            return Err(AppError::internal(
-                "docker.hijack_head_too_large",
-                "Docker hijack 响应头超出长度限制",
-            ));
+            return Err(AppError::internal("docker.hijack_head_too_large"));
         }
         let n = tokio::time::timeout(DOCKER_HIJACK_HEAD_READ_TIMEOUT, io.read(&mut chunk))
             .await
-            .map_err(|_| AppError::timeout("docker.hijack_timeout", "等待 Docker hijack 响应超时").retryable(true))?
+            .map_err(|_| AppError::timeout("docker.hijack_timeout").retryable(true))?
             .map_err(|e| {
-                AppError::unavailable("docker.response_read_failed", "读取 Docker HTTP 响应失败")
+                AppError::unavailable("docker.response_read_failed")
                     .with_detail(e.to_string())
                     .retryable(true)
             })?;
         if n == 0 {
-            return Err(AppError::unavailable("docker.hijack_closed", "Docker hijack 连接已关闭").retryable(true));
+            return Err(AppError::unavailable("docker.hijack_closed").retryable(true));
         }
         received.extend_from_slice(&chunk[..n]);
     };
@@ -585,7 +518,7 @@ async fn read_hijack_response_head(io: &mut ChannelStream<client::Msg>) -> AppRe
         .and_then(|line| line.split_whitespace().nth(1))
         .and_then(|code| code.parse::<u16>().ok())
         .and_then(|code| StatusCode::from_u16(code).ok())
-        .ok_or_else(|| AppError::internal("docker.hijack_status_invalid", "解析 Docker hijack 状态失败"))?;
+        .ok_or_else(|| AppError::internal("docker.hijack_status_invalid"))?;
 
     Ok((status, headers, pending))
 }
@@ -603,9 +536,9 @@ async fn read_hijack_error_body(
     while body.len() < content_length {
         let n = tokio::time::timeout(DOCKER_HIJACK_ERROR_READ_TIMEOUT, io.read(&mut chunk))
             .await
-            .map_err(|_| AppError::timeout("docker.hijack_error_timeout", "读取 Docker 错误响应超时").retryable(true))?
+            .map_err(|_| AppError::timeout("docker.hijack_error_timeout").retryable(true))?
             .map_err(|e| {
-                AppError::unavailable("docker.response_read_failed", "读取 Docker HTTP 响应失败")
+                AppError::unavailable("docker.response_read_failed")
                     .with_detail(e.to_string())
                     .retryable(true)
             })?;

@@ -19,14 +19,10 @@ use super::rules::{
 };
 
 fn is_rule_running(state: &State<AppState>, id: &str) -> bool {
-    lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "读取端口转发运行时状态失败",
-    )
-    .ok()
-    .and_then(|runtime| runtime.get(id).and_then(|state| state.handle.as_ref()).map(|_| true))
-    .unwrap_or(false)
+    lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")
+        .ok()
+        .and_then(|runtime| runtime.get(id).and_then(|state| state.handle.as_ref()).map(|_| true))
+        .unwrap_or(false)
 }
 
 pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: &State<'_, AppState>) -> AppResult<()> {
@@ -40,17 +36,12 @@ pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: 
         }
     }
     if !found {
-        return Err(AppError::not_found("port_forward.not_found", "端口转发不存在"));
+        return Err(AppError::not_found("port_forward.not_found"));
     }
     save_port_forward_rules_to_state(state, &rules)?;
 
     if !enabled
-        && let Some(handle) = lock_mutex(
-            &state.port_forwards,
-            "port_forward.runtime_lock_failed",
-            "更新端口转发运行时状态失败",
-        )?
-        .remove(&id)
+        && let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
         && let Some(runtime) = handle.handle
     {
         let _ = runtime.stop_tx.send(true);
@@ -61,7 +52,7 @@ pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: 
 
 async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, AppState>) -> AppResult<()> {
     if !rule.enabled {
-        return Err(AppError::validation("port_forward.rule_disabled", "该规则已被禁用"));
+        return Err(AppError::validation("port_forward.rule_disabled"));
     }
     if is_rule_running(state, &rule.id) {
         return Ok(());
@@ -69,12 +60,11 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
 
     // 旧规则可能带着未校验的绑定地址
     let bind_addr = super::rules::resolve_bind_address(Some(rule.bind_address.as_str()))?;
-    let listener = TcpListener::bind((bind_addr.as_str(), rule.local_port)).map_err(|e| {
-        AppError::conflict("port_forward.local_port_unavailable", "本地端口被占用或无法绑定").with_source(e)
-    })?;
+    let listener = TcpListener::bind((bind_addr.as_str(), rule.local_port))
+        .map_err(|e| AppError::conflict("port_forward.local_port_unavailable").with_source(e))?;
     let actual_local_port = listener
         .local_addr()
-        .map_err(|e| AppError::internal("port_forward.local_addr_read_failed", "读取本地端口失败").with_source(e))?
+        .map_err(|e| AppError::internal("port_forward.local_addr_read_failed").with_source(e))?
         .port();
 
     let server_cfg = ServerContext::from_state(state, &rule.server_id)?.server().clone();
@@ -94,12 +84,7 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
         }),
         ..PortForwardRuntimeState::default()
     };
-    lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "记录端口转发运行时状态失败",
-    )?
-    .insert(rule.id.clone(), handle);
+    lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.insert(rule.id.clone(), handle);
     info!(
         target: "shipyardx_lib::services::port_forward",
         "port forward runtime started; rule_id={} server_id={} bind_address={} local_port={} remote_host={} remote_port={}",
@@ -140,21 +125,17 @@ pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) ->
         .collect();
 
     let enabled_ids: HashSet<String> = enabled_rules.iter().map(|rule| rule.id.clone()).collect();
-    let running_ids: Vec<String> = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "读取端口转发运行时状态失败",
-    )?
-    .iter()
-    .filter(|(_, state)| {
-        state
-            .handle
-            .as_ref()
-            .map(|handle| handle.server_id == server_id)
-            .unwrap_or(false)
-    })
-    .map(|(id, _)| id.clone())
-    .collect();
+    let running_ids: Vec<String> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .iter()
+        .filter(|(_, state)| {
+            state
+                .handle
+                .as_ref()
+                .map(|handle| handle.server_id == server_id)
+                .unwrap_or(false)
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
 
     stop_disabled_rules(&state, running_ids, &enabled_ids)?;
 
@@ -165,7 +146,7 @@ pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) ->
                 "failed to start enabled port forward; rule_id={} server_id={} message={} detail={:?}",
                 rule.id,
                 rule.server_id,
-                error.message,
+                error,
                 error.detail
             );
             record_start_failure(&state, &rule.id, error);
@@ -181,14 +162,10 @@ pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<(
     let rules = load_port_forward_rules_from_state(&state)?;
     let enabled_rules: Vec<PortForwardRule> = rules.into_iter().filter(|rule| rule.enabled).collect();
     let enabled_ids: HashSet<String> = enabled_rules.iter().map(|rule| rule.id.clone()).collect();
-    let running_ids: Vec<String> = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "读取端口转发运行时状态失败",
-    )?
-    .keys()
-    .cloned()
-    .collect();
+    let running_ids: Vec<String> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .keys()
+        .cloned()
+        .collect();
 
     stop_disabled_rules(&state, running_ids, &enabled_ids)?;
 
@@ -199,7 +176,7 @@ pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<(
                 "failed to start global enabled port forward; rule_id={} server_id={} message={} detail={:?}",
                 rule.id,
                 rule.server_id,
-                error.message,
+                error,
                 error.detail
             );
             record_start_failure(&state, &rule.id, error);
@@ -212,13 +189,9 @@ pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<(
 }
 
 pub async fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let handle = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "更新端口转发运行时状态失败",
-    )?
-    .remove(&id)
-    .ok_or_else(|| AppError::not_found("port_forward.not_found", "端口转发不存在"))?;
+    let handle = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .remove(&id)
+        .ok_or_else(|| AppError::not_found("port_forward.not_found"))?;
 
     if let Some(runtime) = handle.handle {
         let _ = runtime.stop_tx.send(true);
@@ -236,13 +209,9 @@ pub async fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppRes
 }
 
 pub async fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
-    let handles: Vec<_> = lock_mutex(
-        &state.port_forwards,
-        "port_forward.runtime_lock_failed",
-        "更新端口转发运行时状态失败",
-    )?
-    .drain()
-    .collect();
+    let handles: Vec<_> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .drain()
+        .collect();
     let total = handles.len();
     for (_id, handle) in handles {
         if let Some(runtime) = handle.handle {
@@ -264,12 +233,7 @@ fn stop_disabled_rules(
 ) -> AppResult<()> {
     for id in running_ids {
         if !enabled_ids.contains(&id)
-            && let Some(handle) = lock_mutex(
-                &state.port_forwards,
-                "port_forward.runtime_lock_failed",
-                "更新端口转发运行时状态失败",
-            )?
-            .remove(&id)
+            && let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
             && let Some(runtime) = handle.handle
         {
             let _ = runtime.stop_tx.send(true);

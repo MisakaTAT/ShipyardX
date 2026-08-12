@@ -1,212 +1,1009 @@
 {
-  "common": {
-    "restoreDefaults": "デフォルトに戻す",
-    "cancel": "キャンセル",
-    "confirm": "確定",
-    "opening": "開いています…",
-    "open": "開く",
-    "loading": "読み込み中…",
-    "noMatch": "一致する項目がありません",
-    "placeholder": "—"
-  },
-  "settings": {
-    "nav": {
-      "general": "一般",
-      "appstore": "アプリストア",
-      "hotkeys": "ホットキー",
-      "terminal": "ターミナル",
-      "debug": "デバッグ",
-      "about": "このアプリについて"
-    },
-    "reset": {
-      "title": "デフォルトに戻す",
-      "confirmTitle": "設定をデフォルトに戻しますか？",
-      "confirmSuffix": "。この操作は取り消せません。"
-    },
-    "general": {
-      "theme": {
-        "title": "テーマ",
-        "light": "ライト",
-        "dark": "ダーク",
-        "system": "システムに従う",
-        "lightDesc": "常にライト表示を使用します",
-        "darkDesc": "常にダーク表示を使用します",
-        "systemDesc": "システムの外観に合わせて自動で切り替えます"
-      },
-      "language": {
-        "title": "言語",
-        "description": "表示言語を選択します",
-        "system": "システムに従う"
-      },
-      "version": {
-        "title": "バージョン情報",
-        "current": "バージョン {{version}}",
-        "notChecked": "未確認",
-        "checking": "更新を確認しています",
-        "downloading": "更新をダウンロードしています",
-        "installed": "再起動待ち",
-        "available": "新しいバージョン {{version}} があります",
-        "error": "更新の確認に失敗しました",
-        "latest": "最新の状態です"
-      },
-      "update": {
-        "title": "更新を確認",
-        "description": "最新バージョンを確認してインストールします",
-        "check": "更新を確認",
-        "checking": "確認中…",
-        "downloadingAction": "ダウンロード中…",
-        "install": "{{version}} をインストール",
-        "progressPreparing": "ダウンロードの準備中…",
-        "progressDownloaded": "{{size}} をダウンロード済み",
-        "downloadingDesc": "更新をダウンロードしています。{{progress}}",
-        "installedDesc": "更新の準備が完了しました。アプリを再起動すると適用されます",
-        "latestDesc": "すでに最新バージョンです",
-        "availableDesc": "新しいバージョン {{version}} があります",
-        "availableDescWithDate": "新しいバージョン {{version}} があります（{{date}} 公開）",
-        "toastLatest": "すでに最新バージョンです",
-        "toastFound": "新しいバージョン {{version}} があります",
-        "toastFoundDesc": "ダウンロードしてインストールできます",
-        "toastCheckFailed": "更新の確認に失敗しました",
-        "toastCheckFailedDesc": "updater の設定を確認してから再試行してください",
-        "toastInstalled": "{{name}} {{version}} をインストールしました",
-        "toastInstalledDesc": "インストールが完了しました。アプリを再起動して新しいバージョンをご利用ください",
-        "toastInstallFailed": "更新のインストールに失敗しました",
-        "toastInstallFailedDesc": "インストール中に問題が発生しました。しばらくしてから再試行してください"
-      }
-    },
+  "backend": {
     "appstore": {
-      "sources": {
-        "title": "アプリソース",
-        "description": "利用可能なリポジトリを管理します。使用するソースはストアページで選択します",
-        "namePlaceholder": "リポジトリ名",
-        "add": "ソースを追加",
-        "delete": "ソースを削除"
+      "unnamed_source": "名称未設定のソース"
+    },
+    "errors": {
+      "app": {
+        "main_window_missing": {
+          "message": "メインウィンドウが見つかりません"
+        }
       },
-      "proxy": {
-        "enableTitle": "プロキシを使用",
-        "enableDesc": "アプリストアの同期をグローバルプロキシ経由にします",
-        "urlTitle": "プロキシアドレス",
-        "urlDesc": "HTTP プロキシに対応しています。例: http://127.0.0.1:7890"
+      "appstore": {
+        "app_key_invalid": {
+          "message": "アプリ識別子に使用できない文字が含まれています: {{value}}"
+        },
+        "app_not_found": {
+          "message": "アプリ {{app}} が見つかりません"
+        },
+        "apps_dir_entry_failed": {
+          "message": "apps ディレクトリの項目を読み取れませんでした"
+        },
+        "apps_dir_entry_type_failed": {
+          "message": "apps ディレクトリ項目の種別を読み取れませんでした"
+        },
+        "apps_dir_read_failed": {
+          "message": "apps ディレクトリを読み取れませんでした"
+        },
+        "cache_clear_failed": {
+          "message": "アプリストアのキャッシュを削除できませんでした"
+        },
+        "cache_clear_join_failed": {
+          "message": "アプリストアのキャッシュを削除できませんでした"
+        },
+        "cache_dir_name_invalid": {
+          "message": "アプリストアのキャッシュディレクトリ名が不正です"
+        },
+        "cache_entry_failed": {
+          "message": "アプリストアのキャッシュディレクトリの項目を読み取れませんでした"
+        },
+        "cache_info_join_failed": {
+          "message": "アプリストアのキャッシュ情報を読み取れませんでした"
+        },
+        "cache_parent_missing": {
+          "message": "アプリストアのキャッシュディレクトリの親ディレクトリを特定できませんでした"
+        },
+        "cache_read_failed": {
+          "message": "アプリストアのキャッシュディレクトリを読み取れませんでした"
+        },
+        "cache_recover_rename_failed": {
+          "action": "そのディレクトリを使用しているプログラムを終了してから再試行してください",
+          "message": "未完了のアプリストアキャッシュを整理できませんでした"
+        },
+        "cache_stat_failed": {
+          "message": "アプリストアのキャッシュ情報を読み取れませんでした"
+        },
+        "cache_state_join_failed": {
+          "message": "アプリストアのキャッシュ状態を確認できませんでした"
+        },
+        "compose_render_invalid": {
+          "action": "入力した値に引用符やコロンなど YAML の構造を壊す文字が含まれていないか確認してください",
+          "message": "生成された docker-compose.yml が正しい YAML ではありません"
+        },
+        "compose_template_read_failed": {
+          "message": "デプロイテンプレートを読み取れませんでした"
+        },
+        "compose_up_failed": {
+          "message": "コンテナの起動に失敗しました"
+        },
+        "data_dir_entry_failed": {
+          "message": "データディレクトリの項目を読み取れませんでした"
+        },
+        "data_dir_read_failed": {
+          "message": "データディレクトリを読み取れませんでした"
+        },
+        "data_dir_stat_failed": {
+          "message": "データディレクトリの情報を読み取れませんでした"
+        },
+        "data_dir_unavailable": {
+          "message": "アプリのデータディレクトリを取得できませんでした"
+        },
+        "env_key_invalid": {
+          "action": "英数字とアンダースコアのみ使用でき、数字で始めることはできません",
+          "message": "環境変数名が不正です: {{key}}"
+        },
+        "env_value_invalid": {
+          "action": "値から改行や制御文字を取り除いてください",
+          "message": "{{key}} の値に使用できない文字が含まれています"
+        },
+        "manifest_not_found": {
+          "message": "アプリ {{app}} の data.yml が見つかりません"
+        },
+        "manifest_parse_failed": {
+          "message": "data.yml を解析できませんでした"
+        },
+        "manifest_read_failed": {
+          "message": "data.yml を読み取れませんでした"
+        },
+        "no_enabled_source": {
+          "message": "有効なアプリストアソースがありません"
+        },
+        "settings_parse_failed": {
+          "message": "アプリストアの設定を解析できませんでした"
+        },
+        "settings_read_failed": {
+          "message": "アプリストアの設定を読み取れませんでした"
+        },
+        "settings_serialize_failed": {
+          "message": "アプリストア設定のシリアライズに失敗しました"
+        },
+        "settings_write_join_failed": {
+          "message": "アプリストアの設定を書き込めませんでした"
+        },
+        "source_missing": {
+          "message": "アプリストアソースが設定されていません"
+        },
+        "source_not_found": {
+          "message": "アプリストアソースが見つかりません: {{source_id}}"
+        },
+        "sync_failed": {
+          "message": "アプリストアの同期に失敗しました"
+        },
+        "sync_join_failed": {
+          "message": "アプリストアの同期タスクに失敗しました"
+        },
+        "version_invalid": {
+          "message": "バージョンに使用できない文字が含まれています: {{value}}"
+        },
+        "version_not_found": {
+          "message": "{{app}} バージョン {{version}} の docker-compose.yml が見つかりません"
+        }
       },
-      "cache": {
-        "dirTitle": "キャッシュディレクトリ",
-        "dirDesc": "ストアのリポジトリとメタデータをローカルに保存する場所",
-        "sizeTitle": "キャッシュサイズ",
-        "sizeDesc": "ローカルキャッシュが使用している容量",
-        "clearTitle": "キャッシュを削除",
-        "clearDesc": "ローカルキャッシュを削除します。次回ストアを開くと再取得されます",
-        "clear": "キャッシュを削除",
-        "clearing": "削除中…"
+      "base64": {
+        "decode": {
+          "message": "Base64 のデコードに失敗しました"
+        }
       },
-      "resetDesc": "アプリソースとプロキシ設定を初期値に戻します",
-      "toast": {
-        "saved": "アプリストアの設定を保存しました",
-        "saveFailed": "アプリストアの設定を保存できませんでした",
-        "sourceEnabled": "ソースを有効にしました",
-        "sourceDisabled": "ソースを無効にしました",
-        "sourceRemoved": "ソースを削除しました",
-        "keepOneEnabled": "有効なソースを 1 つ以上残してください",
-        "keepOneSource": "ソースを 1 つ以上残してください",
-        "reset": "アプリストアの設定をデフォルトに戻しました",
-        "cacheCleared": "アプリストアのキャッシュを削除しました",
-        "cacheClearFailed": "アプリストアのキャッシュを削除できませんでした"
+      "config": {
+        "base64_decode_failed": {
+          "message": "保存された認証情報をデコードできませんでした"
+        },
+        "cipher_decrypt_init_failed": {
+          "message": "復号器の初期化に失敗しました"
+        },
+        "cipher_encrypt_init_failed": {
+          "message": "暗号化器の初期化に失敗しました"
+        },
+        "data_dir_create_failed": {
+          "message": "設定ディレクトリを作成できませんでした"
+        },
+        "data_dir_unavailable": {
+          "message": "アプリのデータディレクトリを取得できませんでした"
+        },
+        "decrypt_failed": {
+          "message": "サーバーのパスワードを復号できませんでした"
+        },
+        "encrypt_failed": {
+          "message": "サーバーのパスワードを暗号化できませんでした"
+        },
+        "encrypted_data_invalid": {
+          "message": "保存された認証情報の形式が不正です"
+        },
+        "file_replace_failed": {
+          "message": "設定ファイルを置き換えられませんでした"
+        },
+        "keyring_access_failed": {
+          "action": "キーチェーンサービスが利用可能か確認してください。Linux では gnome-keyring や KWallet などの Secret Service 実装が必要です",
+          "message": "システムキーチェーンにアクセスできませんでした"
+        },
+        "keyring_read_failed": {
+          "action": "キーチェーンサービスが利用可能か確認してください。Linux では gnome-keyring や KWallet などの Secret Service 実装が必要です",
+          "message": "システムキーチェーンを読み取れませんでした"
+        },
+        "keyring_write_failed": {
+          "action": "キーチェーンサービスが利用可能か確認してください。Linux では gnome-keyring や KWallet などの Secret Service 実装が必要です",
+          "message": "システムキーチェーンに書き込めませんでした"
+        },
+        "master_key_invalid": {
+          "action": "キーチェーンから「{{account}}」の項目を削除してから再試行してください",
+          "message": "キーチェーン内のマスターキーの形式が不正です"
+        },
+        "password_utf8_invalid": {
+          "message": "復号したパスワードデータが不正です"
+        },
+        "server_serialize_failed": {
+          "message": "サーバー設定のシリアライズに失敗しました"
+        },
+        "server_write_failed": {
+          "message": "サーバー設定を書き込めませんでした"
+        },
+        "tempfile_create_failed": {
+          "message": "一時設定ファイルを作成できませんでした"
+        },
+        "tempfile_sync_failed": {
+          "message": "一時設定ファイルの同期に失敗しました"
+        },
+        "tempfile_write_failed": {
+          "message": "一時設定ファイルを書き込めませんでした"
+        }
+      },
+      "container": {
+        "stats_empty": {
+          "message": "コンテナの統計情報が空です"
+        }
+      },
+      "daemon": {
+        "serialize_failed": {
+          "message": "Docker daemon 設定のシリアライズに失敗しました"
+        }
+      },
+      "docker": {
+        "api_client_error": {
+          "message": "Docker API リクエストが不正です (HTTP {{status}})"
+        },
+        "api_request_failed": {
+          "message": "Docker API リクエストに失敗しました (HTTP {{status}})"
+        },
+        "api_server_error": {
+          "message": "Docker が一時的に利用できません (HTTP {{status}})"
+        },
+        "api_version_cache_lock_failed": {
+          "message": "Docker API バージョンのキャッシュを更新できませんでした"
+        },
+        "connect_failed": {
+          "message": "Docker に接続できませんでした"
+        },
+        "endpoint_cache_lock_failed": {
+          "message": "Docker エンドポイントのキャッシュを更新できませんでした"
+        },
+        "events_start_failed": {
+          "message": "Docker イベントストリームを開始できませんでした"
+        },
+        "hijack_closed": {
+          "message": "Docker hijack 接続が閉じられました"
+        },
+        "hijack_error_timeout": {
+          "message": "Docker のエラー応答の読み取りがタイムアウトしました"
+        },
+        "hijack_head_too_large": {
+          "message": "Docker hijack の応答ヘッダーが長すぎます"
+        },
+        "hijack_status_invalid": {
+          "message": "Docker hijack のステータスを解析できませんでした"
+        },
+        "hijack_timeout": {
+          "message": "Docker hijack の応答待ちがタイムアウトしました"
+        },
+        "host_unsupported": {
+          "message": "サポートされていない Docker ホストです: {{raw}}"
+        },
+        "http_handshake_failed": {
+          "message": "Docker への HTTP 接続を確立できませんでした"
+        },
+        "http_pool_lock_failed": {
+          "message": "Docker HTTP 接続プールを更新できませんでした"
+        },
+        "permission_denied": {
+          "message": "Docker ソケット {{path}} へのアクセス権限がありません"
+        },
+        "pooled_connection_missing": {
+          "message": "Docker HTTP 接続プールの状態が異常です: 接続がありません"
+        },
+        "request_encode_failed": {
+          "message": "Docker リクエストボディのシリアライズに失敗しました"
+        },
+        "request_failed": {
+          "message": "Docker リクエストに失敗しました"
+        },
+        "request_send_failed": {
+          "message": "Docker への HTTP リクエストを送信できませんでした"
+        },
+        "request_timeout": {
+          "message": "Docker リクエストがタイムアウトしました"
+        },
+        "response_format_failed": {
+          "message": "JSON の整形に失敗しました"
+        },
+        "response_read_failed": {
+          "message": "Docker の HTTP 応答を読み取れませんでした"
+        },
+        "socket_open_failed": {
+          "message": "Docker ソケットチャネルを開けませんでした"
+        },
+        "socket_path_empty": {
+          "message": "Docker Unix ソケットのパスは空にできません"
+        },
+        "stream_error": {
+          "message": "Docker のストリーミングリクエストに失敗しました"
+        },
+        "tcp_host_invalid": {
+          "message": "Docker TCP ホストが不正です: {{raw}}"
+        },
+        "tcp_open_failed": {
+          "message": "Docker TCP チャネルを開けませんでした"
+        },
+        "tcp_port_invalid": {
+          "message": "Docker TCP ポートが不正です: {{raw}}"
+        },
+        "tcp_unreachable": {
+          "message": "Docker TCP ホストに到達できません: {{host}}:{{port}}"
+        },
+        "unavailable": {
+          "message": "Docker が未インストール、未起動、または {{path}} が利用できません"
+        },
+        "version_missing": {
+          "message": "Docker が API バージョンを返しませんでした"
+        }
+      },
+      "docker_events": {
+        "status_lock_failed": {
+          "message": "イベントストリームの状態を読み取れませんでした"
+        },
+        "streams_lock_failed": {
+          "message": "イベントストリームの状態を読み取れませんでした"
+        }
+      },
+      "image": {
+        "export_dir_invalid": {
+          "message": "選択したパスはフォルダーではありません"
+        },
+        "export_dir_missing": {
+          "message": "選択したディレクトリが存在しません"
+        },
+        "export_exists": {
+          "action": "別の書き出しファイル名を指定してください",
+          "message": "ファイルが既に存在します"
+        },
+        "export_file_name_invalid": {
+          "action": "空にはできず、パス区切り文字も含められません",
+          "message": "ファイル名が不正です"
+        },
+        "export_flush_failed": {
+          "message": "書き出したイメージファイルを保存できませんでした"
+        },
+        "export_open_failed": {
+          "message": "イメージ書き出しファイルを作成できませんでした"
+        },
+        "export_permission_denied": {
+          "message": "選択したディレクトリへの書き込み権限がありません"
+        },
+        "export_write_failed": {
+          "message": "イメージ書き出しファイルに書き込めませんでした"
+        },
+        "import_file_denied": {
+          "message": "選択したイメージファイルの読み取り権限がありません"
+        },
+        "import_file_invalid": {
+          "message": "選択したパスはファイルではありません"
+        },
+        "import_file_missing": {
+          "message": "選択したイメージファイルが存在しません"
+        },
+        "import_open_failed": {
+          "message": "イメージファイルを開けませんでした"
+        },
+        "import_stat_failed": {
+          "message": "イメージファイルの情報を読み取れませんでした"
+        },
+        "pull_cancelled": {
+          "message": "イメージの取得を中止しました"
+        },
+        "pull_event_parse_failed": {
+          "message": "イメージ取得の進捗を解析できませんでした"
+        },
+        "pull_failed": {
+          "message": "イメージの取得に失敗しました"
+        },
+        "pull_streams_lock_failed": {
+          "message": "イメージ取得の状態を記録できませんでした"
+        }
+      },
+      "io": {
+        "error": {
+          "message": "ローカルの I/O 操作に失敗しました"
+        }
+      },
+      "log_stream": {
+        "start_lock_failed": {
+          "message": "ログストリームの状態を記録できませんでした"
+        },
+        "stop_lock_failed": {
+          "message": "ログストリームを停止できませんでした"
+        }
+      },
+      "port_forward": {
+        "bind_address_invalid": {
+          "action": "ローカルアドレス一覧から選ぶか、127.0.0.1 を入力してください",
+          "message": "バインドアドレスは IP リテラルである必要があります: {{bind_addr}}"
+        },
+        "bind_address_multicast": {
+          "message": "バインドアドレスにマルチキャストアドレスは指定できません"
+        },
+        "config_dir_create_failed": {
+          "message": "ポートフォワード設定ディレクトリを作成できませんでした"
+        },
+        "connect_failed": {
+          "message": "SSH 接続に失敗しました"
+        },
+        "data_file_lock_failed": {
+          "message": "ポートフォワード設定のパスを読み取れませんでした"
+        },
+        "interfaces_list_failed": {
+          "message": "ローカルのネットワークインターフェースを読み取れませんでした"
+        },
+        "local_addr_read_failed": {
+          "message": "ローカルポートを読み取れませんでした"
+        },
+        "local_port_conflict": {
+          "message": "ローカルポート {{port}} は別のルールで使用されています"
+        },
+        "local_port_unavailable": {
+          "message": "ローカルポートが使用中か、バインドできません"
+        },
+        "local_socket_config_failed": {
+          "message": "ローカルソケットの設定に失敗しました"
+        },
+        "local_socket_takeover_failed": {
+          "message": "ローカル接続を引き継げませんでした"
+        },
+        "not_found": {
+          "message": "ポートフォワードのルールが見つかりません"
+        },
+        "read_failed": {
+          "message": "ポートフォワードのデータを読み取れませんでした"
+        },
+        "remote_unreachable": {
+          "message": "転送先のポートに到達できません"
+        },
+        "rule_disabled": {
+          "message": "このルールは無効になっています"
+        },
+        "rules_parse_failed": {
+          "message": "port_forwards.json を解析できませんでした"
+        },
+        "rules_serialize_failed": {
+          "message": "ポートフォワード設定のシリアライズに失敗しました"
+        },
+        "rules_write_failed": {
+          "message": "port_forwards.json を書き込めませんでした"
+        },
+        "runtime_lock_failed": {
+          "message": "ポートフォワードの実行状態を更新できませんでした"
+        },
+        "shutdown_failed": {
+          "message": "ポートフォワードの書き込み側を閉じられませんでした"
+        },
+        "write_failed": {
+          "message": "ポートフォワードのデータを書き込めませんでした"
+        }
+      },
+      "serde": {
+        "json": {
+          "message": "JSON の処理に失敗しました"
+        },
+        "yaml": {
+          "message": "YAML の処理に失敗しました"
+        }
+      },
+      "server": {
+        "not_found": {
+          "message": "サーバーが見つかりません"
+        }
+      },
+      "servers": {
+        "add_lock_failed": {
+          "message": "サーバー一覧を書き込めませんでした"
+        },
+        "data_file_lock_failed": {
+          "message": "サーバー設定のパスを読み取れませんでした"
+        },
+        "delete_lock_failed": {
+          "message": "サーバー一覧を書き込めませんでした"
+        },
+        "list_lock_failed": {
+          "message": "サーバー一覧を読み取れませんでした"
+        },
+        "store_lock_failed": {
+          "message": "サーバー設定を更新できませんでした"
+        },
+        "update_lock_failed": {
+          "message": "サーバー一覧を書き込めませんでした"
+        }
+      },
+      "sftp": {
+        "channel_open_failed": {
+          "message": "SFTP セッションを開けませんでした"
+        },
+        "create_file_failed": {
+          "message": "リモートファイル {{path}} を作成できませんでした"
+        },
+        "local_dir_entry_failed": {
+          "message": "ローカルディレクトリの項目を読み取れませんでした"
+        },
+        "local_dir_read_failed": {
+          "message": "ローカルディレクトリを読み取れませんでした"
+        },
+        "local_file_open_failed": {
+          "message": "ローカルファイルを開けませんでした"
+        },
+        "local_file_read_failed": {
+          "message": "ローカルファイルを読み取れませんでした"
+        },
+        "local_metadata_failed": {
+          "message": "ローカルファイルの情報を読み取れませんでした"
+        },
+        "mkdir_failed": {
+          "message": "リモートディレクトリ {{path}} を作成できませんでした"
+        },
+        "remote_path_conflict": {
+          "message": "{{path}} は既に存在し、ディレクトリではありません"
+        },
+        "resolve_home_failed": {
+          "message": "リモートのホームディレクトリを解決できませんでした"
+        },
+        "session_init_failed": {
+          "message": "SFTP セッションの初期化に失敗しました"
+        },
+        "shutdown_failed": {
+          "message": "リモートファイルを閉じられませんでした"
+        },
+        "stat_failed": {
+          "message": "リモートディレクトリを確認できませんでした"
+        },
+        "subsystem_request_failed": {
+          "message": "SFTP サブシステムを開始できませんでした"
+        },
+        "write_failed": {
+          "message": "リモートファイルに書き込めませんでした"
+        }
+      },
+      "ssh": {
+        "address_invalid": {
+          "message": "アドレスまたはポートが不正です"
+        },
+        "auth_incomplete": {
+          "action": "ユーザー名、パスワード、または鍵の設定を確認してください",
+          "message": "認証が完了しませんでした"
+        },
+        "auth_method_unsupported": {
+          "action": "サーバーが受け付ける方式に切り替えてください",
+          "message": "この認証方式はサポートされていません"
+        },
+        "auth_type_invalid": {
+          "message": "サポートされていない認証タイプです: {{authType}}"
+        },
+        "channel_open_failed": {
+          "message": "SSH チャネルを開けませんでした"
+        },
+        "command_failed": {
+          "message": "リモートコマンドの実行に失敗しました"
+        },
+        "config_invalid": {
+          "message": "設定が不正です"
+        },
+        "connect_failed": {
+          "message": "接続できませんでした"
+        },
+        "connect_timeout": {
+          "action": "ホストに到達できるか、セキュリティグループやファイアウォールの設定を確認してください",
+          "message": "{{host}}:{{port}} への接続がタイムアウトしました"
+        },
+        "connection_interrupted": {
+          "action": "ネットワークを確認してから再試行してください",
+          "message": "接続が中断されました"
+        },
+        "connection_lost": {
+          "action": "ネットワークを確認してから再試行してください",
+          "message": "接続がタイムアウトしました"
+        },
+        "connection_refused": {
+          "action": "SSH サービスが起動しているか、ポート設定が正しいか確認してください",
+          "message": "サーバーに接続を拒否されました"
+        },
+        "disconnected": {
+          "message": "リモート側から接続が閉じられました"
+        },
+        "exec_failed": {
+          "message": "リモートコマンドを実行できませんでした"
+        },
+        "handshake_failed": {
+          "action": "SSH サーバーの設定とプロトコルの互換性を確認してください",
+          "message": "ハンドシェイクに失敗しました"
+        },
+        "host_key_changed": {
+          "action": "中間者攻撃の可能性があります。サーバーが本当に鍵を更新したか確認してから再度信頼してください",
+          "message": "{{host}}:{{port}} のホスト鍵が変更されています"
+        },
+        "host_key_probe_failed": {
+          "message": "サーバーのホスト鍵を読み取れませんでした"
+        },
+        "host_key_unknown": {
+          "action": "サーバーのフィンガープリントを確認してから信頼してください",
+          "message": "{{host}}:{{port}} のホスト鍵はまだ信頼されていません"
+        },
+        "host_key_verification_failed": {
+          "action": "接続先のサーバーが正しいか、ホスト鍵が変更されていないか確認してください",
+          "message": "ホストの識別情報の検証に失敗しました"
+        },
+        "key_not_found": {
+          "message": "鍵ファイルが存在しないか読み取れません: {{path}}"
+        },
+        "key_parse_failed": {
+          "action": "秘密鍵の形式を確認するか、別の鍵ファイルを選択してください",
+          "message": "鍵を解析できませんでした"
+        },
+        "key_read_failed": {
+          "message": "秘密鍵を読み取れませんでした"
+        },
+        "known_hosts_parse_failed": {
+          "message": "信頼済みホスト鍵を解析できませんでした"
+        },
+        "known_hosts_serialize_failed": {
+          "message": "信頼済みホスト鍵のシリアライズに失敗しました"
+        },
+        "known_hosts_uninitialized": {
+          "message": "ホスト鍵ストアが初期化されていません"
+        },
+        "no_common_algo": {
+          "action": "SSH サーバーまたはクライアントが対応するアルゴリズムを調整してから再試行してください",
+          "message": "互換性のあるアルゴリズムがありません"
+        },
+        "not_authenticated": {
+          "action": "ユーザー名、パスワード、または鍵の設定を確認してください",
+          "message": "認証がまだ完了していません"
+        },
+        "password_auth_failed": {
+          "message": "パスワード認証に失敗しました"
+        },
+        "pool_handle_missing": {
+          "message": "SSH 接続プールの状態が異常です: ハンドルがありません"
+        },
+        "public_key_auth_failed": {
+          "message": "鍵認証に失敗しました"
+        },
+        "rsa_probe_failed": {
+          "message": "RSA 署名アルゴリズムの検出に失敗しました"
+        },
+        "runtime_init_failed": {
+          "message": "SSH ランタイムの初期化に失敗しました"
+        },
+        "stdin_close_failed": {
+          "message": "リモートコマンドの入力を閉じられませんでした"
+        },
+        "stdin_write_failed": {
+          "message": "リモートコマンドの入力に書き込めませんでした"
+        }
+      },
+      "state": {
+        "servers_lock_failed": {
+          "message": "サーバー一覧を読み取れませんでした"
+        }
+      },
+      "system": {
+        "fonts_list_failed": {
+          "message": "システムフォントを読み取れませんでした"
+        },
+        "restart_failed": {
+          "message": "Docker サービスを再起動できませんでした"
+        },
+        "service_manager_missing": {
+          "action": "systemctl、rc-service、service のいずれも利用できません。サーバー上で手動で Docker を再起動してください",
+          "message": "利用可能なサービスマネージャーが見つかりません"
+        },
+        "service_operation_failed": {
+          "action": "サービス名と現在のユーザーの権限を確認してください",
+          "message": "サービスマネージャーが docker restart を実行できませんでした"
+        },
+        "service_restart_failed": {
+          "action": "権限、ユニット名、サービス状態のいずれかが原因の可能性があります。ホスト上で systemctl restart docker.service が実行できる場合は、接続に sudo パスワードを設定してください",
+          "message": "systemctl による docker の再起動に失敗しました"
+        },
+        "su_password_invalid": {
+          "action": "root のパスワードを入力し直してください",
+          "message": "root のパスワードが違います"
+        },
+        "sudo_password_invalid": {
+          "action": "sudo のパスワードを入力し直してください",
+          "message": "sudo のパスワードが違います"
+        },
+        "sudo_password_required": {
+          "action": "サーバー接続に sudo パスワードを設定するか、sudoers でこのユーザーに NOPASSWD を設定してください",
+          "message": "sudo を非対話で実行できません"
+        },
+        "sudo_unavailable": {
+          "action": "root もしくは sudo 権限のあるアカウントを使用してください",
+          "message": "現在のユーザーは root ではなく、sudo も見つかりません"
+        }
+      },
+      "task": {
+        "join": {
+          "message": "バックグラウンドタスクの実行に失敗しました"
+        }
+      },
+      "terminal": {
+        "channel_open_failed": {
+          "message": "ターミナルチャネルを開けませんでした"
+        },
+        "container_id_invalid": {
+          "message": "コンテナ ID または名前に使用できない文字が含まれています"
+        },
+        "exec_read_failed": {
+          "message": "コンテナのターミナルを読み取れませんでした"
+        },
+        "exec_write_failed": {
+          "message": "コンテナのターミナルに書き込めませんでした"
+        },
+        "export_dir_missing": {
+          "message": "書き出し先のディレクトリが存在しません"
+        },
+        "export_path_forbidden": {
+          "message": "アプリのデータディレクトリには書き出せません"
+        },
+        "export_path_invalid": {
+          "message": "書き出しパスが不正です"
+        },
+        "export_path_not_absolute": {
+          "message": "書き出しパスは絶対パスである必要があります"
+        },
+        "export_path_symlink": {
+          "message": "シンボリックリンクは上書きできません"
+        },
+        "export_write_failed": {
+          "message": "ターミナルの書き出しファイルに書き込めませんでした"
+        },
+        "handshake_lock_failed": {
+          "message": "ターミナルのハンドシェイク状態を削除できませんでした"
+        },
+        "pty_request_failed": {
+          "message": "ターミナル PTY を要求できませんでした"
+        },
+        "sessions_lock_failed": {
+          "message": "ターミナルセッションを閉じられませんでした"
+        },
+        "shell_start_failed": {
+          "message": "リモートシェルを起動できませんでした"
+        },
+        "ws_addr_failed": {
+          "message": "ターミナル WebSocket のアドレスを読み取れませんでした"
+        },
+        "ws_bind_failed": {
+          "message": "ターミナル WebSocket サーバーを起動できませんでした"
+        },
+        "ws_clients_lock_failed": {
+          "message": "ターミナル WebSocket クライアントを削除できませんでした"
+        },
+        "ws_not_initialized": {
+          "message": "ターミナル WebSocket サーバーが初期化されていません"
+        }
+      },
+      "unknown": {
+        "message": "操作に失敗しました"
       }
     },
-    "hotkeys": {
-      "commandPalette": {
-        "title": "コマンドパレット",
-        "description": "サーバー、転送ルール、ホストキーを検索したり、コマンドを実行します"
-      },
-      "terminalSearch": {
-        "title": "ターミナル内検索",
-        "description": "ターミナル内の検索バーを表示して入力欄にフォーカスします"
-      },
-      "recording": "キーを押してください…",
-      "unset": "未設定",
-      "resetDesc": "すべてのショートカットを初期の組み合わせに戻します",
-      "toast": {
-        "updated": "ショートカットを {{hotkey}} に変更しました",
-        "reset": "ショートカットをデフォルトに戻しました"
-      }
+    "image_pull": {
+      "cancelled": "取得を中止しました",
+      "cancelled_detail": "このイメージの取得を中止しました",
+      "docker_connect_failed": "Docker API に接続できませんでした",
+      "done": "取得が完了しました",
+      "done_detail": "イメージの準備ができました",
+      "failed": "取得に失敗しました",
+      "preparing": "取得の準備中"
     },
-    "terminal": {
-      "frontend": {
-        "title": "レンダラー",
-        "description": "ターミナルの描画方式を切り替えます"
-      },
-      "ligatures": {
-        "title": "合字",
-        "description": "対応するプログラミングフォントで合字を有効にします"
-      },
-      "theme": {
-        "title": "配色",
-        "description": "ターミナルの配色テーマを切り替えます",
-        "searchPlaceholder": "配色を検索"
-      },
-      "scrollback": {
-        "title": "スクロールバック",
-        "description": "バッファに保持する行数"
-      },
-      "fontFamily": {
-        "title": "フォント",
-        "description": "ターミナルで使用する等幅フォントを設定します",
-        "searchPlaceholder": "フォントを検索"
-      },
-      "fontSize": {
-        "title": "フォントサイズ",
-        "description": "ターミナル文字の表示サイズを調整します"
-      },
-      "cursorStyle": {
-        "title": "カーソルの形状",
-        "description": "ターミナルカーソルの形を設定します",
-        "block": "ブロック",
-        "underline": "アンダーライン",
-        "bar": "バー"
-      },
-      "cursorBlink": {
-        "title": "カーソルの点滅",
-        "description": "カーソルの点滅アニメーションを切り替えます"
-      },
-      "lineHeight": {
-        "title": "行の高さ",
-        "description": "行の高さを調整します。全体の縦方向の密度に影響します"
-      },
-      "resetDesc": "ターミナルのすべての項目を初期値に戻します",
-      "toast": {
-        "reset": "ターミナル設定をデフォルトに戻しました"
-      }
+    "install": {
+      "compose_upload_failed": "docker-compose.yml をアップロードできませんでした",
+      "data_copy_done": "データディレクトリのコピーが完了しました（合計 {{total}}）",
+      "data_copy_done_unknown": "データディレクトリのコピーが完了しました",
+      "data_copy_failed": "データをコピーできませんでした",
+      "data_copy_progress": "{{transferred}} / {{total}}（{{percent}}%）をアップロード済み",
+      "data_copy_progress_unknown": "{{transferred}} をアップロード済み",
+      "data_copy_running": "データディレクトリをコピーしています…",
+      "deploy_done": "ファイルの配置が完了しました",
+      "deploy_running": "リモートサーバーにファイルを配置しています…",
+      "env_upload_failed": ".env をアップロードできませんでした",
+      "env_validate_failed": "変数の検証に失敗しました",
+      "network_done": "Docker ネットワークの準備ができました",
+      "network_running": "Docker ネットワークを作成しています…",
+      "prepare_done": "デプロイテンプレートの準備が完了しました",
+      "prepare_running": "デプロイテンプレートを準備しています…",
+      "remote_mkdir_failed": "リモートディレクトリを作成できませんでした",
+      "sftp_connect_failed": "SFTP 接続を確立できませんでした",
+      "start_done": "コンテナが起動しました",
+      "start_failed": "コンテナの起動に失敗しました",
+      "start_running": "コンテナを起動しています…",
+      "template_read_failed": "テンプレートを読み取れませんでした",
+      "template_render_failed": "テンプレートの生成に失敗しました"
     },
-    "debug": {
-      "devtools": {
-        "title": "開発者ツール",
-        "description": "現在のメインウィンドウの DevTools を開きます",
-        "action": "開発者ツールを開く",
-        "toastOpened": "DevTools を開きました",
-        "toastFailed": "DevTools を開けませんでした"
-      },
-      "logs": {
-        "title": "ログディレクトリ",
-        "description": "アプリのログが書き出されるディレクトリを開きます",
-        "action": "ログディレクトリを開く",
-        "toastOpened": "ログディレクトリを開きました",
-        "toastFailed": "ログディレクトリを開けませんでした"
-      }
+    "port_forward": {
+      "all_interfaces": "すべてのインターフェース (0.0.0.0)"
+    }
+  },
+  "ui": {
+    "appstore": {
+      "syncDone": "同期が完了しました"
     },
-    "about": {
-      "description": "Tauri で構築したデスクトップ向け Docker 管理クライアントです。Windows、macOS、Linux に対応し、ローカルとリモートで一貫したコンテナ操作を提供します。",
-      "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
-      "releaseNotes": "リリースノート",
-      "releaseNotesDesc": "最新のリリース履歴を確認します",
-      "website": "公式サイト",
-      "websiteDesc": "プロジェクトのホームページを開きます",
-      "feedback": "フィードバック",
-      "feedbackDesc": "issue の報告や機能の提案をします",
-      "sourceCode": "ソースコード",
-      "sourceCodeDesc": "プロジェクトのリポジトリを閲覧します",
-      "contributors": "コントリビューター",
-      "contributorsDesc": "プロジェクトの貢献者を確認します",
-      "toastMetadataFailed": "アプリ情報を読み取れませんでした",
-      "toastOpenLinkFailed": "リンクを開けませんでした"
+    "common": {
+      "cancel": "キャンセル",
+      "confirm": "確定",
+      "loading": "読み込み中…",
+      "noMatch": "一致する項目がありません",
+      "open": "開く",
+      "opening": "開いています…",
+      "placeholder": "—",
+      "restoreDefaults": "デフォルトに戻す"
+    },
+    "servers": {
+      "connectOk": "サーバーに接続しました",
+      "testFailed": "接続テストに失敗しました"
+    },
+    "settings": {
+      "about": {
+        "contributors": "コントリビューター",
+        "contributorsDesc": "プロジェクトの貢献者を確認します",
+        "copyright": "Copyright © {{years}} <0>{{author}}</0>. All rights reserved.",
+        "description": "Tauri で構築したデスクトップ向け Docker 管理クライアントです。Windows、macOS、Linux に対応し、ローカルとリモートで一貫したコンテナ操作を提供します。",
+        "feedback": "フィードバック",
+        "feedbackDesc": "issue の報告や機能の提案をします",
+        "releaseNotes": "リリースノート",
+        "releaseNotesDesc": "最新のリリース履歴を確認します",
+        "sourceCode": "ソースコード",
+        "sourceCodeDesc": "プロジェクトのリポジトリを閲覧します",
+        "toastMetadataFailed": "アプリ情報を読み取れませんでした",
+        "toastOpenLinkFailed": "リンクを開けませんでした",
+        "website": "公式サイト",
+        "websiteDesc": "プロジェクトのホームページを開きます"
+      },
+      "appstore": {
+        "cache": {
+          "clear": "キャッシュを削除",
+          "clearDesc": "ローカルキャッシュを削除します。次回ストアを開くと再取得されます",
+          "clearTitle": "キャッシュを削除",
+          "clearing": "削除中…",
+          "dirDesc": "ストアのリポジトリとメタデータをローカルに保存する場所",
+          "dirTitle": "キャッシュディレクトリ",
+          "sizeDesc": "ローカルキャッシュが使用している容量",
+          "sizeTitle": "キャッシュサイズ"
+        },
+        "proxy": {
+          "enableDesc": "アプリストアの同期をグローバルプロキシ経由にします",
+          "enableTitle": "プロキシを使用",
+          "urlDesc": "HTTP プロキシに対応しています。例: http://127.0.0.1:7890",
+          "urlTitle": "プロキシアドレス"
+        },
+        "resetDesc": "アプリソースとプロキシ設定を初期値に戻します",
+        "sources": {
+          "add": "ソースを追加",
+          "delete": "ソースを削除",
+          "description": "利用可能なリポジトリを管理します。使用するソースはストアページで選択します",
+          "namePlaceholder": "リポジトリ名",
+          "title": "アプリソース"
+        },
+        "toast": {
+          "cacheClearFailed": "アプリストアのキャッシュを削除できませんでした",
+          "cacheCleared": "アプリストアのキャッシュを削除しました",
+          "keepOneEnabled": "有効なソースを 1 つ以上残してください",
+          "keepOneSource": "ソースを 1 つ以上残してください",
+          "reset": "アプリストアの設定をデフォルトに戻しました",
+          "saveFailed": "アプリストアの設定を保存できませんでした",
+          "saved": "アプリストアの設定を保存しました",
+          "sourceDisabled": "ソースを無効にしました",
+          "sourceEnabled": "ソースを有効にしました",
+          "sourceRemoved": "ソースを削除しました"
+        }
+      },
+      "debug": {
+        "devtools": {
+          "action": "開発者ツールを開く",
+          "description": "現在のメインウィンドウの DevTools を開きます",
+          "title": "開発者ツール",
+          "toastFailed": "DevTools を開けませんでした",
+          "toastOpened": "DevTools を開きました"
+        },
+        "logs": {
+          "action": "ログディレクトリを開く",
+          "description": "アプリのログが書き出されるディレクトリを開きます",
+          "title": "ログディレクトリ",
+          "toastFailed": "ログディレクトリを開けませんでした",
+          "toastOpened": "ログディレクトリを開きました"
+        }
+      },
+      "general": {
+        "language": {
+          "description": "表示言語を選択します",
+          "system": "システムに従う",
+          "title": "言語"
+        },
+        "theme": {
+          "dark": "ダーク",
+          "darkDesc": "常にダーク表示を使用します",
+          "light": "ライト",
+          "lightDesc": "常にライト表示を使用します",
+          "system": "システムに従う",
+          "systemDesc": "システムの外観に合わせて自動で切り替えます",
+          "title": "テーマ"
+        },
+        "update": {
+          "availableDesc": "新しいバージョン {{version}} があります",
+          "availableDescWithDate": "新しいバージョン {{version}} があります（{{date}} 公開）",
+          "check": "更新を確認",
+          "checking": "確認中…",
+          "description": "最新バージョンを確認してインストールします",
+          "downloadingAction": "ダウンロード中…",
+          "downloadingDesc": "更新をダウンロードしています。{{progress}}",
+          "install": "{{version}} をインストール",
+          "installedDesc": "更新の準備が完了しました。アプリを再起動すると適用されます",
+          "latestDesc": "すでに最新バージョンです",
+          "progressDownloaded": "{{size}} をダウンロード済み",
+          "progressPreparing": "ダウンロードの準備中…",
+          "title": "更新を確認",
+          "toastCheckFailed": "更新の確認に失敗しました",
+          "toastCheckFailedDesc": "updater の設定を確認してから再試行してください",
+          "toastFound": "新しいバージョン {{version}} があります",
+          "toastFoundDesc": "ダウンロードしてインストールできます",
+          "toastInstallFailed": "更新のインストールに失敗しました",
+          "toastInstallFailedDesc": "インストール中に問題が発生しました。しばらくしてから再試行してください",
+          "toastInstalled": "{{name}} {{version}} をインストールしました",
+          "toastInstalledDesc": "インストールが完了しました。アプリを再起動して新しいバージョンをご利用ください",
+          "toastLatest": "すでに最新バージョンです"
+        },
+        "version": {
+          "available": "新しいバージョン {{version}} があります",
+          "checking": "更新を確認しています",
+          "current": "バージョン {{version}}",
+          "downloading": "更新をダウンロードしています",
+          "error": "更新の確認に失敗しました",
+          "installed": "再起動待ち",
+          "latest": "最新の状態です",
+          "notChecked": "未確認",
+          "title": "バージョン情報"
+        }
+      },
+      "hotkeys": {
+        "commandPalette": {
+          "description": "サーバー、転送ルール、ホストキーを検索したり、コマンドを実行します",
+          "title": "コマンドパレット"
+        },
+        "recording": "キーを押してください…",
+        "resetDesc": "すべてのショートカットを初期の組み合わせに戻します",
+        "terminalSearch": {
+          "description": "ターミナル内の検索バーを表示して入力欄にフォーカスします",
+          "title": "ターミナル内検索"
+        },
+        "toast": {
+          "reset": "ショートカットをデフォルトに戻しました",
+          "updated": "ショートカットを {{hotkey}} に変更しました"
+        },
+        "unset": "未設定"
+      },
+      "nav": {
+        "about": "このアプリについて",
+        "appstore": "アプリストア",
+        "debug": "デバッグ",
+        "general": "一般",
+        "hotkeys": "ホットキー",
+        "terminal": "ターミナル"
+      },
+      "reset": {
+        "confirmSuffix": "。この操作は取り消せません。",
+        "confirmTitle": "設定をデフォルトに戻しますか？",
+        "title": "デフォルトに戻す"
+      },
+      "terminal": {
+        "cursorBlink": {
+          "description": "カーソルの点滅アニメーションを切り替えます",
+          "title": "カーソルの点滅"
+        },
+        "cursorStyle": {
+          "bar": "バー",
+          "block": "ブロック",
+          "description": "ターミナルカーソルの形を設定します",
+          "title": "カーソルの形状",
+          "underline": "アンダーライン"
+        },
+        "fontFamily": {
+          "description": "ターミナルで使用する等幅フォントを設定します",
+          "searchPlaceholder": "フォントを検索",
+          "title": "フォント"
+        },
+        "fontSize": {
+          "description": "ターミナル文字の表示サイズを調整します",
+          "title": "フォントサイズ"
+        },
+        "frontend": {
+          "description": "ターミナルの描画方式を切り替えます",
+          "title": "レンダラー"
+        },
+        "ligatures": {
+          "description": "対応するプログラミングフォントで合字を有効にします",
+          "title": "合字"
+        },
+        "lineHeight": {
+          "description": "行の高さを調整します。全体の縦方向の密度に影響します",
+          "title": "行の高さ"
+        },
+        "resetDesc": "ターミナルのすべての項目を初期値に戻します",
+        "scrollback": {
+          "description": "バッファに保持する行数",
+          "title": "スクロールバック"
+        },
+        "theme": {
+          "description": "ターミナルの配色テーマを切り替えます",
+          "searchPlaceholder": "配色を検索",
+          "title": "配色"
+        },
+        "toast": {
+          "reset": "ターミナル設定をデフォルトに戻しました"
+        }
+      }
     }
   }
 }
