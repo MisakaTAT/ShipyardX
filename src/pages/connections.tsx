@@ -10,7 +10,7 @@ import { APP_PATHS } from '@/shared/lib/app-router'
 import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { ServerCard } from '@/features/servers/ui/server-card'
 import { useDeleteServer, useServers } from '@/features/servers/api/use-servers'
-import { forgetSnapshot, useServerSnapshots } from '@/features/servers/api/use-server-snapshot'
+import { forgetServerOs, useServerOsMap } from '@/features/servers/api/use-server-os'
 
 interface ConnectionsProps {
   onConnect: (server: ServerConfig) => void
@@ -19,7 +19,7 @@ interface ConnectionsProps {
 export default function Connections({ onConnect }: ConnectionsProps) {
   const { data: servers = [], isLoading, isFetching } = useServers()
   const deleteServer = useDeleteServer()
-  const { snapshots, refresh, refreshing } = useServerSnapshots()
+  const serverOsMap = useServerOsMap()
 
   const [showDialog, setShowDialog] = useState(false)
   const [editingServer, setEditingServer] = useState<ServerConfig | null>(null)
@@ -94,15 +94,13 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                   <ServerCard
                     key={server.id}
                     server={server}
-                    snapshot={snapshots[server.id]}
-                    refreshing={refreshing.has(server.id)}
+                    os={serverOsMap[server.id]}
                     onConnect={() => onConnect(server)}
                     onEdit={() => {
                       setEditingServer(server)
                       setShowDialog(true)
                     }}
                     onDelete={() => setDeleteServerId(server.id)}
-                    onRefresh={() => void refresh(server.id)}
                   />
                 ))}
               </div>
@@ -134,7 +132,7 @@ export default function Connections({ onConnect }: ConnectionsProps) {
         onConfirm={() => {
           if (!deleteServerId) return
           deleteServer.mutate(deleteServerId)
-          forgetSnapshot(deleteServerId)
+          forgetServerOs(deleteServerId)
         }}
       />
     </>
