@@ -152,8 +152,6 @@ fn docker_api_kind(status_code: u16) -> AppErrorKind {
     }
 }
 
-/// Docker HTTP 错误的统一构造：bollard 和自建 transport 两条路径都走这里，
-/// 否则状态码分类、retryable 规则会各写一份、改的时候漏一处。
 pub(crate) fn docker_api_error(status_code: u16, detail: Option<String>) -> AppError {
     AppError::new(docker_api_code(status_code), docker_api_kind(status_code))
         .param("status", status_code)

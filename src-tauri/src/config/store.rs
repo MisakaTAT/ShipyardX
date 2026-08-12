@@ -18,7 +18,6 @@ const KEYRING_ACCOUNT: &str = "ShipyardX Safe Storage";
 
 static MASTER_KEY: OnceLock<[u8; 32]> = OnceLock::new();
 
-/// 钥匙串的读/写/访问各自成 code：原先把中文动词拼进文案，无法翻译。
 fn keyring_error(code: &'static str, error: keyring::Error) -> AppError {
     AppError::internal(code).with_detail(error.to_string())
 }
