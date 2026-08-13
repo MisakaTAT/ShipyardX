@@ -1,31 +1,16 @@
-import { useState, useEffect, lazy, Suspense, type ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { Router, useLocation } from 'wouter'
-import { Loader2 } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import Sider from '@/layouts/sider/sider'
 import Connections from '@/pages/connections'
-import type { WorkspaceTab } from '@/pages/workspace'
+import Workspace, { type WorkspaceTab } from '@/pages/workspace'
+import AppStore from '@/pages/app-store'
+import PortForward from '@/pages/port-forward'
+import HostKeys from '@/pages/host-keys'
+import SettingsPage from '@/pages/settings'
 import { KeepAlive } from '@/shared/components/keep-alive'
 import { CommandPaletteHost } from '@/features/command-palette/ui/command-palette-host'
 import { APP_PATHS, appMemoryLocation } from '@/shared/lib/app-router'
-
-const Workspace = lazy(() => import('@/pages/workspace'))
-const AppStore = lazy(() => import('@/pages/app-store'))
-const PortForward = lazy(() => import('@/pages/port-forward'))
-const HostKeys = lazy(() => import('@/pages/host-keys'))
-const SettingsPage = lazy(() => import('@/pages/settings'))
-
-function PageFallback() {
-  return (
-    <div className="flex h-full min-h-48 flex-1 items-center justify-center">
-      <Loader2 className="size-6 animate-spin text-muted-foreground" />
-    </div>
-  )
-}
-
-function LazyPage({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<PageFallback />}>{children}</Suspense>
-}
 
 export default function Layout() {
   return (
@@ -57,50 +42,44 @@ function LayoutContent() {
       <main className="flex flex-1 flex-col overflow-hidden bg-background">
         {isStore ? (
           <div className="flex-1 overflow-auto p-3">
-            <LazyPage>
-              <AppStore />
-            </LazyPage>
+            <AppStore />
           </div>
         ) : null}
 
         {selectedServer ? (
           <KeepAlive show={isWorkspace} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <LazyPage>
-              <Workspace
-                selectedServer={selectedServer}
-                onDisconnect={() => setSelectedServer(null)}
-                activeTab={workspaceTab}
-                onActiveTabChange={setWorkspaceTab}
-              />
-            </LazyPage>
+            <Workspace
+              selectedServer={selectedServer}
+              onDisconnect={() => setSelectedServer(null)}
+              activeTab={workspaceTab}
+              onActiveTabChange={setWorkspaceTab}
+            />
           </KeepAlive>
         ) : null}
 
         {isPortForward ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <LazyPage>
-              <PortForward />
-            </LazyPage>
+            <PortForward />
           </div>
         ) : null}
 
         {isHostKeys ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <LazyPage>
-              <HostKeys />
-            </LazyPage>
+            <HostKeys />
           </div>
         ) : null}
 
         {isSettings ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <LazyPage>
-              <SettingsPage />
-            </LazyPage>
+            <SettingsPage />
           </div>
         ) : null}
 
-        {!selectedServer && isWorkspace ? <Connections onConnect={setSelectedServer} /> : null}
+        {!selectedServer && isWorkspace ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <Connections onConnect={setSelectedServer} />
+          </div>
+        ) : null}
       </main>
     </div>
   )
