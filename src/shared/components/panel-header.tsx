@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { LucideProps } from 'lucide-react'
 import { SearchInput } from '@/shared/components/search-input'
 import { formatNowTime } from '@/shared/lib/datetime'
@@ -22,6 +23,7 @@ interface PanelHeaderProps {
 }
 
 export function PanelHeader({ icon: Icon, title, stats, search, lastUpdated, actions, className }: PanelHeaderProps) {
+  const { t } = useTranslation()
   const updatedText =
     lastUpdated == null
       ? null
@@ -49,7 +51,9 @@ export function PanelHeader({ icon: Icon, title, stats, search, lastUpdated, act
       ) : null}
 
       <div className="ml-auto flex items-center gap-2">
-        {updatedText ? <span className="text-[11px] text-muted-foreground">更新于 {updatedText}</span> : null}
+        {updatedText ? (
+          <span className="text-[11px] text-muted-foreground">{t('ui.panel.updatedAt', { time: updatedText })}</span>
+        ) : null}
         {actions}
       </div>
     </div>

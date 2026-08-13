@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import {
   volumeCreateDefaultValues,
   volumeCreateFormSchema,
@@ -26,6 +27,7 @@ export interface VolumeCreateDialogProps {
 }
 
 export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCreated }: VolumeCreateDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const createVolume = useCreateVolume(serverId)
 
@@ -74,7 +76,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
       },
       {
         onSuccess: () => {
-          toast.success('存储卷已创建')
+          toast.success(t('ui.volumes.created'))
           onOpenChange(false)
           void onCreated?.()
         },
@@ -91,24 +93,24 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
         if (!next && submitting) return
         onOpenChange(next)
       }}
-      title="创建存储卷"
+      title={t('ui.volumes.createTitle')}
       icon={Database}
       disableClose={submitting}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-vol-create`} disabled={submitting}>
             {submitting ? (
               <>
                 <Loader2 className="animate-spin" />
-                创建中
+                {t('ui.common.creating')}
               </>
             ) : (
               <>
                 <Plus />
-                创建
+                {t('ui.common.create')}
               </>
             )}
           </Button>
@@ -121,7 +123,12 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="名称" htmlFor={`${formId}-name`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.common.name')}
+                htmlFor={`${formId}-name`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${formId}-name`}
                   {...field}
@@ -136,10 +143,10 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
             control={form.control}
             name="driver"
             render={({ field }) => (
-              <FormFieldRow label="模式" required>
+              <FormFieldRow label={t('ui.volumes.mode')} required>
                 <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="选择 Driver" />
+                    <SelectValue placeholder={t('ui.docker.selectDriver')} />
                   </SelectTrigger>
                   <SelectContent align="start">
                     <SelectItem value="local">local</SelectItem>
@@ -160,7 +167,7 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                     disabled={submitting}
                     onCheckedChange={(c) => field.onChange(c === true)}
                   />
-                  启用 NFS 存储
+                  {t('ui.volumes.enableNfs')}
                 </FieldLabel>
               </Field>
             )}
@@ -172,11 +179,16 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 control={form.control}
                 name="nfsAddr"
                 render={({ field, fieldState }) => (
-                  <FormFieldRow label="地址" htmlFor={`${formId}-nfs-addr`} required invalid={fieldState.invalid}>
+                  <FormFieldRow
+                    label={t('ui.volumes.nfsAddr')}
+                    htmlFor={`${formId}-nfs-addr`}
+                    required
+                    invalid={fieldState.invalid}
+                  >
                     <Input
                       id={`${formId}-nfs-addr`}
                       {...field}
-                      placeholder="10.0.0.10 或 nfs.example.com"
+                      placeholder={t('ui.volumes.nfsAddrPlaceholder')}
                       disabled={submitting}
                       aria-invalid={fieldState.invalid}
                     />
@@ -188,7 +200,11 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                   control={form.control}
                   name="nfsVersion"
                   render={({ field, fieldState }) => (
-                    <FormFieldRow label="版本" htmlFor={`${formId}-nfs-ver`} invalid={fieldState.invalid}>
+                    <FormFieldRow
+                      label={t('ui.volumes.nfsVersion')}
+                      htmlFor={`${formId}-nfs-ver`}
+                      invalid={fieldState.invalid}
+                    >
                       <Input
                         id={`${formId}-nfs-ver`}
                         {...field}
@@ -203,7 +219,12 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                   control={form.control}
                   name="nfsMount"
                   render={({ field, fieldState }) => (
-                    <FormFieldRow label="挂载点" htmlFor={`${formId}-nfs-mount`} required invalid={fieldState.invalid}>
+                    <FormFieldRow
+                      label={t('ui.volumes.nfsMount')}
+                      htmlFor={`${formId}-nfs-mount`}
+                      required
+                      invalid={fieldState.invalid}
+                    >
                       <Input
                         id={`${formId}-nfs-mount`}
                         {...field}
@@ -219,7 +240,11 @@ export default function VolumeCreateDialog({ serverId, open, onOpenChange, onCre
                 control={form.control}
                 name="nfsOptions"
                 render={({ field, fieldState }) => (
-                  <FormFieldRow label="可选参数" htmlFor={`${formId}-nfs-opt`} invalid={fieldState.invalid}>
+                  <FormFieldRow
+                    label={t('ui.volumes.nfsOptions')}
+                    htmlFor={`${formId}-nfs-opt`}
+                    invalid={fieldState.invalid}
+                  >
                     <Input
                       id={`${formId}-nfs-opt`}
                       {...field}

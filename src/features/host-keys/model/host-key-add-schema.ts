@@ -3,9 +3,12 @@ import { trimmedRequiredString } from '@/shared/lib/form-zod'
 import { isValidFingerprint } from '@/features/host-keys/model/host-key'
 
 export const hostKeyAddFormSchema = z.object({
-  host: trimmedRequiredString('请填写主机地址'),
-  port: z.number().int().min(1, '端口无效').max(65535, '端口不能超过 65535'),
-  fingerprint: trimmedRequiredString('请填写指纹').refine(isValidFingerprint, '指纹格式应为 SHA256:<43 位 base64>'),
+  host: trimmedRequiredString('ui.validation.host'),
+  port: z.number().int().min(1, 'ui.validation.portInvalid').max(65535, 'ui.validation.portTooLarge'),
+  fingerprint: trimmedRequiredString('ui.validation.fingerprint').refine(
+    isValidFingerprint,
+    'ui.validation.fingerprintFormat'
+  ),
 })
 
 export type HostKeyAddFormValues = z.infer<typeof hostKeyAddFormSchema>

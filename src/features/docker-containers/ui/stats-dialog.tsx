@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Cpu, HardDrive, MemoryStick, Network } from 'lucide-react'
 import { formatNowTime } from '@/shared/lib/datetime'
 import { StandardDialog } from '@/shared/components/standard-dialog'
@@ -94,6 +95,7 @@ function StatRow({ icon, label, value, subvalue, color }: StatRowProps) {
 }
 
 export default function StatsDialog({ serverId, containerId, containerName, onClose }: Props) {
+  const { t } = useTranslation()
   const [lastUpdated, setLastUpdated] = useState('')
   const statsQuery = useContainerStats(serverId, containerId)
   const stats = statsQuery.data ?? null
@@ -114,7 +116,7 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
         {loading && !stats ? (
           <div className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
             <div className="size-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-            <span className="text-sm">获取资源数据中...</span>
+            <span className="text-sm">{t('ui.stats.loading')}</span>
           </div>
         ) : null}
 
@@ -124,26 +126,35 @@ export default function StatsDialog({ serverId, containerId, containerName, onCl
               <Gauge
                 value={stats.cpu_percent ?? 0}
                 color="blue"
-                label="CPU 使用率"
+                label={t('ui.stats.cpuPercent')}
                 sublabel={`${stats.cpu_percent ?? 0}%`}
               />
-              <Gauge value={stats.mem_percent ?? 0} color="green" label="内存使用率" sublabel={stats.mem} />
+              <Gauge
+                value={stats.mem_percent ?? 0}
+                color="green"
+                label={t('ui.stats.memPercent')}
+                sublabel={stats.mem}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <StatRow
                 icon={<MemoryStick size={16} />}
-                label="内存使用"
+                label={t('ui.stats.memUsage')}
                 value={stats.mem_usage}
-                subvalue={`限制: ${stats.mem_limit}`}
+                subvalue={t('ui.stats.memLimit', { limit: stats.mem_limit })}
                 color="green"
               />
               <StatRow icon={<Cpu size={16} />} label="CPU" value={`${stats.cpu_percent}%`} color="blue" />
-              <StatRow icon={<Network size={16} />} label="网络 接收 / 发送" value={stats.net} color="cyan" />
-              <StatRow icon={<HardDrive size={16} />} label="磁盘 读 / 写" value={stats.blk} color="purple" />
+              <StatRow icon={<Network size={16} />} label={t('ui.stats.network')} value={stats.net} color="cyan" />
+              <StatRow icon={<HardDrive size={16} />} label={t('ui.stats.disk')} value={stats.blk} color="purple" />
             </div>
 
-            {lastUpdated ? <div className="text-center text-xs text-muted-foreground">更新于 {lastUpdated}</div> : null}
+            {lastUpdated ? (
+              <div className="text-center text-xs text-muted-foreground">
+                {t('ui.stats.updatedAt', { time: lastUpdated })}
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

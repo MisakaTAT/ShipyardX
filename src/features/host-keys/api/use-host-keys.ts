@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands, type KnownHostEntry } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
@@ -22,7 +23,9 @@ export function useForgetHostKey() {
     mutationFn: ({ host, port }: { host: string; port: number }) => commands.forgetHostKey(host, port),
     invalidate: [qk.knownHosts()],
     onSuccess: (_removed, { host, port }) => {
-      toast.success(`已删除 ${host}:${port} 的指纹`, { description: '下次连接该主机时会重新要求确认' })
+      toast.success(i18n.t('ui.hostKeys.deleted', { host, port: String(port) }), {
+        description: i18n.t('ui.hostKeys.deletedDesc'),
+      })
     },
   })
 }
@@ -35,7 +38,7 @@ export function useForgetHostKeys() {
     },
     invalidate: [qk.knownHosts()],
     onSuccess: (count) => {
-      toast.success(`已清理 ${count} 条指纹`)
+      toast.success(i18n.t('ui.hostKeys.cleaned', { count: String(count) }))
     },
   })
 }
@@ -45,7 +48,9 @@ export function useClearKnownHosts() {
     mutationFn: () => commands.clearKnownHosts(),
     invalidate: [qk.knownHosts()],
     onSuccess: (count) => {
-      toast.success(`已清空 ${count} 条指纹`, { description: '所有主机下次连接时都会重新要求确认' })
+      toast.success(i18n.t('ui.hostKeys.cleared', { count: String(count) }), {
+        description: i18n.t('ui.hostKeys.clearedDesc'),
+      })
     },
   })
 }
@@ -56,7 +61,7 @@ export function useTrustHostKey() {
       commands.trustHostKey(host, port, fingerprint),
     invalidate: [qk.knownHosts()],
     onSuccess: (_r, { host, port }) => {
-      toast.success(`已信任 ${host}:${port} 的指纹`)
+      toast.success(i18n.t('ui.hostKeys.trusted', { host, port: String(port) }))
     },
   })
 }
@@ -85,7 +90,7 @@ export function useHostKeyProbe() {
         const fingerprint = await commands.probeHostKey(entry.host, entry.port)
         update(id, fingerprint === entry.fingerprint ? { status: 'match' } : { status: 'mismatch', fingerprint })
       } catch (error) {
-        update(id, { status: 'failed', message: getErrorMessage(error, '检测失败') })
+        update(id, { status: 'failed', message: getErrorMessage(error, i18n.t('ui.hostKeys.checkFailed')) })
       }
     },
     [update]

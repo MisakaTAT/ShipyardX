@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { pickAppShortDesc, pickAppTags } from '@/features/appstore/model/app-locale'
 import { useLocation } from 'wouter'
 import {
   ArrowLeftRight,
@@ -22,6 +24,7 @@ import { useAppSettings } from '@/app/settings-store'
 import { withQuery, type PaletteItem } from '@/features/command-palette/model/palette-item'
 
 export function usePaletteItems(enabled: boolean): PaletteItem[] {
+  const { t, i18n } = useTranslation()
   const [, navigate] = useLocation()
   const { setTheme } = useTheme()
   const light = useIsLightMode()
@@ -85,13 +88,14 @@ export function usePaletteItems(enabled: boolean): PaletteItem[] {
     const multiSource = appsBySource.length > 1
     for (const { sourceId, sourceName, apps } of appsBySource) {
       for (const app of apps) {
+        const shortDesc = pickAppShortDesc(app, i18n.language)
         items.push({
           id: `app:${sourceId}:${app.key}`,
           group: 'app',
           title: app.name,
-          subtitle: multiSource ? `${sourceName} · ${app.short_desc_zh}` : app.short_desc_zh,
+          subtitle: multiSource ? `${sourceName} · ${shortDesc}` : shortDesc,
           icon: Package,
-          keywords: `${app.key} ${sourceName} ${app.tags.join(' ')}`,
+          keywords: `${app.key} ${sourceName} ${pickAppTags(app, i18n.language).join(' ')}`,
           // 先切源再跳转，否则落到应用商店页看到的还是原来那个源
           run: () => {
             setSourceId(sourceId)
@@ -105,53 +109,53 @@ export function usePaletteItems(enabled: boolean): PaletteItem[] {
       {
         id: 'command:add-server',
         group: 'command',
-        title: '添加服务器',
+        title: t('ui.palette.addServer'),
         icon: Plus,
-        keywords: 'server add new 新建',
+        keywords: t('ui.palette.kwAddServer'),
         run: () => navigate(`${APP_PATHS.workspace}?new=1`),
       },
       {
         id: 'command:add-forward',
         group: 'command',
-        title: '创建转发规则',
+        title: t('ui.palette.addForward'),
         icon: Plus,
-        keywords: 'port forward add new 新建',
+        keywords: t('ui.palette.kwAddForward'),
         run: () => navigate(`${APP_PATHS.portForward}?new=1`),
       },
       {
         id: 'command:add-host-key',
         group: 'command',
-        title: '添加指纹',
+        title: t('ui.palette.addHostKey'),
         icon: Plus,
-        keywords: 'host key fingerprint add new 新建',
+        keywords: t('ui.palette.kwAddHostKey'),
         run: () => navigate(`${APP_PATHS.hostKeys}?new=1`),
       },
       {
         id: 'command:open-store',
         group: 'command',
-        title: '打开应用商店',
+        title: t('ui.palette.openAppStore'),
         icon: Stone,
-        keywords: 'appstore apps',
+        keywords: t('ui.palette.kwOpenStore'),
         run: () => navigate(APP_PATHS.store),
       },
       {
         id: 'command:open-settings',
         group: 'command',
-        title: '打开设置',
+        title: t('ui.palette.openSettings'),
         icon: Settings,
-        keywords: 'settings preferences 偏好',
+        keywords: t('ui.palette.kwOpenSettings'),
         run: () => navigate(APP_PATHS.settings),
       },
       {
         id: 'command:toggle-theme',
         group: 'command',
-        title: light ? '切换到深色主题' : '切换到浅色主题',
+        title: t(light ? 'ui.palette.themeDark' : 'ui.palette.themeLight'),
         icon: light ? Moon : Sun,
-        keywords: 'theme dark light 主题',
+        keywords: t('ui.palette.kwToggleTheme'),
         run: () => runThemeTransition(null, () => setTheme(light ? 'dark' : 'light')),
       }
     )
 
     return items
-  }, [servers, forwards, hostKeys, appsBySource, serverById, navigate, setSourceId, light, setTheme])
+  }, [t, i18n.language, servers, forwards, hostKeys, appsBySource, serverById, navigate, setSourceId, light, setTheme])
 }

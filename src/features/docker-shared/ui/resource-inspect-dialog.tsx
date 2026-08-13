@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CodeViewer } from '@/shared/components/code-viewer'
 import { Check, Copy, RefreshCw, ScanSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function ResourceInspectDialog({ serverId, kind, targetId, targetLabel, onClose }: Props) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const inspectQuery = useResourceInspect(serverId, kind, targetId)
   const json = inspectQuery.data ?? ''
@@ -64,16 +66,16 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
             type="button"
             variant="default"
             disabled={loading}
-            title="重新加载"
+            title={t('ui.common.reload')}
             onClick={() => void inspectQuery.refetch()}
           >
             <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />
-            刷新
+            {t('ui.common.refresh')}
           </Button>
 
-          <Button type="button" variant="outline" disabled={!json} title="复制 JSON" onClick={handleCopy}>
+          <Button type="button" variant="outline" disabled={!json} title={t('ui.common.copyJson')} onClick={handleCopy}>
             {copied ? <Check className="text-green-500" /> : <Copy />}
-            复制
+            {t('ui.common.copy')}
           </Button>
         </>
       }
@@ -83,7 +85,7 @@ export default function ResourceInspectDialog({ serverId, kind, targetId, target
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              加载中…
+              {t('ui.common.loading')}
             </div>
           </div>
         ) : null}

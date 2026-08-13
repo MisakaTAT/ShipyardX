@@ -36,7 +36,7 @@ describe('runContainerFormSchema', () => {
     })
 
     expect(result.success).toBe(false)
-    expect(result.error?.issues.some((issue) => issue.message.includes('主机端口 8080 已重复'))).toBe(true)
+    expect(result.error?.issues.some((issue) => issue.message.includes('8080'))).toBe(true)
   })
 })
 

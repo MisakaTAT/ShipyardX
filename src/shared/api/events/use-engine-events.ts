@@ -1,3 +1,4 @@
+import i18n from '@/app/i18n'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import debounce from 'lodash-es/debounce'
 import type { DebouncedFunc } from 'lodash-es/debounce'
@@ -147,7 +148,7 @@ export function useEngineEvents({
         }
 
         lastErrorToastRef.current = { key, at: now }
-        toastAppError(p.error, 'Docker 事件流连接失败')
+        toastAppError(p.error, i18n.t('ui.events.streamFailed'))
       }
       const applyRefresh = (p: DockerStreamRefresh) => {
         const eventType = p.resource

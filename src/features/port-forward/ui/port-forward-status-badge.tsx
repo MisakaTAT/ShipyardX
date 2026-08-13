@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ToneBadge } from '@/shared/components'
 
 interface PortForwardStatusBadgeProps {
@@ -6,23 +7,24 @@ interface PortForwardStatusBadgeProps {
 }
 
 export function PortForwardStatusBadge({ running, enabled }: PortForwardStatusBadgeProps) {
+  const { t } = useTranslation()
   if (running) {
     return (
       <ToneBadge tone="success" dot pulse>
-        监听中
+        {t('ui.portForward.statusListening')}
       </ToneBadge>
     )
   }
   if (enabled) {
     return (
       <ToneBadge tone="pending" dot>
-        待启动
+        {t('ui.portForward.statusPending')}
       </ToneBadge>
     )
   }
   return (
     <ToneBadge tone="muted" dot>
-      已禁用
+      {t('ui.portForward.statusDisabled')}
     </ToneBadge>
   )
 }

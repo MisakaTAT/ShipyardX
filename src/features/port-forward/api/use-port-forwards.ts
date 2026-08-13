@@ -41,7 +41,7 @@ export function useCreatePortForwardRule() {
     mutationFn: (args: Parameters<typeof commands.createPortForwardRule>) => commands.createPortForwardRule(...args),
     invalidate: [qk.portForwards()],
     onSuccess: (created) => {
-      toast.success(`已创建转发规则（本地端口：${created.local_port}）`)
+      toast.success(i18n.t('ui.portForward.created', { port: String(created.local_port) }))
     },
   })
 }
@@ -81,7 +81,7 @@ export function useSetPortForwardEnabled() {
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => commands.setPortForwardEnabled(id, enabled),
     invalidate: [qk.portForwards()],
     onSuccess: (_r, { enabled }) => {
-      toast.success(enabled ? '规则已启用' : '规则已禁用')
+      toast.success(i18n.t(enabled ? 'ui.portForward.enabled' : 'ui.portForward.disabled'))
     },
   })
 }
@@ -91,7 +91,7 @@ export function useDeletePortForward() {
     mutationFn: (id: string) => commands.deletePortForward(id),
     invalidate: [qk.portForwards()],
     onSuccess: () => {
-      toast.success('已删除规则')
+      toast.success(i18n.t('ui.portForward.deleted'))
     },
   })
 }
@@ -101,7 +101,7 @@ export function useStartAllPortForwards() {
     mutationFn: () => commands.startAllEnabledGlobal(),
     invalidate: [qk.portForwards()],
     onSuccess: () => {
-      toast.success('已启动所有已启用规则')
+      toast.success(i18n.t('ui.portForward.startedAll'))
     },
   })
 }
@@ -111,7 +111,7 @@ export function useStopAllPortForwards() {
     mutationFn: () => commands.stopAllGlobal(),
     invalidate: [qk.portForwards()],
     onSuccess: () => {
-      toast.success('已停止所有转发')
+      toast.success(i18n.t('ui.portForward.stoppedAll'))
     },
   })
 }

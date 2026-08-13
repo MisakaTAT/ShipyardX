@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands } from '@/types/app-bindings'
 import { getErrorCode, toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
@@ -20,18 +21,18 @@ export function useDockerAccess(serverId: string, enabled = true) {
     async (notify = false) => {
       const result = await query.refetch()
       if (!result.error) {
-        if (notify) toast.success('Docker 连接正常')
+        if (notify) toast.success(i18n.t('ui.dockerAccess.ok'))
         return
       }
       const e = result.error
       const code = getErrorCode(e)
       if (notify) {
         if (code === 'docker.permission_denied') {
-          toastAppError(e, '权限不足，请将用户加入 docker 组')
+          toastAppError(e, i18n.t('ui.dockerAccess.denied'))
         } else if (code === 'docker.unavailable') {
-          toastAppError(e, 'Docker 未安装或未运行')
+          toastAppError(e, i18n.t('ui.dockerAccess.missing'))
         } else {
-          toastAppError(e, '无法连接 Docker')
+          toastAppError(e, i18n.t('ui.dockerAccess.failed'))
         }
       }
     },

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Download, Layers, MoreHorizontal, ScanSearch, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/shared/ui/dropdown-menu'
@@ -20,17 +21,20 @@ export function ImageActionsMenu({
   onInspect,
   onRemove,
 }: ImageActionsMenuProps) {
+  const { t } = useTranslation()
   const disabled = Boolean(busy)
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" title="更多操作" />}>
+      <DropdownMenuTrigger
+        render={<Button type="button" variant="ghost" size="icon-sm" title={t('ui.common.moreActions')} />}
+      >
         <MoreHorizontal />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuContent align="end" className="w-auto min-w-40">
         <DropdownMenuItem onClick={onExport} disabled={disabled}>
           <Download className="size-3.5" />
-          导出
+          {t('ui.common.export')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onLayers} disabled={disabled}>
           <Layers className="size-3.5" />
@@ -42,7 +46,7 @@ export function ImageActionsMenu({
         </DropdownMenuItem>
         <DropdownMenuItem variant="destructive" onClick={onRemove} disabled={disabled}>
           <Trash2 className="size-3.5" />
-          删除
+          {t('ui.common.delete')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -10,7 +10,7 @@ describe('imageExportFormSchema', () => {
     })
 
     expect(result.success).toBe(false)
-    expect(result.error?.issues[0]?.message).toBe('请输入导出文件名')
+    expect(result.error?.issues[0]?.message).toBe('ui.validation.exportFileName')
   })
 
   it('rejects invalid export file names', () => {
@@ -20,7 +20,7 @@ describe('imageExportFormSchema', () => {
     })
 
     expect(result.success).toBe(false)
-    expect(result.error?.issues[0]?.message).toBe('文件名包含非法字符，请重新命名')
+    expect(result.error?.issues[0]?.message).toBe('ui.validation.fileNameInvalid')
   })
 })
 
@@ -39,6 +39,6 @@ describe('imageImportFormSchema', () => {
     })
 
     expect(result.success).toBe(false)
-    expect(result.error?.issues[0]?.message).toBe('请选择有效的镜像归档文件')
+    expect(result.error?.issues[0]?.message).toBe('ui.validation.imageArchive')
   })
 })

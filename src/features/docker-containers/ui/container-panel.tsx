@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Box, ChevronDown, HeartCrack, HeartPulse, Plus, Trash2 } from 'lucide-react'
 import type { Container } from '@/types/app-bindings'
 import LogDialog from '@/features/docker-containers/ui/log-dialog'
@@ -33,6 +34,7 @@ function getContainerHealth(status: string): 'healthy' | 'unhealthy' | 'unknown'
 }
 
 export default function ContainerPanel({ serverId }: ContainerPanelProps) {
+  const { t } = useTranslation()
   const { data: containers = [], isFetching, dataUpdatedAt } = useContainers(serverId)
   const action = useContainerAction(serverId)
   const pruneStoppedContainers = usePruneStoppedContainers(serverId)
@@ -75,7 +77,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
     () => [
       {
         id: 'name',
-        header: '名称',
+        header: t('ui.common.name'),
         cell: ({ row }) => {
           const c = row.original
           return (
@@ -88,13 +90,13 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       },
       {
         id: 'image',
-        header: '镜像',
+        header: t('ui.containers.colImage'),
         cell: ({ row }) => <span title={row.original.image}>{row.original.image}</span>,
       },
 
       {
         id: 'state',
-        header: '状态',
+        header: t('ui.containers.colState'),
         cell: ({ row }) => {
           const c = row.original
           return <ContainerStateBadge state={c.state} />
@@ -155,18 +157,18 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       },
       {
         id: 'ports',
-        header: '端口',
+        header: t('ui.containers.colPorts'),
         meta: { width: '14rem' },
         cell: ({ row }) => <ContainerPortsCell ports={row.original.ports} />,
       },
       {
         id: 'created',
-        header: '创建时间',
+        header: t('ui.common.created'),
         cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',
-        header: '操作',
+        header: t('ui.common.actions'),
         meta: { width: '3rem' },
         cell: ({ row }) => {
           const c = row.original
@@ -186,38 +188,45 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [action.isPending]
+    [t, action.isPending]
   )
 
   const removeDescription = removeTarget
     ? shouldForceRemoveContainer(removeTarget.state)
-      ? `容器「${removeTarget.name}」正在运行，将使用强制移除。`
-      : `确定要删除容器「${removeTarget.name}」吗？`
+      ? t('ui.containers.forceRemoveDesc', { name: removeTarget.name })
+      : t('ui.containers.removeDesc', { name: removeTarget.name })
     : ''
-  const removeConfirmText = removeTarget && shouldForceRemoveContainer(removeTarget.state) ? '强制删除' : '删除'
+  const removeConfirmText =
+    removeTarget && shouldForceRemoveContainer(removeTarget.state)
+      ? t('ui.containers.forceRemove')
+      : t('ui.common.delete')
 
   return (
     <PanelShell>
       <PanelHeader
         icon={Box}
-        title="容器"
-        stats={containers.length > 0 ? `${runningCount}/${containers.length} 运行中` : undefined}
+        title={t('ui.containers.title')}
+        stats={
+          containers.length > 0
+            ? t('ui.containers.runningStats', { running: String(runningCount), total: String(containers.length) })
+            : undefined
+        }
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" />}>
-              操作
+              {t('ui.common.actions')}
               <ChevronDown />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuContent align="end" className="w-auto min-w-40">
               <DropdownMenuItem onClick={() => setRunDialogOpen(true)}>
                 <Plus className="size-3.5" />
-                运行容器
+                {t('ui.containers.run')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
                 <Trash2 className="size-3.5" />
-                清理已停止容器
+                {t('ui.containers.pruneTitle')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -229,7 +238,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         data={filtered}
         getRowId={(c) => c.id}
         loading={isFetching && containers.length === 0}
-        empty={{ icon: Box, title: search ? `无匹配的容器 "${search}"` : '没有容器' }}
+        empty={{ icon: Box, title: search ? t('ui.containers.noMatch', { query: search }) : t('ui.containers.empty') }}
       />
 
       {logTarget ? (
@@ -277,7 +286,7 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除容器"
+        title={t('ui.containers.deleteTitle')}
         description={removeDescription}
         destructive
         confirmText={removeConfirmText}
@@ -291,10 +300,10 @@ export default function ContainerPanel({ serverId }: ContainerPanelProps) {
       <ConfirmDialog
         open={cleanupOpen}
         onOpenChange={setCleanupOpen}
-        title="清理已停止容器"
-        description="删除当前所有已停止的容器。仍在运行的容器不会受影响，但已停止容器的元数据会被彻底移除。"
+        title={t('ui.containers.pruneTitle')}
+        description={t('ui.containers.pruneDesc')}
         destructive
-        confirmText="清理已停止容器"
+        confirmText={t('ui.containers.pruneTitle')}
         onConfirm={() => {
           pruneStoppedContainers.mutate()
         }}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Activity, Box, CircleDot, Database, Filter, Layers, Search, Share2, Trash2 } from 'lucide-react'
 import type { DockerEvent, EventStreamStatus } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
@@ -14,12 +15,14 @@ interface EventPanelProps {
 
 type TypeFilter = 'all' | 'container' | 'image' | 'network' | 'volume'
 
-const TYPE_FILTERS: { key: TypeFilter; label: string; icon: React.ReactNode }[] = [
-  { key: 'all', label: '全部', icon: <Activity className="size-3.5" /> },
-  { key: 'container', label: '容器', icon: <Box className="size-3.5" /> },
-  { key: 'image', label: '镜像', icon: <Layers className="size-3.5" /> },
-  { key: 'network', label: '网络', icon: <Share2 className="size-3.5" /> },
-  { key: 'volume', label: '存储卷', icon: <Database className="size-3.5" /> },
+type TypeFilterLabelKey = `ui.events.filter${'All' | 'Container' | 'Image' | 'Network' | 'Volume'}`
+
+const TYPE_FILTERS: { key: TypeFilter; labelKey: TypeFilterLabelKey; icon: React.ReactNode }[] = [
+  { key: 'all', labelKey: 'ui.events.filterAll', icon: <Activity className="size-3.5" /> },
+  { key: 'container', labelKey: 'ui.events.filterContainer', icon: <Box className="size-3.5" /> },
+  { key: 'image', labelKey: 'ui.events.filterImage', icon: <Layers className="size-3.5" /> },
+  { key: 'network', labelKey: 'ui.events.filterNetwork', icon: <Share2 className="size-3.5" /> },
+  { key: 'volume', labelKey: 'ui.events.filterVolume', icon: <Database className="size-3.5" /> },
 ]
 
 function typeIcon(icon: string) {
@@ -45,36 +48,38 @@ function typeIcon(icon: string) {
   }
 }
 
-function statusIndicator(status: EventStreamStatus) {
+function StatusIndicator({ status }: { status: EventStreamStatus }) {
+  const { t } = useTranslation()
   switch (status) {
     case 'connected':
       return (
         <ToneBadge tone="success" dot pulse>
-          已连接
+          {t('ui.events.connected')}
         </ToneBadge>
       )
     case 'connecting':
       return (
         <ToneBadge tone="info" dot pulse>
-          连接中
+          {t('ui.events.connecting')}
         </ToneBadge>
       )
     case 'disconnected':
       return (
         <ToneBadge tone="warning" dot pulse>
-          已断开，重连中…
+          {t('ui.events.reconnecting')}
         </ToneBadge>
       )
     case 'stopped':
       return (
         <ToneBadge tone="muted" dot>
-          已停止
+          {t('ui.events.stopped')}
         </ToneBadge>
       )
   }
 }
 
 export default function EventPanel({ events, status, onClear }: EventPanelProps) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [showFilters, setShowFilters] = useState(false)
@@ -110,7 +115,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
     () => [
       {
         id: 'name',
-        header: '名称',
+        header: t('ui.common.name'),
         meta: { width: '12rem' },
         cell: ({ row }) => (
           <span className="font-medium text-foreground" title={row.original.actor_name || undefined}>
@@ -126,13 +131,13 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       },
       {
         id: 'time',
-        header: '时间',
+        header: t('ui.events.colTime'),
         meta: { width: '8rem' },
         cell: ({ row }) => row.original.time || '-',
       },
       {
         id: 'type',
-        header: '类型',
+        header: t('ui.events.colType'),
         meta: { width: '8rem' },
         cell: ({ row }) => (
           <span className="inline-flex max-w-full min-w-0 items-center gap-1.5">
@@ -143,41 +148,41 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
       },
       {
         id: 'action',
-        header: '动作',
+        header: t('ui.events.colAction'),
         meta: { width: '8rem' },
         cell: ({ row }) => <ToneBadge tone={row.original.action_tone as BadgeTone}>{row.original.action}</ToneBadge>,
       },
       {
         id: 'image',
-        header: '镜像',
+        header: t('ui.events.colImage'),
         meta: { width: '8rem' },
         cell: ({ row }) => <span title={row.original.actor_image || undefined}>{row.original.actor_image || '-'}</span>,
       },
       {
         id: 'detail',
-        header: '详情',
+        header: t('ui.events.colDetail'),
         cell: ({ row }) => <span title={row.original.detail || undefined}>{row.original.detail || '-'}</span>,
       },
     ],
-    []
+    [t]
   )
 
   return (
     <PanelShell>
       <PanelHeader
         icon={Activity}
-        title="事件"
+        title={t('ui.events.title')}
         stats={events.length > 0 ? `(${events.length})` : undefined}
         search={{ value: search, onChange: setSearch }}
         actions={
           <>
-            {statusIndicator(status)}
+            <StatusIndicator status={status} />
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               className={showFilters ? 'bg-muted text-foreground' : undefined}
-              title="类型过滤"
+              title={t('ui.events.typeFilter')}
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter />
@@ -186,7 +191,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
               type="button"
               variant="destructive"
               size="icon-sm"
-              title="清空事件"
+              title={t('ui.events.clear')}
               onClick={onClear}
               disabled={events.length === 0}
             >
@@ -211,7 +216,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
               )}
             >
               {f.icon}
-              {f.label}
+              {t(f.labelKey)}
               <span className="text-[10px] opacity-60">{typeCounts[f.key] || 0}</span>
             </button>
           ))}
@@ -224,7 +229,7 @@ export default function EventPanel({ events, status, onClear }: EventPanelProps)
         getRowId={(ev, i) => ev.event_id || `${ev.time}-${ev.actor_id}-${ev.action}-${i}`}
         empty={{
           icon: events.length === 0 ? Activity : Search,
-          title: events.length === 0 ? '等待 Docker 事件…' : '无匹配的事件',
+          title: events.length === 0 ? t('ui.events.waiting') : t('ui.events.noMatch'),
         }}
       />
     </PanelShell>

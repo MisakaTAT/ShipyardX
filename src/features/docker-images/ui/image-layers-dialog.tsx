@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { type Image } from '@/types/app-bindings'
 import { Layers, Loader2 } from 'lucide-react'
 import { StandardDialog } from '@/shared/components/standard-dialog'
@@ -12,6 +13,7 @@ export interface ImageLayersDialogProps {
 }
 
 export default function ImageLayersDialog({ serverId, open, image, onOpenChange }: ImageLayersDialogProps) {
+  const { t } = useTranslation()
   const imageHistoryQuery = useImageHistory(serverId, image?.id ?? '', open && Boolean(image))
   const layers = imageHistoryQuery.data
   const error = imageHistoryQuery.error ? getErrorMessage(imageHistoryQuery.error) : null
@@ -68,7 +70,7 @@ export default function ImageLayersDialog({ serverId, open, image, onOpenChange 
               </div>
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">无 Layers 信息</div>
+            <div className="text-sm text-muted-foreground">{t('ui.images.noLayers')}</div>
           )
         ) : (
           <div className="flex h-40 items-center justify-center text-muted-foreground">

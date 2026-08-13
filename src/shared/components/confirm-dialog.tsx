@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,12 +28,13 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmText = '确定',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   destructive = false,
   onConfirm,
   extra,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const handleConfirm = () => {
     void Promise.resolve(onConfirm()).finally(() => onOpenChange(false))
   }
@@ -48,9 +50,9 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         {extra ? <div className="mt-1">{extra}</div> : null}
         <AlertDialogFooter>
-          <AlertDialogCancel variant="ghost">{cancelText}</AlertDialogCancel>
+          <AlertDialogCancel variant="ghost">{cancelText ?? t('ui.common.cancel')}</AlertDialogCancel>
           <AlertDialogAction variant={destructive ? 'destructive' : 'default'} onClick={handleConfirm}>
-            {confirmText}
+            {confirmText ?? t('ui.common.confirm')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

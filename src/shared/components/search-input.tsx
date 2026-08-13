@@ -1,4 +1,5 @@
 import { forwardRef, useRef, useImperativeHandle, type KeyboardEventHandler } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
 import { Input } from '@/shared/ui/input'
 import { Button } from '@/shared/ui/button'
@@ -32,6 +33,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   },
   forwardedRef
 ) {
+  const { t } = useTranslation()
   const innerRef = useRef<HTMLInputElement>(null)
   useImperativeHandle(forwardedRef, () => innerRef.current as HTMLInputElement)
 
@@ -48,7 +50,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={placeholder ?? '搜索'}
+        placeholder={placeholder ?? t('ui.common.search')}
         className={cn('w-full pl-9', clearable && value ? 'pr-8' : '', inputClassName)}
       />
       {clearable && value ? (
@@ -59,7 +61,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
             'absolute inset-y-0 right-0 cursor-pointer rounded-l-none text-muted-foreground hover:bg-transparent focus-visible:ring-ring/50',
             clearButtonClassName
           )}
-          aria-label="清除搜索"
+          aria-label={t('ui.common.clearSearch')}
           onClick={() => onChange('')}
         >
           <X className="size-3" />

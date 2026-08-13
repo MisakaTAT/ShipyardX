@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { ShieldAlert, ShieldQuestion } from 'lucide-react'
 import { commands, events, type HostKeyPrompt } from '@/types/app-bindings'
@@ -23,6 +24,7 @@ function Fingerprint({ label, value, tone }: { label: string; value: string; ton
 
 /** 主机密钥首次出现或发生变化时展示指纹，由用户决定是否信任 */
 export function HostKeyGuard() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [prompt, setPrompt] = useState<HostKeyPrompt | null>(null)
 
@@ -49,12 +51,12 @@ export function HostKeyGuard() {
     if (!prompt) return
     try {
       await commands.trustHostKey(prompt.host, prompt.port, prompt.fingerprint)
-      toast.success('已信任该主机密钥', { description: `${prompt.host}:${prompt.port}` })
+      toast.success(t('ui.hostKeyGuard.trusted'), { description: `${prompt.host}:${prompt.port}` })
       await queryClient.invalidateQueries()
     } catch (error) {
-      toastAppError(error, '信任主机密钥失败')
+      toastAppError(error, t('ui.hostKeyGuard.trustFailed'))
     }
-  }, [prompt, queryClient])
+  }, [prompt, queryClient, t])
 
   if (!prompt) return null
 
@@ -70,22 +72,27 @@ export function HostKeyGuard() {
       title={
         <span className="inline-flex items-center gap-2">
           <Icon className={`size-4 ${changed ? 'text-red-600 dark:text-red-400' : 'text-amber-600'}`} />
-          {changed ? '主机密钥已变更' : '首次连接该主机'}
+          {changed ? t('ui.hostKeyGuard.changedTitle') : t('ui.hostKeyGuard.firstTitle')}
         </span>
       }
-      description={
-        changed
-          ? `${prompt.host}:${prompt.port} 的主机密钥与此前记录的不一致。这可能是服务器重装或更换了密钥，也可能是中间人攻击。请通过可信渠道核对指纹后再继续。`
-          : `${prompt.host}:${prompt.port} 的主机密钥尚未被信任。请核对下方指纹与服务器上 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub 的输出是否一致。`
-      }
+      description={t(changed ? 'ui.hostKeyGuard.changedBody' : 'ui.hostKeyGuard.firstBody', {
+        host: prompt.host,
+        port: String(prompt.port),
+      })}
       extra={
         <div className="space-y-3">
-          {prompt.known_fingerprint ? <Fingerprint label="已记录指纹" value={prompt.known_fingerprint} /> : null}
-          <Fingerprint label="服务器当前指纹" value={prompt.fingerprint} tone={changed ? 'danger' : undefined} />
+          {prompt.known_fingerprint ? (
+            <Fingerprint label={t('ui.hostKeyGuard.knownLabel')} value={prompt.known_fingerprint} />
+          ) : null}
+          <Fingerprint
+            label={t('ui.hostKeyGuard.currentLabel')}
+            value={prompt.fingerprint}
+            tone={changed ? 'danger' : undefined}
+          />
         </div>
       }
-      confirmText={changed ? '仍然信任新指纹' : '信任并继续'}
-      cancelText="取消连接"
+      confirmText={changed ? t('ui.hostKeyGuard.trustNew') : t('ui.hostKeyGuard.trustContinue')}
+      cancelText={t('ui.hostKeyGuard.cancelConnect')}
       destructive={changed}
       onConfirm={handleTrust}
     />

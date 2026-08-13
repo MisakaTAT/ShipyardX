@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { commands } from '@/types/app-bindings'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { AnsiUp } from 'ansi_up'
@@ -56,6 +57,7 @@ const LogLine = memo(function LogLine({ html }: { html: string }) {
 })
 
 export default function LogDialog({ serverId, containerId, containerName, onClose }: Props) {
+  const { t } = useTranslation()
   // AnsiUp 有跨行颜色状态，必须在入队时按顺序转换，不能放在会乱序重绘的虚拟列表回调里
   const ansiRef = useRef(new AnsiUp())
   const pendingRef = useRef<LogLineItem[]>([])
@@ -161,7 +163,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
     streamDecoderRef.current = new TextDecoder('utf-8', { fatal: false })
     streamLineBufferRef.current = ''
     resetLines()
-    appendLines([`[${formatNowTime()}] 正在连接日志流...`])
+    appendLines([`[${formatNowTime()}] ${t('ui.logs.connecting')}`])
 
     try {
       const streamId = await commands.startLogStream(serverId, containerId, tail, timestamps)
@@ -185,7 +187,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
         const remaining = streamLineBufferRef.current
         streamLineBufferRef.current = ''
         const tailParts = remaining.length ? remaining.split('\n') : []
-        appendLines([...tailParts, `[${formatNowTime()}] 日志流已结束`])
+        appendLines([...tailParts, `[${formatNowTime()}] ${t('ui.logs.ended')}`])
         setFollow(false)
         streamIdRef.current = null
       })
@@ -193,7 +195,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
       toastAppError(e)
       setFollow(false)
     }
-  }, [serverId, containerId, tail, timestamps, stopStream, resetLines, appendLines])
+  }, [t, serverId, containerId, tail, timestamps, stopStream, resetLines, appendLines])
 
   useEffect(() => {
     if (follow) {
@@ -241,7 +243,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
       open
       onOpenChange={(v) => (!v ? void handleClose() : null)}
       title={containerName}
-      subtitle="日志"
+      subtitle={t('ui.logs.subtitle')}
       showCloseButton
       headerActions={
         <>
@@ -252,7 +254,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
             <SelectContent>
               {TAIL_OPTIONS.map((n) => (
                 <SelectItem key={n} value={String(n)}>
-                  后 {n} 行
+                  {t('ui.logs.tail', { count: String(n) })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -262,28 +264,28 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
             type="button"
             variant={timestamps ? 'default' : 'outline'}
             disabled={follow}
-            title="显示时间戳"
-            onClick={() => setTimestamps((t) => !t)}
+            title={t('ui.logs.showTimestamps')}
+            onClick={() => setTimestamps((v) => !v)}
           >
             <Clock />
-            时间戳
+            {t('ui.logs.timestamps')}
           </Button>
 
           <Button
             type="button"
             variant={follow ? 'default' : 'outline'}
-            title={follow ? '停止跟踪' : '实时跟踪'}
+            title={follow ? t('ui.logs.stopFollow') : t('ui.logs.startFollow')}
             onClick={() => setFollow((f) => !f)}
           >
             {follow ? (
               <>
                 <Square />
-                停止
+                {t('ui.logs.stop')}
               </>
             ) : (
               <>
                 <Play />
-                跟踪
+                {t('ui.logs.follow')}
               </>
             )}
           </Button>
@@ -293,20 +295,24 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
               type="button"
               variant="outline"
               disabled={loading}
-              title="刷新"
+              title={t('ui.common.refresh')}
               onClick={() => void loadStaticLogs()}
             >
               <RefreshCw className={`${loading ? 'animate-spin' : ''}`} />
-              刷新
+              {t('ui.common.refresh')}
             </Button>
           ) : null}
 
-          <Button type="button" variant="outline" title="复制全部" onClick={handleCopy}>
+          <Button type="button" variant="outline" title={t('ui.logs.copyAll')} onClick={handleCopy}>
             {copied ? <Check className="text-green-500" /> : <Copy />}
-            复制
+            {t('ui.common.copy')}
           </Button>
 
-          {lineCount > 0 ? <span className="text-xs text-muted-foreground">{lineCount} 行</span> : null}
+          {lineCount > 0 ? (
+            <span className="text-xs text-muted-foreground">
+              {t('ui.logs.lineCount', { count: String(lineCount) })}
+            </span>
+          ) : null}
         </>
       }
     >
@@ -315,7 +321,7 @@ export default function LogDialog({ serverId, containerId, containerName, onClos
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="size-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              加载中...
+              {t('ui.common.loading')}
             </div>
           </div>
         ) : null}

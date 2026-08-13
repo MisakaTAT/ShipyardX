@@ -1,5 +1,6 @@
 import { RefreshCw, ServerCrash, ShieldAlert, Terminal, Unplug } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/ui/button'
 import { InlineCode } from '@/shared/components/inline-code'
 
@@ -12,6 +13,7 @@ interface DockerAccessGuideProps {
 }
 
 export function DockerAccessGuide({ status, username, onRetry, onDisconnect, onOpenTerminal }: DockerAccessGuideProps) {
+  const { t } = useTranslation()
   const isServerError = status === 'server_error'
   const isPermission = status === 'no_permission'
   const isNoDocker = status === 'no_docker'
@@ -31,57 +33,57 @@ export function DockerAccessGuide({ status, username, onRetry, onDisconnect, onO
           </div>
           <h2 className="text-lg font-semibold text-foreground">
             {isServerError
-              ? '无法连接服务器'
+              ? t('ui.accessGuide.sshTitle')
               : isPermission
-                ? 'Docker 权限不足'
+                ? t('ui.accessGuide.permTitle')
                 : isNoDocker
-                  ? 'Docker 未就绪'
-                  : '无法连接 Docker'}
+                  ? t('ui.accessGuide.notReadyTitle')
+                  : t('ui.accessGuide.failedTitle')}
           </h2>
           <p className="text-sm text-muted-foreground">
             {isServerError
-              ? 'SSH 连接尚未建立，请先检查服务器地址、端口、认证信息和网络连通性。'
+              ? t('ui.accessGuide.sshBody')
               : isPermission
-                ? `当前用户 ${username} 没有访问 Docker socket 的权限，请将该用户加入 docker 用户组。`
+                ? t('ui.accessGuide.permBody', { username })
                 : isNoDocker
-                  ? '目标服务器上未找到 Docker socket，请确认 Docker 已安装并正在运行。'
-                  : '无法连接到远程 Docker 服务，请检查服务器状态。'}
+                  ? t('ui.accessGuide.notReadyBody')
+                  : t('ui.accessGuide.failedBody')}
           </p>
         </div>
 
         {isServerError ? (
-          <StepGroup title="建议先检查：">
-            <Step index={1} title="服务器地址与端口">
-              <InlineCode block>确认 IP / 域名、SSH 端口、网络策略是否正确</InlineCode>
+          <StepGroup title={t('ui.accessGuide.checkFirst')}>
+            <Step index={1} title={t('ui.accessGuide.sshStep1')}>
+              <InlineCode block>{t('ui.accessGuide.sshStep1Body')}</InlineCode>
             </Step>
-            <Step index={2} title="认证信息">
-              <InlineCode block>确认用户名、密码或私钥配置可用</InlineCode>
+            <Step index={2} title={t('ui.accessGuide.sshStep2')}>
+              <InlineCode block>{t('ui.accessGuide.sshStep2Body')}</InlineCode>
             </Step>
-            <Step index={3} title="手动验证 SSH">
+            <Step index={3} title={t('ui.accessGuide.sshStep3')}>
               <InlineCode block>{`ssh ${username}@your-server`}</InlineCode>
             </Step>
           </StepGroup>
         ) : isPermission ? (
-          <StepGroup title="按以下步骤配置：">
-            <Step index={1} title="将用户加入 docker 组">
+          <StepGroup title={t('ui.accessGuide.configSteps')}>
+            <Step index={1} title={t('ui.accessGuide.permStep1')}>
               <InlineCode block>{`sudo usermod -aG docker ${username}`}</InlineCode>
             </Step>
-            <Step index={2} title="重新登录使组变更生效">
+            <Step index={2} title={t('ui.accessGuide.permStep2')}>
               <InlineCode block>newgrp docker</InlineCode>
             </Step>
-            <Step index={3} title="验证权限">
+            <Step index={3} title={t('ui.accessGuide.permStep3')}>
               <InlineCode block>docker info</InlineCode>
             </Step>
           </StepGroup>
         ) : isNoDocker ? (
-          <StepGroup title="可能的原因与解决方式：">
-            <Step index={1} title="Docker 未安装">
+          <StepGroup title={t('ui.accessGuide.causes')}>
+            <Step index={1} title={t('ui.accessGuide.notReadyStep1')}>
               <InlineCode block>curl -fsSL https://get.docker.com | sh</InlineCode>
             </Step>
-            <Step index={2} title="Docker 服务未启动">
+            <Step index={2} title={t('ui.accessGuide.notReadyStep2')}>
               <InlineCode block>sudo systemctl start docker</InlineCode>
             </Step>
-            <Step index={3} title="设置开机自启">
+            <Step index={3} title={t('ui.accessGuide.notReadyStep3')}>
               <InlineCode block>sudo systemctl enable docker</InlineCode>
             </Step>
           </StepGroup>
@@ -90,15 +92,15 @@ export function DockerAccessGuide({ status, username, onRetry, onDisconnect, onO
         <div className="flex items-center justify-center gap-3">
           <Button variant="outline" onClick={onDisconnect}>
             <Unplug />
-            断开连接
+            {t('ui.workspace.disconnect')}
           </Button>
           <Button variant="outline" onClick={onOpenTerminal}>
             <Terminal />
-            打开终端
+            {t('ui.workspace.openTerminal')}
           </Button>
           <Button onClick={onRetry}>
             <RefreshCw />
-            重新检测
+            {t('ui.workspace.recheck')}
           </Button>
         </div>
       </div>

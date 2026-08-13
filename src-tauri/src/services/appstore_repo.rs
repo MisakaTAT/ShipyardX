@@ -246,7 +246,8 @@ impl AppstoreRepo {
                 name: manifest.additional.name.clone(),
                 app_type: manifest.additional.app_type.clone(),
                 tags: manifest.tags.clone(),
-                description: pick_description(&manifest.additional.description),
+                tags_en: manifest.additional.tags.clone(),
+                description: manifest.additional.description.clone(),
                 short_desc_zh: manifest.additional.short_desc_zh.clone(),
                 short_desc_en: manifest.additional.short_desc_en.clone(),
                 website: manifest.additional.website.clone().unwrap_or_default(),
@@ -281,6 +282,7 @@ impl AppstoreRepo {
             key: app_key.to_string(),
             name: manifest.additional.name.clone(),
             tags: manifest.tags.clone(),
+            tags_en: manifest.additional.tags.clone(),
             description: manifest.additional.description.clone(),
             short_desc_zh: manifest.additional.short_desc_zh,
             short_desc_en: manifest.additional.short_desc_en,
@@ -547,16 +549,6 @@ fn dir_size(path: &Path) -> AppResult<u64> {
         }
     }
     Ok(total)
-}
-
-fn pick_description(desc: &crate::dto::appstore::DescriptionI18n) -> String {
-    if !desc.zh.is_empty() {
-        return desc.zh.clone();
-    }
-    if !desc.en.is_empty() {
-        return desc.en.clone();
-    }
-    String::new()
 }
 
 fn detect_cache_repo_state_blocking(cache_dir: &Path, expected_repo_url: &str) -> AppResult<CacheRepoState> {

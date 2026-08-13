@@ -3,7 +3,7 @@ import { trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const volumeCreateFormSchema = z
   .object({
-    name: trimmedRequiredString('请填写卷名称'),
+    name: trimmedRequiredString('ui.validation.volumeName'),
     driver: z.literal('local'),
     enableNfs: z.boolean(),
     nfsAddr: z.string(),
@@ -14,10 +14,10 @@ export const volumeCreateFormSchema = z
   .superRefine((data, ctx) => {
     if (!data.enableNfs) return
     if (!data.nfsAddr.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写 NFS 地址', path: ['nfsAddr'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.nfsAddr', path: ['nfsAddr'] })
     }
     if (!data.nfsMount.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写 NFS 挂载点', path: ['nfsMount'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.nfsMount', path: ['nfsMount'] })
     }
   })
 

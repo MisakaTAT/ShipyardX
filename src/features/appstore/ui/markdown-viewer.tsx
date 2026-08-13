@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react'
+import i18n from '@/app/i18n'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { marked } from 'marked'
 import { sanitizeHtml } from '@/shared/lib/sanitize-html'
@@ -9,7 +10,7 @@ export function MarkdownViewer({ content }: { content: string }) {
       const rendered = marked.parse(content, { async: false }) as string
       return sanitizeHtml(rendered)
     } catch {
-      return `<p>Markdown 渲染失败</p>`
+      return `<p>${i18n.t('ui.appstore.markdownFailed')}</p>`
     }
   }, [content])
 

@@ -3,6 +3,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { FolderUp, Loader2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { useImportImage } from '@/features/docker-images/api/use-images'
 import {
   imageImportDefaultValues,
@@ -25,6 +26,7 @@ interface ImageImportDialogProps {
 }
 
 export default function ImageImportDialog({ serverId, open, onOpenChange }: ImageImportDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const importImage = useImportImage(serverId)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -108,7 +110,7 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
       importId,
       filePath: values.filePath.trim(),
     })
-    toast.success('镜像已导入')
+    toast.success(t('ui.images.imported'))
     activeImportIdRef.current = null
     onOpenChange(false)
   })
@@ -122,25 +124,25 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
         if (!next && importing) return
         onOpenChange(next)
       }}
-      title="导入镜像"
+      title={t('ui.images.importTitle')}
       icon={FolderUp}
       disableClose={importing}
       showCloseButton
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={importing}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-import`} disabled={importing}>
             {importing ? (
               <>
                 <Loader2 className="animate-spin" />
-                导入中
+                {t('ui.images.importing')}
               </>
             ) : (
               <>
                 <FolderUp />
-                导入到服务器
+                {t('ui.images.importToServer')}
               </>
             )}
           </Button>
@@ -154,16 +156,12 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
             name="filePath"
             render={({ field, fieldState }) => (
               <FormFieldRow
-                label="镜像文件"
+                label={t('ui.images.imageFile')}
                 required
                 invalid={fieldState.invalid}
                 variant="title"
                 contentClassName="gap-2"
-                description={
-                  <FormFieldHint id={`${formId}-file-desc`}>
-                    支持上传 Docker 镜像包，系统会自动完成远程导入。
-                  </FormFieldHint>
-                }
+                description={<FormFieldHint id={`${formId}-file-desc`}>{t('ui.images.imageFileHint')}</FormFieldHint>}
               >
                 <div className="flex items-center gap-2">
                   <Input
@@ -174,12 +172,12 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
                     }}
                     aria-invalid={fieldState.invalid}
                     aria-describedby={`${formId}-file-desc`}
-                    placeholder="请选择本地镜像 tar 包"
+                    placeholder={t('ui.images.selectFilePlaceholder')}
                     disabled={importing}
                   />
                   <Button type="button" variant="outline" onClick={() => void handlePickFile()} disabled={importing}>
                     <FolderUp />
-                    选择文件
+                    {t('ui.common.selectFile')}
                   </Button>
                 </div>
               </FormFieldRow>
@@ -190,13 +188,13 @@ export default function ImageImportDialog({ serverId, open, onOpenChange }: Imag
         {importing ? (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">导入进度</span>
+              <span className="font-medium text-foreground">{t('ui.images.importProgress')}</span>
               <span className="text-muted-foreground">
                 {progress
                   ? progress.total
                     ? `${progress.transferred} / ${progress.total}`
                     : progress.transferred
-                  : '准备中...'}
+                  : t('ui.common.preparing')}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-border/70">

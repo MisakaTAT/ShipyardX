@@ -109,6 +109,29 @@ for (const key of base.keys()) {
   problems.push(`${BASE_LOCALE}: 词条 "backend.errors.${code}" 在后端已不存在`)
 }
 
+const FRONTEND_SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
+const UI_KEY_SHAPE = /['"`](ui\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)['"`]/g
+
+const usedUiKeys = new Set()
+;(function walkFrontend(dir) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) {
+      if (path !== LOCALES_DIR) walkFrontend(path)
+    } else if (/\.tsx?$/.test(name)) {
+      for (const m of readFileSync(path, 'utf8').matchAll(UI_KEY_SHAPE)) usedUiKeys.add(m[1])
+    }
+  }
+})(FRONTEND_SRC)
+
+for (const key of usedUiKeys) {
+  if (!base.has(key)) problems.push(`${BASE_LOCALE}: 源码引用了不存在的词条 "${key}"`)
+}
+for (const key of base.keys()) {
+  if (!key.startsWith('ui.') || usedUiKeys.has(key)) continue
+  problems.push(`${BASE_LOCALE}: 词条 "${key}" 没有任何引用`)
+}
+
 if (problems.length) {
   console.error(`i18n check failed (${problems.length} problems):`)
   for (const problem of problems) console.error(`  ${problem}`)

@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Play, Square, Trash2 } from 'lucide-react'
 import type { PortForward, ServerConfig } from '@/types/app-bindings'
@@ -9,12 +10,14 @@ import { PortForwardStatusBadge } from '@/features/port-forward/ui/port-forward-
 import { TrafficRow, WarnIcon } from '@/features/port-forward/ui/port-forward-cells'
 
 interface BuildColumnsParams {
+  t: TFunction
   serverById: Map<string, ServerConfig>
   onToggleEnabled: (id: string, enabled: boolean) => void
   onDelete: (id: string) => void
 }
 
 export function buildPortForwardColumns({
+  t,
   serverById,
   onToggleEnabled,
   onDelete,
@@ -22,7 +25,7 @@ export function buildPortForwardColumns({
   return [
     {
       id: 'container',
-      header: '容器',
+      header: t('ui.portForward.colContainer'),
       cell: ({ row }) => {
         const f = row.original
         return (
@@ -35,14 +38,14 @@ export function buildPortForwardColumns({
     },
     {
       id: 'host',
-      header: '主机',
+      header: t('ui.portForward.colHost'),
       cell: ({ row }) => (
         <div className="text-foreground">{serverById.get(row.original.server_id)?.name ?? row.original.server_id}</div>
       ),
     },
     {
       id: 'protocol',
-      header: '协议',
+      header: t('ui.portForward.colProtocol'),
       meta: { className: 'whitespace-normal' },
       cell: ({ row }) => (
         <ToneBadge tone="info" className="uppercase">
@@ -52,7 +55,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'local',
-      header: '本地端口',
+      header: t('ui.portForward.colLocalPort'),
       meta: { width: '12rem' },
       cell: ({ row }) => {
         const f = row.original
@@ -75,7 +78,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'target',
-      header: '目标',
+      header: t('ui.portForward.colTarget'),
       cell: ({ row }) => (
         <>
           {row.original.remote_host}:{row.original.remote_port}
@@ -84,7 +87,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'status',
-      header: '状态',
+      header: t('ui.portForward.colStatus'),
       cell: ({ row }) => {
         const f = row.original
         return (
@@ -101,7 +104,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'traffic',
-      header: '流量',
+      header: t('ui.portForward.colTraffic'),
       meta: { width: '12rem' },
       cell: ({ row }) => (
         <div className="space-y-0.5">
@@ -112,7 +115,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'speed',
-      header: '速度',
+      header: t('ui.portForward.colSpeed'),
       meta: { width: '12rem' },
       cell: ({ row }) => {
         const f = row.original
@@ -126,7 +129,7 @@ export function buildPortForwardColumns({
     },
     {
       id: 'actions',
-      header: '操作',
+      header: t('ui.portForward.colActions'),
       meta: { width: '5rem' },
       cell: ({ row }) => {
         const f = row.original
@@ -136,7 +139,7 @@ export function buildPortForwardColumns({
               type="button"
               variant="ghost"
               size="icon-sm"
-              title={f.enabled ? '禁用' : '启用'}
+              title={f.enabled ? t('ui.portForward.disable') : t('ui.portForward.enable')}
               onClick={() => onToggleEnabled(f.id, !f.enabled)}
               className={cn(
                 'text-muted-foreground',
@@ -149,7 +152,7 @@ export function buildPortForwardColumns({
               type="button"
               variant="ghost"
               size="icon-sm"
-              title="删除"
+              title={t('ui.common.delete')}
               onClick={() => onDelete(f.id)}
               className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
             >

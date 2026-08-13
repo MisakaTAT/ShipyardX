@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Terminal as TerminalIcon, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 
@@ -13,6 +14,7 @@ interface TerminalPanelProps {
 }
 
 export default function TerminalPanel({ serverId, containerId, title, onRequestClose }: TerminalPanelProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex h-full flex-col bg-card">
       {title ? (
@@ -29,7 +31,7 @@ export default function TerminalPanel({ serverId, containerId, title, onRequestC
                 size="icon-sm"
                 className="text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={onRequestClose}
-                title="关闭"
+                title={t('ui.common.close')}
               >
                 <X />
               </Button>

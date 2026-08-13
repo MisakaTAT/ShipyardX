@@ -5,7 +5,7 @@ const mirrorUrlSchema = z
   .string()
   .trim()
   .refine((value) => z.httpUrl().safeParse(value).success, {
-    message: '镜像加速地址仅支持合法的 http 或 https 地址',
+    message: 'ui.validation.registryMirror',
   })
 
 const cgroupDriverSchema = z.enum(['', 'systemd', 'cgroupfs'])
@@ -32,7 +32,7 @@ export const dockerDaemonFormSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['mirrorText'],
-          message: result.error.issues[0]?.message ?? '镜像加速地址格式无效',
+          message: result.error.issues[0]?.message ?? 'ui.validation.registryMirrorInvalid',
         })
         break
       }
@@ -43,7 +43,7 @@ export const dockerDaemonFormSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['log_max_size'],
-          message: '启用日志切割时，请填写日志大小',
+          message: 'ui.validation.logSize',
         })
       }
 
@@ -51,7 +51,7 @@ export const dockerDaemonFormSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['log_max_file'],
-          message: '启用日志切割时，请填写日志文件数量',
+          message: 'ui.validation.logFiles',
         })
       }
     }
@@ -61,7 +61,7 @@ export const dockerDaemonFormSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['socket_path'],
-        message: 'Socket 路径需以 unix:// 或 tcp:// 开头',
+        message: 'ui.validation.socketPath',
       })
     }
   })
@@ -114,7 +114,7 @@ export function formValuesToDaemonUpdate(values: DockerDaemonFormValues, sudo_pa
 }
 
 export const dockerSudoPasswordFormSchema = z.object({
-  password: z.string().min(1, '请输入提权密码'),
+  password: z.string().min(1, 'ui.validation.sudoPassword'),
 })
 
 export type DockerSudoPasswordFormValues = z.infer<typeof dockerSudoPasswordFormSchema>

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { commands } from '@/types/app-bindings'
 import {
   daemonSettingsToFormValues,
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function DockerManagePanel({ serverId }: Props) {
+  const { t } = useTranslation()
   const daemonFormId = useId()
   const [authOpen, setAuthOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'save' | 'restart' | null>(null)
@@ -68,7 +70,7 @@ export default function DockerManagePanel({ serverId }: Props) {
     const params = formValuesToDaemonUpdate(values, password ?? null)
     try {
       await updateDaemonSettings.mutateAsync(params)
-      toast.success('Docker 配置已保存，需手动重启后生效。')
+      toast.success(t('ui.daemon.saved'))
       setAuthOpen(false)
       setPendingAction(null)
       await reload()
@@ -104,15 +106,15 @@ export default function DockerManagePanel({ serverId }: Props) {
           lastError ?? {
             code: 'docker.restart_recovery_timeout',
             kind: 'timeout' as const,
-            message: '重启命令已执行，但 Docker 尚未恢复连接，请稍后重试',
+            message: t('ui.daemon.restartPending'),
             detail: null,
             retryable: true,
-            action: '稍后重试，或检查 Docker 服务状态',
+            action: t('ui.daemon.restartPendingAction'),
           }
         )
       }
 
-      toast.success('重启完成')
+      toast.success(t('ui.daemon.restarted'))
       setAuthOpen(false)
       setPendingAction(null)
       await reload()
@@ -148,16 +150,16 @@ export default function DockerManagePanel({ serverId }: Props) {
               <SettingsCard>
                 <div className="flex flex-wrap items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground">镜像加速</div>
-                    <div className="mt-1 text-xs text-muted-foreground">多个地址换行填写（为空则取消镜像加速）</div>
+                    <div className="text-sm font-medium text-foreground">{t('ui.daemon.mirrors')}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{t('ui.daemon.mirrorsHint')}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="icon-sm"
-                      title="重启 Docker"
-                      aria-label="重启 Docker"
+                      title={t('ui.daemon.restart')}
+                      aria-label={t('ui.daemon.restart')}
                       onClick={() => void runRestart()}
                       disabled={busy}
                     >
@@ -167,8 +169,8 @@ export default function DockerManagePanel({ serverId }: Props) {
                       type="button"
                       variant="outline"
                       size="icon-sm"
-                      title="撤销未保存修改"
-                      aria-label="撤销未保存修改"
+                      title={t('ui.daemon.revert')}
+                      aria-label={t('ui.daemon.revert')}
                       onClick={() => daemonForm.reset()}
                       disabled={busy}
                     >
@@ -178,8 +180,8 @@ export default function DockerManagePanel({ serverId }: Props) {
                       type="submit"
                       form={`${daemonFormId}-daemon`}
                       size="icon-sm"
-                      title="保存"
-                      aria-label="保存"
+                      title={t('ui.common.save')}
+                      aria-label={t('ui.common.save')}
                       disabled={busy || !daemonForm.formState.isDirty}
                     >
                       {saving ? <Loader2 className="animate-spin" /> : <Save />}
@@ -215,7 +217,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                     render={({ field }) => (
                       <Field>
                         <FieldLabel className="text-sm font-medium text-foreground">Live restore</FieldLabel>
-                        <FieldDescription>允许在 Docker 守护进程异常停机时保留正在运行的容器状态</FieldDescription>
+                        <FieldDescription>{t('ui.daemon.liveRestoreHint')}</FieldDescription>
                         <FieldContent className="mt-3">
                           <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                             <Checkbox
@@ -223,7 +225,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                               disabled={busy}
                               onCheckedChange={(c) => field.onChange(c === true)}
                             />
-                            {field.value ? '已启用' : '已禁用'}
+                            {field.value ? t('ui.common.enabled') : t('ui.common.disabled')}
                           </label>
                         </FieldContent>
                       </Field>
@@ -238,7 +240,9 @@ export default function DockerManagePanel({ serverId }: Props) {
                     render={({ field }) => (
                       <Field>
                         <FieldLabel className="text-sm font-medium text-foreground">cgroup driver</FieldLabel>
-                        <FieldDescription>当前 {cgroupDriver || '默认'}</FieldDescription>
+                        <FieldDescription>
+                          {t('ui.daemon.cgroupCurrent', { driver: cgroupDriver || t('ui.common.default') })}
+                        </FieldDescription>
                         <FieldContent className="mt-3">
                           <RadioGroup
                             value={field.value === '' ? 'default' : field.value}
@@ -248,7 +252,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                           >
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                               <RadioGroupItem value="default" id={`${daemonFormId}-cgroup-default`} />
-                              默认
+                              {t('ui.common.default')}
                             </label>
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                               <RadioGroupItem value="systemd" id={`${daemonFormId}-cgroup-systemd`} />
@@ -272,8 +276,10 @@ export default function DockerManagePanel({ serverId }: Props) {
                   name="socket_path"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel className="text-sm font-medium text-foreground">Socket 路径</FieldLabel>
-                      <FieldDescription>Docker 守护进程（Docker Daemon）与客户端之间的通信通道</FieldDescription>
+                      <FieldLabel className="text-sm font-medium text-foreground">
+                        {t('ui.daemon.socketPath')}
+                      </FieldLabel>
+                      <FieldDescription>{t('ui.daemon.socketHint')}</FieldDescription>
                       <FieldContent className="mt-3">
                         <Input
                           {...field}
@@ -293,7 +299,9 @@ export default function DockerManagePanel({ serverId }: Props) {
                   name="log_rotation"
                   render={({ field }) => (
                     <Field>
-                      <FieldLabel className="text-sm font-medium text-foreground">日志切割</FieldLabel>
+                      <FieldLabel className="text-sm font-medium text-foreground">
+                        {t('ui.daemon.logRotation')}
+                      </FieldLabel>
                       <FieldContent className="mt-3">
                         <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
                           <Checkbox
@@ -301,7 +309,7 @@ export default function DockerManagePanel({ serverId }: Props) {
                             disabled={busy}
                             onCheckedChange={(c) => field.onChange(c === true)}
                           />
-                          启用日志切割
+                          {t('ui.daemon.enableLogRotation')}
                         </label>
                         {logRotation ? (
                           <div className="mt-2 grid grid-cols-2 gap-3">

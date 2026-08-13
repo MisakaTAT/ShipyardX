@@ -1,4 +1,5 @@
 import { Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { openCommandPalette } from '@/features/command-palette/model/palette-control'
 
 interface ActiveFilterChipProps {
@@ -8,12 +9,13 @@ interface ActiveFilterChipProps {
 }
 
 export function ActiveFilterChip({ query, count, onClear }: ActiveFilterChipProps) {
+  const { t } = useTranslation()
   return (
     <div className="mt-3 flex">
       <div className="flex h-7 items-center rounded-lg bg-muted text-xs text-muted-foreground">
         <button
           type="button"
-          title="修改筛选条件"
+          title={t('ui.filter.edit')}
           onClick={() => openCommandPalette(query)}
           className="flex h-full min-w-0 cursor-pointer items-center gap-1.5 rounded-l-lg pr-2 pl-2.5 transition-colors hover:text-foreground"
         >
@@ -23,7 +25,7 @@ export function ActiveFilterChip({ query, count, onClear }: ActiveFilterChipProp
         </button>
         <button
           type="button"
-          title="清除筛选"
+          title={t('ui.filter.clear')}
           onClick={onClear}
           className="flex h-full cursor-pointer items-center rounded-r-lg pr-2 pl-1 transition-colors hover:text-foreground"
         >

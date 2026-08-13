@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toastAppError } from '@/shared/lib/errors'
@@ -46,7 +47,7 @@ function notifyCleanupSuccess(
   }
 ) {
   toast.success(title, {
-    description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
+    description: i18n.t('ui.images.pruned', { count: String(result.deleted_count), size: result.reclaimed }),
   })
 }
 
@@ -77,7 +78,7 @@ export function usePruneDanglingImages(serverId: string) {
     mutationFn: () => commands.pruneDanglingImages(serverId),
     invalidate: [qk.images(serverId)],
     onSuccess: (result) => {
-      notifyCleanupSuccess('已清理悬空镜像', result)
+      notifyCleanupSuccess(i18n.t('ui.images.prunedDangling'), result)
     },
   })
 }
@@ -87,7 +88,7 @@ export function usePruneUnusedImages(serverId: string) {
     mutationFn: () => commands.pruneUnusedImages(serverId),
     invalidate: [qk.images(serverId)],
     onSuccess: (result) => {
-      notifyCleanupSuccess('已清理未使用镜像', result)
+      notifyCleanupSuccess(i18n.t('ui.images.prunedUnused'), result)
     },
   })
 }
@@ -97,7 +98,7 @@ export function usePruneBuilderCache(serverId: string) {
     mutationFn: () => commands.pruneBuilderCache(serverId),
     invalidate: [qk.images(serverId)],
     onSuccess: (result) => {
-      notifyCleanupSuccess('已清理构建缓存', result)
+      notifyCleanupSuccess(i18n.t('ui.images.prunedCache'), result)
     },
   })
 }

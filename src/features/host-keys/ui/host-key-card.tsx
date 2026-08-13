@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Copy, Fingerprint, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import type { KnownHostEntry, ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
@@ -29,19 +30,24 @@ function FingerprintLine({ value, tone }: { value: string; tone?: 'danger' }) {
 }
 
 function StatusLabel({ state }: { state?: ProbeState }) {
+  const { t } = useTranslation()
   if (!state || state.status === 'probing') return null
 
   if (state.status === 'match') {
-    return <span className="shrink-0 text-[12px] text-emerald-600 dark:text-emerald-400">与服务器一致</span>
+    return (
+      <span className="shrink-0 text-[12px] text-emerald-600 dark:text-emerald-400">{t('ui.hostKeys.matches')}</span>
+    )
   }
   if (state.status === 'failed') {
     return (
       <span className="shrink-0 cursor-help text-[12px] text-muted-foreground" title={state.message}>
-        检测失败
+        {t('ui.hostKeys.checkFailed')}
       </span>
     )
   }
-  return <span className="shrink-0 text-[12px] font-medium text-red-600 dark:text-red-400">指纹不一致</span>
+  return (
+    <span className="shrink-0 text-[12px] font-medium text-red-600 dark:text-red-400">{t('ui.hostKeys.mismatch')}</span>
+  )
 }
 
 export function HostKeyCard({
@@ -54,6 +60,7 @@ export function HostKeyCard({
   onTrust,
   onDelete,
 }: HostKeyCardProps) {
+  const { t } = useTranslation()
   const mismatch = state?.status === 'mismatch'
   const probing = state?.status === 'probing'
   const names = servers.map((server) => server.name).join('、')
@@ -97,7 +104,7 @@ export function HostKeyCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            title="重新检测"
+            title={t('ui.hostKeys.recheck')}
             disabled={probing || probeDisabled}
             onClick={onProbe}
             className={cn(
@@ -111,7 +118,7 @@ export function HostKeyCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            title="复制指纹"
+            title={t('ui.hostKeys.copyFingerprint')}
             onClick={onCopy}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -121,7 +128,7 @@ export function HostKeyCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            title="删除"
+            title={t('ui.common.delete')}
             onClick={onDelete}
             className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
           >
@@ -137,10 +144,10 @@ export function HostKeyCard({
       {mismatch ? (
         <div className="mt-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[12px] text-muted-foreground">服务器当前指纹</span>
+            <span className="text-[12px] text-muted-foreground">{t('ui.hostKeys.currentFingerprint')}</span>
             <Button type="button" variant="outline" size="xs" onClick={() => onTrust(state.fingerprint)}>
               <ShieldCheck />
-              改为信任
+              {t('ui.hostKeys.trustInstead')}
             </Button>
           </div>
           <FingerprintLine value={state.fingerprint} tone="danger" />

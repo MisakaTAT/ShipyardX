@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, Download, FolderUp, Image as ImageIcon, Trash2, Wrench } from 'lucide-react'
 import type { Image } from '@/types/app-bindings'
 import ImagePullDialog from '@/features/docker-images/ui/image-pull-dialog'
@@ -28,6 +29,7 @@ interface ImagePanelProps {
 const imageRefLabel = (img: Image) => (img.tag !== '<none>' ? `${img.repository}:${img.tag}` : img.id)
 
 export default function ImagePanel({ serverId }: ImagePanelProps) {
+  const { t } = useTranslation()
   const { data: images = [], isFetching, dataUpdatedAt } = useImages(serverId)
   const removeImage = useRemoveImage(serverId)
   const exportImage = useExportImage(serverId)
@@ -60,7 +62,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
     () => [
       {
         id: 'repository',
-        header: '仓库',
+        header: t('ui.images.colRepository'),
         cell: ({ row }) => (
           <span className="font-medium text-foreground" title={row.original.repository}>
             {row.original.repository}
@@ -74,10 +76,10 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
       },
       {
         id: 'tag',
-        header: '标签',
+        header: t('ui.images.colTags'),
         cell: ({ row }) =>
           row.original.tag === '<none>' ? (
-            <ToneBadge tone="muted">无标签</ToneBadge>
+            <ToneBadge tone="muted">{t('ui.images.noTags')}</ToneBadge>
           ) : (
             <ToneBadge tone="info" maxWidth="8rem">
               {row.original.tag}
@@ -107,15 +109,15 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
           )
         },
       },
-      { id: 'size', header: '大小', cell: ({ row }) => row.original.size },
+      { id: 'size', header: t('ui.images.colSize'), cell: ({ row }) => row.original.size },
       {
         id: 'created',
-        header: '创建时间',
+        header: t('ui.common.created'),
         cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',
-        header: '操作',
+        header: t('ui.common.actions'),
         meta: { width: '3rem' },
         cell: ({ row }) => {
           const img = row.original
@@ -143,6 +145,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      t,
       exportImage.isPending,
       pruneBuilderCache.isPending,
       pruneDanglingImages.isPending,
@@ -154,61 +157,59 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
   const cleanupDialog = cleanupTarget
     ? {
         dangling: {
-          title: '清理悬空镜像',
-          description: '仅删除没有标签且不再被引用的悬空镜像，用于回收无效层占用的空间。',
-          confirmText: '清理悬空镜像',
+          title: t('ui.images.pruneDanglingTitle'),
+          description: t('ui.images.pruneDanglingDesc'),
+          confirmText: t('ui.images.pruneDanglingTitle'),
         },
         unused: {
-          title: '清理未使用镜像',
-          description: '删除当前没有被任何容器使用的镜像。若后续还需要这些镜像，需要重新拉取或重新导入。',
-          confirmText: '清理未使用镜像',
+          title: t('ui.images.pruneUnusedTitle'),
+          description: t('ui.images.pruneUnusedDesc'),
+          confirmText: t('ui.images.pruneUnusedTitle'),
         },
         builder: {
-          title: '清理构建缓存',
-          description: '删除 Docker build 过程中留下的缓存层，不影响已存在的镜像和容器，但后续构建可能变慢。',
-          confirmText: '清理构建缓存',
+          title: t('ui.images.pruneCacheTitle'),
+          description: t('ui.images.pruneCacheDesc'),
+          confirmText: t('ui.images.pruneCacheTitle'),
         },
       }[cleanupTarget]
     : null
 
-  const removeDescription = removeTarget
-    ? `确认删除镜像「${imageRefLabel(removeTarget)}」？\n\n默认情况下，若仍有容器使用该镜像，删除会失败。可勾选强制删除以解除引用并删除（可能影响运行中的容器，请谨慎）。`
-    : ''
+  const removeDescription = removeTarget ? t('ui.images.deleteDesc', { name: imageRefLabel(removeTarget) }) : ''
 
   return (
     <PanelShell>
       <PanelHeader
         icon={ImageIcon}
-        title="镜像"
+        title={t('ui.images.title')}
         stats={images.length > 0 ? `(${images.length})` : undefined}
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" />}>
-              操作
+              {t('ui.common.actions')}
               <ChevronDown />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuContent align="end" className="w-auto min-w-40">
               <DropdownMenuItem onClick={() => setShowPull(true)}>
                 <Download className="size-3.5" />
-                拉取镜像
+                {t('ui.images.pull')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowImport(true)}>
                 <FolderUp className="size-3.5" />
-                导入镜像
+                {t('ui.images.importTitle')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupTarget('dangling')}>
                 <Trash2 className="size-3.5" />
-                清理悬空镜像
+                {t('ui.images.pruneDanglingTitle')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupTarget('unused')}>
                 <Trash2 className="size-3.5" />
-                清理未使用镜像
+                {t('ui.images.pruneUnusedTitle')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupTarget('builder')}>
                 <Wrench className="size-3.5" />
-                清理构建缓存
+                {t('ui.images.pruneCacheTitle')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -222,7 +223,7 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         loading={isFetching && images.length === 0}
         empty={{
           icon: ImageIcon,
-          title: search ? `无匹配的镜像 "${search}"` : '没有镜像',
+          title: search ? t('ui.images.noMatch', { query: search }) : t('ui.images.empty'),
         }}
       />
 
@@ -263,14 +264,14 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除镜像"
+        title={t('ui.images.deleteTitle')}
         description={removeDescription}
         destructive
-        confirmText="删除"
+        confirmText={t('ui.common.delete')}
         extra={
           <label className="flex w-full cursor-pointer items-start gap-2.5 text-left">
             <Checkbox checked={removeForce} onCheckedChange={(c) => setRemoveForce(c === true)} className="mt-0.5" />
-            <span className="text-xs leading-snug text-muted-foreground">强制删除</span>
+            <span className="text-xs leading-snug text-muted-foreground">{t('ui.images.forceDelete')}</span>
           </label>
         }
         onConfirm={() => {
@@ -286,10 +287,10 @@ export default function ImagePanel({ serverId }: ImagePanelProps) {
         onOpenChange={(open) => {
           if (!open) setCleanupTarget(null)
         }}
-        title={cleanupDialog?.title ?? '清理'}
+        title={cleanupDialog?.title ?? t('ui.images.cleanupFallback')}
         description={cleanupDialog?.description}
         destructive
-        confirmText={cleanupDialog?.confirmText ?? '清理'}
+        confirmText={cleanupDialog?.confirmText ?? t('ui.images.cleanupFallback')}
         onConfirm={() => {
           if (cleanupTarget === 'dangling') {
             pruneDanglingImages.mutate()

@@ -1,4 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Box, Check, ChevronDown, Copy, Cpu, Gauge, HardDrive, Layers, Network, Server, Shield } from 'lucide-react'
 import { commands } from '@/types/app-bindings'
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export default function ServerOverview({ serverId }: Props) {
+  const { t } = useTranslation()
   const [warningsOpen, setWarningsOpen] = useState(false)
   const { data: info, isFetching: loading } = useQuery({
     queryKey: qk.dockerInfo(serverId),
@@ -37,12 +40,12 @@ export default function ServerOverview({ serverId }: Props) {
         {loading && !info ? (
           <div className="flex items-center gap-2 rounded-xl border border-border px-4 py-6 text-xs text-muted-foreground">
             <div className="h-3 w-3 animate-spin rounded-full border border-primary border-t-transparent" />
-            加载主机信息...
+            {t('ui.overview.loadingHost')}
           </div>
         ) : (
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
             <div className="space-y-3">
-              <SectionCard title="运行状态" icon={<Gauge className="size-4" />}>
+              <SectionCard title={t('ui.overview.runtimeState')} icon={<Gauge className="size-4" />}>
                 <RuntimeStatusPanel
                   running={info?.containers_running ?? '0'}
                   paused={info?.containers_paused ?? '0'}
@@ -53,7 +56,7 @@ export default function ServerOverview({ serverId }: Props) {
                 />
               </SectionCard>
 
-              <SectionCard title="容器能力" icon={<Shield className="size-4" />}>
+              <SectionCard title={t('ui.overview.capabilities')} icon={<Shield className="size-4" />}>
                 <CapabilityList
                   items={[
                     ['Memory Limit', info?.memory_limit ?? false],
@@ -68,50 +71,64 @@ export default function ServerOverview({ serverId }: Props) {
                 />
               </SectionCard>
 
-              <SectionCard title="主机信息" icon={<Server className="size-4" />}>
+              <SectionCard title={t('ui.overview.hostInfo')} icon={<Server className="size-4" />}>
                 <div className="grid gap-4 lg:grid-cols-2">
                   <KeyValueList
                     items={[
-                      ['操作系统', info?.os || '-'],
-                      ['系统类型', info?.os_type || '-'],
-                      ['内核版本', info?.kernel_version || '-'],
-                      ['架构', info?.architecture || '-'],
+                      [t('ui.overview.os'), info?.os || '-'],
+                      [t('ui.overview.osType'), info?.os_type || '-'],
+                      [t('ui.overview.kernel'), info?.kernel_version || '-'],
+                      [t('ui.overview.arch'), info?.architecture || '-'],
                     ]}
                   />
                   <KeyValueList
                     items={[
                       ['Docker Root Dir', info?.docker_root_dir || '-'],
-                      ['存储驱动', info?.storage_driver || '-'],
-                      ['日志驱动', info?.logging_driver || '-'],
+                      [t('ui.overview.storageDriver'), info?.storage_driver || '-'],
+                      [t('ui.overview.loggingDriver'), info?.logging_driver || '-'],
                       ['Firewall', info?.firewall_driver || '-'],
                     ]}
                   />
                 </div>
-                <InlineTagBlock label="主机标签" items={info?.labels ?? []} empty="暂无标签" />
+                <InlineTagBlock
+                  label={t('ui.overview.hostLabels')}
+                  items={info?.labels ?? []}
+                  empty={t('ui.overview.noLabels')}
+                />
               </SectionCard>
             </div>
 
             <div className="space-y-3">
-              <SectionCard title="Docker 引擎" icon={<Box className="size-4" />}>
+              <SectionCard title={t('ui.overview.engine')} icon={<Box className="size-4" />}>
                 <KeyValueList
                   compact
                   columns={2}
                   items={[
-                    ['引擎版本', info?.server_version || '-'],
-                    ['API 版本', info?.api_version || '-'],
-                    ['默认运行时', info?.default_runtime || '-'],
+                    [t('ui.overview.engineVersion'), info?.server_version || '-'],
+                    [t('ui.overview.apiVersion'), info?.api_version || '-'],
+                    [t('ui.overview.defaultRuntime'), info?.default_runtime || '-'],
                     ['Cgroup', joinValues(info?.cgroup_driver, info?.cgroup_version) || '-'],
-                    ['Live Restore', boolText(info?.live_restore_enabled ?? false)],
-                    ['Experimental', boolText(info?.experimental_build ?? false)],
-                    ['Debug', boolText(info?.debug ?? false)],
-                    ['IPv4 Forwarding', boolText(info?.ipv4_forwarding ?? false)],
+                    ['Live Restore', boolText(t, info?.live_restore_enabled ?? false)],
+                    ['Experimental', boolText(t, info?.experimental_build ?? false)],
+                    ['Debug', boolText(t, info?.debug ?? false)],
+                    ['IPv4 Forwarding', boolText(t, info?.ipv4_forwarding ?? false)],
                   ]}
                 />
-                <InlineTagBlock compact label="可用运行时" items={info?.runtimes ?? []} empty="无" />
-                <InlineTagBlock compact label="安全选项" items={info?.security_options ?? []} empty="无" />
+                <InlineTagBlock
+                  compact
+                  label={t('ui.overview.runtimes')}
+                  items={info?.runtimes ?? []}
+                  empty={t('ui.common.none')}
+                />
+                <InlineTagBlock
+                  compact
+                  label={t('ui.overview.securityOptions')}
+                  items={info?.security_options ?? []}
+                  empty={t('ui.common.none')}
+                />
               </SectionCard>
 
-              <SectionCard title="网络与扩展" icon={<Network className="size-4" />}>
+              <SectionCard title={t('ui.overview.networkPlugins')} icon={<Network className="size-4" />}>
                 <KeyValueList
                   items={[
                     ['HTTP Proxy', info?.http_proxy || '-'],
@@ -119,15 +136,39 @@ export default function ServerOverview({ serverId }: Props) {
                     ['No Proxy', info?.no_proxy || '-'],
                   ]}
                 />
-                <InlineTagBlock label="卷插件" items={info?.volume_plugins ?? []} empty="无" />
-                <InlineTagBlock label="网络插件" items={info?.network_plugins ?? []} empty="无" />
-                <InlineTagBlock label="认证插件" items={info?.authorization_plugins ?? []} empty="无" />
-                <InlineTagBlock label="日志插件" items={info?.log_plugins ?? []} empty="无" />
+                <InlineTagBlock
+                  label={t('ui.overview.volumePlugin')}
+                  items={info?.volume_plugins ?? []}
+                  empty={t('ui.common.none')}
+                />
+                <InlineTagBlock
+                  label={t('ui.overview.networkPlugin')}
+                  items={info?.network_plugins ?? []}
+                  empty={t('ui.common.none')}
+                />
+                <InlineTagBlock
+                  label={t('ui.overview.authPlugin')}
+                  items={info?.authorization_plugins ?? []}
+                  empty={t('ui.common.none')}
+                />
+                <InlineTagBlock
+                  label={t('ui.overview.logPlugin')}
+                  items={info?.log_plugins ?? []}
+                  empty={t('ui.common.none')}
+                />
               </SectionCard>
 
-              <SectionCard title="底层信息" icon={<Layers className="size-4" />}>
-                <InlineTagBlock label="存储驱动详情" items={info?.storage_driver_status ?? []} empty="无" />
-                <InlineTagBlock label="防火墙信息" items={info?.firewall_info ?? []} empty="无" />
+              <SectionCard title={t('ui.overview.lowLevel')} icon={<Layers className="size-4" />}>
+                <InlineTagBlock
+                  label={t('ui.overview.storageStatus')}
+                  items={info?.storage_driver_status ?? []}
+                  empty={t('ui.common.none')}
+                />
+                <InlineTagBlock
+                  label={t('ui.overview.firewallInfo')}
+                  items={info?.firewall_info ?? []}
+                  empty={t('ui.common.none')}
+                />
               </SectionCard>
             </div>
           </div>
@@ -148,6 +189,7 @@ function HeroPanel({
   warningsOpen: boolean
   onToggleWarnings: () => void
 }) {
+  const { t } = useTranslation()
   const warningCount = info?.warning_details.length ?? 0
   const statusDotClass = loading ? 'animate-pulse bg-sky-400' : warningCount > 0 ? 'bg-amber-500' : 'bg-emerald-500'
 
@@ -159,31 +201,56 @@ function HeroPanel({
             <div className={`h-2 w-2 rounded-full ${statusDotClass}`} />
             <span className="text-xs tracking-wider text-muted-foreground uppercase">Host Overview</span>
           </div>
-          <h2 className="mt-2 text-lg font-semibold text-foreground">{info?.name || '未知主机'}</h2>
+          <h2 className="mt-2 text-lg font-semibold text-foreground">{info?.name || t('ui.overview.unknownHost')}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {joinValues(info?.os || 'Unknown OS', info?.os_version, info?.architecture) || 'Unknown OS'}
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <MetricCard icon={<Box className="size-4" />} label="容器" value={info?.containers ?? '-'} />
-          <MetricCard icon={<Layers className="size-4" />} label="镜像" value={info?.images ?? '-'} />
+          <MetricCard
+            icon={<Box className="size-4" />}
+            label={t('ui.overview.containers')}
+            value={info?.containers ?? '-'}
+          />
+          <MetricCard
+            icon={<Layers className="size-4" />}
+            label={t('ui.overview.images')}
+            value={info?.images ?? '-'}
+          />
           <MetricCard icon={<Cpu className="size-4" />} label="CPU" value={info?.ncpu ?? '-'} />
-          <MetricCard icon={<HardDrive className="size-4" />} label="内存" value={info?.mem_total ?? '-'} />
+          <MetricCard
+            icon={<HardDrive className="size-4" />}
+            label={t('ui.overview.memory')}
+            value={info?.mem_total ?? '-'}
+          />
         </div>
       </div>
 
       <div className="mt-4 grid gap-2 md:grid-cols-3">
-        <SummaryTile title="Docker 版本" value={info?.server_version || '-'} meta={`API ${info?.api_version || '-'}`} />
         <SummaryTile
-          title="存储与运行时"
-          value={info?.storage_driver || '-'}
-          meta={joinValues(info?.default_runtime, joinValues(info?.cgroup_driver, info?.cgroup_version)) || '未识别'}
+          title={t('ui.overview.dockerVersion')}
+          value={info?.server_version || '-'}
+          meta={`API ${info?.api_version || '-'}`}
         />
         <SummaryTile
-          title="风险状态"
-          value={warningCount > 0 ? '发现告警' : '运行稳定'}
-          meta={warningCount > 0 ? `${warningCount} 条提示` : loading ? '刷新中' : '当前无额外提示'}
+          title={t('ui.overview.storageRuntime')}
+          value={info?.storage_driver || '-'}
+          meta={
+            joinValues(info?.default_runtime, joinValues(info?.cgroup_driver, info?.cgroup_version)) ||
+            t('ui.overview.unidentified')
+          }
+        />
+        <SummaryTile
+          title={t('ui.overview.riskStatus')}
+          value={warningCount > 0 ? t('ui.overview.hasWarnings') : t('ui.overview.stable')}
+          meta={
+            warningCount > 0
+              ? t('ui.overview.warningCount', { count: String(warningCount) })
+              : loading
+                ? t('ui.overview.refreshing')
+                : t('ui.overview.noNotices')
+          }
           tone={warningCount > 0 ? 'warning' : 'normal'}
           interactive={warningCount > 0}
           expanded={warningsOpen}
@@ -283,11 +350,12 @@ function RuntimeStatusPanel({
   pausedPercent: number
   stoppedPercent: number
 }) {
+  const { t } = useTranslation()
   return (
     <div className="grid gap-4 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border">
-      <RuntimeStateItem label="运行中" value={running} percent={runningPercent} tone="green" />
-      <RuntimeStateItem label="已暂停" value={paused} percent={pausedPercent} tone="amber" />
-      <RuntimeStateItem label="已停止" value={stopped} percent={stoppedPercent} tone="slate" />
+      <RuntimeStateItem label={t('ui.overview.running')} value={running} percent={runningPercent} tone="green" />
+      <RuntimeStateItem label={t('ui.overview.paused')} value={paused} percent={pausedPercent} tone="amber" />
+      <RuntimeStateItem label={t('ui.overview.stopped')} value={stopped} percent={stoppedPercent} tone="slate" />
     </div>
   )
 }
@@ -367,6 +435,7 @@ function KeyValueList({
 }
 
 function CapabilityList({ items }: { items: Array<[string, boolean]> }) {
+  const { t } = useTranslation()
   return (
     <div className="grid gap-1.5 sm:grid-cols-2">
       {items.map(([label, enabled]) => (
@@ -380,7 +449,7 @@ function CapabilityList({ items }: { items: Array<[string, boolean]> }) {
           <div
             className={`shrink-0 text-xs font-medium ${enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}`}
           >
-            {enabled ? '已启用' : '未启用'}
+            {enabled ? t('ui.common.enabled') : t('ui.common.notEnabled')}
           </div>
         </div>
       ))}
@@ -427,19 +496,20 @@ function InlineTagBlock({
 }
 
 function WarningInlineList({ warnings }: { warnings: string[] }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(warnings.join('\n')).then(() => {
       setCopied(true)
-      toast.success('告警已复制')
+      toast.success(t('ui.overview.warningsCopied'))
       setTimeout(() => setCopied(false), 1500)
     })
-  }, [warnings])
+  }, [warnings, t])
 
   return (
     <div className="mt-4 border-t border-border pt-4">
-      <div className="mt-3 space-y-2">
+      <div className="space-y-2">
         {warnings.map((warning, index) => (
           <div key={`${index}-${warning}`} className="border-l-2 border-amber-500/40 pl-3">
             <div className="flex items-start gap-3">
@@ -452,7 +522,7 @@ function WarningInlineList({ warnings }: { warnings: string[] }) {
                     type="button"
                     className="inline-flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                     onClick={handleCopy}
-                    title="复制全部提示"
+                    title={t('ui.overview.copyWarnings')}
                   >
                     {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
                   </button>
@@ -471,6 +541,6 @@ function joinValues(...values: Array<string | null | undefined>) {
   return values.filter(Boolean).join(' / ')
 }
 
-function boolText(value: boolean) {
-  return value ? '已启用' : '未启用'
+function boolText(t: TFunction, value: boolean) {
+  return value ? t('ui.common.enabled') : t('ui.common.notEnabled')
 }

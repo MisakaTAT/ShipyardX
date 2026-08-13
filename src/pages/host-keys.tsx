@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, Fingerprint, Loader2, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import type { KnownHostEntry, ServerConfig } from '@/types/app-bindings'
 import { Button } from '@/shared/ui/button'
@@ -46,6 +47,7 @@ function OrphanGroup({
   onClear: () => void
   children: ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 rounded-xl border border-dashed border-border px-3.5 py-2">
@@ -57,7 +59,9 @@ function OrphanGroup({
           <ChevronRight
             className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')}
           />
-          <span className="truncate text-[13px] text-muted-foreground">{count} 条指纹没有对应的服务器配置</span>
+          <span className="truncate text-[13px] text-muted-foreground">
+            {t('ui.hostKeys.orphans', { count: String(count) })}
+          </span>
         </button>
         <Button
           type="button"
@@ -67,7 +71,7 @@ function OrphanGroup({
           onClick={onClear}
         >
           <Trash2 />
-          清理
+          {t('ui.hostKeys.cleanUp')}
         </Button>
       </div>
       {expanded ? <div className="space-y-2">{children}</div> : null}
@@ -76,6 +80,7 @@ function OrphanGroup({
 }
 
 export default function HostKeysPage() {
+  const { t } = useTranslation()
   const { data: entries = [], isFetching } = useKnownHosts()
   const { data: servers = [] } = useServers()
   const forget = useForgetHostKey()
@@ -124,11 +129,14 @@ export default function HostKeysPage() {
     }
   }, [filtered, probe])
 
-  const handleCopy = useCallback((fingerprint: string) => {
-    void navigator.clipboard.writeText(fingerprint).then(() => {
-      toast.success('指纹已复制')
-    })
-  }, [])
+  const handleCopy = useCallback(
+    (fingerprint: string) => {
+      void navigator.clipboard.writeText(fingerprint).then(() => {
+        toast.success(t('ui.hostKeys.copied'))
+      })
+    },
+    [t]
+  )
 
   const handleTrust = useCallback(
     (entry: KnownHostEntry, fingerprint: string) => {
@@ -170,10 +178,8 @@ export default function HostKeysPage() {
             <div className="shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-lg font-semibold text-foreground">主机指纹</h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    管理已信任的 SSH 主机密钥，指纹变化时会中断连接并要求重新确认。
-                  </p>
+                  <h1 className="text-lg font-semibold text-foreground">{t('ui.hostKeys.title')}</h1>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('ui.hostKeys.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <CommandPaletteButton />
@@ -185,27 +191,27 @@ export default function HostKeysPage() {
                           variant="outline"
                           size="icon"
                           className="text-muted-foreground"
-                          title="更多操作"
+                          title={t('ui.common.moreActions')}
                         />
                       }
                     >
                       <MoreHorizontal />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
+                    <DropdownMenuContent align="end" className="w-auto min-w-36">
                       <DropdownMenuItem disabled={probingAll} onClick={() => void probeAll()}>
                         <RefreshCw className={cn('size-3.5', probingAll && 'animate-spin')} />
-                        检测全部
+                        {t('ui.hostKeys.probeAll')}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem variant="destructive" onClick={() => setShowClearAll(true)}>
                         <Trash2 className="size-3.5" />
-                        清空全部
+                        {t('ui.hostKeys.clearAll')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <Button type="button" onClick={() => setShowAdd(true)}>
                     <Plus />
-                    添加指纹
+                    {t('ui.hostKeys.addTitle')}
                   </Button>
                 </div>
               </div>
@@ -221,20 +227,18 @@ export default function HostKeysPage() {
                   <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
                     <Fingerprint />
                   </div>
-                  <h2 className="text-sm font-semibold text-foreground">还没有已信任的主机</h2>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    首次连接服务器时会显示指纹并请你确认，确认后会记录在这里。你也可以先手动录入从服务器上抄来的指纹。
-                  </p>
+                  <h2 className="text-sm font-semibold text-foreground">{t('ui.hostKeys.emptyTitle')}</h2>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t('ui.hostKeys.emptyBody')}</p>
                   <div className="mt-5">
                     <Button onClick={() => setShowAdd(true)}>
                       <Plus />
-                      添加指纹
+                      {t('ui.hostKeys.addTitle')}
                     </Button>
                   </div>
                 </div>
               </div>
             ) : filtered.length === 0 ? (
-              <EmptyState icon={Search} title={`没有匹配「${search}」的指纹`} />
+              <EmptyState icon={Search} title={t('ui.hostKeys.noMatch', { query: search })} />
             ) : (
               <div className="flex flex-col gap-4">
                 {orphans.length > 0 ? (
@@ -264,14 +268,14 @@ export default function HostKeysPage() {
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null)
         }}
-        title="删除指纹"
+        title={t('ui.hostKeys.deleteTitle')}
         description={
           pendingDelete
-            ? `删除 ${pendingDelete.host}:${pendingDelete.port} 的指纹后，下次连接该主机时需要重新确认。`
+            ? t('ui.hostKeys.deleteDesc', { host: pendingDelete.host, port: String(pendingDelete.port) })
             : ''
         }
         destructive
-        confirmText="删除"
+        confirmText={t('ui.common.delete')}
         onConfirm={() => {
           if (!pendingDelete) return
           forget.mutate({ host: pendingDelete.host, port: pendingDelete.port })
@@ -281,20 +285,20 @@ export default function HostKeysPage() {
       <ConfirmDialog
         open={showClearOrphans}
         onOpenChange={setShowClearOrphans}
-        title="清理无关联指纹"
-        description={`将删除 ${orphans.length} 条没有对应服务器配置的指纹。已关联服务器的记录不受影响。`}
+        title={t('ui.hostKeys.cleanTitle')}
+        description={t('ui.hostKeys.cleanDesc', { count: String(orphans.length) })}
         destructive
-        confirmText="清理"
+        confirmText={t('ui.hostKeys.cleanUp')}
         onConfirm={() => forgetMany.mutate(orphans.map(({ entry }) => ({ host: entry.host, port: entry.port })))}
       />
 
       <ConfirmDialog
         open={showClearAll}
         onOpenChange={setShowClearAll}
-        title="清空全部指纹"
-        description={`将删除全部 ${entries.length} 条已信任指纹，包含已关联服务器的那些。所有主机下次连接时都需要重新确认，此操作不可撤销。`}
+        title={t('ui.hostKeys.clearTitle')}
+        description={t('ui.hostKeys.clearDesc', { count: String(entries.length) })}
         destructive
-        confirmText="清空"
+        confirmText={t('ui.hostKeys.clear')}
         onConfirm={() => clear.mutate()}
       />
     </div>

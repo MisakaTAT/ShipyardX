@@ -1,3 +1,4 @@
+import i18n from '@/app/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { commands, type RunContainer, type Image } from '@/types/app-bindings'
@@ -81,7 +82,7 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
 
       try {
         if (needsPull) {
-          setImageStepTitle('拉取镜像')
+          setImageStepTitle(i18n.t('ui.run.pullImage'))
           setImageStepDetail(img)
           setImageStep('active')
           await pullImage(
@@ -102,10 +103,10 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
           )
           if (!mountedRef.current) return
           setImageStep('done')
-          setImageStepDetail('镜像已就绪')
+          setImageStepDetail(i18n.t('ui.run.imageReady'))
         } else {
-          setImageStepTitle('检查本地镜像')
-          setImageStepDetail('本地已有该标签，跳过拉取')
+          setImageStepTitle(i18n.t('ui.run.checkLocalImage'))
+          setImageStepDetail(i18n.t('ui.run.imageCached'))
           setImageStep('done')
         }
 
@@ -116,7 +117,7 @@ export function useRunContainerFlow(serverId: string, onSuccess: () => void) {
         setRunStep('done')
 
         const short = containerId.replace(/^sha256:/, '').slice(0, 12)
-        toast.success(`容器已创建并启动（${short}）`)
+        toast.success(i18n.t('ui.run.created', { name: short }))
         qc.invalidateQueries({ queryKey: qk.containers(serverId) })
         qc.invalidateQueries({ queryKey: qk.images(serverId) })
         onSuccess()

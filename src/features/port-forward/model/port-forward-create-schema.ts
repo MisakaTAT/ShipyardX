@@ -2,11 +2,11 @@ import { z } from 'zod'
 import { trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const portForwardCreateFormSchema = z.object({
-  serverId: trimmedRequiredString('请选择主机'),
-  containerId: trimmedRequiredString('请选择容器'),
-  containerPort: z.number().int().min(1, '请选择容器端口').max(65535, '端口无效'),
-  bindAddress: trimmedRequiredString('请选择绑定地址'),
-  localPort: z.number().int().min(0, '本地端口不能为负').max(65535, '本地端口不能超过 65535'),
+  serverId: trimmedRequiredString('ui.validation.selectHost'),
+  containerId: trimmedRequiredString('ui.validation.selectContainer'),
+  containerPort: z.number().int().min(1, 'ui.validation.selectContainerPort').max(65535, 'ui.validation.portInvalid'),
+  bindAddress: trimmedRequiredString('ui.validation.selectBindAddress'),
+  localPort: z.number().int().min(0, 'ui.validation.localPortNegative').max(65535, 'ui.validation.localPortTooLarge'),
 })
 
 export type PortForwardCreateFormValues = z.infer<typeof portForwardCreateFormSchema>

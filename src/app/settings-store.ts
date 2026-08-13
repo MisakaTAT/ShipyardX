@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import { isSupportedLanguage, type LanguageSetting } from '@/app/i18n'
+import i18n, { isSupportedLanguage, type LanguageSetting } from '@/app/i18n'
 import { DEFAULT_APPSTORE_SOURCES } from '@/shared/lib/appstore-settings'
 import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
 import { normalizeHotkey } from '@/shared/lib/hotkeys'
@@ -219,7 +219,7 @@ function normalizeAppstoreSettings(input: unknown): AppSettings['appstore'] {
   const sources = raw.sources.length
     ? raw.sources.map((source, index) => ({
         id: normalizeString(source.id, `source-${index + 1}`),
-        name: normalizeString(source.name, `应用商店 ${index + 1}`),
+        name: normalizeString(source.name, i18n.t('ui.appstore.defaultSourceName', { index: String(index + 1) })),
         repoUrl: normalizeString(source.repoUrl, fallbackSource.repoUrl),
         enabled: normalizeBoolean(source.enabled, true),
       }))

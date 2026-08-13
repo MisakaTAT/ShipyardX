@@ -1,5 +1,9 @@
 import type { FieldErrors, FieldValues, SubmitErrorHandler, SubmitHandler, UseFormReturn } from 'react-hook-form'
+import i18n from '@/app/i18n'
 import { toast } from '@/shared/components/toast'
+
+export const translateIssue = (message: string) =>
+  i18n.exists(message) ? (i18n.t as (key: string) => string)(message) : message
 
 function findFirstErrorMessage(error: unknown): string | null {
   if (!error) return null
@@ -16,7 +20,7 @@ function findFirstErrorMessage(error: unknown): string | null {
 
   const record = error as Record<string, unknown>
   if (typeof record.message === 'string' && record.message.trim()) {
-    return record.message
+    return translateIssue(record.message)
   }
 
   for (const value of Object.values(record)) {
@@ -29,9 +33,9 @@ function findFirstErrorMessage(error: unknown): string | null {
 
 export function getFirstFormErrorMessage<TFieldValues extends FieldValues>(
   errors: FieldErrors<TFieldValues>,
-  fallback = '表单校验失败，请检查后重试'
+  fallback?: string
 ) {
-  return findFirstErrorMessage(errors) ?? fallback
+  return findFirstErrorMessage(errors) ?? fallback ?? i18n.t('ui.form.validationFailed')
 }
 
 export function toastFormErrors<TFieldValues extends FieldValues>(

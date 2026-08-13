@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, Plus, ScanSearch, Share2, Trash2 } from 'lucide-react'
 import type { Network } from '@/types/app-bindings'
 import NetworkCreateDialog from '@/features/docker-networks/ui/network-create-dialog'
@@ -14,6 +15,7 @@ interface NetworkPanelProps {
 }
 
 export default function NetworkPanel({ serverId }: NetworkPanelProps) {
+  const { t } = useTranslation()
   const { data: networks = [], isFetching, dataUpdatedAt } = useNetworks(serverId)
   const removeNetwork = useRemoveNetwork(serverId)
   const pruneUnusedNetworks = usePruneUnusedNetworks(serverId)
@@ -44,7 +46,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
     () => [
       {
         id: 'name',
-        header: '名称',
+        header: t('ui.common.name'),
         cell: ({ row }) => {
           const n = row.original
           return (
@@ -57,17 +59,25 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
       },
       { id: 'driver', header: 'Driver', cell: ({ row }) => row.original.driver || '-' },
       { id: 'scope', header: 'Scope', cell: ({ row }) => row.original.scope || '-' },
-      { id: 'subnets', header: '子网', cell: ({ row }) => <TruncatedChips items={row.original.subnets} /> },
-      { id: 'gateways', header: '网关', cell: ({ row }) => <TruncatedChips items={row.original.gateways} /> },
+      {
+        id: 'subnets',
+        header: t('ui.networks.colSubnets'),
+        cell: ({ row }) => <TruncatedChips items={row.original.subnets} />,
+      },
+      {
+        id: 'gateways',
+        header: t('ui.networks.colGateways'),
+        cell: ({ row }) => <TruncatedChips items={row.original.gateways} />,
+      },
       {
         id: 'labels',
-        header: '标签',
+        header: t('ui.common.labels'),
         meta: { width: '16rem', className: 'whitespace-normal' },
         cell: ({ row }) => <TruncatedChips items={row.original.labels} />,
       },
       {
         id: 'attrs',
-        header: '属性',
+        header: t('ui.networks.colAttrs'),
         cell: ({ row }) => {
           const n = row.original
           return (
@@ -81,13 +91,13 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
       },
       {
         id: 'created',
-        header: '创建时间',
+        header: t('ui.common.created'),
         meta: { width: '12rem' },
         cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',
-        header: '操作',
+        header: t('ui.common.actions'),
         meta: { width: '5rem' },
         cell: ({ row }) => {
           const n = row.original
@@ -100,7 +110,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                title="删除"
+                title={t('ui.common.delete')}
                 onClick={() => setRemoveTarget(n)}
                 className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
               >
@@ -111,31 +121,31 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         },
       },
     ],
-    []
+    [t]
   )
 
   return (
     <PanelShell>
       <PanelHeader
         icon={Share2}
-        title="网络"
+        title={t('ui.networks.title')}
         stats={networks.length > 0 ? `(${networks.length})` : undefined}
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" />}>
-              操作
+              {t('ui.common.actions')}
               <ChevronDown />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuContent align="end" className="w-auto min-w-40">
               <DropdownMenuItem onClick={() => setShowCreate(true)}>
                 <Plus className="size-3.5" />
-                创建网络
+                {t('ui.networks.createTitle')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
                 <Trash2 className="size-3.5" />
-                清理未使用网络
+                {t('ui.networks.pruneTitle')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -147,7 +157,7 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         data={filtered}
         getRowId={(n) => n.id}
         loading={isFetching && networks.length === 0}
-        empty={{ icon: Share2, title: search ? `无匹配的网络 "${search}"` : '没有网络' }}
+        empty={{ icon: Share2, title: search ? t('ui.networks.noMatch', { query: search }) : t('ui.networks.empty') }}
         tableClassName="text-sm"
       />
 
@@ -168,10 +178,10 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除网络"
-        description={removeTarget ? `确认删除网络「${removeTarget.name}」？\n\n若仍有容器连接该网络，删除会失败。` : ''}
+        title={t('ui.networks.deleteTitle')}
+        description={removeTarget ? t('ui.networks.deleteDesc', { name: removeTarget.name }) : ''}
         destructive
-        confirmText="删除"
+        confirmText={t('ui.common.delete')}
         onConfirm={() => {
           if (!removeTarget) return
           removeNetwork.mutate(removeTarget.id)
@@ -181,10 +191,10 @@ export default function NetworkPanel({ serverId }: NetworkPanelProps) {
       <ConfirmDialog
         open={cleanupOpen}
         onOpenChange={setCleanupOpen}
-        title="清理未使用网络"
-        description="删除当前没有容器连接的网络。系统默认网络不会被清理，自定义网络若仍需使用，请不要执行该操作。"
+        title={t('ui.networks.pruneTitle')}
+        description={t('ui.networks.pruneDesc')}
         destructive
-        confirmText="清理未使用网络"
+        confirmText={t('ui.networks.pruneTitle')}
         onConfirm={() => {
           pruneUnusedNetworks.mutate()
         }}

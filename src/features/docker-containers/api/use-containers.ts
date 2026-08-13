@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands, type RunContainer } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
@@ -60,8 +61,11 @@ export function usePruneStoppedContainers(serverId: string) {
     mutationFn: () => commands.pruneStoppedContainers(serverId),
     invalidate: [qk.containers(serverId)],
     onSuccess: (result) => {
-      toast.success('已清理已停止容器', {
-        description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
+      toast.success(i18n.t('ui.containers.pruned'), {
+        description: i18n.t('ui.containers.prunedDesc', {
+          count: String(result.deleted_count),
+          size: result.reclaimed,
+        }),
       })
     },
   })

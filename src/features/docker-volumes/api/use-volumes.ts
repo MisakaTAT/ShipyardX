@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
@@ -36,8 +37,8 @@ export function usePruneUnusedVolumes(serverId: string) {
     mutationFn: () => commands.pruneUnusedVolumes(serverId),
     invalidate: [qk.volumes(serverId)],
     onSuccess: (result) => {
-      toast.success('已清理未使用存储卷', {
-        description: `清理项 ${result.deleted_count} 个，回收 ${result.reclaimed}`,
+      toast.success(i18n.t('ui.volumes.pruned'), {
+        description: i18n.t('ui.volumes.prunedDesc', { count: String(result.deleted_count), size: result.reclaimed }),
       })
     },
   })

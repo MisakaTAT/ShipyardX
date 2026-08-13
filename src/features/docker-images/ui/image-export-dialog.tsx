@@ -3,6 +3,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { Download, FolderOpen, Loader2 } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { useExportImage } from '@/features/docker-images/api/use-images'
 import {
   imageExportDefaultValues,
@@ -26,6 +27,7 @@ interface ImageExportDialogProps {
 }
 
 export default function ImageExportDialog({ serverId, image, open, onOpenChange }: ImageExportDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const exportImage = useExportImage(serverId)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -104,7 +106,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
         directory: values.directory.trim(),
         fileName: values.fileName.trim(),
       })
-      toast.success('镜像已导出到本地')
+      toast.success(t('ui.images.exported'))
       activeExportIdRef.current = null
       onOpenChange(false)
     } catch (error) {
@@ -123,25 +125,25 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
         if (!next && exporting) return
         onOpenChange(next)
       }}
-      title="导出镜像"
+      title={t('ui.images.exportTitle')}
       icon={Download}
       disableClose={exporting}
       showCloseButton
       footer={
         <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={exporting}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-export`} disabled={exporting || !image}>
             {exporting ? (
               <>
                 <Loader2 className="animate-spin" />
-                导出中
+                {t('ui.images.exporting')}
               </>
             ) : (
               <>
                 <Download />
-                导出到本地
+                {t('ui.images.exportToLocal')}
               </>
             )}
           </Button>
@@ -155,13 +157,11 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             name="fileName"
             render={({ field, fieldState }) => (
               <FormFieldRow
-                label="文件名"
+                label={t('ui.images.fileName')}
                 required
                 invalid={fieldState.invalid}
                 variant="title"
-                description={
-                  <FormFieldHint id={`${formId}-name-desc`}>可自定义名称；未带 `.tar` 会自动补上。</FormFieldHint>
-                }
+                description={<FormFieldHint id={`${formId}-name-desc`}>{t('ui.images.fileNameHint')}</FormFieldHint>}
               >
                 <Input
                   {...field}
@@ -183,19 +183,21 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
             name="directory"
             render={({ field, fieldState }) => (
               <FormFieldRow
-                label="保存目录"
+                label={t('ui.images.saveDirectory')}
                 required
                 invalid={fieldState.invalid}
                 variant="title"
                 contentClassName="gap-2"
-                description={<FormFieldHint id={`${formId}-dir-desc`}>镜像会以 tar 包形式保存到该目录。</FormFieldHint>}
+                description={
+                  <FormFieldHint id={`${formId}-dir-desc`}>{t('ui.images.saveDirectoryHint')}</FormFieldHint>
+                }
               >
                 <div className="flex items-center gap-2">
                   <Input
                     {...field}
                     aria-invalid={fieldState.invalid}
                     aria-describedby={`${formId}-dir-desc`}
-                    placeholder="请选择本地目录"
+                    placeholder={t('ui.images.selectDirectoryPlaceholder')}
                     disabled={exporting}
                   />
                   <Button
@@ -205,7 +207,7 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
                     disabled={exporting}
                   >
                     <FolderOpen />
-                    选择目录
+                    {t('ui.common.selectDirectory')}
                   </Button>
                 </div>
               </FormFieldRow>
@@ -216,13 +218,13 @@ export default function ImageExportDialog({ serverId, image, open, onOpenChange 
         {exporting && progress ? (
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">导出进度</span>
+              <span className="font-medium text-foreground">{t('ui.images.exportProgress')}</span>
               <span className="text-muted-foreground">
                 {progress
                   ? progress.total
                     ? `${progress.transferred} / ${progress.total}`
                     : progress.transferred
-                  : '准备中...'}
+                  : t('ui.common.preparing')}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-border/70">

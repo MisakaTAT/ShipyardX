@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, type ComponentProps, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Box, Play, Plus, Trash2 } from 'lucide-react'
 import { useImages } from '@/features/docker-images/api/use-images'
 import { useNetworks } from '@/features/docker-networks/api/use-networks'
@@ -35,10 +37,10 @@ const CHECK_ROW = 'flex cursor-pointer items-center gap-2.5 text-left text-[13px
 const RADIO_ROW = 'flex cursor-pointer items-center gap-2 text-[13px] text-foreground'
 
 const RESTART_OPTIONS = [
-  { value: 'no', label: '不自动重启' },
-  { value: 'always', label: '始终重启' },
-  { value: 'unless-stopped', label: '除非已手动停止' },
-  { value: 'on-failure', label: '非零退出时重启' },
+  { value: 'no', labelKey: 'ui.run.policyNo' },
+  { value: 'always', labelKey: 'ui.run.policyAlways' },
+  { value: 'unless-stopped', labelKey: 'ui.run.policyUnlessStopped' },
+  { value: 'on-failure', labelKey: 'ui.run.policyOnFailure' },
 ] as const
 
 const BUILT_IN_NETWORKS = new Set(['bridge', 'host', 'none', 'default'])
@@ -59,8 +61,9 @@ function emptyVolume(): RunContainerFormValues['volumes'][number] {
   return { hostPath: '', containerPath: '', readOnly: false }
 }
 
-function getRestartPolicyLabel(value: RunContainerFormValues['restartPolicy']) {
-  return RESTART_OPTIONS.find((option) => option.value === value)?.label ?? value
+function getRestartPolicyLabel(t: TFunction, value: RunContainerFormValues['restartPolicy']) {
+  const option = RESTART_OPTIONS.find((o) => o.value === value)
+  return option ? t(option.labelKey) : value
 }
 
 function SectionTitle({ className, invalid, ...props }: ComponentProps<typeof FieldTitle> & { invalid?: boolean }) {
@@ -152,6 +155,7 @@ function KeyValueEditor({
   renderKeyInput,
   renderValueInput,
 }: KeyValueEditorProps) {
+  const { t } = useTranslation()
   return (
     <FormSection
       title={title}
@@ -159,13 +163,13 @@ function KeyValueEditor({
       action={
         <Button type="button" variant="outline" size="sm" className="gap-1 px-2" onClick={onAdd}>
           <Plus className="size-3" />
-          添加
+          {t('ui.run.addEntry')}
         </Button>
       }
       hint={hint}
     >
       {fields.length === 0 ? (
-        <SectionHint>暂未添加</SectionHint>
+        <SectionHint>{t('ui.run.noEntries')}</SectionHint>
       ) : (
         <div className="space-y-2">
           {fields.map((row, i) => (
@@ -180,8 +184,8 @@ function KeyValueEditor({
                 size="icon-sm"
                 className="shrink-0 text-muted-foreground hover:text-red-500"
                 onClick={() => onRemove(i)}
-                aria-label={`删除${title}第 ${i + 1} 项`}
-                title={`删除${title}第 ${i + 1} 项`}
+                aria-label={t('ui.run.removeEntry', { section: title, index: String(i + 1) })}
+                title={t('ui.run.removeEntry', { section: title, index: String(i + 1) })}
               >
                 <Trash2 />
               </Button>
@@ -220,16 +224,17 @@ function ArgListEditor({
   onRemoveArg,
   renderArgInput,
 }: ArgListEditorProps) {
+  const { t } = useTranslation()
   return (
     <FormSection title={title} hint={hint}>
       <RadioGroup value={mode} onValueChange={(value) => onModeChange(value as 'raw' | 'args')} className="flex gap-4">
         <label className={RADIO_ROW}>
           <RadioGroupItem value="raw" />
-          <span>原始命令</span>
+          <span>{t('ui.run.rawCommand')}</span>
         </label>
         <label className={RADIO_ROW}>
           <RadioGroupItem value="args" />
-          <span>参数列表</span>
+          <span>{t('ui.run.argList')}</span>
         </label>
       </RadioGroup>
       {mode === 'raw' ? (
@@ -242,14 +247,14 @@ function ArgListEditor({
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <FieldLabel>参数列表</FieldLabel>
+            <FieldLabel>{t('ui.run.argList')}</FieldLabel>
             <Button type="button" variant="outline" size="sm" className="gap-1 px-2" onClick={onAddArg}>
               <Plus className="size-3" />
-              添加参数
+              {t('ui.run.addArg')}
             </Button>
           </div>
           {fields.length === 0 ? (
-            <SectionHint>暂未添加参数</SectionHint>
+            <SectionHint>{t('ui.run.noArgs')}</SectionHint>
           ) : (
             <div className="space-y-2">
               {fields.map((row, i) => (
@@ -261,8 +266,8 @@ function ArgListEditor({
                     size="icon-sm"
                     className="shrink-0 text-muted-foreground hover:text-red-500"
                     onClick={() => onRemoveArg(i)}
-                    aria-label={`删除${title}参数 ${i + 1}`}
-                    title={`删除${title}参数 ${i + 1}`}
+                    aria-label={t('ui.run.removeArg', { section: title, index: String(i + 1) })}
+                    title={t('ui.run.removeArg', { section: title, index: String(i + 1) })}
                   >
                     <Trash2 />
                   </Button>
@@ -284,6 +289,7 @@ interface RunContainerDialogProps {
 }
 
 export default function RunContainerDialog({ open, onOpenChange, serverId, onSuccess }: RunContainerDialogProps) {
+  const { t } = useTranslation()
   const imagesQuery = useImages(serverId, open)
   const networksQuery = useNetworks(serverId, open)
   const images = useMemo(() => imagesQuery.data ?? [], [imagesQuery.data])
@@ -354,12 +360,12 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
   }, [open, serverId])
 
   useEffect(() => {
-    if (imagesQuery.error) toastAppError(imagesQuery.error, '加载镜像列表失败')
-  }, [imagesQuery.error])
+    if (imagesQuery.error) toastAppError(imagesQuery.error, t('ui.run.loadImagesFailed'))
+  }, [t, imagesQuery.error])
 
   useEffect(() => {
-    if (networksQuery.error) toastAppError(networksQuery.error, '加载网络列表失败')
-  }, [networksQuery.error])
+    if (networksQuery.error) toastAppError(networksQuery.error, t('ui.run.loadNetworksFailed'))
+  }, [t, networksQuery.error])
 
   const imageOptions = useMemo(() => listSelectableImageRefs(images), [images])
 
@@ -380,19 +386,19 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
     async (values) => {
       onSubmit(values)
     },
-    '请检查容器运行配置后重试'
+    t('ui.run.submitFailed')
   )
 
   const progressSteps = [
     {
       status: flow.imageStep,
-      title: flow.imageStepTitle || '镜像准备',
+      title: flow.imageStepTitle || t('ui.run.imageStep'),
       detail: flow.imageStepDetail || undefined,
     },
     {
       status: flow.runStep,
-      title: '创建并启动容器',
-      detail: flow.runStep === 'active' ? '正在向 Docker 提交创建请求…' : undefined,
+      title: t('ui.run.createStep'),
+      detail: flow.runStep === 'active' ? t('ui.run.createStepDetail') : undefined,
     },
   ]
 
@@ -405,7 +411,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
       onOpenChange={(next) => {
         onOpenChange(next)
       }}
-      title="运行容器"
+      title={t('ui.run.title')}
       icon={Box}
       widthClassName="w-[680px]"
       disableClose={disableClose}
@@ -419,7 +425,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             disabled={flow.runStep === 'active'}
             onClick={() => void flow.handleBackFromProgress()}
           >
-            {flow.imageStep === 'active' ? '中断拉取' : '返回编辑'}
+            {flow.imageStep === 'active' ? t('ui.run.abortPull') : t('ui.run.backToEdit')}
           </Button>
         )
       }
@@ -427,11 +433,11 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
         showForm ? (
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              取消
+              {t('ui.common.cancel')}
             </Button>
             <Button type="submit" form="run-container-builder-form" className="gap-1.5" disabled={imagesLoading}>
               <Play />
-              运行
+              {t('ui.run.run')}
             </Button>
           </div>
         ) : null
@@ -446,16 +452,16 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
               name="name"
               render={({ field, fieldState }) => (
                 <FormFieldRow
-                  label="容器名称"
+                  label={t('ui.run.containerName')}
                   htmlFor="run-ctr-name"
                   required
                   invalid={fieldState.invalid}
-                  description={<SectionHint>仅支持字母数字下划线连字符与英文句点</SectionHint>}
+                  description={<SectionHint>{t('ui.run.nameHint')}</SectionHint>}
                 >
                   <Input
                     id="run-ctr-name"
                     {...field}
-                    placeholder="留空将自动生成容器名称"
+                    placeholder={t('ui.run.namePlaceholder')}
                     aria-invalid={fieldState.invalid}
                   />
                 </FormFieldRow>
@@ -471,7 +477,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   name="image"
                   render={({ field: imageField, fieldState }) => (
                     <FormFieldRow
-                      label="镜像"
+                      label={t('ui.run.image')}
                       required
                       invalid={fieldState.invalid || imageInvalid}
                       variant="title"
@@ -480,9 +486,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       labelClassName={cn(SECTION_TITLE, fieldState.invalid || imageInvalid ? 'text-destructive' : null)}
                       description={
                         manualField.value ? (
-                          <SectionHint>可联想本地列表或直接输入完整引用 本机无该标签时启动前会自动拉取</SectionHint>
+                          <SectionHint>{t('ui.run.imageHint')}</SectionHint>
                         ) : !imagesLoading && imageOptions.length === 0 ? (
-                          <SectionHint>当前无本地镜像 可切换到自定输入 或先到镜像页拉取后再选</SectionHint>
+                          <SectionHint>{t('ui.run.imageEmptyHint')}</SectionHint>
                         ) : undefined
                       }
                     >
@@ -499,12 +505,20 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           disabled={imagesLoading}
                         >
                           <SelectTrigger aria-invalid={fieldState.invalid || imageInvalid} className="w-32 shrink-0">
-                            <SelectValue>{(v) => (v === 'manual' ? '自定义' : v === 'list' ? '列表' : v)}</SelectValue>
+                            <SelectValue>
+                              {(v) =>
+                                v === 'manual'
+                                  ? t('ui.run.imageModeManual')
+                                  : v === 'list'
+                                    ? t('ui.run.imageModeList')
+                                    : v
+                              }
+                            </SelectValue>
                           </SelectTrigger>
                           <SelectContent align="start">
-                            <SelectItem value="manual">自定义</SelectItem>
+                            <SelectItem value="manual">{t('ui.run.imageModeManual')}</SelectItem>
                             <SelectItem value="list" disabled={imageOptions.length === 0}>
-                              列表
+                              {t('ui.run.imageModeList')}
                             </SelectItem>
                           </SelectContent>
                         </Select>
@@ -515,9 +529,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                               {...imageField}
                               list={imageDatalistId}
                               placeholder={
-                                imagesLoading
-                                  ? '正在加载本地镜像…'
-                                  : '例如 nginx:alpine 或 registry.example.com/project:tag'
+                                imagesLoading ? t('ui.run.imageLoadingPlaceholder') : t('ui.run.imagePlaceholder')
                               }
                               disabled={imagesLoading}
                               autoComplete="off"
@@ -542,10 +554,10 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                               <SelectValue
                                 placeholder={
                                   imagesLoading
-                                    ? '正在加载…'
+                                    ? t('ui.run.loading')
                                     : imageOptions.length === 0
-                                      ? '当前无本地镜像'
-                                      : '选择镜像'
+                                      ? t('ui.run.noLocalImages')
+                                      : t('ui.run.selectImage')
                                 }
                               />
                             </SelectTrigger>
@@ -571,9 +583,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                 render={({ field }) => (
                   <>
                     <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                      启动前强制拉取
+                      {t('ui.run.alwaysPull')}
                     </CheckRow>
-                    <SectionHint>勾选后每次启动前都会执行 pull 本机已有同名标签时也可用于更新镜像</SectionHint>
+                    <SectionHint>{t('ui.run.alwaysPullHint')}</SectionHint>
                   </>
                 )}
               />
@@ -581,7 +593,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
             {/* 端口 */}
             <FormSection
-              title="端口"
+              title={t('ui.run.ports')}
               action={
                 <Button
                   type="button"
@@ -591,10 +603,10 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   onClick={() => appendPort(emptyPort())}
                 >
                   <Plus className="size-3" />
-                  添加映射
+                  {t('ui.run.addPortMapping')}
                 </Button>
               }
-              hint="可与下方映射同时使用。启用 `-P` 后，镜像中已 `EXPOSE` 的端口会在主机侧自动分配随机端口。"
+              hint={t('ui.run.portsHint')}
             >
               <Controller
                 control={control}
@@ -604,21 +616,21 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                     value={field.value ? 'all' : 'mapped'}
                     onValueChange={(v) => field.onChange(v === 'all')}
                     className="flex flex-col gap-2"
-                    aria-label="端口映射方式"
+                    aria-label={t('ui.run.portModeLabel')}
                   >
                     <label className={RADIO_ROW}>
                       <RadioGroupItem value="mapped" id="run-port-mode-mapped" />
-                      <span>自定义主机与容器端口</span>
+                      <span>{t('ui.run.portModeManual')}</span>
                     </label>
                     <label className={RADIO_ROW}>
                       <RadioGroupItem value="all" id="run-port-mode-all" />
-                      <span>映射镜像中 EXPOSE 的全部端口（-P）</span>
+                      <span>{t('ui.run.portModePublishAll')}</span>
                     </label>
                   </RadioGroup>
                 )}
               />
               {portFields.length === 0 ? (
-                <SectionHint>未添加映射且未启用 -P 时容器内端口不会暴露到主机</SectionHint>
+                <SectionHint>{t('ui.run.portsEmptyHint')}</SectionHint>
               ) : (
                 <div className="space-y-2">
                   {portFields.map((row, i) => (
@@ -632,7 +644,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                               type="number"
                               min={0}
                               max={65535}
-                              placeholder="主机端口（留空随机分配）"
+                              placeholder={t('ui.run.hostPortPlaceholder')}
                               value={field.value == null || field.value === 0 ? '' : field.value}
                               onChange={(e) => {
                                 const t = e.target.value
@@ -655,7 +667,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                               type="number"
                               min={1}
                               max={65535}
-                              placeholder="容器端口（必填）"
+                              placeholder={t('ui.run.containerPortPlaceholder')}
                               value={field.value || ''}
                               onChange={(e) => {
                                 const v = parseInt(e.target.value, 10)
@@ -671,7 +683,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                           render={({ field, fieldState }) => (
                             <Select value={field.value || 'tcp'} onValueChange={field.onChange}>
                               <SelectTrigger
-                                aria-label="协议"
+                                aria-label={t('ui.run.protocol')}
                                 aria-invalid={fieldState.invalid}
                                 className="w-full min-w-0"
                               >
@@ -702,12 +714,8 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
             {/* 网络 */}
             <FormSection
-              title="网络"
-              hint={
-                isCustomNetwork
-                  ? '当前为自定义网络，可按需指定固定 IPv4 / IPv6。请确保 IP 位于该网络可分配网段内。'
-                  : '固定 IP 仅适用于用户自定义网络。若要指定 IPv4 / IPv6，请先切换到自建网络。'
-              }
+              title={t('ui.run.network')}
+              hint={isCustomNetwork ? t('ui.run.networkCustomHint') : t('ui.run.networkDefaultHint')}
             >
               <Controller
                 control={control}
@@ -720,7 +728,9 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       disabled={networksLoading}
                     >
                       <SelectTrigger aria-invalid={fieldState.invalid}>
-                        <SelectValue placeholder={networksLoading ? '正在加载网络…' : '选择网络'} />
+                        <SelectValue
+                          placeholder={networksLoading ? t('ui.run.networkLoading') : t('ui.run.selectNetwork')}
+                        />
                       </SelectTrigger>
                       <SelectContent align="start">
                         <SelectItem value="bridge">bridge</SelectItem>
@@ -747,7 +757,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       <Input
                         id="run-ctr-ipv4"
                         {...field}
-                        placeholder="留空则自动分配"
+                        placeholder={t('ui.run.autoAssign')}
                         aria-invalid={fieldState.invalid}
                       />
                     </StackField>
@@ -761,7 +771,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       <Input
                         id="run-ctr-ipv6"
                         {...field}
-                        placeholder="留空则自动分配"
+                        placeholder={t('ui.run.autoAssign')}
                         aria-invalid={fieldState.invalid}
                       />
                     </StackField>
@@ -772,7 +782,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
             {/* 数据卷 */}
             <FormSection
-              title="数据卷"
+              title={t('ui.run.volumes')}
               action={
                 <Button
                   type="button"
@@ -782,10 +792,10 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   onClick={() => appendVolume(emptyVolume())}
                 >
                   <Plus className="size-3" />
-                  添加挂载
+                  {t('ui.run.addMount')}
                 </Button>
               }
-              hint="当前仅支持主机路径绑定挂载。适合持久化配置、数据目录和日志目录。"
+              hint={t('ui.run.volumesHint')}
             >
               {volumeFields.map((row, i) => (
                 <div key={row.id} className="flex flex-row items-center gap-2 rounded-lg border border-border p-1">
@@ -794,14 +804,22 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       control={control}
                       name={`volumes.${i}.hostPath`}
                       render={({ field, fieldState }) => (
-                        <Input placeholder="主机目录 /data/app" {...field} aria-invalid={fieldState.invalid} />
+                        <Input
+                          placeholder={t('ui.run.hostPathPlaceholder')}
+                          {...field}
+                          aria-invalid={fieldState.invalid}
+                        />
                       )}
                     />
                     <Controller
                       control={control}
                       name={`volumes.${i}.containerPath`}
                       render={({ field, fieldState }) => (
-                        <Input placeholder="容器内路径 var/www" {...field} aria-invalid={fieldState.invalid} />
+                        <Input
+                          placeholder={t('ui.run.containerPathPlaceholder')}
+                          {...field}
+                          aria-invalid={fieldState.invalid}
+                        />
                       )}
                     />
                   </div>
@@ -811,7 +829,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                       name={`volumes.${i}.readOnly`}
                       render={({ field }) => (
                         <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                          只读
+                          {t('ui.run.readOnly')}
                         </CheckRow>
                       )}
                     />
@@ -831,13 +849,13 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
             {/* 启动命令 & 入口 */}
             <ArgListEditor
-              title="启动命令（CMD）"
+              title={t('ui.run.cmdTitle')}
               mode={commandMode}
               onModeChange={(mode) => setValue('commandMode', mode)}
               rawValue={commandText}
               onRawChange={(value) => setValue('commandText', value)}
-              rawPlaceholder="例如：nginx -g 'daemon off;'"
-              hint="留空则沿用镜像默认 CMD。原始命令适合一次性粘贴，参数列表适合逐项编辑。"
+              rawPlaceholder={t('ui.run.cmdPlaceholder')}
+              hint={t('ui.run.cmdHint')}
               fields={commandArgFields}
               onAddArg={() => appendCommandArg(emptyArgRow())}
               onRemoveArg={removeCommandArg}
@@ -848,7 +866,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   render={({ field, fieldState }) => (
                     <Input
                       {...field}
-                      placeholder={index === 0 ? '例如 nginx' : '例如 -g / daemon off;'}
+                      placeholder={index === 0 ? t('ui.run.cmdArg0') : t('ui.run.cmdArgN')}
                       aria-invalid={fieldState.invalid}
                     />
                   )}
@@ -857,13 +875,13 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             />
 
             <ArgListEditor
-              title="入口命令（ENTRYPOINT）"
+              title={t('ui.run.entrypointTitle')}
               mode={entrypointMode}
               onModeChange={(mode) => setValue('entrypointMode', mode)}
               rawValue={entrypointText}
               onRawChange={(value) => setValue('entrypointText', value)}
-              rawPlaceholder="例如：/docker-entrypoint.sh nginx"
-              hint="留空则沿用镜像默认 ENTRYPOINT。多数镜像无需额外修改，只有需要覆盖入口脚本时再填写。"
+              rawPlaceholder={t('ui.run.entrypointPlaceholder')}
+              hint={t('ui.run.entrypointHint')}
               fields={entrypointArgFields}
               onAddArg={() => appendEntrypointArg(emptyArgRow())}
               onRemoveArg={removeEntrypointArg}
@@ -874,7 +892,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   render={({ field, fieldState }) => (
                     <Input
                       {...field}
-                      placeholder={index === 0 ? '例如 /docker-entrypoint.sh' : '例如 nginx'}
+                      placeholder={index === 0 ? t('ui.run.entrypointArg0') : t('ui.run.entrypointArgN')}
                       aria-invalid={fieldState.invalid}
                     />
                   )}
@@ -884,8 +902,8 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
 
             {/* 标签 & 环境变量 */}
             <KeyValueEditor
-              title="容器标签（Labels）"
-              hint="适合写元数据，例如 `app=shipyardx`、`env=prod`。"
+              title={t('ui.run.labelsTitle')}
+              hint={t('ui.run.labelsHint')}
               fields={labelFields}
               invalid={Boolean(errors.labelEntries)}
               onAdd={() => appendLabel(emptyKeyValueRow())}
@@ -911,8 +929,8 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             />
 
             <KeyValueEditor
-              title="环境变量"
-              hint="前端会校验键名是否为空，提交时会转换为 `KEY=value` 传给 Docker。"
+              title={t('ui.run.envTitle')}
+              hint={t('ui.run.envHint')}
               fields={envFields}
               invalid={Boolean(errors.envEntries)}
               onAdd={() => appendEnv(emptyKeyValueRow())}
@@ -938,16 +956,13 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             />
 
             {/* 资源限制 */}
-            <FormSection
-              title="资源限制"
-              hint="CPU 权重用于相对调度优先级，CPU 上限与内存上限用于硬限制。桌面环境下建议先从温和限制开始。"
-            >
+            <FormSection title={t('ui.run.resourcesTitle')} hint={t('ui.run.resourcesHint')}>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setValue('cpuQuotaCores', '0.5')}>
-                  0.5 核
+                  {t('ui.run.halfCore')}
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => setValue('cpuQuotaCores', '1')}>
-                  1 核
+                  {t('ui.run.oneCore')}
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => setValue('memoryMb', '512')}>
                   512 MB
@@ -961,13 +976,13 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   control={control}
                   name="cpuShares"
                   render={({ field, fieldState }) => (
-                    <StackField label="CPU 权重（shares）" htmlFor="run-cpu-shares" invalid={fieldState.invalid}>
+                    <StackField label={t('ui.run.cpuShares')} htmlFor="run-cpu-shares" invalid={fieldState.invalid}>
                       <Input
                         id="run-cpu-shares"
                         type="number"
                         min={0}
                         {...field}
-                        placeholder="默认 1024；0 表示不设置"
+                        placeholder={t('ui.run.cpuSharesPlaceholder')}
                         aria-invalid={fieldState.invalid}
                       />
                     </StackField>
@@ -977,14 +992,14 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   control={control}
                   name="cpuQuotaCores"
                   render={({ field, fieldState }) => (
-                    <StackField label="CPU 上限（核数）" htmlFor="run-cpu-quota" invalid={fieldState.invalid}>
+                    <StackField label={t('ui.run.cpuQuota')} htmlFor="run-cpu-quota" invalid={fieldState.invalid}>
                       <Input
                         id="run-cpu-quota"
                         type="number"
                         min={0}
                         step="0.1"
                         {...field}
-                        placeholder="0 或留空表示不限制"
+                        placeholder={t('ui.run.noLimitPlaceholder')}
                         aria-invalid={fieldState.invalid}
                       />
                     </StackField>
@@ -994,13 +1009,13 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   control={control}
                   name="memoryMb"
                   render={({ field, fieldState }) => (
-                    <StackField label="内存上限（MB）" htmlFor="run-mem" invalid={fieldState.invalid}>
+                    <StackField label={t('ui.run.memoryLimit')} htmlFor="run-mem" invalid={fieldState.invalid}>
                       <Input
                         id="run-mem"
                         type="number"
                         min={0}
                         {...field}
-                        placeholder="0 或留空表示不限制"
+                        placeholder={t('ui.run.noLimitPlaceholder')}
                         aria-invalid={fieldState.invalid}
                       />
                     </StackField>
@@ -1010,36 +1025,34 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
             </FormSection>
 
             {/* 其它选项 */}
-            <FormSection title="其它选项">
+            <FormSection title={t('ui.run.otherTitle')}>
               <Controller
                 control={control}
                 name="autoRemove"
                 render={({ field }) => (
                   <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                    停止后自动删除容器（--rm）
+                    {t('ui.run.autoRemove')}
                   </CheckRow>
                 )}
               />
-              <SectionHint className="pl-6">
-                适合一次性任务或临时调试。启用后容器停止即删除，日志和元数据也会一起消失。
-              </SectionHint>
+              <SectionHint className="pl-6">{t('ui.run.autoRemoveHint')}</SectionHint>
               <Controller
                 control={control}
                 name="privileged"
                 render={({ field }) => (
                   <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                    特权模式，近似主机权限（--privileged）
+                    {t('ui.run.privileged')}
                   </CheckRow>
                 )}
               />
-              <SectionHint className="pl-6">特权模式会显著扩大容器可访问的主机能力（谨慎启用！）</SectionHint>
+              <SectionHint className="pl-6">{t('ui.run.privilegedHint')}</SectionHint>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
                 <Controller
                   control={control}
                   name="tty"
                   render={({ field }) => (
                     <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                      分配伪终端（-t）
+                      {t('ui.run.tty')}
                     </CheckRow>
                   )}
                 />
@@ -1048,27 +1061,25 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   name="openStdin"
                   render={({ field }) => (
                     <CheckRow checked={field.value} onCheckedChange={field.onChange}>
-                      保持标准输入打开（-i）
+                      {t('ui.run.stdin')}
                     </CheckRow>
                   )}
                 />
               </div>
-              <SectionHint className="pl-6">
-                交互式容器通常会同时开启 TTY 和保持标准输入打开；如果只是后台服务，一般不需要勾选。
-              </SectionHint>
+              <SectionHint className="pl-6">{t('ui.run.ttyHint')}</SectionHint>
             </FormSection>
 
             {/* 重启策略 */}
             <FormSection
-              title="重启策略"
+              title={t('ui.run.restartTitle')}
               hint={
                 restartPolicy === 'no'
-                  ? '容器退出后不自动重启。适合一次性任务。'
+                  ? t('ui.run.restartNoHint')
                   : restartPolicy === 'always'
-                    ? 'Docker 或宿主重启后都会尝试拉起容器。适合常驻服务。'
+                    ? t('ui.run.restartAlwaysHint')
                     : restartPolicy === 'unless-stopped'
-                      ? '与 always 类似，但手动停止后不会自动恢复。适合日常服务。'
-                      : '仅当容器异常退出时重试，适合需要保护但不希望无限重启的任务。'
+                      ? t('ui.run.restartUnlessStoppedHint')
+                      : t('ui.run.restartOnFailureHint')
               }
             >
               <div className="grid grid-cols-2 gap-3">
@@ -1076,17 +1087,17 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                   control={control}
                   name="restartPolicy"
                   render={({ field, fieldState }) => (
-                    <StackField label="策略" invalid={fieldState.invalid}>
+                    <StackField label={t('ui.run.policy')} invalid={fieldState.invalid}>
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger aria-invalid={fieldState.invalid} className="w-full">
                           <SelectValue>
-                            {(value) => getRestartPolicyLabel(value as RunContainerFormValues['restartPolicy'])}
+                            {(value) => getRestartPolicyLabel(t, value as RunContainerFormValues['restartPolicy'])}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent align="start">
                           {RESTART_OPTIONS.map((o) => (
                             <SelectItem key={o.value} value={o.value}>
-                              {o.label}
+                              {t(o.labelKey)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1099,11 +1110,7 @@ export default function RunContainerDialog({ open, onOpenChange, serverId, onSuc
                     control={control}
                     name="restartMaxRetry"
                     render={({ field, fieldState }) => (
-                      <StackField
-                        label="最大重试次数（on-failure）"
-                        htmlFor="run-restart-max"
-                        invalid={fieldState.invalid}
-                      >
+                      <StackField label={t('ui.run.maxRetry')} htmlFor="run-restart-max" invalid={fieldState.invalid}>
                         <Input
                           id="run-restart-max"
                           type="number"

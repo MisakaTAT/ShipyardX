@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands } from '@/types/app-bindings'
 import { getErrorCode, toastAppError } from '@/shared/lib/errors'
 import { toast } from '@/shared/components/toast'
@@ -18,12 +19,15 @@ export function useServerConnection(serverId: string) {
     async (notify = false) => {
       const result = await query.refetch()
       if (!result.error) {
-        if (notify) toast.success('服务器连接正常')
+        if (notify) toast.success(i18n.t('ui.servers.connectionOk'))
         return
       }
       if (notify) {
         const code = getErrorCode(result.error)
-        toastAppError(result.error, code.startsWith('ssh.') ? '无法连接服务器' : '服务器连接检测失败')
+        toastAppError(
+          result.error,
+          code.startsWith('ssh.') ? i18n.t('ui.servers.unreachable') : i18n.t('ui.servers.checkFailed')
+        )
       }
     },
     [query]

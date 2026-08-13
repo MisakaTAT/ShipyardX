@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, PackagePlus, Search, Settings2, Stone } from 'lucide-react'
 import { useLocation } from 'wouter'
@@ -12,15 +13,18 @@ import { ActiveFilterChip } from '@/shared/components/active-filter-chip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import { CommandPaletteButton } from '@/features/command-palette/ui/command-palette-button'
 import { AppDetailDialog } from '@/features/appstore/ui/app-detail-dialog'
+import { TagFilterBar } from '@/features/appstore/ui/tag-filter-bar'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { qk } from '@/shared/api/query-keys'
 import { AppListItem, type AppstoreSyncProgress } from '@/types/app-bindings'
 import { APP_PATHS } from '@/shared/lib/app-router'
 import { usePageQuery } from '@/shared/hooks/use-page-query'
 import { useSelectedAppSource } from '@/features/appstore/model/source-selection'
+import { pickAppShortDesc, pickAppTags } from '@/features/appstore/model/app-locale'
 import { cn } from '@/shared/lib/utils'
 
 export default function AppStorePage() {
+  const { t, i18n } = useTranslation()
   const [, navigate] = useLocation()
   const qc = useQueryClient()
   const { settings: appSettings } = useAppSettings()
@@ -40,15 +44,22 @@ export default function AppStorePage() {
   const [selectedAppKey, setSelectedAppKey] = useState<string | null>(null)
   const [dialogMode, setDialogMode] = useState<'readme' | 'install'>('readme')
 
+  const language = i18n.language
+
   const allTags = useMemo(() => {
     const tags = new Map<string, number>()
     for (const app of apps) {
-      for (const tag of app.tags) {
+      for (const tag of pickAppTags(app, language)) {
         tags.set(tag, (tags.get(tag) || 0) + 1)
       }
     }
     return Array.from(tags.entries()).sort((a, b) => b[1] - a[1])
-  }, [apps])
+  }, [apps, language])
+
+  // 中英文是两套分类，切语言后旧的选中项在新分类里不存在，会把列表筛成空
+  useEffect(() => {
+    setSelectedTags(new Set())
+  }, [language])
 
   const filtered = useMemo(() => {
     let result = apps
@@ -58,15 +69,15 @@ export default function AppStorePage() {
         (app) =>
           app.name.toLowerCase().includes(q) ||
           app.key.toLowerCase().includes(q) ||
-          app.short_desc_zh.toLowerCase().includes(q) ||
-          app.description.toLowerCase().includes(q)
+          pickAppShortDesc(app, language).toLowerCase().includes(q) ||
+          Object.values(app.description).some((text) => text.toLowerCase().includes(q))
       )
     }
     if (selectedTags.size > 0) {
-      result = result.filter((app) => app.tags.some((t) => selectedTags.has(t)))
+      result = result.filter((app) => pickAppTags(app, language).some((tag) => selectedTags.has(tag)))
     }
     return result
-  }, [apps, search, selectedTags])
+  }, [apps, search, selectedTags, language])
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) => {
@@ -101,9 +112,9 @@ export default function AppStorePage() {
         <div className="shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-foreground">应用商店</h1>
+              <h1 className="text-lg font-semibold text-foreground">{t('ui.appStore.title')}</h1>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                浏览和安装商店中的应用，一键部署到远程服务器，共 {apps.length} 个应用。
+                {t('ui.appStore.subtitle', { count: apps.length })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -118,7 +129,7 @@ export default function AppStorePage() {
                   disabled={sync.isPending || switchingSource}
                 >
                   <SelectTrigger className="h-8 max-w-56 min-w-40 text-xs">
-                    <span className="truncate">{activeSource?.name ?? '选择应用源'}</span>
+                    <span className="truncate">{activeSource?.name ?? t('ui.appStore.selectSource')}</span>
                   </SelectTrigger>
                   <SelectContent align="end">
                     {enabledSources.map((source) => (
@@ -133,7 +144,7 @@ export default function AppStorePage() {
                 size="icon-sm"
                 variant="outline"
                 onClick={() => navigate(`${APP_PATHS.settings}?section=appstore`)}
-                aria-label="打开应用商店设置"
+                aria-label={t('ui.appStore.openSettings')}
                 disabled={switchingSource}
               >
                 <Settings2 className="size-4" />
@@ -145,28 +156,14 @@ export default function AppStorePage() {
                 disabled={sync.isPending || switchingSource || enabledSources.length === 0}
               >
                 {sync.isPending ? <Spinner data-icon="inline-start" /> : null}
-                <span>{sync.isPending ? '同步中' : '同步'}</span>
+                <span>{sync.isPending ? t('ui.appStore.syncing') : t('ui.appStore.sync')}</span>
               </Button>
             </div>
           </div>
 
           {search ? <ActiveFilterChip query={search} count={filtered.length} onClear={clearQuery} /> : null}
 
-          {allTags.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {allTags.map(([tag, count]) => (
-                <Badge
-                  key={tag}
-                  variant={selectedTags.has(tag) ? 'default' : 'outline'}
-                  className="cursor-pointer text-[11px] transition-colors"
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                  <span className="ml-1 text-[10px] opacity-60">{count}</span>
-                </Badge>
-              ))}
-            </div>
-          )}
+          <TagFilterBar tags={allTags} selected={selectedTags} onToggle={toggleTag} />
         </div>
       )}
 
@@ -177,19 +174,17 @@ export default function AppStorePage() {
               {sync.isPending ? <Loader2 className="animate-spin" /> : <Stone />}
             </div>
             <h2 className="text-sm font-semibold text-foreground">
-              {sync.isPending ? '正在同步应用商店' : '尚未同步应用商店'}
+              {sync.isPending ? t('ui.appStore.syncingTitle') : t('ui.appStore.notSyncedTitle')}
             </h2>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              {sync.isPending
-                ? '首次同步可能需要一点时间'
-                : '同步应用仓库后，可在此浏览和搜索数百款精选应用，选择您需要的版本并一键部署到服务器'}
+              {sync.isPending ? t('ui.appStore.firstSyncHint') : t('ui.appStore.notSyncedBody')}
             </p>
             {sync.isPending ? (
               <SyncProgressBar progress={syncPercent} className="mt-4 text-left" compact />
             ) : (
               <div className="mt-5">
                 <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
-                  立即同步
+                  {t('ui.appStore.syncNow')}
                 </Button>
               </div>
             )}
@@ -199,7 +194,7 @@ export default function AppStorePage() {
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <Search className="mx-auto size-8 text-muted-foreground/60" />
-            <p className="mt-2 text-sm text-muted-foreground">未找到匹配的应用</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t('ui.appStore.noMatch')}</p>
           </div>
         </div>
       ) : (
@@ -244,17 +239,19 @@ function SyncProgressBar({
   className?: string
   compact?: boolean
 }) {
+  const { t } = useTranslation()
   const percent = progress ? Math.min(Math.max(Math.round(progress.percent ?? 0), 0), 100) : 0
   const hasStarted = !!progress && progress.total_objects > 0
   const detail = hasStarted
-    ? `${progress.received_objects} / ${progress.total_objects} 个对象`
-    : '正在等待远端返回对象信息'
-  const indexed = progress && progress.indexed_objects > 0 ? `，已处理 ${progress.indexed_objects} 个对象` : ''
+    ? t('ui.appStore.objectCount', { received: progress.received_objects, total: progress.total_objects })
+    : t('ui.appStore.waitingRemote')
+  const indexed =
+    progress && progress.indexed_objects > 0 ? t('ui.appStore.indexed', { count: progress.indexed_objects }) : ''
 
   return (
     <div className={cn(compact ? 'space-y-3' : 'space-y-2', className)}>
       <div className={cn('flex items-end justify-between gap-3', compact ? 'justify-center' : '')}>
-        {!compact ? <span className="text-xs text-muted-foreground">同步进度</span> : null}
+        {!compact ? <span className="text-xs text-muted-foreground">{t('ui.appStore.syncProgress')}</span> : null}
         <span className="shrink-0 text-sm font-medium text-foreground tabular-nums">{percent}%</span>
       </div>
 
@@ -283,6 +280,7 @@ function SyncProgressPopover({
   progress: AppstoreSyncProgress | null
   initialSync: boolean
 }) {
+  const { t } = useTranslation()
   const percent = progress ? Math.min(Math.max(Math.round(progress.percent ?? 0), 0), 100) : 0
 
   return (
@@ -297,9 +295,11 @@ function SyncProgressPopover({
       <PopoverContent align="end" sideOffset={8} className="w-72 p-3">
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-medium text-foreground">{initialSync ? '首次同步中' : '同步中'}</h3>
+            <h3 className="text-sm font-medium text-foreground">
+              {initialSync ? t('ui.appStore.firstSyncTitle') : t('ui.appStore.syncing')}
+            </h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {initialSync ? '正在拉取应用商店仓库，完成后将自动展示应用列表' : '正在更新已启用的应用商店仓库'}
+              {initialSync ? t('ui.appStore.firstSyncBody') : t('ui.appStore.updatingBody')}
             </p>
           </div>
           <SyncProgressBar progress={progress} />
@@ -318,6 +318,7 @@ function AppCard({
   onClick: () => void
   onInstall: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
+  const { t, i18n } = useTranslation()
   return (
     <div
       className="group cursor-pointer rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/30 hover:bg-accent/30"
@@ -336,21 +337,23 @@ function AppCard({
             <h3 className="truncate text-sm font-medium text-foreground">{app.name}</h3>
             <button
               className="ml-auto shrink-0 rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/10"
-              title="安装"
+              title={t('ui.appStore.install')}
               onClick={onInstall}
             >
               <PackagePlus className="size-3.5 text-primary" />
             </button>
           </div>
           <p className="mt-0.5 line-clamp-1 text-[11px] leading-relaxed text-muted-foreground">
-            {app.short_desc_zh || app.description || '暂无描述'}
+            {pickAppShortDesc(app, i18n.language) || t('ui.appStore.noDescription')}
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
-            {app.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="px-1.5 py-0 text-[10px]">
-                {tag}
-              </Badge>
-            ))}
+            {pickAppTags(app, i18n.language)
+              .slice(0, 3)
+              .map((tag) => (
+                <Badge key={tag} variant="secondary" className="px-1.5 py-0 text-[10px]">
+                  {tag}
+                </Badge>
+              ))}
           </div>
         </div>
       </div>

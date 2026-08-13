@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'wouter'
+import { useTranslation } from 'react-i18next'
 import { useAppSettings } from '@/app/settings-store'
 import { formatHotkeyLabel } from '@/shared/lib/hotkeys'
 import { ChevronRight, CornerDownLeft, Search } from 'lucide-react'
@@ -9,7 +10,7 @@ import {
   filterItems,
   groupItems,
   withQuery,
-  GROUP_LABELS,
+  GROUP_LABEL_KEYS,
   GROUP_PATHS,
 } from '@/features/command-palette/model/palette-item'
 import { usePaletteItems } from '@/features/command-palette/api/use-palette-items'
@@ -21,6 +22,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, initialQuery = '', onOpenChange }: CommandPaletteProps) {
+  const { t } = useTranslation()
   const [, navigate] = useLocation()
   const {
     settings: {
@@ -83,7 +85,7 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
         className="top-[18%] flex! w-140 max-w-[calc(100%-2rem)] translate-y-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
         showCloseButton={false}
       >
-        <DialogTitle className="sr-only">命令面板</DialogTitle>
+        <DialogTitle className="sr-only">{t('ui.palette.title')}</DialogTitle>
 
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-3.5">
           <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -92,7 +94,7 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="搜索服务器、转发规则、指纹、应用或者命令"
+            placeholder={t('ui.palette.placeholder')}
             autoComplete="off"
             spellCheck={false}
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
@@ -101,7 +103,7 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
 
         <div ref={listRef} className="max-h-[min(60vh,26rem)] min-h-0 flex-1 overflow-y-auto p-1.5">
           {matched.length === 0 ? (
-            <div className="px-3 py-10 text-center text-[13px] text-muted-foreground">没有匹配的结果</div>
+            <div className="px-3 py-10 text-center text-[13px] text-muted-foreground">{t('ui.palette.noResults')}</div>
           ) : (
             groups.map(({ group, items: groupItems }) => {
               const path = GROUP_PATHS[group]
@@ -116,12 +118,12 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
                         navigate(withQuery(path, query))
                       }}
                     >
-                      <span className="mr-[-0.08em] tracking-[0.08em]">{GROUP_LABELS[group]}</span>
+                      <span className="mr-[-0.08em] tracking-[0.08em]">{t(GROUP_LABEL_KEYS[group])}</span>
                       <ChevronRight className="size-3" />
                     </button>
                   ) : (
                     <div className="flex items-center px-2.5 py-1.5 text-[11px] leading-none font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                      {GROUP_LABELS[group]}
+                      {t(GROUP_LABEL_KEYS[group])}
                     </div>
                   )}
                   {groupItems.map((item) => {
@@ -159,17 +161,17 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
         </div>
 
         <div className="flex h-10 shrink-0 items-center gap-4 border-t border-border bg-muted/30 px-3.5 text-[11px] text-muted-foreground">
-          <Hint label="选择">
+          <Hint label={t('ui.palette.hintSelect')}>
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd>
           </Hint>
-          <Hint label="打开">
+          <Hint label={t('ui.palette.hintOpen')}>
             <Kbd>↵</Kbd>
           </Hint>
-          <Hint label="关闭">
+          <Hint label={t('ui.palette.hintClose')}>
             <Kbd>Esc</Kbd>
           </Hint>
-          <Hint label="打开面板" className="ml-auto">
+          <Hint label={t('ui.palette.hintToggle')} className="ml-auto">
             <Kbd>{formatHotkeyLabel(commandPalette)}</Kbd>
           </Hint>
         </div>

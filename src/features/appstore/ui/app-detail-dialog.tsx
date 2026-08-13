@@ -16,16 +16,18 @@ import type {
   InstallStepEvent,
   ServerConfig,
 } from '@/types/app-bindings'
+import { useTranslation } from 'react-i18next'
 import { listen } from '@tauri-apps/api/event'
 import { CodeViewer } from '@/shared/components/code-viewer'
 import { HighlightLog } from '@/features/appstore/ui/highlight-log'
 import { MarkdownViewer } from '@/features/appstore/ui/markdown-viewer'
+import { pickAppReadme, pickAppShortDesc, pickAppTags } from '@/features/appstore/model/app-locale'
 
-const STEP_LABELS: Record<string, string> = {
-  prepare: '准备部署模板',
-  deploy: '部署文件',
-  network: '创建网络',
-  start: '启动容器',
+const STEP_LABEL_KEYS: Record<string, `ui.appstore.step${'Prepare' | 'Deploy' | 'Network' | 'Start'}`> = {
+  prepare: 'ui.appstore.stepPrepare',
+  deploy: 'ui.appstore.stepDeploy',
+  network: 'ui.appstore.stepNetwork',
+  start: 'ui.appstore.stepStart',
 }
 
 function buildDefaultContainerName(appKey: string) {
@@ -41,10 +43,10 @@ const CONTAINER_NAME_FIELD: FormField_Serialize = {
   default: '',
   label: {
     zh: '容器名称',
-    en: 'Container Name',
+    en: 'Container name',
+    ja: 'コンテナ名',
     'zh-Hant': '',
     'pt-br': '',
-    ja: '',
     'es-es': '',
     ko: '',
     ru: '',
@@ -65,6 +67,7 @@ interface AppDetailDialogProps {
 }
 
 export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: AppDetailDialogProps) {
+  const { t, i18n } = useTranslation()
   const { data: detail, isLoading } = useAppDetail(sourceId, appKey)
   const install = useInstallApp()
   const [selectedVersion, setSelectedVersion] = useState<AppVersionInfo_Serialize | null>(null)
@@ -166,21 +169,22 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
     form,
     async (values) => {
       if (!selectedServerId) {
-        toast.warning('请选择服务器')
+        toast.warning(t('ui.appstore.selectServer'))
         return
       }
       handleInstall(values)
     },
-    '请检查应用安装配置后重试'
+    t('ui.appstore.installFailed')
   )
 
   const isLoadingContent = isLoading || !detail
+  const readme = detail ? pickAppReadme(detail, i18n.language) : ''
 
   return (
     <StandardDialog
       open={!!appKey}
       onOpenChange={handleOpenChange}
-      title={isLoadingContent ? '加载中...' : detail.name}
+      title={isLoadingContent ? t('ui.appstore.loadingTitle') : detail.name}
       icon={Stone}
       widthClassName="w-[640px]"
       disableClose={install.isPending}
@@ -188,7 +192,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
         mode === 'readme' ? null : install.isSuccess || install.isError ? (
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
-              关闭
+              {t('ui.common.close')}
             </Button>
           </div>
         ) : selectedVersion ? (
@@ -199,7 +203,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
                 onChange={(e) => setSelectedServerId(e.target.value)}
                 className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
               >
-                <option value="">选择服务器...</option>
+                <option value="">{t('ui.appstore.selectServerPlaceholder')}</option>
                 {servers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.host})
@@ -209,7 +213,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
             </div>
             <Button onClick={() => void submitInstallWithToast()} disabled={install.isPending || !selectedServerId}>
               {install.isPending && <Loader2 className="mr-1.5 size-3.5 animate-spin" />}
-              安装
+              {t('ui.common.install')}
             </Button>
           </div>
         ) : null
@@ -232,10 +236,10 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
             )}
             <div className="min-w-0 flex-1">
               <p className="text-[13px] leading-relaxed text-muted-foreground">
-                {detail.short_desc_zh || detail.short_desc_en}
+                {pickAppShortDesc(detail, i18n.language)}
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
-                {detail.tags.map((tag) => (
+                {pickAppTags(detail, i18n.language).map((tag) => (
                   <Badge key={tag} variant="secondary" className="text-[10px]">
                     {tag}
                   </Badge>
@@ -252,7 +256,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
                 className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
               >
                 <Globe className="size-3.5" />
-                官网
+                {t('ui.appstore.website')}
               </a>
             )}
             {detail.github && (
@@ -269,14 +273,15 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
               </a>
             )}
           </div>
-          {detail.readme_zh && <MarkdownViewer content={detail.readme_zh} />}
+          {readme ? <MarkdownViewer content={readme} /> : null}
         </div>
       ) : install.isPending || install.isSuccess || install.isError ? (
         /* 安装进度 / 结果 */
         <div>
           {['prepare', 'deploy', 'network', 'start'].map((stepKey) => {
             const step = installSteps.get(stepKey)
-            const label = STEP_LABELS[stepKey] || stepKey
+            const labelKey = STEP_LABEL_KEYS[stepKey]
+            const label = labelKey ? t(labelKey) : stepKey
             const isRunning = step?.status === 'running'
             const isDone = step?.status === 'done'
             const isError = step?.status === 'error'
@@ -317,7 +322,7 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
         <form className="space-y-4" onSubmit={submitInstallWithToast}>
           {/* Version selection */}
           <div>
-            <FormFieldLabel className="mb-2">选择版本</FormFieldLabel>
+            <FormFieldLabel className="mb-2">{t('ui.appstore.selectVersion')}</FormFieldLabel>
             <div className="grid grid-cols-3 gap-2">
               {detail.versions.map((v) => (
                 <button
@@ -391,6 +396,15 @@ export function AppDetailDialog({ sourceId, appKey, servers, mode, onClose }: Ap
   )
 }
 
+function pickFieldLabel(field: FormField_Serialize, language: string) {
+  const localized = language.startsWith('ja')
+    ? field.label?.ja
+    : language.startsWith('zh')
+      ? field.label?.zh
+      : field.label?.en
+  return localized || field.label?.en || field.label?.zh || field.envKey
+}
+
 function FormFieldInput({
   field,
   control,
@@ -400,10 +414,12 @@ function FormFieldInput({
   control: ReturnType<typeof useForm<Record<string, string>>>['control']
   error: { message?: string } | undefined
 }) {
-  const label = field.label?.zh || field.label?.en || field.envKey
+  const { t, i18n } = useTranslation()
+  const label = pickFieldLabel(field, i18n.language)
   const isPassword = field.type === 'password'
   const fieldType = isPassword ? 'password' : 'text'
-  const placeholder = field.envKey === 'CONTAINER_NAME' ? '请填写容器名称' : field.default || ''
+  const placeholder =
+    field.envKey === 'CONTAINER_NAME' ? t('ui.appstore.containerNamePlaceholder') : field.default || ''
 
   if (field.type === 'select' || field.values?.length > 0) {
     return (
@@ -411,14 +427,14 @@ function FormFieldInput({
         <Controller
           control={control}
           name={field.envKey}
-          rules={field.required ? { required: `请填写 ${label}` } : undefined}
+          rules={field.required ? { required: t('ui.appstore.fieldRequired', { label }) } : undefined}
           render={({ field: formField }) => (
             <select
               value={formField.value || ''}
               onChange={(e) => formField.onChange(e.target.value)}
               className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
             >
-              <option value="">请选择</option>
+              <option value="">{t('ui.common.selectPlaceholder')}</option>
               {field.values.map((v) => (
                 <option key={v.value} value={v.value}>
                   {v.label}
@@ -436,7 +452,7 @@ function FormFieldInput({
       <Controller
         control={control}
         name={field.envKey}
-        rules={field.required ? { required: `请填写 ${label}` } : undefined}
+        rules={field.required ? { required: t('ui.appstore.fieldRequired', { label }) } : undefined}
         render={({ field: formField }) => <Input type={fieldType} {...formField} placeholder={placeholder} />}
       />
     </FormFieldRow>

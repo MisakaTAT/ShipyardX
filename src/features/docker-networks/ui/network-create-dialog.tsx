@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import {
   networkCreateDefaultValues,
   networkCreateFormSchema,
@@ -27,6 +28,7 @@ export interface NetworkCreateDialogProps {
 }
 
 export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCreated }: NetworkCreateDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const createNetwork = useCreateNetwork(serverId)
 
@@ -52,7 +54,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
     }
     createNetwork.mutate(req, {
       onSuccess: () => {
-        toast.success('网络已创建')
+        toast.success(t('ui.networks.created'))
         onOpenChange(false)
         void onCreated?.()
       },
@@ -68,24 +70,24 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
         if (!next && submitting) return
         onOpenChange(next)
       }}
-      title="创建网络"
+      title={t('ui.networks.createTitle')}
       icon={Share2}
       disableClose={submitting}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-net-create`} disabled={submitting}>
             {submitting ? (
               <>
                 <Loader2 className="animate-spin" />
-                创建中
+                {t('ui.common.creating')}
               </>
             ) : (
               <>
                 <Plus />
-                创建
+                {t('ui.common.create')}
               </>
             )}
           </Button>
@@ -98,7 +100,12 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="名称" htmlFor={`${formId}-name`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.common.name')}
+                htmlFor={`${formId}-name`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${formId}-name`}
                   {...field}
@@ -116,7 +123,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               <FormFieldRow label="Driver" required invalid={fieldState.invalid}>
                 <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                   <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
-                    <SelectValue placeholder="选择 Driver" />
+                    <SelectValue placeholder={t('ui.docker.selectDriver')} />
                   </SelectTrigger>
                   <SelectContent align="start">
                     <SelectItem value="bridge">bridge</SelectItem>
@@ -135,7 +142,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               control={form.control}
               name="subnet"
               render={({ field, fieldState }) => (
-                <FormFieldRow label="子网（可选）" htmlFor={`${formId}-subnet`} invalid={fieldState.invalid}>
+                <FormFieldRow label={t('ui.networks.subnet')} htmlFor={`${formId}-subnet`} invalid={fieldState.invalid}>
                   <Input
                     id={`${formId}-subnet`}
                     {...field}
@@ -150,7 +157,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               control={form.control}
               name="gateway"
               render={({ field, fieldState }) => (
-                <FormFieldRow label="网关（可选）" htmlFor={`${formId}-gw`} invalid={fieldState.invalid}>
+                <FormFieldRow label={t('ui.networks.gateway')} htmlFor={`${formId}-gw`} invalid={fieldState.invalid}>
                   <Input
                     id={`${formId}-gw`}
                     {...field}
@@ -162,7 +169,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
               )}
             />
           </div>
-          <FormFieldHint>不填子网时由 Docker 自动分配地址池</FormFieldHint>
+          <FormFieldHint>{t('ui.networks.subnetHint')}</FormFieldHint>
           <Controller
             control={form.control}
             name="internal"
@@ -174,7 +181,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     disabled={submitting}
                     onCheckedChange={(c) => field.onChange(c === true)}
                   />
-                  Internal（禁止对外路由）
+                  {t('ui.networks.internal')}
                 </FieldLabel>
               </Field>
             )}
@@ -190,7 +197,7 @@ export default function NetworkCreateDialog({ serverId, open, onOpenChange, onCr
                     disabled={submitting}
                     onCheckedChange={(c) => field.onChange(c === true)}
                   />
-                  Attachable（允许其它引擎附加容器）
+                  {t('ui.networks.attachable')}
                 </FieldLabel>
               </Field>
             )}

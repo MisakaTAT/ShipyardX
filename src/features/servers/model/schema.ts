@@ -4,20 +4,20 @@ import { trimmedRequiredString } from '@/shared/lib/form-zod'
 
 export const serverFormSchema = z
   .object({
-    name: trimmedRequiredString('请填写服务器名称'),
-    host: trimmedRequiredString('请填写主机地址'),
-    port: z.number().int().min(1, '端口须在 1–65535').max(65535),
-    username: trimmedRequiredString('请填写用户名'),
+    name: trimmedRequiredString('ui.validation.serverName'),
+    host: trimmedRequiredString('ui.validation.host'),
+    port: z.number().int().min(1, 'ui.validation.portRange').max(65535),
+    username: trimmedRequiredString('ui.validation.username'),
     auth_type: z.enum(['key', 'password']),
     password: z.string(),
     key_path: z.string(),
   })
   .superRefine((data, ctx) => {
     if (data.auth_type === 'password' && !data.password.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写密码', path: ['password'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.password', path: ['password'] })
     }
     if (data.auth_type === 'key' && !data.key_path.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写密钥路径', path: ['key_path'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.keyPath', path: ['key_path'] })
     }
   })
 
@@ -50,18 +50,18 @@ export function serverConfigToFormValues(s: ServerConfig): ServerFormValues {
 
 export const serverTestConnectionSchema = z
   .object({
-    host: trimmedRequiredString('请先填写主机地址'),
-    username: trimmedRequiredString('请先填写用户名'),
+    host: trimmedRequiredString('ui.validation.hostFirst'),
+    username: trimmedRequiredString('ui.validation.usernameFirst'),
     auth_type: z.enum(['key', 'password']),
     password: z.string(),
     key_path: z.string(),
   })
   .superRefine((data, ctx) => {
     if (data.auth_type === 'password' && !data.password.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写密码', path: ['password'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.password', path: ['password'] })
     }
     if (data.auth_type === 'key' && !data.key_path.trim()) {
-      ctx.addIssue({ code: 'custom', message: '请填写密钥路径', path: ['key_path'] })
+      ctx.addIssue({ code: 'custom', message: 'ui.validation.keyPath', path: ['key_path'] })
     }
   })
 

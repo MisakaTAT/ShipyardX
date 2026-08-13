@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, Loader2, Play, Plus, Search, Square } from 'lucide-react'
 import type { PortForward } from '@/types/app-bindings'
 import PortForwardCreateDialog from '@/features/port-forward/ui/port-forward-create-dialog'
@@ -20,6 +21,7 @@ import { CommandPaletteButton } from '@/features/command-palette/ui/command-pale
 import { buildPortForwardColumns } from '@/features/port-forward/ui/port-forward-columns'
 
 export default function PortForwardPage() {
+  const { t } = useTranslation()
   const { data: rules = [], isFetching: rulesLoading } = usePortForwards()
   const { data: servers = [] } = useServers()
   const setEnabled = useSetPortForwardEnabled()
@@ -67,11 +69,12 @@ export default function PortForwardPage() {
   const columns = useMemo(
     () =>
       buildPortForwardColumns({
+        t,
         serverById,
         onToggleEnabled: (id, enabled) => setEnabled.mutate({ id, enabled }),
         onDelete: (id) => remove.mutate(id),
       }),
-    [serverById, setEnabled, remove]
+    [t, serverById, setEnabled, remove]
   )
 
   if (rulesLoading && rules.length === 0) {
@@ -90,10 +93,8 @@ export default function PortForwardPage() {
             <div className="shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-lg font-semibold text-foreground">端口转发</h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    管理 SSH 隧道端口转发规则，将远程容器端口映射到本地。
-                  </p>
+                  <h1 className="text-lg font-semibold text-foreground">{t('ui.portForward.title')}</h1>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('ui.portForward.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <CommandPaletteButton />
@@ -105,17 +106,17 @@ export default function PortForwardPage() {
                       disabled={rulesLoading}
                     >
                       <Square />
-                      停止
+                      {t('ui.portForward.stop')}
                     </Button>
                   ) : enabledCount > 0 ? (
                     <Button type="button" variant="outline" onClick={() => startAll.mutate()} disabled={rulesLoading}>
                       <Play />
-                      启动
+                      {t('ui.portForward.start')}
                     </Button>
                   ) : null}
                   <Button type="button" onClick={() => setShowCreate(true)}>
                     <Plus />
-                    创建规则
+                    {t('ui.portForward.create')}
                   </Button>
                 </div>
               </div>
@@ -130,14 +131,12 @@ export default function PortForwardPage() {
                 <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
                   <ArrowLeftRight />
                 </div>
-                <h2 className="text-sm font-semibold text-foreground">尚未创建转发规则</h2>
-                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                  创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。
-                </p>
+                <h2 className="text-sm font-semibold text-foreground">{t('ui.portForward.emptyTitle')}</h2>
+                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t('ui.portForward.emptyBody')}</p>
                 <div className="mt-5">
                   <Button onClick={() => setShowCreate(true)}>
                     <Plus />
-                    创建规则
+                    {t('ui.portForward.create')}
                   </Button>
                 </div>
               </div>
@@ -145,7 +144,7 @@ export default function PortForwardPage() {
           ) : (
             <div className="flex-1 overflow-hidden rounded-xl border border-border bg-card">
               {filteredRules.length === 0 && rules.length > 0 ? (
-                <EmptyState icon={Search} title={`没有匹配「${search}」的规则`} />
+                <EmptyState icon={Search} title={t('ui.portForward.noMatch', { query: search })} />
               ) : (
                 <DataTable<PortForward>
                   columns={columns}
@@ -153,7 +152,7 @@ export default function PortForwardPage() {
                   getRowId={(r) => r.id}
                   loading={rulesLoading && rules.length === 0}
                   tableClassName="text-sm"
-                  empty={{ icon: Search, title: '没有记录' }}
+                  empty={{ icon: Search, title: t('ui.portForward.noRecords') }}
                 />
               )}
             </div>

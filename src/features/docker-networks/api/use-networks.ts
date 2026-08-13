@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import i18n from '@/app/i18n'
 import { commands, type NetworkCreate } from '@/types/app-bindings'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
@@ -31,8 +32,8 @@ export function usePruneUnusedNetworks(serverId: string) {
     mutationFn: () => commands.pruneUnusedNetworks(serverId),
     invalidate: [qk.networks(serverId)],
     onSuccess: (result) => {
-      toast.success('已清理未使用网络', {
-        description: `清理项 ${result.deleted_count} 个`,
+      toast.success(i18n.t('ui.networks.pruned'), {
+        description: i18n.t('ui.networks.prunedDesc', { count: String(result.deleted_count) }),
       })
     },
   })

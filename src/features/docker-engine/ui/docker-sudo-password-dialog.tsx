@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import {
   dockerSudoPasswordDefaultValues,
   dockerSudoPasswordFormSchema,
@@ -27,6 +28,7 @@ export default function DockerSudoPasswordDialog({
   busy,
   onSubmitPassword,
 }: DockerSudoPasswordDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const form = useForm<DockerSudoPasswordFormValues>({
     resolver: zodResolver(dockerSudoPasswordFormSchema),
@@ -55,34 +57,34 @@ export default function DockerSudoPasswordDialog({
         if (!next && busy) return
         onOpenChange(next)
       }}
-      title="请输入提权密码"
+      title={t('ui.sudo.title')}
       icon={KeyRound}
       disableClose={busy}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={requestClose} disabled={busy}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-sudo`} disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : null}
-            确认
+            {t('ui.common.confirm')}
           </Button>
         </div>
       }
     >
       <form id={`${formId}-sudo`} onSubmit={onSubmit} className="contents">
         <FieldGroup className="gap-3">
-          <FormFieldHint>当前操作需要 sudo 权限 请输入服务器用户的提权密码</FormFieldHint>
+          <FormFieldHint>{t('ui.sudo.hint')}</FormFieldHint>
           <Controller
             control={form.control}
             name="password"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="sudo 密码" required invalid={fieldState.invalid} variant="title">
+              <FormFieldRow label={t('ui.sudo.label')} required invalid={fieldState.invalid} variant="title">
                 <Input
                   id={`${formId}-pwd`}
                   type="password"
                   {...field}
-                  placeholder="sudo 密码"
+                  placeholder={t('ui.sudo.label')}
                   disabled={busy}
                   autoComplete="off"
                   aria-invalid={fieldState.invalid}

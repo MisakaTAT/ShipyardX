@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ToneBadge } from '@/shared/components'
 import type { BadgeTone } from '@/shared/styles/variants'
 
@@ -11,20 +12,24 @@ const TONE_BY_STATE: Record<string, BadgeTone> = {
   created: 'info',
 }
 
-const LABEL_BY_STATE: Record<string, string> = {
-  created: '已创建',
-  running: '运行中',
-  paused: '已暂停',
-  restarting: '重启中',
-  removing: '删除中',
-  exited: '已停止',
-  dead: '已停止',
+type StateLabelKey = `ui.containers.state${'Created' | 'Running' | 'Paused' | 'Restarting' | 'Removing' | 'Exited'}`
+
+const LABEL_KEY_BY_STATE: Record<string, StateLabelKey> = {
+  created: 'ui.containers.stateCreated',
+  running: 'ui.containers.stateRunning',
+  paused: 'ui.containers.statePaused',
+  restarting: 'ui.containers.stateRestarting',
+  removing: 'ui.containers.stateRemoving',
+  exited: 'ui.containers.stateExited',
+  dead: 'ui.containers.stateExited',
 }
 
 export function ContainerStateBadge({ state }: { state: string }) {
+  const { t } = useTranslation()
   const s = state.toLowerCase().trim()
   const tone = TONE_BY_STATE[s] ?? 'muted'
-  const label = LABEL_BY_STATE[s] ?? state
+  const labelKey = LABEL_KEY_BY_STATE[s]
+  const label = labelKey ? t(labelKey) : state
   return (
     <ToneBadge tone={tone} dot>
       {label}

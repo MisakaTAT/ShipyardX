@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { save } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { CanvasAddon } from '@xterm/addon-canvas'
@@ -192,6 +193,7 @@ type EndSessionOptions = {
 }
 
 export default function Terminal({ serverId, containerId }: TerminalProps) {
+  const { t } = useTranslation()
   const {
     settings: {
       hotkeys,
@@ -317,24 +319,27 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
         })
   }, [])
 
-  const downloadExport = useCallback(async (content: string, filename: string, type: string) => {
-    try {
-      const path = await save({
-        defaultPath: filename,
-        filters: [
-          {
-            name: type === 'text/html;charset=utf-8' ? 'HTML' : 'Text',
-            extensions: [type === 'text/html;charset=utf-8' ? 'html' : 'txt'],
-          },
-        ],
-      })
-      if (!path) return
-      await commands.saveTerminalExport(path, content)
-      setToolStatus('导出完成')
-    } catch {
-      setToolStatus('导出未完成')
-    }
-  }, [])
+  const downloadExport = useCallback(
+    async (content: string, filename: string, type: string) => {
+      try {
+        const path = await save({
+          defaultPath: filename,
+          filters: [
+            {
+              name: type === 'text/html;charset=utf-8' ? 'HTML' : 'Text',
+              extensions: [type === 'text/html;charset=utf-8' ? 'html' : 'txt'],
+            },
+          ],
+        })
+        if (!path) return
+        await commands.saveTerminalExport(path, content)
+        setToolStatus(t('ui.terminal.exportDone'))
+      } catch {
+        setToolStatus(t('ui.terminal.exportFailed'))
+      }
+    },
+    [t]
+  )
 
   useEffect(() => {
     serverEpochRef.current += 1
@@ -738,7 +743,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     runSearch(nextQuery)
                   }}
                   clearable
-                  placeholder="搜索终端内容"
+                  placeholder={t('ui.terminal.searchPlaceholder')}
                   className="w-48"
                   inputClassName="h-7 rounded-md border-border bg-card/80 py-0 text-sm"
                   clearButtonClassName="inset-y-auto top-1/2 right-0.5 size-6 -translate-y-1/2 rounded-md"
@@ -782,7 +787,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 >
                   <Download />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuContent align="end" className="w-auto min-w-40">
                   <DropdownMenuItem
                     onClick={() => {
                       const content = serializeAddonRef.current?.serialize()
@@ -790,7 +795,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                       downloadExport(content, 'terminal.txt', 'text/plain;charset=utf-8')
                     }}
                   >
-                    导出 TXT
+                    {t('ui.terminal.exportTxt')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => {
@@ -799,7 +804,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                       downloadExport(content, 'terminal.html', 'text/html;charset=utf-8')
                     }}
                   >
-                    导出 HTML
+                    {t('ui.terminal.exportHtml')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -836,25 +841,25 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     <TerminalIcon className="size-7 text-primary" />
                   </div>
                   <h2 className="text-lg font-semibold text-foreground">
-                    {wasEverConnected ? '连接已断开' : '尚未连接终端'}
+                    {wasEverConnected ? t('ui.terminal.disconnectedTitle') : t('ui.terminal.notConnectedTitle')}
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {wasEverConnected
-                      ? '当前会话已结束，你可以重新发起连接'
+                      ? t('ui.terminal.endedBody')
                       : isContainerExec
-                        ? '将为当前容器创建 exec 会话，并连接到交互式终端'
-                        : '将连接到当前服务器的远程终端，连接后即可开始输入命令'}
+                        ? t('ui.terminal.execBody')
+                        : t('ui.terminal.remoteBody')}
                   </p>
                 </div>
                 {isContainerExec && (
                   <div className="mx-auto w-full max-w-md rounded-xl border border-border bg-muted p-3 text-left">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <p className="text-xs text-muted-foreground">执行用户（可选）</p>
+                        <p className="text-xs text-muted-foreground">{t('ui.terminal.execUser')}</p>
                         <Input
                           value={execUser}
                           onChange={(e) => setExecUser(e.target.value)}
-                          placeholder="root 或 1000:1000"
+                          placeholder={t('ui.terminal.execUserPlaceholder')}
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -870,18 +875,18 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                             <SelectItem value="/bin/ash">/bin/ash</SelectItem>
                             <SelectItem value="/bin/bash">/bin/bash</SelectItem>
                             <SelectItem value="/bin/sh">/bin/sh</SelectItem>
-                            <SelectItem value="custom">自定义</SelectItem>
+                            <SelectItem value="custom">{t('ui.common.custom')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                     {execShellPreset === 'custom' ? (
                       <div className="mt-3 space-y-1.5">
-                        <p className="text-xs text-muted-foreground">自定义 Shell</p>
+                        <p className="text-xs text-muted-foreground">{t('ui.terminal.customShell')}</p>
                         <Input
                           value={execCustomShell}
                           onChange={(e) => setExecCustomShell(e.target.value)}
-                          placeholder="示例 /busybox/sh"
+                          placeholder={t('ui.terminal.customShellPlaceholder')}
                         />
                       </div>
                     ) : null}
@@ -894,7 +899,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                     disabled={isContainerExec && execShellPreset === 'custom' && !execCustomShell.trim()}
                   >
                     <TerminalIcon />
-                    {wasEverConnected ? '重新连接' : '连接终端'}
+                    {wasEverConnected ? t('ui.terminal.reconnect') : t('ui.terminal.connect')}
                   </Button>
                 </div>
               </>
@@ -905,9 +910,9 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                 <div className="flex size-14 items-center justify-center rounded-xl bg-primary/10">
                   <Loader2 className="size-7 animate-spin text-primary" />
                 </div>
-                <h2 className="text-lg font-semibold text-foreground">正在连接</h2>
+                <h2 className="text-lg font-semibold text-foreground">{t('ui.terminal.connecting')}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {isContainerExec ? '正在启动容器终端并建立连接，请稍候' : '正在连接远程终端，请稍候'}
+                  {isContainerExec ? t('ui.terminal.connectingExec') : t('ui.terminal.connectingRemote')}
                 </p>
               </div>
             )}
@@ -934,7 +939,7 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                       onClick={() => setErrorDetailsExpanded((v) => !v)}
                       aria-expanded={errorDetailsExpanded}
                     >
-                      查看详情
+                      {t('ui.common.details')}
                       <ChevronDown
                         className={cn('transition-transform duration-200', errorDetailsExpanded && 'rotate-180')}
                       />
@@ -956,11 +961,11 @@ export default function Terminal({ serverId, containerId }: TerminalProps) {
                       setTerminalError(null)
                     }}
                   >
-                    返回
+                    {t('ui.common.back')}
                   </Button>
                   <Button type="button" onClick={connect}>
                     <RefreshCw />
-                    重试
+                    {t('ui.common.retry')}
                   </Button>
                 </div>
               </>

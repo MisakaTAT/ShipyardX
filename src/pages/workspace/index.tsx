@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from '@/shared/components/toast'
 import {
   Activity,
@@ -41,14 +42,14 @@ export type WorkspaceTab =
   | 'terminal'
 
 const NAV_ITEMS: WorkspaceTabItem<WorkspaceTab>[] = [
-  { key: 'overview', icon: <ServerIcon className="size-4.5" />, label: '概览' },
-  { key: 'containers', icon: <Box className="size-4.5" />, label: '容器' },
-  { key: 'images', icon: <Layers className="size-4.5" />, label: '镜像' },
-  { key: 'networks', icon: <Share2 className="size-4.5" />, label: '网络' },
-  { key: 'volumes', icon: <Database className="size-4.5" />, label: '存储卷' },
-  { key: 'events', icon: <Activity className="size-4.5" />, label: '事件' },
-  { key: 'docker', icon: <Settings2 className="size-4.5" />, label: '配置' },
-  { key: 'terminal', icon: <Terminal className="size-4.5" />, label: '终端' },
+  { key: 'overview', icon: <ServerIcon className="size-4.5" />, labelKey: 'ui.workspace.tabOverview' },
+  { key: 'containers', icon: <Box className="size-4.5" />, labelKey: 'ui.workspace.tabContainers' },
+  { key: 'images', icon: <Layers className="size-4.5" />, labelKey: 'ui.workspace.tabImages' },
+  { key: 'networks', icon: <Share2 className="size-4.5" />, labelKey: 'ui.workspace.tabNetworks' },
+  { key: 'volumes', icon: <Database className="size-4.5" />, labelKey: 'ui.workspace.tabVolumes' },
+  { key: 'events', icon: <Activity className="size-4.5" />, labelKey: 'ui.workspace.tabEvents' },
+  { key: 'docker', icon: <Settings2 className="size-4.5" />, labelKey: 'ui.workspace.tabDocker' },
+  { key: 'terminal', icon: <Terminal className="size-4.5" />, labelKey: 'ui.workspace.tabTerminal' },
 ]
 
 const TRANSPARENT_TABS = new Set<WorkspaceTab>(['overview', 'docker'])
@@ -61,6 +62,7 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ selectedServer, onDisconnect, activeTab, onActiveTabChange }: WorkspaceProps) {
+  const { t } = useTranslation()
   const { status: serverStatus, ok: serverOk, recheck: recheckServer } = useServerConnection(selectedServer.id)
   const {
     status: dockerStatus,
@@ -83,7 +85,7 @@ export default function Workspace({ selectedServer, onDisconnect, activeTab, onA
   const handleDisconnect = () => {
     const label = selectedServer.name
     onDisconnect()
-    toast.success(`连接 ${label} 已断开`)
+    toast.success(t('ui.workspace.disconnected', { name: label }))
   }
 
   if (serverStatus === 'checking' || (serverOk && dockerStatus === 'checking')) {

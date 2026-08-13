@@ -1,3 +1,4 @@
+import i18n from '@/app/i18n'
 import { z } from 'zod'
 import {
   buildRunParamsFromForm,
@@ -95,12 +96,14 @@ export function runFormValuesToBuildArgs(v: RunContainerFormValues) {
   }
 }
 
+const translate = i18n.t.bind(i18n) as (key: string, params?: Record<string, string>) => string
+
 export const runContainerFormSchema = runContainerFormBaseSchema.superRefine((data, ctx) => {
   const params = buildRunParamsFromForm(runFormValuesToBuildArgs(data))
-  for (const { message, path } of getRunContainerValidationIssues(params)) {
+  for (const { messageKey, params: messageParams, path } of getRunContainerValidationIssues(params)) {
     ctx.addIssue({
       code: 'custom',
-      message,
+      message: translate(messageKey, messageParams),
       path: path.length ? path : [],
     })
   }

@@ -4,12 +4,15 @@ import { APP_PATHS } from '@/shared/lib/app-router'
 
 export type PaletteGroup = 'server' | 'forward' | 'hostKey' | 'app' | 'command'
 
-export const GROUP_LABELS: Record<PaletteGroup, string> = {
-  server: '服务器',
-  forward: '端口转发',
-  hostKey: '主机指纹',
-  app: '应用商店',
-  command: '命令',
+export const GROUP_LABEL_KEYS: Record<
+  PaletteGroup,
+  `ui.palette.group${'Server' | 'Forward' | 'HostKey' | 'App' | 'Command'}`
+> = {
+  server: 'ui.palette.groupServer',
+  forward: 'ui.palette.groupForward',
+  hostKey: 'ui.palette.groupHostKey',
+  app: 'ui.palette.groupApp',
+  command: 'ui.palette.groupCommand',
 }
 
 export const GROUP_ORDER: PaletteGroup[] = ['server', 'forward', 'hostKey', 'app', 'command']

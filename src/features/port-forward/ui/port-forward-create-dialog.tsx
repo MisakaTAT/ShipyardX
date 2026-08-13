@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useId, useMemo } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import {
   portForwardCreateDefaultValues,
   portForwardCreateFormSchema,
@@ -27,6 +28,7 @@ interface PortForwardCreateDialogProps {
 }
 
 export default function PortForwardCreateDialog({ open, onOpenChange, onCreated }: PortForwardCreateDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const createRule = useCreatePortForwardRule()
 
@@ -96,11 +98,11 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
     async (values) => {
       const container = containers.find((c) => c.id === values.containerId)
       if (!container) {
-        toast.error('请选择容器')
+        toast.error(t('ui.validation.selectContainer'))
         return
       }
       if (portOptions.length === 0) {
-        form.setError('containerPort', { type: 'custom', message: '该容器没有可用 TCP 端口' })
+        form.setError('containerPort', { type: 'custom', message: 'ui.portForward.noTcpPorts' })
         return
       }
 
@@ -127,7 +129,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
         }
       )
     },
-    '请检查端口转发配置后重试'
+    t('ui.portForward.createFailed')
   )
 
   const submitting = createRule.isPending
@@ -139,17 +141,17 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
         if (!next && submitting) return
         onOpenChange(next)
       }}
-      title="创建转发规则"
+      title={t('ui.portForward.createTitle')}
       icon={ArrowLeftRight}
       disableClose={submitting}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-pf-create`} disabled={submitting}>
             {submitting ? <Loader2 className="animate-spin" /> : null}
-            创建
+            {t('ui.portForward.create')}
           </Button>
         </div>
       }
@@ -160,15 +162,17 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             control={form.control}
             name="serverId"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="主机" required invalid={fieldState.invalid}>
+              <FormFieldRow label={t('ui.portForward.colHost')} required invalid={fieldState.invalid}>
                 <Select
                   value={field.value}
                   onValueChange={field.onChange}
                   disabled={submitting || serversLoading || servers.length === 0}
                 >
                   <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
-                    <SelectValue placeholder="选择主机">
-                      {(value) => (value ? (servers.find((s) => s.id === value)?.name ?? value) : '选择主机')}
+                    <SelectValue placeholder={t('ui.portForward.selectHost')}>
+                      {(value) =>
+                        value ? (servers.find((s) => s.id === value)?.name ?? value) : t('ui.portForward.selectHost')
+                      }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent align="start">
@@ -187,7 +191,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             control={form.control}
             name="containerId"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="容器" required invalid={fieldState.invalid}>
+              <FormFieldRow label={t('ui.portForward.colContainer')} required invalid={fieldState.invalid}>
                 {containersLoading ? (
                   <div className="flex h-9 items-center justify-center">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -199,8 +203,12 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     disabled={submitting || containers.length === 0}
                   >
                     <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
-                      <SelectValue placeholder="选择容器">
-                        {(value) => (value ? (containers.find((c) => c.id === value)?.name ?? value) : '选择容器')}
+                      <SelectValue placeholder={t('ui.portForward.selectContainer')}>
+                        {(value) =>
+                          value
+                            ? (containers.find((c) => c.id === value)?.name ?? value)
+                            : t('ui.portForward.selectContainer')
+                        }
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent align="start">
@@ -220,9 +228,9 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             control={form.control}
             name="containerPort"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="容器端口" required invalid={fieldState.invalid}>
+              <FormFieldRow label={t('ui.portForward.containerPort')} required invalid={fieldState.invalid}>
                 {portOptions.length === 0 ? (
-                  <FormFieldHint>该容器没有可用 TCP 端口</FormFieldHint>
+                  <FormFieldHint>{t('ui.portForward.noTcpPorts')}</FormFieldHint>
                 ) : (
                   <Select
                     value={
@@ -234,7 +242,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
                     disabled={submitting}
                   >
                     <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
-                      <SelectValue placeholder="选择容器端口" />
+                      <SelectValue placeholder={t('ui.portForward.selectContainerPort')} />
                     </SelectTrigger>
                     <SelectContent align="start">
                       {portOptions.map((p) => (
@@ -253,7 +261,7 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             control={form.control}
             name="bindAddress"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="绑定地址" required invalid={fieldState.invalid}>
+              <FormFieldRow label={t('ui.portForward.bindAddress')} required invalid={fieldState.invalid}>
                 <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
                   <SelectTrigger className="w-full" aria-invalid={fieldState.invalid}>
                     <SelectValue />
@@ -275,11 +283,11 @@ export default function PortForwardCreateDialog({ open, onOpenChange, onCreated 
             name="localPort"
             render={({ field, fieldState }) => (
               <FormFieldRow
-                label="本地端口"
+                label={t('ui.portForward.colLocalPort')}
                 htmlFor={`${formId}-local-port`}
                 required
                 invalid={fieldState.invalid}
-                description={<FormFieldHint>填 0 时由系统随机分配本地端口</FormFieldHint>}
+                description={<FormFieldHint>{t('ui.portForward.localPortHint')}</FormFieldHint>}
               >
                 <Input
                   id={`${formId}-local-port`}

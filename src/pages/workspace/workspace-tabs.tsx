@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion } from 'motion/react'
 import { RefreshCw, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
@@ -8,8 +9,11 @@ import { cn } from '@/shared/lib/utils'
 export interface WorkspaceTabItem<K extends string = string> {
   key: K
   icon: ReactNode
-  label: string
+  labelKey: WorkspaceTabLabelKey
 }
+
+type WorkspaceTabLabelKey =
+  `ui.workspace.tab${'Overview' | 'Containers' | 'Images' | 'Networks' | 'Volumes' | 'Events' | 'Docker' | 'Terminal'}`
 
 interface WorkspaceTabsProps<K extends string> {
   items: WorkspaceTabItem<K>[]
@@ -30,6 +34,7 @@ export function WorkspaceTabs<K extends string>({
   onDockerRetry,
   onDisconnect,
 }: WorkspaceTabsProps<K>) {
+  const { t } = useTranslation()
   const alwaysEnabled = new Set<K>(alwaysEnabledKeys)
   return (
     <Tabs
@@ -67,7 +72,7 @@ export function WorkspaceTabs<K extends string>({
                     />
                   ) : null}
                   <span className="relative z-10">{item.icon}</span>
-                  <span className="relative z-10">{item.label}</span>
+                  <span className="relative z-10">{t(item.labelKey)}</span>
                 </button>
               )
             })}
@@ -80,7 +85,7 @@ export function WorkspaceTabs<K extends string>({
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-lg hover:bg-amber-500/15 hover:text-amber-500"
-                title="重新检测 Docker"
+                title={t('ui.workspace.recheckDocker')}
                 onClick={onDockerRetry}
               >
                 <RefreshCw className="size-[18px]" />
@@ -91,7 +96,7 @@ export function WorkspaceTabs<K extends string>({
               variant="ghost"
               size="icon-sm"
               className="rounded-lg text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
-              title="断开连接"
+              title={t('ui.workspace.disconnect')}
               onClick={onDisconnect}
             >
               <X className="size-[18px]" />

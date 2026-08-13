@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Controller, useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { commands } from '@/types/app-bindings'
 import { pullImage } from '@/features/docker-images/lib/pull-image-stream'
 import { toImagePullViewModel, type ImagePullViewModel } from '@/features/docker-images/lib/image-pull-view'
@@ -29,6 +30,7 @@ export interface ImagePullDialogProps {
 }
 
 export default function ImagePullDialog({ serverId, open, onOpenChange, onSuccess }: ImagePullDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const qc = useQueryClient()
   const form = useForm<ImagePullFormValues>({
@@ -110,7 +112,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
         if (!next) void handleClose()
         else onOpenChange(true)
       }}
-      title="拉取镜像"
+      title={t('ui.images.pull')}
       icon={Download}
       disableClose={pulling}
       showCloseButton
@@ -124,7 +126,7 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
               name="image"
               render={({ field, fieldState }) => (
                 <FormFieldRow
-                  label="镜像引用"
+                  label={t('ui.images.imageRef')}
                   required
                   invalid={fieldState.invalid}
                   variant="title"
@@ -143,12 +145,12 @@ export default function ImagePullDialog({ serverId, open, onOpenChange, onSucces
                       {pulling ? (
                         <>
                           <Loader2 className="animate-spin" />
-                          拉取中
+                          {t('ui.images.pulling')}
                         </>
                       ) : (
                         <>
                           <Download />
-                          拉取
+                          {t('ui.images.pullAction')}
                         </>
                       )}
                     </Button>

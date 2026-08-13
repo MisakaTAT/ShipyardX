@@ -150,7 +150,8 @@ pub struct AppListItem {
     #[serde(rename = "type")]
     pub app_type: String,
     pub tags: Vec<String>,
-    pub description: String,
+    pub tags_en: Vec<String>,
+    pub description: DescriptionI18n,
     pub short_desc_zh: String,
     pub short_desc_en: String,
     pub website: String,
@@ -163,6 +164,7 @@ pub struct AppDetail {
     pub key: String,
     pub name: String,
     pub tags: Vec<String>,
+    pub tags_en: Vec<String>,
     pub description: DescriptionI18n,
     pub short_desc_zh: String,
     pub short_desc_en: String,

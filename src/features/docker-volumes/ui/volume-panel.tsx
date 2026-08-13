@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, Database, Plus, ScanSearch, Trash2 } from 'lucide-react'
 import type { Volume } from '@/types/app-bindings'
 import VolumeCreateDialog from '@/features/docker-volumes/ui/volume-create-dialog'
@@ -14,6 +15,7 @@ interface VolumePanelProps {
 }
 
 export default function VolumePanel({ serverId }: VolumePanelProps) {
+  const { t } = useTranslation()
   const { data: volumes = [], isFetching, dataUpdatedAt } = useVolumes(serverId)
   const removeVolume = useRemoveVolume(serverId)
   const pruneUnusedVolumes = usePruneUnusedVolumes(serverId)
@@ -42,7 +44,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
     () => [
       {
         id: 'name',
-        header: '名称',
+        header: t('ui.common.name'),
         meta: { width: '16rem' },
         cell: ({ row }) => (
           <span className="font-medium text-foreground" title={row.original.name}>
@@ -96,13 +98,13 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
       },
       {
         id: 'created',
-        header: '创建时间',
+        header: t('ui.common.created'),
         meta: { width: '12rem' },
         cell: ({ row }) => <span title={row.original.created_at || undefined}>{row.original.created_ago}</span>,
       },
       {
         id: 'actions',
-        header: '操作',
+        header: t('ui.common.actions'),
         meta: { width: '5rem' },
         cell: ({ row }) => {
           const v = row.original
@@ -115,7 +117,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                title="删除"
+                title={t('ui.common.delete')}
                 onClick={() => setRemoveTarget(v)}
                 className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
               >
@@ -126,31 +128,31 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         },
       },
     ],
-    [serverId]
+    [t, serverId]
   )
 
   return (
     <PanelShell>
       <PanelHeader
         icon={Database}
-        title="存储卷"
+        title={t('ui.volumes.title')}
         stats={volumes.length > 0 ? `(${volumes.length})` : undefined}
         search={{ value: search, onChange: setSearch }}
         lastUpdated={dataUpdatedAt}
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" />}>
-              操作
+              {t('ui.common.actions')}
               <ChevronDown />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuContent align="end" className="w-auto min-w-40">
               <DropdownMenuItem onClick={() => setShowCreate(true)}>
                 <Plus className="size-3.5" />
-                创建存储卷
+                {t('ui.volumes.createTitle')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setCleanupOpen(true)}>
                 <Trash2 className="size-3.5" />
-                清理未使用存储卷
+                {t('ui.volumes.pruneTitle')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -162,7 +164,7 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         data={filtered}
         getRowId={(v) => v.name}
         loading={isFetching && volumes.length === 0}
-        empty={{ icon: Database, title: search ? `无匹配的存储卷 "${search}"` : '没有存储卷' }}
+        empty={{ icon: Database, title: search ? t('ui.volumes.noMatch', { query: search }) : t('ui.volumes.empty') }}
       />
 
       <VolumeCreateDialog serverId={serverId} open={showCreate} onOpenChange={setShowCreate} />
@@ -182,12 +184,10 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
         onOpenChange={(open) => {
           if (!open) setRemoveTarget(null)
         }}
-        title="删除存储卷"
-        description={
-          removeTarget ? `确认删除存储卷「${removeTarget.name}」？\n\n若仍有容器正在使用该卷，删除会失败。` : ''
-        }
+        title={t('ui.volumes.deleteTitle')}
+        description={removeTarget ? t('ui.volumes.deleteDesc', { name: removeTarget.name }) : ''}
         destructive
-        confirmText="删除"
+        confirmText={t('ui.common.delete')}
         onConfirm={() => {
           if (!removeTarget) return
           removeVolume.mutate(removeTarget.name)
@@ -197,10 +197,10 @@ export default function VolumePanel({ serverId }: VolumePanelProps) {
       <ConfirmDialog
         open={cleanupOpen}
         onOpenChange={setCleanupOpen}
-        title="清理未使用存储卷"
-        description="删除当前没有被任何容器使用的本地存储卷。被清理后，其中的数据将无法恢复。"
+        title={t('ui.volumes.pruneTitle')}
+        description={t('ui.volumes.pruneDesc')}
         destructive
-        confirmText="清理未使用存储卷"
+        confirmText={t('ui.volumes.pruneTitle')}
         onConfirm={() => {
           pruneUnusedVolumes.mutate()
         }}

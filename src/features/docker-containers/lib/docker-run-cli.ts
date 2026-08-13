@@ -35,7 +35,11 @@ function splitShellArgs(input: string): string[] {
   return out
 }
 
-export type RunContainerValidationIssue = { message: string; path: (string | number)[] }
+export type RunContainerValidationIssue = {
+  messageKey: string
+  params?: Record<string, string>
+  path: (string | number)[]
+}
 
 const RESTART_POLICIES = new Set(['no', 'always', 'unless-stopped', 'on-failure'])
 
@@ -73,16 +77,16 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   const issues: RunContainerValidationIssue[] = []
 
   if (!params.image?.trim()) {
-    issues.push({ message: '镜像不能为空', path: ['image'] })
+    issues.push({ messageKey: 'ui.validation.imageRequired', path: ['image'] })
   }
 
   const nm = params.name?.trim() ?? ''
   if (nm) {
     if (nm.length > 255) {
-      issues.push({ message: '名称过长（最多 255 字符）', path: ['name'] })
+      issues.push({ messageKey: 'ui.validation.nameTooLong', path: ['name'] })
     } else if (!/^[\w.-]+$/.test(nm)) {
       issues.push({
-        message: '名称仅允许字母、数字、下划线、连字符与点号',
+        messageKey: 'ui.validation.nameCharset',
         path: ['name'],
       })
     }
@@ -93,11 +97,11 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
     if (!t) continue
     const eq = t.indexOf('=')
     if (eq === -1) {
-      issues.push({ message: `环境变量须为 KEY=value：${t}`, path: ['envEntries', i, 'key'] })
+      issues.push({ messageKey: 'ui.validation.envFormat', params: { entry: t }, path: ['envEntries', i, 'key'] })
       break
     }
     if (!t.slice(0, eq).trim()) {
-      issues.push({ message: `环境变量键名不能为空：${t}`, path: ['envEntries', i, 'key'] })
+      issues.push({ messageKey: 'ui.validation.envKeyEmpty', params: { entry: t }, path: ['envEntries', i, 'key'] })
       break
     }
   }
@@ -107,11 +111,11 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
     if (!t) continue
     const eq = t.indexOf('=')
     if (eq === -1) {
-      issues.push({ message: `标签须为 KEY=value：${t}`, path: ['labelEntries', i, 'key'] })
+      issues.push({ messageKey: 'ui.validation.labelFormat', params: { entry: t }, path: ['labelEntries', i, 'key'] })
       break
     }
     if (!t.slice(0, eq).trim()) {
-      issues.push({ message: `标签键名不能为空：${t}`, path: ['labelEntries', i, 'key'] })
+      issues.push({ messageKey: 'ui.validation.labelKeyEmpty', params: { entry: t }, path: ['labelEntries', i, 'key'] })
       break
     }
   }
@@ -122,22 +126,26 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
     const p = ports[i]
     const cp = p.container_port
     if (!cp || cp < 1 || cp > 65535) {
-      issues.push({ message: '容器端口须在 1–65535', path: ['ports', i, 'containerPort'] })
+      issues.push({ messageKey: 'ui.validation.containerPortRange', path: ['ports', i, 'containerPort'] })
     }
     const hp = p.host_port
     if (hp != null && hp !== 0 && (hp < 1 || hp > 65535)) {
-      issues.push({ message: '主机端口须留空、0 或 1–65535', path: ['ports', i, 'hostPort'] })
+      issues.push({ messageKey: 'ui.validation.hostPortRange', path: ['ports', i, 'hostPort'] })
     }
     const proto = (p.protocol || 'tcp').trim().toLowerCase()
     if (proto !== 'tcp' && proto !== 'udp') {
-      issues.push({ message: '端口协议仅支持 tcp 或 udp', path: ['ports', i, 'protocol'] })
+      issues.push({ messageKey: 'ui.validation.portProtocol', path: ['ports', i, 'protocol'] })
     }
 
     if (hp != null && hp !== 0) {
       const key = `${proto}:${hp}`
       const previousIndex = seenHostPorts.get(key)
       if (previousIndex != null) {
-        issues.push({ message: `主机端口 ${hp} 已重复（${proto}）`, path: ['ports', i, 'hostPort'] })
+        issues.push({
+          messageKey: 'ui.validation.hostPortDuplicate',
+          params: { port: String(hp), protocol: proto },
+          path: ['ports', i, 'hostPort'],
+        })
       } else {
         seenHostPorts.set(key, i)
       }
@@ -148,10 +156,10 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   for (let i = 0; i < vols.length; i++) {
     const v = vols[i]
     if (!v.host_path?.trim()) {
-      issues.push({ message: '卷挂载主机路径不能为空', path: ['volumes', i, 'hostPath'] })
+      issues.push({ messageKey: 'ui.validation.volumeHostPath', path: ['volumes', i, 'hostPath'] })
     }
     if (!v.container_path?.trim()) {
-      issues.push({ message: '卷挂载容器路径不能为空', path: ['volumes', i, 'containerPath'] })
+      issues.push({ messageKey: 'ui.validation.volumeContainerPath', path: ['volumes', i, 'containerPath'] })
     }
   }
 
@@ -160,14 +168,14 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   const netNorm = (params.network?.trim() ?? '').toLowerCase()
   const isUserDefinedNetwork = netNorm.length > 0 && !['bridge', 'host', 'none', 'default'].includes(netNorm)
   if (ip4 && !isValidIpv4(ip4)) {
-    issues.push({ message: 'IPv4 地址格式不正确', path: ['ipv4Address'] })
+    issues.push({ messageKey: 'ui.validation.ipv4Format', path: ['ipv4Address'] })
   }
   if (ip6 && !isValidIpv6(ip6)) {
-    issues.push({ message: 'IPv6 地址格式不正确', path: ['ipv6Address'] })
+    issues.push({ messageKey: 'ui.validation.ipv6Format', path: ['ipv6Address'] })
   }
   if ((ip4 || ip6) && !isUserDefinedNetwork) {
     issues.push({
-      message: '固定 IPv4/IPv6 仅适用于用户自定义网络，请在网络中选择自建网络（非 bridge / host / none）',
+      messageKey: 'ui.validation.staticIpNetwork',
       path: ['network'],
     })
   }
@@ -175,7 +183,8 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   const rp = normalizeRestartPolicy(params.restart_policy || 'no')
   if (!RESTART_POLICIES.has(rp)) {
     issues.push({
-      message: `不支持的重启策略：${params.restart_policy}（可选：no、always、unless-stopped、on-failure）`,
+      messageKey: 'ui.validation.restartPolicy',
+      params: { policy: String(params.restart_policy) },
       path: ['restartPolicy'],
     })
   }
@@ -183,18 +192,18 @@ export function getRunContainerValidationIssues(params: RunContainer): RunContai
   if (rp === 'on-failure') {
     const n = params.restart_max_retry
     if (n != null && (!Number.isFinite(n) || n < 0)) {
-      issues.push({ message: '最大重试次数须为不小于 0 的整数', path: ['restartMaxRetry'] })
+      issues.push({ messageKey: 'ui.validation.restartMaxRetry', path: ['restartMaxRetry'] })
     }
   }
 
   if (params.cpu_shares != null && params.cpu_shares < 0) {
-    issues.push({ message: 'CPU 权重不能为负', path: ['cpuShares'] })
+    issues.push({ messageKey: 'ui.validation.cpuSharesNegative', path: ['cpuShares'] })
   }
   if (params.cpu_quota_cores != null && params.cpu_quota_cores < 0) {
-    issues.push({ message: 'CPU 上限（核）不能为负', path: ['cpuQuotaCores'] })
+    issues.push({ messageKey: 'ui.validation.cpuQuotaNegative', path: ['cpuQuotaCores'] })
   }
   if (params.memory_mb != null && params.memory_mb < 0) {
-    issues.push({ message: '内存上限不能为负', path: ['memoryMb'] })
+    issues.push({ messageKey: 'ui.validation.memoryNegative', path: ['memoryMb'] })
   }
 
   return issues

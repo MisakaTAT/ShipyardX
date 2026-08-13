@@ -11,7 +11,7 @@ import {
 } from '@/features/servers/model/schema'
 import { Server as ServerIcon, Loader2, Eye, EyeOff } from 'lucide-react'
 import { FormFieldRow } from '@/shared/components/form-field'
-import { createToastFormSubmit } from '@/shared/lib/form-error-toast'
+import { createToastFormSubmit, translateIssue } from '@/shared/lib/form-error-toast'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { FieldGroup } from '@/shared/ui/field'
@@ -75,7 +75,9 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
       key_path: full.key_path,
     })
     if (!parsed.success) {
-      toast.warning(parsed.error.issues[0]?.message ?? '校验失败')
+      toast.warning(
+        parsed.error.issues[0] ? translateIssue(parsed.error.issues[0].message) : t('ui.form.validationFailed')
+      )
       return
     }
     const testPayload: ServerConfig = {
@@ -103,7 +105,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
     <StandardDialog
       open={open}
       onOpenChange={handleOpenChange}
-      title={isEdit ? '编辑服务器' : '添加服务器'}
+      title={isEdit ? t('ui.serverDialog.editTitle') : t('ui.serverDialog.addTitle')}
       icon={ServerIcon}
       disableClose={busy}
       widthClassName="w-[640px]"
@@ -111,15 +113,15 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
         <div className="flex items-center justify-between gap-3">
           <Button type="button" variant="secondary" disabled={busy} onClick={handleTest}>
             {testConnection.isPending ? <Loader2 className="animate-spin" /> : null}
-            测试连接
+            {t('ui.serverDialog.testConnection')}
           </Button>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" disabled={busy} onClick={() => onOpenChange(false)}>
-              取消
+              {t('ui.common.cancel')}
             </Button>
             <Button type="submit" form={`${baseId}-server-form`} disabled={busy}>
               {saveServer.isPending ? <Loader2 className="animate-spin" /> : null}
-              {isEdit ? '保存' : '添加'}
+              {isEdit ? t('ui.common.save') : t('ui.common.add')}
             </Button>
           </div>
         </div>
@@ -131,11 +133,16 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
             control={form.control}
             name="name"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="服务器名称" htmlFor={`${baseId}-name`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.serverDialog.name')}
+                htmlFor={`${baseId}-name`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${baseId}-name`}
                   {...field}
-                  placeholder="生产服务器"
+                  placeholder={t('ui.serverDialog.namePlaceholder')}
                   disabled={busy}
                   aria-invalid={fieldState.invalid}
                 />
@@ -149,7 +156,12 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                 control={form.control}
                 name="host"
                 render={({ field, fieldState }) => (
-                  <FormFieldRow label="主机地址" htmlFor={`${baseId}-host`} required invalid={fieldState.invalid}>
+                  <FormFieldRow
+                    label={t('ui.serverDialog.host')}
+                    htmlFor={`${baseId}-host`}
+                    required
+                    invalid={fieldState.invalid}
+                  >
                     <Input
                       id={`${baseId}-host`}
                       {...field}
@@ -165,7 +177,12 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
               control={form.control}
               name="port"
               render={({ field, fieldState }) => (
-                <FormFieldRow label="端口" htmlFor={`${baseId}-port`} required invalid={fieldState.invalid}>
+                <FormFieldRow
+                  label={t('ui.serverDialog.port')}
+                  htmlFor={`${baseId}-port`}
+                  required
+                  invalid={fieldState.invalid}
+                >
                   <Input
                     id={`${baseId}-port`}
                     type="number"
@@ -191,7 +208,12 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
             control={form.control}
             name="username"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="用户名" htmlFor={`${baseId}-user`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.serverDialog.username')}
+                htmlFor={`${baseId}-user`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${baseId}-user`}
                   {...field}
@@ -203,7 +225,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
             )}
           />
 
-          <FormFieldRow label="认证方式" required>
+          <FormFieldRow label={t('ui.serverDialog.authType')} required>
             <div className="flex gap-2">
               {(['key', 'password'] as const).map((type) => (
                 <Button
@@ -214,7 +236,7 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
                   disabled={busy}
                   onClick={() => form.setValue('auth_type', type, { shouldValidate: true })}
                 >
-                  {type === 'key' ? 'SSH 密钥' : '密码'}
+                  {type === 'key' ? t('ui.serverDialog.authKey') : t('ui.serverDialog.authPassword')}
                 </Button>
               ))}
             </div>
@@ -225,13 +247,18 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
               control={form.control}
               name="password"
               render={({ field, fieldState }) => (
-                <FormFieldRow label="密码" htmlFor={`${baseId}-pwd`} required invalid={fieldState.invalid}>
+                <FormFieldRow
+                  label={t('ui.serverDialog.password')}
+                  htmlFor={`${baseId}-pwd`}
+                  required
+                  invalid={fieldState.invalid}
+                >
                   <div className="relative">
                     <Input
                       id={`${baseId}-pwd`}
                       type={showPassword ? 'text' : 'password'}
                       {...field}
-                      placeholder="SSH 登录密码"
+                      placeholder={t('ui.serverDialog.passwordPlaceholder')}
                       disabled={busy}
                       className="pr-10"
                       aria-invalid={fieldState.invalid}
@@ -255,7 +282,12 @@ export default function ServerDialog({ open, onOpenChange, server }: ServerDialo
               control={form.control}
               name="key_path"
               render={({ field, fieldState }) => (
-                <FormFieldRow label="密钥路径" htmlFor={`${baseId}-key`} required invalid={fieldState.invalid}>
+                <FormFieldRow
+                  label={t('ui.serverDialog.keyPath')}
+                  htmlFor={`${baseId}-key`}
+                  required
+                  invalid={fieldState.invalid}
+                >
                   <Input
                     id={`${baseId}-key`}
                     {...field}

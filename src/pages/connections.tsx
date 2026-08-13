@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Plus, Search, Server as ServerIcon } from 'lucide-react'
 import type { ServerConfig } from '@/types/app-bindings'
 import ServerDialog from '@/features/servers/ui/server-dialog'
@@ -17,6 +18,7 @@ interface ConnectionsProps {
 }
 
 export default function Connections({ onConnect }: ConnectionsProps) {
+  const { t } = useTranslation()
   const { data: servers = [], isLoading, isFetching } = useServers()
   const deleteServer = useDeleteServer()
   const serverOsMap = useServerOsMap()
@@ -51,14 +53,14 @@ export default function Connections({ onConnect }: ConnectionsProps) {
             <div className="shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-lg font-semibold text-foreground">服务器</h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">管理远程服务器连接，选择一个服务器进入工作区。</p>
+                  <h1 className="text-lg font-semibold text-foreground">{t('ui.connections.title')}</h1>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('ui.connections.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <CommandPaletteButton />
                   <Button onClick={openAdd}>
                     <Plus />
-                    添加服务器
+                    {t('ui.connections.add')}
                   </Button>
                 </div>
               </div>
@@ -74,20 +76,20 @@ export default function Connections({ onConnect }: ConnectionsProps) {
                   <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-xl bg-primary/10 text-primary [&_svg]:size-7">
                     <ServerIcon />
                   </div>
-                  <h2 className="text-sm font-semibold text-foreground">尚未配置远程服务器</h2>
+                  <h2 className="text-sm font-semibold text-foreground">{t('ui.connections.emptyTitle')}</h2>
                   <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    立即配置连接，便捷管理 Docker 容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。
+                    {t('ui.connections.emptyBody')}
                   </p>
                   <div className="mt-5">
                     <Button onClick={openAdd}>
                       <Plus />
-                      添加服务器
+                      {t('ui.connections.add')}
                     </Button>
                   </div>
                 </div>
               </div>
             ) : filtered.length === 0 ? (
-              <EmptyState icon={Search} title="没有找到匹配的服务器" />
+              <EmptyState icon={Search} title={t('ui.connections.noMatch')} />
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
                 {filtered.map((server) => (
@@ -125,10 +127,10 @@ export default function Connections({ onConnect }: ConnectionsProps) {
         onOpenChange={(open) => {
           if (!open) setDeleteServerId(null)
         }}
-        title="删除服务器"
-        description="确定要删除此服务器配置吗？此操作不可撤销。"
+        title={t('ui.connections.deleteTitle')}
+        description={t('ui.connections.deleteDesc')}
         destructive
-        confirmText="删除"
+        confirmText={t('ui.common.delete')}
         onConfirm={() => {
           if (!deleteServerId) return
           deleteServer.mutate(deleteServerId)

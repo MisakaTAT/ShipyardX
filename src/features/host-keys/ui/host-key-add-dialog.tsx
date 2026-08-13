@@ -1,4 +1,5 @@
 import { useEffect, useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { Fingerprint, Loader2 } from 'lucide-react'
@@ -21,6 +22,7 @@ interface HostKeyAddDialogProps {
 }
 
 export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialogProps) {
+  const { t } = useTranslation()
   const formId = useId()
   const trust = useTrustHostKey()
 
@@ -43,7 +45,7 @@ export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialo
         { onSuccess: () => onOpenChange(false) }
       )
     },
-    '请检查主机和指纹后重试'
+    t('ui.hostKeys.addFailed')
   )
 
   const submitting = trust.isPending
@@ -55,17 +57,17 @@ export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialo
         if (!next && submitting) return
         onOpenChange(next)
       }}
-      title="添加指纹"
+      title={t('ui.hostKeys.addTitle')}
       icon={Fingerprint}
       disableClose={submitting}
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" disabled={submitting} onClick={() => onOpenChange(false)}>
-            取消
+            {t('ui.common.cancel')}
           </Button>
           <Button type="submit" form={`${formId}-host-key-add`} disabled={submitting}>
             {submitting ? <Loader2 className="animate-spin" /> : null}
-            添加
+            {t('ui.common.add')}
           </Button>
         </div>
       }
@@ -76,10 +78,15 @@ export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialo
             control={form.control}
             name="host"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="主机" htmlFor={`${formId}-host`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.hostKeys.hostLabel')}
+                htmlFor={`${formId}-host`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${formId}-host`}
-                  placeholder="例如 192.168.1.10 或 example.com"
+                  placeholder={t('ui.hostKeys.hostPlaceholder')}
                   autoComplete="off"
                   spellCheck={false}
                   disabled={submitting}
@@ -94,7 +101,12 @@ export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialo
             control={form.control}
             name="port"
             render={({ field, fieldState }) => (
-              <FormFieldRow label="端口" htmlFor={`${formId}-port`} required invalid={fieldState.invalid}>
+              <FormFieldRow
+                label={t('ui.hostKeys.portLabel')}
+                htmlFor={`${formId}-port`}
+                required
+                invalid={fieldState.invalid}
+              >
                 <Input
                   id={`${formId}-port`}
                   type="number"
@@ -120,7 +132,7 @@ export default function HostKeyAddDialog({ open, onOpenChange }: HostKeyAddDialo
             name="fingerprint"
             render={({ field, fieldState }) => (
               <FormFieldRow
-                label="指纹"
+                label={t('ui.hostKeys.fingerprintLabel')}
                 htmlFor={`${formId}-fingerprint`}
                 required
                 invalid={fieldState.invalid}
