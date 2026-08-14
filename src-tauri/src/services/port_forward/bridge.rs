@@ -2,15 +2,15 @@ use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
-use log::{debug, error};
+use log::error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::TcpStream as TokioTcpStream;
 use tokio::sync::watch;
 
 use crate::config::timeouts::PORT_FORWARD_ACCEPT_RETRY_DELAY;
+use crate::dto::port_forward::PortForwardError;
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::pool;
@@ -20,7 +20,7 @@ pub(super) struct PortForwardBridgeArgs {
     pub(super) server_cfg: ServerConfig,
     pub(super) remote_host: String,
     pub(super) remote_port: u16,
-    pub(super) last_error: Arc<Mutex<Option<String>>>,
+    pub(super) last_error: Arc<Mutex<Option<PortForwardError>>>,
     pub(super) tx_bytes: Arc<AtomicU64>,
     pub(super) rx_bytes: Arc<AtomicU64>,
 }
@@ -31,26 +31,21 @@ pub(super) struct PortForwardAcceptArgs {
     pub(super) remote_host: String,
     pub(super) remote_port: u16,
     pub(super) stop_rx: watch::Receiver<bool>,
-    pub(super) last_error: Arc<Mutex<Option<String>>>,
+    pub(super) last_error: Arc<Mutex<Option<PortForwardError>>>,
     pub(super) tx_bytes: Arc<AtomicU64>,
     pub(super) rx_bytes: Arc<AtomicU64>,
 }
 
-pub(super) fn error_message(error: AppError) -> String {
-    error.detail.unwrap_or(error.code)
+pub(super) fn error_message(error: &AppError) -> String {
+    error.detail.clone().unwrap_or_else(|| error.code.clone())
 }
 
-/// 主机密钥错误原样上抛，包装后前端就没法提示了
-fn connect_error(error: AppError) -> AppError {
-    if error.is_host_key() {
-        return error;
-    }
-    AppError::unavailable("port_forward.connect_failed").with_detail(error_message(error))
-}
-
+/// 通配地址和「无网络 IP」都落到回环。
+/// `host` 网络模式的容器在容器列表里 ip 是 "-"，它的端口本就开在宿主回环上，
+/// 原样存下去会让 direct-tcpip 拿着 "-" 去解析，必然失败。
 pub(super) fn normalize_host(ip: &str) -> String {
     let v = ip.trim();
-    if v.is_empty() || v == "0.0.0.0" || v == "::" || v == "::0" {
+    if v.is_empty() || v == "-" || v == "0.0.0.0" || v == "::" || v == "::0" {
         "127.0.0.1".to_string()
     } else {
         v.to_string()
@@ -74,8 +69,7 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
 
     let result = async move {
         let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
-            .await
-            .map_err(connect_error)?
+            .await?
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable").with_source(e))?;
 
         local_stream
@@ -100,19 +94,23 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
     }
     .await;
 
-    if let Err(e) = result {
-        error!(
-            target: "shipyardx_lib::services::port_forward",
-            "port forward bridge failed; server_id={} remote_host={} remote_port={} message={} detail={:?}",
-            log_server_id,
-            log_remote_host,
-            remote_port,
-            e,
-            e.detail
-        );
-        if let Ok(mut last_error_guard) = last_error.lock() {
-            *last_error_guard = Some(error_message(e));
+    let failure = match result {
+        Ok(()) => None,
+        Err(e) => {
+            error!(
+                target: "shipyardx_lib::services::port_forward",
+                "port forward bridge failed; server_id={} remote_host={} remote_port={} code={} detail={:?}",
+                log_server_id,
+                log_remote_host,
+                remote_port,
+                e.code,
+                e.detail
+            );
+            Some(PortForwardError::now(e))
         }
+    };
+    if let Ok(mut last_error_guard) = last_error.lock() {
+        *last_error_guard = failure;
     }
 }
 
@@ -201,19 +199,33 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
     }
 }
 
-pub(super) async fn probe_remote(server_cfg: &ServerConfig, remote_host: &str, remote_port: u16) -> AppResult<()> {
-    let _start = Instant::now();
-    debug!(
-        target: "shipyardx_lib::services::port_forward",
-        "probing remote port; server_id={} remote_host={} remote_port={}",
-        server_cfg.id,
-        remote_host,
-        remote_port
-    );
-    let channel = pool::open_direct_tcpip(server_cfg, remote_host.to_string(), remote_port)
-        .await
-        .map_err(|e| AppError::unavailable("port_forward.connect_failed").with_detail(error_message(e)))?
-        .map_err(|e| AppError::unavailable("port_forward.remote_unreachable").with_source(e))?;
-    drop(channel);
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wildcards_and_missing_ips_fall_back_to_loopback() {
+        for raw in ["", "  ", "-", "0.0.0.0", "::", "::0"] {
+            assert_eq!(normalize_host(raw), "127.0.0.1", "input: {raw:?}");
+        }
+    }
+
+    #[test]
+    fn keeps_real_container_ips() {
+        assert_eq!(normalize_host("172.18.0.5"), "172.18.0.5");
+        assert_eq!(normalize_host(" 10.4.0.9 "), "10.4.0.9");
+        assert_eq!(normalize_host("fd00::2"), "fd00::2");
+    }
+
+    #[test]
+    fn error_message_prefers_detail_then_code() {
+        assert_eq!(
+            error_message(&AppError::internal("port_forward.read_failed")),
+            "port_forward.read_failed"
+        );
+        assert_eq!(
+            error_message(&AppError::internal("port_forward.read_failed").with_detail("broken pipe")),
+            "broken pipe"
+        );
+    }
 }

@@ -91,10 +91,12 @@ pub fn run() {
             commands::port_forward::list_port_forwards_all,
             commands::port_forward::create_port_forward_rule,
             commands::port_forward::set_port_forward_enabled,
+            commands::port_forward::set_port_forwards_enabled,
             commands::port_forward::delete_port_forward,
             commands::port_forward::start_all_enabled,
             commands::port_forward::start_all_enabled_global,
             commands::port_forward::stop_all_global,
+            commands::port_forward::start_port_forward,
             commands::port_forward::stop_port_forward,
             commands::terminal::open_terminal,
             commands::terminal::open_container_exec_terminal,
@@ -173,6 +175,7 @@ pub fn run() {
             })?;
             ssh::known_hosts::init(app.handle(), &config::store::data_dir_from_file(&data_file));
             let servers = load_servers(&data_file);
+            let port_forward_rules = state::PortForwardRuleStore::load(&data_file);
             match app.path().app_log_dir() {
                 Ok(log_dir) => info!(target: "shipyardx_lib::app", "app log directory: {}", log_dir.display()),
                 Err(error) => warn!(
@@ -197,7 +200,9 @@ pub fn run() {
                 terminal_handshakes: RwLock::new(HashMap::new()),
                 event_streams: RwLock::new(HashMap::new()),
                 port_forwards: Mutex::new(HashMap::new()),
+                port_forward_rules,
             });
+            services::port_forward::spawn_speed_sampler(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

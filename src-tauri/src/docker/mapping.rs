@@ -14,7 +14,7 @@ fn format_port_ip(ip: &str) -> String {
 fn format_ports(ports: &[PortSummary]) -> String {
     ports
         .iter()
-        .filter_map(|port| match (port.public_port, port.typ.clone()) {
+        .filter_map(|port| match (port.public_port, port.typ) {
             (Some(public_port), Some(port_type)) => {
                 let ip = format_port_ip(port.ip.as_deref().unwrap_or("0.0.0.0"));
                 Some(format!("{}:{}->{}/{}", ip, public_port, port.private_port, port_type))

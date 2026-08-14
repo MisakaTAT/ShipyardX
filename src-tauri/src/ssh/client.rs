@@ -199,7 +199,12 @@ pub async fn connect(config: &ServerConfig) -> AppResult<client::Handle<SshClien
         client::connect(client_config, (config.host.as_str(), config.port), handler),
     )
     .await
-    .map_err(|_| AppError::timeout("ssh.connect_timeout").retryable(true))?
+    .map_err(|_| {
+        AppError::timeout("ssh.connect_timeout")
+            .param("host", &config.host)
+            .param("port", config.port)
+            .retryable(true)
+    })?
     .map_err(|e| {
         verdict
             .lock()

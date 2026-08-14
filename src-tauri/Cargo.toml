@@ -80,3 +80,6 @@ keyring = { version = "3.6", features = ["windows-native"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6", features = ["sync-secret-service", "crypto-rust", "vendored"] }
+
+[dev-dependencies]
+specta-serde = "0.0.12"

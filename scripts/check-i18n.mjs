@@ -78,7 +78,15 @@ const CODE_ALLOWLIST = new Set(['serde.json', 'serde.yaml'])
 const isCode = (value) =>
   CODE_ALLOWLIST.has(value) || (!NOT_A_CODE.some((pattern) => pattern.test(value)) && value !== 'example.com')
 
+/** AppError 的构造入口，用于定位某个 code 是在哪一行被建出来的 */
+const ERROR_CTOR =
+  /AppError::(?:validation|auth|permission|not_found|conflict|unavailable|timeout|internal|new|wrap)\(\s*"([a-z0-9_.]+)"/g
+/** 链式 .param(...) 一般紧跟在构造之后，扫描一个小窗口足够 */
+const PARAM_WINDOW_LINES = 8
+
 const rustCodes = new Set()
+/** code -> [{ file, line, params }]，每个构造点单独记，漏一处就报一处 */
+const rustCtors = new Map()
 ;(function walkRust(dir) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
@@ -88,6 +96,16 @@ const rustCodes = new Set()
       for (const m of text.matchAll(CODE_SHAPE)) {
         if (isCode(m[1])) rustCodes.add(m[1])
       }
+
+      const lines = text.split('\n')
+      lines.forEach((line, index) => {
+        for (const m of line.matchAll(ERROR_CTOR)) {
+          const window = lines.slice(index, index + PARAM_WINDOW_LINES).join('\n')
+          const params = new Set([...window.matchAll(/\.param\(\s*"(\w+)"/g)].map((hit) => hit[1]))
+          if (!rustCtors.has(m[1])) rustCtors.set(m[1], [])
+          rustCtors.get(m[1]).push({ file: `${name}:${index + 1}`, params })
+        }
+      })
     }
   }
 })(RUST_SRC)
@@ -107,6 +125,26 @@ for (const key of base.keys()) {
   const code = key.slice('backend.errors.'.length).replace(/\.(message|action)$/, '')
   if (code === 'unknown' || rustCodes.has(code)) continue
   problems.push(`${BASE_LOCALE}: 词条 "backend.errors.${code}" 在后端已不存在`)
+}
+
+/**
+ * 词条里的 {{占位符}} 必须由后端 .param() 填上，否则前端会原样渲染出 "{{host}}"。
+ * 同一个 code 可能有多个构造点，逐个查。
+ */
+for (const [code, ctors] of rustCtors) {
+  const expected = new Set()
+  for (const field of ['message', 'action']) {
+    const text = base.get(`backend.errors.${code}.${field}`)
+    for (const name of placeholders(text)) expected.add(name)
+  }
+  if (!expected.size) continue
+
+  for (const { file, params } of ctors) {
+    const missing = [...expected].filter((name) => !params.has(name))
+    if (missing.length) {
+      problems.push(`${file}: 构造 "${code}" 时缺少 .param({{${missing.join('}}, {{')}}})，前端会显示原始占位符`)
+    }
+  }
 }
 
 const FRONTEND_SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')

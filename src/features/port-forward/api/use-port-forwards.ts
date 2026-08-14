@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { commands } from '@/types/app-bindings'
 import i18n from '@/app/i18n'
@@ -46,34 +46,26 @@ export function useCreatePortForwardRule() {
   })
 }
 
-/** 启用时每 3 秒轮询一次端口转发列表，页面不可见时暂停 */
+const POLL_INTERVAL_MS = 3000
+
 export function usePortForwardPolling(enabled: boolean) {
   const qc = useQueryClient()
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
+
   useEffect(() => {
-    if (!enabled) return
-    let timer: number | undefined
-    const start = () => {
-      if (timer == null && !document.hidden) {
-        qc.invalidateQueries({ queryKey: qk.portForwards() })
-        timer = window.setInterval(() => {
-          qc.invalidateQueries({ queryKey: qk.portForwards() })
-        }, 3000)
-      }
+    const refresh = () => {
+      if (!enabledRef.current || document.hidden) return
+      void qc.invalidateQueries({ queryKey: qk.portForwards() })
     }
-    const stop = () => {
-      if (timer != null) {
-        window.clearInterval(timer)
-        timer = undefined
-      }
-    }
-    const onVisibility = () => (document.hidden ? stop() : start())
-    document.addEventListener('visibilitychange', onVisibility)
-    start()
+
+    const timer = window.setInterval(refresh, POLL_INTERVAL_MS)
+    document.addEventListener('visibilitychange', refresh)
     return () => {
-      stop()
-      document.removeEventListener('visibilitychange', onVisibility)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
     }
-  }, [qc, enabled])
+  }, [qc])
 }
 
 export function useSetPortForwardEnabled() {
@@ -82,6 +74,29 @@ export function useSetPortForwardEnabled() {
     invalidate: [qk.portForwards()],
     onSuccess: (_r, { enabled }) => {
       toast.success(i18n.t(enabled ? 'ui.portForward.enabled' : 'ui.portForward.disabled'))
+    },
+  })
+}
+
+export function useRetryPortForward() {
+  return useInvalidatingMutation({
+    mutationFn: (id: string) => commands.startPortForward(id),
+    invalidate: [qk.portForwards()],
+    onSuccess: () => {
+      toast.success(i18n.t('ui.portForward.retried'))
+    },
+  })
+}
+
+export function useSetPortForwardsEnabled() {
+  return useInvalidatingMutation({
+    mutationFn: ({ ids, enabled }: { ids: string[]; enabled: boolean }) =>
+      commands.setPortForwardsEnabled(ids, enabled),
+    invalidate: [qk.portForwards()],
+    onSuccess: (_r, { ids, enabled }) => {
+      toast.success(
+        i18n.t(enabled ? 'ui.portForward.enabledMany' : 'ui.portForward.disabledMany', { count: ids.length })
+      )
     },
   })
 }

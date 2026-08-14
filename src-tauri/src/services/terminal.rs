@@ -99,10 +99,9 @@ fn terminal_ws_send(app: &AppHandle, session_id: &str, frame: Vec<u8>) {
     if let Ok(clients) = lock_read(
         &app.state::<AppState>().terminal_ws_clients,
         "terminal.ws_clients_lock_failed",
-    ) {
-        if let Some(tx) = clients.get(session_id).cloned() {
-            let _ = tx.send(frame);
-        }
+    ) && let Some(tx) = clients.get(session_id).cloned()
+    {
+        let _ = tx.send(frame);
     }
 }
 
@@ -310,16 +309,16 @@ async fn run_container_exec_thread(ctx: ContainerExecThreadCtx) -> AppResult<()>
     )
     .await?;
     mark_backend_ready(&ah, &session_id);
-    run_docker_exec_io_loop(
-        session_id.clone(),
+    run_docker_exec_io_loop(DockerExecIoArgs {
+        session_id: session_id.clone(),
         rx,
         ah,
-        &config,
-        &created.id,
-        &mut hijack,
-        cols,
-        rows,
-    )
+        config: &config,
+        exec_id: &created.id,
+        hijack: &mut hijack,
+        initial_cols: cols,
+        initial_rows: rows,
+    })
     .await;
     info!(
         target: "shipyardx_lib::services::terminal",
@@ -348,16 +347,29 @@ async fn resize_docker_exec(config: &ServerConfig, exec_id: &str, cols: u32, row
         .is_ok()
 }
 
-async fn run_docker_exec_io_loop(
+struct DockerExecIoArgs<'a> {
     session_id: String,
-    mut rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
+    rx: tokio_mpsc::UnboundedReceiver<TerminalMsg>,
     ah: AppHandle,
-    config: &ServerConfig,
-    exec_id: &str,
-    hijack: &mut crate::docker::transport::DockerHijackConnection,
+    config: &'a ServerConfig,
+    exec_id: &'a str,
+    hijack: &'a mut crate::docker::transport::DockerHijackConnection,
     initial_cols: u32,
     initial_rows: u32,
-) {
+}
+
+async fn run_docker_exec_io_loop(args: DockerExecIoArgs<'_>) {
+    let DockerExecIoArgs {
+        session_id,
+        mut rx,
+        ah,
+        config,
+        exec_id,
+        hijack,
+        initial_cols,
+        initial_rows,
+    } = args;
+
     let mut input_buf = Vec::<u8>::new();
     let mut read_buf = [0u8; 8192];
     let mut last_cols = 0;
@@ -516,10 +528,10 @@ async fn run_terminal_io_loop(
 
 fn dispatch_terminal_msg(ah: &AppHandle, session_id: &str, msg: TerminalMsg) {
     let app_state = ah.state::<AppState>();
-    if let Ok(terminals) = lock_read(&app_state.terminals, "terminal.sessions_lock_failed") {
-        if let Some(handle) = terminals.get(session_id) {
-            let _ = handle.tx.send(msg);
-        }
+    if let Ok(terminals) = lock_read(&app_state.terminals, "terminal.sessions_lock_failed")
+        && let Some(handle) = terminals.get(session_id)
+    {
+        let _ = handle.tx.send(msg);
     }
 }
 

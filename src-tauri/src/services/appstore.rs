@@ -183,26 +183,22 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
     info!(target: "shipyardx_lib::services::appstore", "deploying app files; server_id={} app_key={} version={} install_id={}", server.id, req.app_key, req.version, install_id);
 
     let env_content = build_env_file(&req.env_values);
-    let sftp = SshSftpSession::connect(server).await.map_err(|e| {
+    let sftp = SshSftpSession::connect(server).await.inspect_err(|_| {
         emit_step(app, "deploy", "error", "install.sftp_connect_failed");
-        e
     })?;
     let remote_base_dir = sftp.home_path(&remote_rel_base);
-    sftp.create_dir_all(&remote_base_dir).await.map_err(|e| {
+    sftp.create_dir_all(&remote_base_dir).await.inspect_err(|_| {
         emit_step(app, "deploy", "error", "install.remote_mkdir_failed");
-        e
     })?;
     sftp.upload_bytes(&format!("{}/docker-compose.yml", remote_base_dir), rendered.as_bytes())
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             emit_step(app, "deploy", "error", "install.compose_upload_failed");
-            e
         })?;
     sftp.upload_bytes(&format!("{}/.env", remote_base_dir), env_content.as_bytes())
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             emit_step(app, "deploy", "error", "install.env_upload_failed");
-            e
         })?;
 
     let local_data_dir = version_dir.join("data");
@@ -212,9 +208,8 @@ pub async fn install_app_inner(app: &AppHandle, server: &ServerConfig, req: &Ins
         emit_step(app, "deploy", "running", "install.data_copy_running");
         copy_data_dir_to_remote(app, &sftp, &local_data_dir, &format!("{}/data", remote_base_dir))
             .await
-            .map_err(|e| {
+            .inspect_err(|_| {
                 emit_step(app, "deploy", "error", "install.data_copy_failed");
-                e
             })?;
     }
     emit_step(app, "deploy", "done", "install.deploy_done");

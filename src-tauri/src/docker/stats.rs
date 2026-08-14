@@ -84,15 +84,15 @@ fn cpu_percent(key: &str, raw: &ContainerStatsResponse) -> f64 {
 }
 
 fn memory(raw: &ContainerStatsResponse) -> (u64, u64, f64) {
-    let usage = raw.memory_stats.as_ref().and_then(|stats| stats.usage).unwrap_or(0) as u64;
+    let usage = raw.memory_stats.as_ref().and_then(|stats| stats.usage).unwrap_or(0);
     let cache = raw
         .memory_stats
         .as_ref()
         .and_then(|stats| stats.stats.as_ref())
         .and_then(|s| s.get("cache").or(s.get("inactive_file")).copied())
-        .unwrap_or(0) as u64;
+        .unwrap_or(0);
     let mem_usage = usage.saturating_sub(cache);
-    let mem_limit = raw.memory_stats.as_ref().and_then(|stats| stats.limit).unwrap_or(1) as u64;
+    let mem_limit = raw.memory_stats.as_ref().and_then(|stats| stats.limit).unwrap_or(1);
     let mem_percent = ((mem_usage as f64 / mem_limit as f64) * 100.0 * 10.0).round() / 10.0;
     (mem_usage, mem_limit, mem_percent)
 }

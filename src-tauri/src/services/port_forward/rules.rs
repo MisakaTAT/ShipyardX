@@ -8,45 +8,18 @@ use crate::state::{AppState, PortForwardRuntimeState, lock_mutex};
 use crate::utils::id::generate_id;
 
 use super::PORT_FORWARD_BIND_IP;
-use super::bridge::{error_message, normalize_host};
+use super::bridge::normalize_host;
 use super::metrics::runtime_state_to_port_forward;
 
-pub(super) fn load_port_forward_rules_from_state(state: &State<AppState>) -> AppResult<Vec<PortForwardRule>> {
-    let data_file = lock_mutex(&state.data_file, "port_forward.data_file_lock_failed")?.clone();
-    let path = crate::config::store::data_dir_from_file(&data_file).join("port_forwards.json");
-    let rules_raw = std::fs::read_to_string(&path).unwrap_or_default();
-    if rules_raw.trim().is_empty() {
-        return Ok(vec![]);
-    }
-    serde_json::from_str::<Vec<PortForwardRule>>(&rules_raw)
-        .map_err(|e| AppError::internal("port_forward.rules_parse_failed").with_source(e))
-}
-
-pub(super) fn save_port_forward_rules_to_state(state: &State<AppState>, rules: &[PortForwardRule]) -> AppResult<()> {
-    let data_file = lock_mutex(&state.data_file, "port_forward.data_file_lock_failed")?.clone();
-    let dir = crate::config::store::data_dir_from_file(&data_file);
-    std::fs::create_dir_all(&dir)
-        .map_err(|e| AppError::internal("port_forward.config_dir_create_failed").with_source(e))?;
-    let path = dir.join("port_forwards.json");
-    let json = serde_json::to_string_pretty(rules)
-        .map_err(|e| AppError::internal("port_forward.rules_serialize_failed").with_source(e))?;
-    crate::config::store::atomic_write(&path, json.as_bytes())
-        .map_err(|e| AppError::internal("port_forward.rules_write_failed").with_detail(e.detail.unwrap_or(e.code)))
-}
-
 pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
-    let rules = load_port_forward_rules_from_state(&state)?;
-    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let rules = state.port_forward_rules.snapshot()?;
+    let runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let idle = PortForwardRuntimeState::default();
 
     Ok(rules
-        .into_iter()
+        .iter()
         .filter(|rule| rule.server_id == server_id)
-        .map(|rule| {
-            let runtime_state = runtime
-                .entry(rule.id.clone())
-                .or_insert_with(PortForwardRuntimeState::default);
-            runtime_state_to_port_forward(rule, runtime_state)
-        })
+        .map(|rule| runtime_state_to_port_forward(rule, runtime.get(&rule.id).unwrap_or(&idle)))
         .collect())
 }
 
@@ -83,12 +56,7 @@ pub async fn create_port_forward_rule(
     let bind_addr = resolve_bind_address(params.bind_address.as_deref())?;
 
     if params.local_port != 0 {
-        // 先查冲突再探测绑定
-        let existing_rules = load_port_forward_rules_from_state(&state)?;
-        if existing_rules
-            .iter()
-            .any(|rule| rule.local_port == params.local_port && rule.bind_address == bind_addr)
-        {
+        if has_local_port_conflict(&state.port_forward_rules.snapshot()?, params.local_port, &bind_addr) {
             return Err(AppError::conflict("port_forward.local_port_conflict").param("port", params.local_port));
         }
 
@@ -97,7 +65,6 @@ pub async fn create_port_forward_rule(
         drop(listener);
     }
 
-    let mut rules = load_port_forward_rules_from_state(&state)?;
     let rule = PortForwardRule {
         id: generate_id(),
         server_id: server_id.clone(),
@@ -111,8 +78,14 @@ pub async fn create_port_forward_rule(
         local_port: params.local_port,
         bind_address: bind_addr,
     };
-    rules.push(rule.clone());
-    save_port_forward_rules_to_state(&state, &rules)?;
+
+    let rule = state.port_forward_rules.mutate_durable(|rules| {
+        if rule.local_port != 0 && has_local_port_conflict(rules, rule.local_port, &rule.bind_address) {
+            return Err(AppError::conflict("port_forward.local_port_conflict").param("port", rule.local_port));
+        }
+        rules.push(rule.clone());
+        Ok(rule)
+    })?;
 
     Ok(PortForward {
         id: rule.id,
@@ -127,10 +100,8 @@ pub async fn create_port_forward_rule(
         local_port: rule.local_port,
         bind_address: rule.bind_address,
         running: false,
-        tx: crate::utils::formatting::format_bytes_u64(0),
-        rx: crate::utils::formatting::format_bytes_u64(0),
-        tx_speed: "0 B/s".to_string(),
-        rx_speed: "0 B/s".to_string(),
+        tx_speed_bps: 0.0,
+        rx_speed_bps: 0.0,
         last_error: None,
     })
 }
@@ -139,46 +110,40 @@ pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_
     super::runtime::update_rule_enabled_and_runtime(id, enabled, &state)
 }
 
+pub async fn set_port_forwards_enabled(ids: Vec<String>, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
+    super::runtime::update_rules_enabled_and_runtime(&ids, enabled, &state)
+}
+
 pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id) {
-        if let Some(runtime) = handle.handle {
-            let _ = runtime.stop_tx.send(true);
-        }
+    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
+        && let Some(runtime) = handle.handle
+    {
+        let _ = runtime.stop_tx.send(true);
     }
 
-    let mut rules = load_port_forward_rules_from_state(&state)?;
-    rules.retain(|rule| rule.id != id);
-    save_port_forward_rules_to_state(&state, &rules)?;
+    state.port_forward_rules.mutate_durable(|rules| {
+        rules.retain(|rule| rule.id != id);
+        Ok(())
+    })?;
     log::info!(target: "shipyardx_lib::services::port_forward", "port forward rule deleted; rule_id={}", id);
     Ok(())
 }
 
 pub async fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
-    let rules = load_port_forward_rules_from_state(&state)?;
-    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let rules = state.port_forward_rules.snapshot()?;
+    let runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let idle = PortForwardRuntimeState::default();
 
     Ok(rules
-        .into_iter()
-        .map(|rule| {
-            let runtime_state = runtime
-                .entry(rule.id.clone())
-                .or_insert_with(PortForwardRuntimeState::default);
-            runtime_state_to_port_forward(rule, runtime_state)
-        })
+        .iter()
+        .map(|rule| runtime_state_to_port_forward(rule, runtime.get(&rule.id).unwrap_or(&idle)))
         .collect())
 }
 
-pub(super) fn set_runtime_error(state: &State<'_, AppState>, id: &str, error: Option<String>) {
-    if let Ok(mut runtime) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed") {
-        runtime
-            .entry(id.to_string())
-            .or_insert_with(PortForwardRuntimeState::default)
-            .last_error = error;
-    }
-}
-
-pub(super) fn record_start_failure(state: &State<'_, AppState>, id: &str, error: AppError) {
-    set_runtime_error(state, id, Some(error_message(error)));
+pub(super) fn has_local_port_conflict(rules: &[PortForwardRule], local_port: u16, bind_addr: &str) -> bool {
+    rules
+        .iter()
+        .any(|rule| rule.local_port == local_port && rule.bind_address == bind_addr)
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex, RwLock, atomic::AtomicU64};
 use std::time::Instant;
 
 use crate::dto::events::EventStreamStatus;
+use crate::dto::port_forward::PortForwardError;
 use crate::dto::server::ServerConfig;
 use tokio::sync::{mpsc as tokio_mpsc, watch};
 
@@ -43,6 +44,7 @@ pub struct AppState {
     pub(crate) terminal_handshakes: RwLock<HashMap<String, TerminalHandshakeState>>,
     pub(crate) event_streams: RwLock<HashMap<String, EventStreamHandle>>,
     pub(crate) port_forwards: Mutex<HashMap<String, PortForwardRuntimeState>>,
+    pub(crate) port_forward_rules: super::PortForwardRuleStore,
 }
 
 pub(crate) struct PortForwardRuntimeHandle {
@@ -51,16 +53,17 @@ pub(crate) struct PortForwardRuntimeHandle {
     pub(crate) local_port: u16,
     pub(crate) tx_bytes: Arc<AtomicU64>,
     pub(crate) rx_bytes: Arc<AtomicU64>,
+    pub(crate) last_error: Arc<Mutex<Option<PortForwardError>>>,
 }
 
 pub(crate) struct PortForwardRuntimeState {
     pub(crate) handle: Option<PortForwardRuntimeHandle>,
-    pub(crate) last_error: Option<String>,
+    pub(crate) last_error: Option<PortForwardError>,
     pub(crate) last_sample_at: Option<Instant>,
     pub(crate) last_tx_bytes: u64,
     pub(crate) last_rx_bytes: u64,
-    pub(crate) tx_speed: String,
-    pub(crate) rx_speed: String,
+    pub(crate) tx_speed_bps: f64,
+    pub(crate) rx_speed_bps: f64,
 }
 
 impl Default for PortForwardRuntimeState {
@@ -71,8 +74,8 @@ impl Default for PortForwardRuntimeState {
             last_sample_at: None,
             last_tx_bytes: 0,
             last_rx_bytes: 0,
-            tx_speed: "0 B/s".to_string(),
-            rx_speed: "0 B/s".to_string(),
+            tx_speed_bps: 0.0,
+            rx_speed_bps: 0.0,
         }
     }
 }

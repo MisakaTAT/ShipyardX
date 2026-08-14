@@ -389,15 +389,6 @@
         "bind_address_multicast": {
           "message": "The bind address can't be a multicast address"
         },
-        "config_dir_create_failed": {
-          "message": "Couldn't create the port forwarding config directory"
-        },
-        "connect_failed": {
-          "message": "SSH connection failed"
-        },
-        "data_file_lock_failed": {
-          "message": "Couldn't read the port forwarding config path"
-        },
         "interfaces_list_failed": {
           "message": "Couldn't read the local network interfaces"
         },
@@ -428,8 +419,8 @@
         "rule_disabled": {
           "message": "This rule is disabled"
         },
-        "rules_parse_failed": {
-          "message": "Couldn't parse port_forwards.json"
+        "rules_lock_failed": {
+          "message": "Failed to read the port forwarding rule table"
         },
         "rules_serialize_failed": {
           "message": "Couldn't serialize the port forwarding config"
@@ -442,6 +433,10 @@
         },
         "shutdown_failed": {
           "message": "Couldn't close the port forwarding writer"
+        },
+        "warmup_timeout": {
+          "message": "Timed out connecting to {{host}}",
+          "action": "Check that the host is reachable and review firewall or security group rules"
         },
         "write_failed": {
           "message": "Couldn't write port forwarding data"
@@ -1211,31 +1206,37 @@
     },
     "portForward": {
       "bindAddress": "Bind address",
-      "colActions": "Actions",
       "colContainer": "Container",
       "colHost": "Host",
       "colLocalPort": "Local port",
-      "colProtocol": "Protocol",
-      "colSpeed": "Speed",
-      "colStatus": "Status",
-      "colTarget": "Target",
-      "colTraffic": "Traffic",
       "containerPort": "Container port",
       "create": "Create",
-      "created": "Forwarding rule created (local port {{port}})",
       "createFailed": "Check the forwarding settings and try again",
       "createTitle": "Create forwarding rule",
+      "created": "Forwarding rule created (local port {{port}})",
       "deleted": "Rule deleted",
       "disable": "Disable",
+      "disableContainer": "Disable every rule on this container",
+      "disableHost": "Disable every rule on this host",
       "disabled": "Rule disabled",
+      "disabledMany": "Disabled {{count}} rules",
       "emptyBody": "Create a rule to tunnel a remote container's TCP port to your machine for local development and debugging.",
       "emptyTitle": "No forwarding rules yet",
       "enable": "Enable",
+      "enableContainer": "Enable every rule on this container",
+      "enableHost": "Enable every rule on this host",
       "enabled": "Rule enabled",
+      "enabledMany": "Enabled {{count}} rules",
+      "errorDetail": "Details",
+      "errorRetry": "Retry",
+      "errorRetrying": "Retrying…",
+      "errorTitle": "Last error",
+      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "Enter 0 to let the system pick a local port",
       "noMatch": "No rules match “{{query}}”",
-      "noRecords": "No records",
       "noTcpPorts": "This container has no TCP ports",
+      "openLocal": "Open {{address}} in the browser",
+      "retried": "Rule restarted",
       "selectContainer": "Select a container",
       "selectContainerPort": "Select a container port",
       "selectHost": "Select a host",
@@ -1246,7 +1247,7 @@
       "statusPending": "Not started",
       "stop": "Stop",
       "stoppedAll": "Stopped all forwarding",
-      "subtitle": "Manage SSH tunnel rules that map remote container ports to your machine.",
+      "summary": "{{hosts}} hosts · {{running}}/{{total}} listening",
       "title": "Port forwarding"
     },
     "run": {

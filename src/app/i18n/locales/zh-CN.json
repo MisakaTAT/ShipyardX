@@ -389,15 +389,6 @@
         "bind_address_multicast": {
           "message": "绑定地址不能是组播地址"
         },
-        "config_dir_create_failed": {
-          "message": "创建端口转发配置目录失败"
-        },
-        "connect_failed": {
-          "message": "SSH 连接失败"
-        },
-        "data_file_lock_failed": {
-          "message": "读取端口转发配置路径失败"
-        },
         "interfaces_list_failed": {
           "message": "读取本地网卡地址失败"
         },
@@ -428,8 +419,8 @@
         "rule_disabled": {
           "message": "该规则已被禁用"
         },
-        "rules_parse_failed": {
-          "message": "解析 port_forwards.json 失败"
+        "rules_lock_failed": {
+          "message": "读取端口转发规则表失败"
         },
         "rules_serialize_failed": {
           "message": "序列化端口转发配置失败"
@@ -442,6 +433,10 @@
         },
         "shutdown_failed": {
           "message": "关闭端口转发写入端失败"
+        },
+        "warmup_timeout": {
+          "message": "连接 {{host}} 超时",
+          "action": "请检查目标主机是否可达，以及安全组或防火墙设置"
         },
         "write_failed": {
           "message": "写入端口转发数据失败"
@@ -1211,31 +1206,37 @@
     },
     "portForward": {
       "bindAddress": "绑定地址",
-      "colActions": "操作",
       "colContainer": "容器",
       "colHost": "主机",
       "colLocalPort": "本地端口",
-      "colProtocol": "协议",
-      "colSpeed": "速度",
-      "colStatus": "状态",
-      "colTarget": "目标",
-      "colTraffic": "流量",
       "containerPort": "容器端口",
       "create": "创建",
-      "created": "已创建转发规则（本地端口：{{port}}）",
       "createFailed": "请检查端口转发配置后重试",
       "createTitle": "创建转发规则",
+      "created": "已创建转发规则（本地端口：{{port}}）",
       "deleted": "已删除规则",
       "disable": "禁用",
+      "disableContainer": "停用该容器全部规则",
+      "disableHost": "停用该主机全部规则",
       "disabled": "规则已禁用",
+      "disabledMany": "已停用 {{count}} 条规则",
       "emptyBody": "创建端口转发规则，将远程容器的 TCP 端口通过 SSH 隧道映射到本地，方便本地开发与调试。",
       "emptyTitle": "尚未创建转发规则",
       "enable": "启用",
+      "enableContainer": "启用该容器全部规则",
+      "enableHost": "启用该主机全部规则",
       "enabled": "规则已启用",
+      "enabledMany": "已启用 {{count}} 条规则",
+      "errorDetail": "详情",
+      "errorRetry": "重试",
+      "errorRetrying": "正在重试…",
+      "errorTitle": "最近一次错误",
+      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "填 0 时由系统随机分配本地端口",
       "noMatch": "没有匹配「{{query}}」的规则",
-      "noRecords": "没有记录",
       "noTcpPorts": "该容器没有可用 TCP 端口",
+      "openLocal": "在浏览器打开 {{address}}",
+      "retried": "已重新启动该规则",
       "selectContainer": "选择容器",
       "selectContainerPort": "选择容器端口",
       "selectHost": "选择主机",
@@ -1246,7 +1247,7 @@
       "statusPending": "待启动",
       "stop": "停止",
       "stoppedAll": "已停止所有转发",
-      "subtitle": "管理 SSH 隧道端口转发规则，将远程容器端口映射到本地。",
+      "summary": "{{hosts}} 台主机 · {{running}}/{{total}} 条监听中",
       "title": "端口转发"
     },
     "run": {

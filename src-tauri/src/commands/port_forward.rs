@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::dto::port_forward::{LocalAddress, PortForward, PortForwardCreate};
 use crate::error::AppResult;
@@ -35,14 +35,26 @@ pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_
 
 #[tauri::command]
 #[specta::specta]
+pub async fn set_port_forwards_enabled(ids: Vec<String>, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
+    port_forward::set_port_forwards_enabled(ids, enabled, state).await
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
     port_forward::delete_port_forward(id, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    port_forward::start_all_enabled(server_id, state).await
+pub async fn start_all_enabled(server_id: String, app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    port_forward::start_all_enabled(server_id, app_handle, state).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn start_port_forward(id: String, app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    port_forward::start_port_forward(id, app_handle, state).await
 }
 
 #[tauri::command]
@@ -59,8 +71,8 @@ pub async fn list_port_forwards_all(state: State<'_, AppState>) -> AppResult<Vec
 
 #[tauri::command]
 #[specta::specta]
-pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
-    port_forward::start_all_enabled_global(state).await
+pub async fn start_all_enabled_global(app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    port_forward::start_all_enabled_global(app_handle, state).await
 }
 
 #[tauri::command]

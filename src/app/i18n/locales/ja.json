@@ -389,15 +389,6 @@
         "bind_address_multicast": {
           "message": "バインドアドレスにマルチキャストアドレスは指定できません"
         },
-        "config_dir_create_failed": {
-          "message": "ポートフォワード設定ディレクトリを作成できませんでした"
-        },
-        "connect_failed": {
-          "message": "SSH 接続に失敗しました"
-        },
-        "data_file_lock_failed": {
-          "message": "ポートフォワード設定のパスを読み取れませんでした"
-        },
         "interfaces_list_failed": {
           "message": "ローカルのネットワークインターフェースを読み取れませんでした"
         },
@@ -428,8 +419,8 @@
         "rule_disabled": {
           "message": "このルールは無効になっています"
         },
-        "rules_parse_failed": {
-          "message": "port_forwards.json を解析できませんでした"
+        "rules_lock_failed": {
+          "message": "ポートフォワード規則テーブルの読み取りに失敗しました"
         },
         "rules_serialize_failed": {
           "message": "ポートフォワード設定のシリアライズに失敗しました"
@@ -442,6 +433,10 @@
         },
         "shutdown_failed": {
           "message": "ポートフォワードの書き込み側を閉じられませんでした"
+        },
+        "warmup_timeout": {
+          "message": "{{host}} への接続がタイムアウトしました",
+          "action": "ホストに到達できるか、ファイアウォールやセキュリティグループの設定を確認してください"
         },
         "write_failed": {
           "message": "ポートフォワードのデータを書き込めませんでした"
@@ -1211,31 +1206,37 @@
     },
     "portForward": {
       "bindAddress": "バインドアドレス",
-      "colActions": "操作",
       "colContainer": "コンテナ",
       "colHost": "ホスト",
       "colLocalPort": "ローカルポート",
-      "colProtocol": "プロトコル",
-      "colSpeed": "速度",
-      "colStatus": "状態",
-      "colTarget": "ターゲット",
-      "colTraffic": "転送量",
       "containerPort": "コンテナポート",
       "create": "作成",
-      "created": "転送ルールを作成しました（ローカルポート: {{port}}）",
       "createFailed": "ポート転送の設定を確認して再試行してください",
       "createTitle": "転送ルールを作成",
+      "created": "転送ルールを作成しました（ローカルポート: {{port}}）",
       "deleted": "ルールを削除しました",
       "disable": "無効化",
+      "disableContainer": "このコンテナの全ルールを無効化",
+      "disableHost": "このホストの全ルールを無効化",
       "disabled": "ルールを無効にしました",
+      "disabledMany": "{{count}} 件のルールを無効にしました",
       "emptyBody": "ルールを作成すると、リモートコンテナの TCP ポートを SSH トンネル経由でローカルに転送でき、開発やデバッグに便利です。",
       "emptyTitle": "転送ルールがありません",
       "enable": "有効化",
+      "enableContainer": "このコンテナの全ルールを有効化",
+      "enableHost": "このホストの全ルールを有効化",
       "enabled": "ルールを有効にしました",
+      "enabledMany": "{{count}} 件のルールを有効にしました",
+      "errorDetail": "詳細",
+      "errorRetry": "再試行",
+      "errorRetrying": "再試行中…",
+      "errorTitle": "直近のエラー",
+      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "0 を入力するとローカルポートは自動で割り当てられます",
       "noMatch": "「{{query}}」に一致するルールがありません",
-      "noRecords": "記録がありません",
       "noTcpPorts": "このコンテナに利用可能な TCP ポートがありません",
+      "openLocal": "{{address}} をブラウザーで開く",
+      "retried": "ルールを再起動しました",
       "selectContainer": "コンテナを選択",
       "selectContainerPort": "コンテナポートを選択",
       "selectHost": "ホストを選択",
@@ -1246,7 +1247,7 @@
       "statusPending": "未起動",
       "stop": "停止",
       "stoppedAll": "すべての転送を停止しました",
-      "subtitle": "SSH トンネルのルールを管理し、リモートコンテナのポートをローカルに割り当てます。",
+      "summary": "ホスト {{hosts}} 台 · {{running}}/{{total}} 待ち受け中",
       "title": "ポート転送"
     },
     "run": {

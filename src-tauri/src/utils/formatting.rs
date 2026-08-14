@@ -126,10 +126,3 @@ pub fn format_time_ago_from_datetime_string(raw: &str) -> String {
     }
     format!("{} years ago", days / 365)
 }
-
-pub fn format_speed(bytes_per_sec: f64) -> String {
-    if !bytes_per_sec.is_finite() || bytes_per_sec <= 0.0 {
-        return "0 B/s".to_string();
-    }
-    format!("{}/s", format_bytes(bytes_per_sec))
-}

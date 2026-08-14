@@ -69,10 +69,12 @@ export const commands = {
 	listPortForwardsAll: () => __TAURI_INVOKE<PortForward[]>("list_port_forwards_all"),
 	createPortForwardRule: (serverId: string, params: PortForwardCreate) => __TAURI_INVOKE<PortForward>("create_port_forward_rule", { serverId, params }),
 	setPortForwardEnabled: (id: string, enabled: boolean) => __TAURI_INVOKE<null>("set_port_forward_enabled", { id, enabled }),
+	setPortForwardsEnabled: (ids: string[], enabled: boolean) => __TAURI_INVOKE<null>("set_port_forwards_enabled", { ids, enabled }),
 	deletePortForward: (id: string) => __TAURI_INVOKE<null>("delete_port_forward", { id }),
 	startAllEnabled: (serverId: string) => __TAURI_INVOKE<null>("start_all_enabled", { serverId }),
 	startAllEnabledGlobal: () => __TAURI_INVOKE<null>("start_all_enabled_global"),
 	stopAllGlobal: () => __TAURI_INVOKE<null>("stop_all_global"),
+	startPortForward: (id: string) => __TAURI_INVOKE<null>("start_port_forward", { id }),
 	stopPortForward: (id: string) => __TAURI_INVOKE<null>("stop_port_forward", { id }),
 	openTerminal: (serverId: string, cols: number, rows: number) => __TAURI_INVOKE<TerminalSession>("open_terminal", { serverId, cols, rows }),
 	openContainerExecTerminal: (serverId: string, params: ContainerExecTerminalParams) => __TAURI_INVOKE<TerminalSession>("open_container_exec_terminal", { serverId, params }),
@@ -554,11 +556,10 @@ export type PortForward = {
 	local_port: number,
 	bind_address: string,
 	running: boolean,
-	tx: string,
-	rx: string,
-	tx_speed: string,
-	rx_speed: string,
-	last_error: string | null,
+	/**  EMA 平滑后的速率，单位为字节/秒；格式化和 i18n 归前端 */
+	tx_speed_bps: number | null,
+	rx_speed_bps: number | null,
+	last_error: PortForwardError | null,
 };
 
 export type PortForwardCreate = {
@@ -571,6 +572,16 @@ export type PortForwardCreate = {
 	local_port: number,
 	bind_address: string | null,
 	enabled: boolean,
+};
+
+/**
+ *  端口转发的最近一次错误。保留完整 AppError 而不是拍平成字符串，
+ *  前端才能走 resolveAppError 拿到 i18n 文案、action 提示和 params 插值。
+ */
+export type PortForwardError = {
+	error: AppError,
+	/**  发生时间（Unix 毫秒），用于判断这条错误是否还新鲜 */
+	at_ms: number,
 };
 
 export type RunContainer = {
@@ -657,4 +668,3 @@ function makeEvent<T>(name: string, serialize?: (payload: T) => unknown, deseria
 
     return Object.assign(fn, base);
 }
-

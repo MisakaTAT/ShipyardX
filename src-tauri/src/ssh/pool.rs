@@ -89,6 +89,17 @@ fn missing_pooled_handle_error() -> AppError {
     AppError::internal("ssh.pool_handle_missing").retryable(true)
 }
 
+pub async fn warm_up(config: &ServerConfig) -> AppResult<()> {
+    let entry = get_entry(config);
+    let mut pooled = entry.lock().await;
+
+    if pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true) {
+        debug!(target: "shipyardx_lib::ssh::pool", "warming up pooled ssh connection; server_id={}", config.id);
+        pooled.handle = Some(connect(config).await?);
+    }
+    Ok(())
+}
+
 pub async fn open_direct_streamlocal(
     config: &ServerConfig,
     path: String,

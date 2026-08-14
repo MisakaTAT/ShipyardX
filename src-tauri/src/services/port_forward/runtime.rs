@@ -1,60 +1,81 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::TcpListener;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-use log::{error, info};
-use tauri::State;
+use log::{error, info, warn};
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::watch;
 
-use crate::dto::port_forward::PortForwardRule;
+use crate::config::timeouts::PORT_FORWARD_WARMUP_TIMEOUT;
+use crate::dto::port_forward::{PortForwardError, PortForwardRule};
+use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
-use crate::services::support::ServerContext;
 use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, lock_mutex};
+use crate::ssh::pool;
+use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_mutex};
 
-use super::bridge::{PortForwardAcceptArgs, accept_loop, probe_remote};
-use super::rules::{
-    load_port_forward_rules_from_state, record_start_failure, save_port_forward_rules_to_state, set_runtime_error,
-};
+use super::bridge::{PortForwardAcceptArgs, accept_loop, error_message};
 
-fn is_rule_running(state: &State<AppState>, id: &str) -> bool {
-    lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")
-        .ok()
-        .and_then(|runtime| runtime.get(id).and_then(|state| state.handle.as_ref()).map(|_| true))
-        .unwrap_or(false)
+const LOG_TARGET: &str = "shipyardx_lib::services::port_forward";
+
+type RuntimeMap = HashMap<String, PortForwardRuntimeState>;
+
+#[derive(Clone, Copy)]
+enum StaleScope<'a> {
+    Keep,
+    Server(&'a str),
+    All,
 }
 
 pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: &State<'_, AppState>) -> AppResult<()> {
-    let mut rules = load_port_forward_rules_from_state(state)?;
-    let mut found = false;
-    for rule in &mut rules {
-        if rule.id == id {
-            rule.enabled = enabled;
-            found = true;
-            break;
-        }
+    update_rules_enabled_and_runtime(std::slice::from_ref(&id), enabled, state)
+}
+
+pub(super) fn update_rules_enabled_and_runtime(
+    ids: &[String],
+    enabled: bool,
+    state: &State<'_, AppState>,
+) -> AppResult<()> {
+    if ids.is_empty() {
+        return Ok(());
     }
-    if !found {
+    let wanted: HashSet<&str> = ids.iter().map(String::as_str).collect();
+
+    let matched = state.port_forward_rules.mutate(|rules| {
+        let mut matched = 0usize;
+        for rule in rules.iter_mut().filter(|rule| wanted.contains(rule.id.as_str())) {
+            rule.enabled = enabled;
+            matched += 1;
+        }
+        Ok(matched)
+    })?;
+
+    if matched == 0 {
         return Err(AppError::not_found("port_forward.not_found"));
     }
-    save_port_forward_rules_to_state(state, &rules)?;
 
-    if !enabled
-        && let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
-        && let Some(runtime) = handle.handle
-    {
-        let _ = runtime.stop_tx.send(true);
+    if !enabled {
+        let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+        for id in ids {
+            if let Some(handle) = runtime.remove(id).and_then(|entry| entry.handle) {
+                let _ = handle.stop_tx.send(true);
+            }
+        }
     }
 
     Ok(())
 }
 
-async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, AppState>) -> AppResult<()> {
+fn start_port_forward_runtime(
+    rule: &PortForwardRule,
+    server_cfg: &ServerConfig,
+    runtime: &mut RuntimeMap,
+) -> AppResult<()> {
     if !rule.enabled {
         return Err(AppError::validation("port_forward.rule_disabled"));
     }
-    if is_rule_running(state, &rule.id) {
+    if runtime.get(&rule.id).is_some_and(|state| state.handle.is_some()) {
         return Ok(());
     }
 
@@ -67,27 +88,40 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
         .map_err(|e| AppError::internal("port_forward.local_addr_read_failed").with_source(e))?
         .port();
 
-    let server_cfg = ServerContext::from_state(state, &rule.server_id)?.server().clone();
-    probe_remote(&server_cfg, &rule.remote_host, rule.remote_port).await?;
-
     let (stop_tx, stop_rx) = watch::channel(false);
     let last_error = Arc::new(Mutex::new(None));
     let tx_bytes = Arc::new(AtomicU64::new(0));
     let rx_bytes = Arc::new(AtomicU64::new(0));
-    let handle = PortForwardRuntimeState {
-        handle: Some(PortForwardRuntimeHandle {
-            stop_tx: stop_tx.clone(),
-            server_id: rule.server_id.clone(),
-            local_port: actual_local_port,
-            tx_bytes: tx_bytes.clone(),
-            rx_bytes: rx_bytes.clone(),
-        }),
-        ..PortForwardRuntimeState::default()
-    };
-    lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.insert(rule.id.clone(), handle);
+
+    spawn_on_runtime(accept_loop(PortForwardAcceptArgs {
+        listener,
+        server_cfg: server_cfg.clone(),
+        remote_host: rule.remote_host.clone(),
+        remote_port: rule.remote_port,
+        stop_rx,
+        last_error: Arc::clone(&last_error),
+        tx_bytes: Arc::clone(&tx_bytes),
+        rx_bytes: Arc::clone(&rx_bytes),
+    }))?;
+
+    runtime.insert(
+        rule.id.clone(),
+        PortForwardRuntimeState {
+            handle: Some(PortForwardRuntimeHandle {
+                stop_tx,
+                server_id: rule.server_id.clone(),
+                local_port: actual_local_port,
+                tx_bytes,
+                rx_bytes,
+                last_error,
+            }),
+            ..PortForwardRuntimeState::default()
+        },
+    );
+
     info!(
-        target: "shipyardx_lib::services::port_forward",
-        "port forward runtime started; rule_id={} server_id={} bind_address={} local_port={} remote_host={} remote_port={}",
+        target: LOG_TARGET,
+        "port forward listening; rule_id={} server_id={} bind_address={} local_port={} remote_host={} remote_port={}",
         rule.id,
         rule.server_id,
         bind_addr,
@@ -95,96 +129,198 @@ async fn start_port_forward_runtime(rule: &PortForwardRule, state: &State<'_, Ap
         rule.remote_host,
         rule.remote_port
     );
-
-    let cfg = server_cfg.clone();
-    let rh = rule.remote_host.clone();
-    let rp = rule.remote_port;
-    let le = last_error.clone();
-    spawn_on_runtime(async move {
-        accept_loop(PortForwardAcceptArgs {
-            listener,
-            server_cfg: cfg,
-            remote_host: rh,
-            remote_port: rp,
-            stop_rx,
-            last_error: le,
-            tx_bytes,
-            rx_bytes,
-        })
-        .await;
-    })?;
-
     Ok(())
 }
 
-pub async fn start_all_enabled(server_id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let rules = load_port_forward_rules_from_state(&state)?;
-    let enabled_rules: Vec<PortForwardRule> = rules
-        .into_iter()
-        .filter(|rule| rule.server_id == server_id && rule.enabled)
-        .collect();
+fn collect_server_configs(
+    state: &State<'_, AppState>,
+    rules: &[PortForwardRule],
+) -> HashMap<String, AppResult<ServerConfig>> {
+    let mut configs: HashMap<String, AppResult<ServerConfig>> = HashMap::new();
+    for rule in rules {
+        configs
+            .entry(rule.server_id.clone())
+            .or_insert_with(|| get_server_config(state, &rule.server_id));
+    }
+    configs
+}
 
-    let enabled_ids: HashSet<String> = enabled_rules.iter().map(|rule| rule.id.clone()).collect();
-    let running_ids: Vec<String> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+fn start_rules(
+    state: &State<'_, AppState>,
+    enabled_rules: &[PortForwardRule],
+    scope: StaleScope<'_>,
+    configs: &HashMap<String, AppResult<ServerConfig>>,
+) -> AppResult<HashMap<String, Vec<String>>> {
+    let keep: HashSet<&str> = enabled_rules.iter().map(|rule| rule.id.as_str()).collect();
+    let mut started_by_server: HashMap<String, Vec<String>> = HashMap::new();
+    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+
+    let stale: Vec<String> = runtime
         .iter()
-        .filter(|(_, state)| {
-            state
-                .handle
-                .as_ref()
-                .map(|handle| handle.server_id == server_id)
-                .unwrap_or(false)
+        .filter(|(id, entry)| {
+            !keep.contains(id.as_str())
+                && match scope {
+                    StaleScope::Keep => false,
+                    StaleScope::Server(scope) => entry.handle.as_ref().is_some_and(|handle| handle.server_id == scope),
+                    StaleScope::All => true,
+                }
         })
         .map(|(id, _)| id.clone())
         .collect();
-
-    stop_disabled_rules(&state, running_ids, &enabled_ids)?;
-
-    for rule in enabled_rules {
-        if let Err(error) = start_port_forward_runtime(&rule, &state).await {
-            error!(
-                target: "shipyardx_lib::services::port_forward",
-                "failed to start enabled port forward; rule_id={} server_id={} message={} detail={:?}",
-                rule.id,
-                rule.server_id,
-                error,
-                error.detail
-            );
-            record_start_failure(&state, &rule.id, error);
-        } else {
-            set_runtime_error(&state, &rule.id, None);
+    for id in stale {
+        if let Some(handle) = runtime.remove(&id).and_then(|entry| entry.handle) {
+            let _ = handle.stop_tx.send(true);
         }
     }
 
-    Ok(())
+    for rule in enabled_rules {
+        let outcome = match configs.get(&rule.server_id) {
+            Some(Ok(server_cfg)) => start_port_forward_runtime(rule, server_cfg, &mut runtime),
+            Some(Err(error)) => Err(error.clone()),
+            None => Err(AppError::not_found("server.not_found")),
+        };
+
+        match outcome {
+            Ok(()) => {
+                if let Some(entry) = runtime.get_mut(&rule.id) {
+                    entry.last_error = None;
+                }
+                started_by_server
+                    .entry(rule.server_id.clone())
+                    .or_default()
+                    .push(rule.id.clone());
+            }
+            Err(error) => {
+                error!(
+                    target: LOG_TARGET,
+                    "failed to start port forward; rule_id={} server_id={} code={} detail={:?}",
+                    rule.id,
+                    rule.server_id,
+                    error.code,
+                    error.detail
+                );
+                runtime.entry(rule.id.clone()).or_default().last_error = Some(PortForwardError::now(error));
+            }
+        }
+    }
+
+    Ok(started_by_server)
 }
 
-pub async fn start_all_enabled_global(state: State<'_, AppState>) -> AppResult<()> {
-    let rules = load_port_forward_rules_from_state(&state)?;
-    let enabled_rules: Vec<PortForwardRule> = rules.into_iter().filter(|rule| rule.enabled).collect();
-    let enabled_ids: HashSet<String> = enabled_rules.iter().map(|rule| rule.id.clone()).collect();
-    let running_ids: Vec<String> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
-        .keys()
+fn spawn_server_warmup(app_handle: AppHandle, server_cfg: ServerConfig, rule_ids: Vec<String>) {
+    let spawned = spawn_on_runtime(async move {
+        let server_id = server_cfg.id.clone();
+        let failure = match tokio::time::timeout(PORT_FORWARD_WARMUP_TIMEOUT, pool::warm_up(&server_cfg)).await {
+            Ok(Ok(())) => None,
+            Ok(Err(error)) => Some(error),
+            Err(_) => Some(
+                AppError::timeout("port_forward.warmup_timeout")
+                    .param("host", &server_cfg.host)
+                    .retryable(true),
+            ),
+        };
+
+        if let Some(error) = failure.as_ref() {
+            warn!(
+                target: LOG_TARGET,
+                "port forward warmup failed; server_id={} rule_count={} code={} detail={}",
+                server_id,
+                rule_ids.len(),
+                error.code,
+                error_message(error)
+            );
+        }
+        let failure = failure.map(PortForwardError::now);
+
+        let app_state = app_handle.state::<AppState>();
+        let Ok(mut runtime) = lock_mutex(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
+            return;
+        };
+        for id in &rule_ids {
+            if let Some(entry) = runtime.get_mut(id) {
+                entry.last_error = failure.clone();
+            }
+        }
+    });
+
+    if let Err(error) = spawned {
+        warn!(
+            target: LOG_TARGET,
+            "unable to spawn port forward warmup; message={} detail={:?}",
+            error,
+            error.detail
+        );
+    }
+}
+
+fn spawn_warmups(
+    app_handle: &AppHandle,
+    started_by_server: HashMap<String, Vec<String>>,
+    configs: &HashMap<String, AppResult<ServerConfig>>,
+) {
+    for (server_id, rule_ids) in started_by_server {
+        if let Some(Ok(server_cfg)) = configs.get(&server_id) {
+            spawn_server_warmup(app_handle.clone(), server_cfg.clone(), rule_ids);
+        }
+    }
+}
+
+pub async fn start_all_enabled(server_id: String, app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    let enabled_rules: Vec<PortForwardRule> = state
+        .port_forward_rules
+        .snapshot()?
+        .iter()
+        .filter(|rule| rule.server_id == server_id && rule.enabled)
         .cloned()
         .collect();
 
-    stop_disabled_rules(&state, running_ids, &enabled_ids)?;
+    let configs = collect_server_configs(&state, &enabled_rules);
+    let started = start_rules(&state, &enabled_rules, StaleScope::Server(&server_id), &configs)?;
+    spawn_warmups(&app_handle, started, &configs);
+    Ok(())
+}
 
-    for rule in enabled_rules {
-        if let Err(error) = start_port_forward_runtime(&rule, &state).await {
-            error!(
-                target: "shipyardx_lib::services::port_forward",
-                "failed to start global enabled port forward; rule_id={} server_id={} message={} detail={:?}",
-                rule.id,
-                rule.server_id,
-                error,
-                error.detail
-            );
-            record_start_failure(&state, &rule.id, error);
-        } else {
-            set_runtime_error(&state, &rule.id, None);
-        }
+pub async fn start_port_forward(id: String, app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    let rule = state
+        .port_forward_rules
+        .snapshot()?
+        .iter()
+        .find(|rule| rule.id == id)
+        .cloned()
+        .ok_or_else(|| AppError::not_found("port_forward.not_found"))?;
+
+    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .remove(&id)
+        .and_then(|entry| entry.handle)
+    {
+        let _ = handle.stop_tx.send(true);
     }
 
+    let rules = [rule];
+    let configs = collect_server_configs(&state, &rules);
+    let started = start_rules(&state, &rules, StaleScope::Keep, &configs)?;
+    spawn_warmups(&app_handle, started, &configs);
+    Ok(())
+}
+
+pub async fn start_all_enabled_global(app_handle: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    let enabled_rules: Vec<PortForwardRule> = state
+        .port_forward_rules
+        .snapshot()?
+        .iter()
+        .filter(|rule| rule.enabled)
+        .cloned()
+        .collect();
+
+    let configs = collect_server_configs(&state, &enabled_rules);
+    let started = start_rules(&state, &enabled_rules, StaleScope::All, &configs)?;
+    info!(
+        target: LOG_TARGET,
+        "started all enabled port forwards; rule_count={} server_count={}",
+        enabled_rules.len(),
+        configs.len()
+    );
+    spawn_warmups(&app_handle, started, &configs);
     Ok(())
 }
 
@@ -196,13 +332,11 @@ pub async fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppRes
     if let Some(runtime) = handle.handle {
         let _ = runtime.stop_tx.send(true);
         info!(
-            target: "shipyardx_lib::services::port_forward",
-            "port forward runtime stopped; rule_id={} server_id={} local_port={} tx_bytes={} rx_bytes={}",
+            target: LOG_TARGET,
+            "port forward runtime stopped; rule_id={} server_id={} local_port={}",
             id,
             runtime.server_id,
-            runtime.local_port,
-            runtime.tx_bytes.load(std::sync::atomic::Ordering::Relaxed),
-            runtime.rx_bytes.load(std::sync::atomic::Ordering::Relaxed)
+            runtime.local_port
         );
     }
     Ok(())
@@ -219,25 +353,9 @@ pub async fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
         }
     }
     info!(
-        target: "shipyardx_lib::services::port_forward",
+        target: LOG_TARGET,
         "stopped all port forward runtimes; count={}",
         total
     );
-    Ok(())
-}
-
-fn stop_disabled_rules(
-    state: &State<'_, AppState>,
-    running_ids: Vec<String>,
-    enabled_ids: &HashSet<String>,
-) -> AppResult<()> {
-    for id in running_ids {
-        if !enabled_ids.contains(&id)
-            && let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
-            && let Some(runtime) = handle.handle
-        {
-            let _ = runtime.stop_tx.send(true);
-        }
-    }
     Ok(())
 }

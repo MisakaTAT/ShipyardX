@@ -1,4 +1,5 @@
 mod app_state;
+mod port_forward_rules;
 
 use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -7,6 +8,7 @@ pub(crate) use app_state::{
     EventStreamHandle, PortForwardRuntimeHandle, PortForwardRuntimeState, StreamHandle, TerminalHandle,
     TerminalHandshakeState, TerminalMsg,
 };
+pub(crate) use port_forward_rules::PortForwardRuleStore;
 
 use tauri::State;
 use tokio::sync::watch;
