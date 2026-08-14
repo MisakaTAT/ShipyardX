@@ -5,7 +5,7 @@ use specta::Type;
 
 use crate::error::AppError;
 
-#[derive(Debug, Serialize, Clone, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct PortForwardError {
     pub error: AppError,
     #[specta(type = specta_typescript::Number)]
@@ -81,7 +81,7 @@ fn default_bind_address() -> String {
     "127.0.0.1".to_string()
 }
 
-#[derive(Debug, Serialize, Clone, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, Type)]
 pub struct PortForward {
     pub id: String,
     pub server_id: String,

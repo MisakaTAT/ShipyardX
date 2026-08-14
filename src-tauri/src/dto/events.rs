@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri_specta::Event;
 
+use crate::dto::port_forward::PortForward;
 use crate::dto::server::HostKeyPrompt;
 use crate::error::AppError;
 
@@ -9,6 +10,11 @@ use crate::error::AppError;
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct HostKeyPromptRequired {
     pub prompt: HostKeyPrompt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct PortForwardSnapshot {
+    pub forwards: Vec<PortForward>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]

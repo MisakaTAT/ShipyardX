@@ -431,15 +431,12 @@
         "runtime_lock_failed": {
           "message": "ポートフォワードの実行状態を更新できませんでした"
         },
-        "shutdown_failed": {
-          "message": "ポートフォワードの書き込み側を閉じられませんでした"
+        "transfer_failed": {
+          "message": "ポートフォワードのデータ転送に失敗しました"
         },
         "warmup_timeout": {
           "message": "{{host}} への接続がタイムアウトしました",
           "action": "ホストに到達できるか、ファイアウォールやセキュリティグループの設定を確認してください"
-        },
-        "write_failed": {
-          "message": "ポートフォワードのデータを書き込めませんでした"
         }
       },
       "serde": {
@@ -1231,7 +1228,6 @@
       "errorRetry": "再試行",
       "errorRetrying": "再試行中…",
       "errorTitle": "直近のエラー",
-      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "0 を入力するとローカルポートは自動で割り当てられます",
       "noMatch": "「{{query}}」に一致するルールがありません",
       "noTcpPorts": "このコンテナに利用可能な TCP ポートがありません",

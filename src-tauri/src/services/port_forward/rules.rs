@@ -1,10 +1,10 @@
-use std::net::{IpAddr, TcpListener};
+use std::net::IpAddr;
 
 use tauri::State;
 
 use crate::dto::port_forward::{PortForward, PortForwardCreate, PortForwardRule};
 use crate::error::{AppError, AppResult};
-use crate::state::{AppState, PortForwardRuntimeState, lock_mutex};
+use crate::state::{AppState, PortForwardRuntimeState, lock_read, lock_write};
 use crate::utils::id::generate_id;
 
 use super::PORT_FORWARD_BIND_IP;
@@ -13,7 +13,7 @@ use super::metrics::runtime_state_to_port_forward;
 
 pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = state.port_forward_rules.snapshot()?;
-    let runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let runtime = lock_read(&state.port_forwards, "port_forward.runtime_lock_failed")?;
     let idle = PortForwardRuntimeState::default();
 
     Ok(rules
@@ -55,14 +55,10 @@ pub async fn create_port_forward_rule(
     let remote_host = normalize_host(&params.remote_host);
     let bind_addr = resolve_bind_address(params.bind_address.as_deref())?;
 
-    if params.local_port != 0 {
-        if has_local_port_conflict(&state.port_forward_rules.snapshot()?, params.local_port, &bind_addr) {
-            return Err(AppError::conflict("port_forward.local_port_conflict").param("port", params.local_port));
-        }
-
-        let listener = TcpListener::bind((bind_addr.as_str(), params.local_port))
-            .map_err(|e| AppError::conflict("port_forward.local_port_unavailable").with_source(e))?;
-        drop(listener);
+    if params.local_port != 0
+        && has_local_port_conflict(&state.port_forward_rules.snapshot()?, params.local_port, &bind_addr)
+    {
+        return Err(AppError::conflict("port_forward.local_port_conflict").param("port", params.local_port));
     }
 
     let rule = PortForwardRule {
@@ -107,15 +103,15 @@ pub async fn create_port_forward_rule(
 }
 
 pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    super::runtime::update_rule_enabled_and_runtime(id, enabled, &state)
+    super::runtime::update_rule_enabled_and_runtime(id, enabled, &state).await
 }
 
 pub async fn set_port_forwards_enabled(ids: Vec<String>, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    super::runtime::update_rules_enabled_and_runtime(&ids, enabled, &state)
+    super::runtime::update_rules_enabled_and_runtime(&ids, enabled, &state).await
 }
 
 pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
+    if let Some(handle) = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
         && let Some(runtime) = handle.handle
     {
         let _ = runtime.stop_tx.send(true);
@@ -131,7 +127,7 @@ pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppR
 
 pub async fn list_all_port_forwards(state: State<'_, AppState>) -> AppResult<Vec<PortForward>> {
     let rules = state.port_forward_rules.snapshot()?;
-    let runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+    let runtime = lock_read(&state.port_forwards, "port_forward.runtime_lock_failed")?;
     let idle = PortForwardRuntimeState::default();
 
     Ok(rules

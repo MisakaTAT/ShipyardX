@@ -261,7 +261,7 @@ async fn open_direct_channel(config: &ServerConfig) -> AppResult<ChannelStream<r
                     .with_detail(e.to_string())
                     .retryable(true)
             }),
-        DockerEndpoint::Tcp { host, port } => pool::open_direct_tcpip(config, host, port)
+        DockerEndpoint::Tcp { host, port } => pool::open_direct_tcpip(config, &host, port)
             .await?
             .map(|channel| channel.into_stream())
             .map_err(|e| {

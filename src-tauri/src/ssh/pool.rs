@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use log::{debug, warn};
 use russh::{Channel, ChannelMsg, client};
@@ -9,14 +10,16 @@ use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::utils::output::floor_char_boundary;
 
-use super::client::{SshClientHandler, connect, disconnect};
+use super::client::{SshClientHandler, connect};
 
 const MAX_CAPTURE_BYTES: usize = 128 * 1024;
 /// 每台服务器的连接数，单连接会让通道创建互相排队
 const SSH_POOL_SIZE: usize = 3;
+const SSH_POOL_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 struct PooledConnection {
-    handle: Option<client::Handle<SshClientHandler>>,
+    handle: Option<Arc<client::Handle<SshClientHandler>>>,
+    last_used: Instant,
 }
 
 type PoolEntry = Arc<tokio::sync::Mutex<PooledConnection>>;
@@ -24,6 +27,7 @@ type PoolEntry = Arc<tokio::sync::Mutex<PooledConnection>>;
 struct SshPoolState {
     slots: Vec<PoolEntry>,
     next: AtomicUsize,
+    connect_guard: tokio::sync::Mutex<()>,
 }
 
 fn pool() -> &'static Mutex<HashMap<String, Arc<SshPoolState>>> {
@@ -31,10 +35,20 @@ fn pool() -> &'static Mutex<HashMap<String, Arc<SshPoolState>>> {
     POOL.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn pool_key(config: &ServerConfig) -> String {
+#[derive(Clone, Copy)]
+enum PoolPurpose {
+    Control,
+    PortForward,
+}
+
+fn pool_key(config: &ServerConfig, purpose: PoolPurpose) -> String {
     format!(
-        "{}|{}@{}:{}|{}|{}",
+        "{}|{}|{}@{}:{}|{}|{}",
         config.id,
+        match purpose {
+            PoolPurpose::Control => "control",
+            PoolPurpose::PortForward => "port-forward",
+        },
         config.username,
         config.host,
         config.port,
@@ -43,8 +57,8 @@ fn pool_key(config: &ServerConfig) -> String {
     )
 }
 
-fn get_entry(config: &ServerConfig) -> PoolEntry {
-    let key = pool_key(config);
+fn get_entry(config: &ServerConfig, purpose: PoolPurpose) -> (PoolEntry, Arc<SshPoolState>) {
+    let key = pool_key(config, purpose);
     let state = {
         let mut guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         guard
@@ -52,15 +66,21 @@ fn get_entry(config: &ServerConfig) -> PoolEntry {
             .or_insert_with(|| {
                 Arc::new(SshPoolState {
                     slots: (0..SSH_POOL_SIZE)
-                        .map(|_| Arc::new(tokio::sync::Mutex::new(PooledConnection { handle: None })))
+                        .map(|_| {
+                            Arc::new(tokio::sync::Mutex::new(PooledConnection {
+                                handle: None,
+                                last_used: Instant::now(),
+                            }))
+                        })
                         .collect(),
                     next: AtomicUsize::new(0),
+                    connect_guard: tokio::sync::Mutex::new(()),
                 })
             })
             .clone()
     };
     let index = state.next.fetch_add(1, Ordering::Relaxed) % state.slots.len();
-    state.slots[index].clone()
+    (state.slots[index].clone(), state)
 }
 
 pub async fn invalidate_server_id(server_id: &str) {
@@ -77,9 +97,24 @@ pub async fn invalidate_server_id(server_id: &str) {
 
     for state in states {
         for entry in &state.slots {
+            entry.lock().await.handle.take();
+        }
+    }
+}
+
+/// 丢弃池对长期闲置连接的引用；活跃桥仍持有 `Arc`，不会被中途断开。
+pub async fn reap_idle() {
+    let states: Vec<Arc<SshPoolState>> = {
+        let guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard.values().cloned().collect()
+    };
+    let now = Instant::now();
+    for state in states {
+        for entry in &state.slots {
             let mut pooled = entry.lock().await;
-            if let Some(mut handle) = pooled.handle.take() {
-                disconnect(&mut handle).await;
+            if pooled.handle.is_some() && now.duration_since(pooled.last_used) >= SSH_POOL_IDLE_TIMEOUT {
+                debug!(target: "shipyardx_lib::ssh::pool", "reaping idle pooled ssh connection");
+                pooled.handle.take();
             }
         }
     }
@@ -90,63 +125,83 @@ fn missing_pooled_handle_error() -> AppError {
 }
 
 pub async fn warm_up(config: &ServerConfig) -> AppResult<()> {
-    let entry = get_entry(config);
-    let mut pooled = entry.lock().await;
-
-    if pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true) {
-        debug!(target: "shipyardx_lib::ssh::pool", "warming up pooled ssh connection; server_id={}", config.id);
-        pooled.handle = Some(connect(config).await?);
-    }
+    let (entry, state) = get_entry(config, PoolPurpose::PortForward);
+    let _ = pooled_handle(entry, state, config).await?;
     Ok(())
+}
+
+async fn pooled_handle(
+    entry: PoolEntry,
+    state: Arc<SshPoolState>,
+    config: &ServerConfig,
+) -> AppResult<Arc<client::Handle<SshClientHandler>>> {
+    {
+        let mut pooled = entry.lock().await;
+        if let Some(handle) = pooled.handle.as_ref().filter(|handle| !handle.is_closed()) {
+            let handle = Arc::clone(handle);
+            pooled.last_used = Instant::now();
+            return Ok(handle);
+        }
+    }
+
+    // 同一服务/用途只允许一个首连；等待者会复用第一个建好的 handle。
+    let _connect_guard = state.connect_guard.lock().await;
+    for candidate in &state.slots {
+        let mut pooled = candidate.lock().await;
+        if let Some(handle) = pooled.handle.as_ref().filter(|handle| !handle.is_closed()) {
+            let handle = Arc::clone(handle);
+            pooled.last_used = Instant::now();
+            return Ok(handle);
+        }
+    }
+
+    let mut pooled = entry.lock().await;
+    if pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true) {
+        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection; server_id={}", config.id);
+        pooled.handle = Some(Arc::new(connect(config).await?));
+    }
+    pooled.last_used = Instant::now();
+    pooled.handle.clone().ok_or_else(missing_pooled_handle_error)
+}
+
+async fn discard_if_same(entry: &PoolEntry, handle: &Arc<client::Handle<SshClientHandler>>) {
+    let mut pooled = entry.lock().await;
+    if pooled
+        .handle
+        .as_ref()
+        .is_some_and(|current| Arc::ptr_eq(current, handle))
+    {
+        pooled.handle.take();
+    }
 }
 
 pub async fn open_direct_streamlocal(
     config: &ServerConfig,
     path: String,
 ) -> AppResult<Result<Channel<client::Msg>, russh::Error>> {
-    let entry = get_entry(config);
-    let mut pooled = entry.lock().await;
-
-    let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
-    if needs_connect {
-        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for streamlocal; server_id={} path={}", config.id, path);
-        pooled.handle = Some(connect(config).await?);
-    }
-
-    let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
+    let (entry, state) = get_entry(config, PoolPurpose::Control);
+    let handle = pooled_handle(entry.clone(), state, config).await?;
     let result = handle.channel_open_direct_streamlocal(path).await;
     if result.is_err() {
         warn!(target: "shipyardx_lib::ssh::pool", "pooled streamlocal channel open failed; server_id={}", config.id);
-        if let Some(mut handle) = pooled.handle.take() {
-            disconnect(&mut handle).await;
-        }
+        discard_if_same(&entry, &handle).await;
     }
     Ok(result)
 }
 
 pub async fn open_direct_tcpip(
     config: &ServerConfig,
-    host: String,
+    host: &str,
     port: u16,
 ) -> AppResult<Result<Channel<client::Msg>, russh::Error>> {
-    let entry = get_entry(config);
-    let mut pooled = entry.lock().await;
-
-    let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
-    if needs_connect {
-        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for tcpip; server_id={} host={} port={}", config.id, host, port);
-        pooled.handle = Some(connect(config).await?);
-    }
-
-    let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
+    let (entry, state) = get_entry(config, PoolPurpose::PortForward);
+    let handle = pooled_handle(entry.clone(), state, config).await?;
     let result = handle
-        .channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+        .channel_open_direct_tcpip(host.to_string(), port as u32, "127.0.0.1", 0)
         .await;
     if result.is_err() {
         warn!(target: "shipyardx_lib::ssh::pool", "pooled tcpip channel open failed; server_id={}", config.id);
-        if let Some(mut handle) = pooled.handle.take() {
-            disconnect(&mut handle).await;
-        }
+        discard_if_same(&entry, &handle).await;
     }
     Ok(result)
 }
@@ -189,30 +244,17 @@ where
     F: FnMut(&str),
 {
     debug!(target: "shipyardx_lib::ssh::pool", "executing pooled ssh command; server_id={} command_bytes={}", config.id, command.len());
-    let entry = get_entry(config);
-    let mut pooled = entry.lock().await;
-
-    let needs_connect = pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true);
-    if needs_connect {
-        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection for exec; server_id={}", config.id);
-        pooled.handle = Some(connect(config).await?);
-    }
-
-    let channel = {
-        let handle = pooled.handle.as_ref().ok_or_else(missing_pooled_handle_error)?;
-        handle.channel_open_session().await
-    };
+    let (entry, state) = get_entry(config, PoolPurpose::Control);
+    let handle = pooled_handle(entry.clone(), state, config).await?;
+    let channel = handle.channel_open_session().await;
     let channel = match channel {
         Ok(channel) => channel,
         Err(error) => {
             warn!(target: "shipyardx_lib::ssh::pool", "ssh channel open failed for exec; server_id={} error={}", config.id, error);
-            if let Some(mut handle) = pooled.handle.take() {
-                disconnect(&mut handle).await;
-            }
+            discard_if_same(&entry, &handle).await;
             return Err(AppError::internal("ssh.channel_open_failed").with_source(error));
         }
     };
-    drop(pooled);
 
     channel.exec(true, command).await.map_err(|e| {
         warn!(target: "shipyardx_lib::ssh::pool", "ssh exec start failed; server_id={} error={}", config.id, e);

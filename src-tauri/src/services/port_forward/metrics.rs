@@ -5,13 +5,15 @@ use std::time::Instant;
 use log::warn;
 use network_interface::{NetworkInterface, NetworkInterfaceConfig};
 use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
 use tokio::time::MissedTickBehavior;
 
 use crate::config::timeouts::PORT_FORWARD_SPEED_TICK;
+use crate::dto::events::PortForwardSnapshot;
 use crate::dto::port_forward::{LocalAddress, PortForward, PortForwardRule};
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
-use crate::state::{AppState, PortForwardRuntimeState, lock_mutex};
+use crate::state::{AppState, PortForwardRuntimeState, lock_write};
 
 const SPEED_EMA_ALPHA: f64 = 0.4;
 const SPEED_FLOOR_BPS: f64 = 1.0;
@@ -92,12 +94,27 @@ pub fn spawn_speed_sampler(app_handle: AppHandle) {
             ticker.tick().await;
             let now = Instant::now();
             let app_state = app_handle.state::<AppState>();
-            let Ok(mut runtime) = lock_mutex(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
-                continue;
+            let forwards = {
+                let Ok(mut runtime) = lock_write(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
+                    continue;
+                };
+                for entry in runtime.values_mut() {
+                    sample_runtime_speeds(entry, now);
+                }
+                let rules = match app_state.port_forward_rules.snapshot() {
+                    Ok(rules) => rules,
+                    Err(_) => continue,
+                };
+                let idle = PortForwardRuntimeState::default();
+                rules
+                    .iter()
+                    .map(|rule| runtime_state_to_port_forward(rule, runtime.get(&rule.id).unwrap_or(&idle)))
+                    .collect()
             };
-            for entry in runtime.values_mut() {
-                sample_runtime_speeds(entry, now);
+            if let Err(error) = (PortForwardSnapshot { forwards }).emit(&app_handle) {
+                warn!(target: "shipyardx_lib::services::port_forward", "unable to emit port forward snapshot: {error}");
             }
+            crate::ssh::pool::reap_idle().await;
         }
     });
 
@@ -171,6 +188,7 @@ mod tests {
         let state = PortForwardRuntimeState {
             handle: Some(PortForwardRuntimeHandle {
                 stop_tx,
+                join: None,
                 server_id: "s1".into(),
                 local_port: 8080,
                 tx_bytes: Arc::clone(&tx_bytes),

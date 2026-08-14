@@ -43,12 +43,13 @@ pub struct AppState {
     pub(crate) terminal_ws_clients: RwLock<HashMap<String, tokio_mpsc::UnboundedSender<Vec<u8>>>>,
     pub(crate) terminal_handshakes: RwLock<HashMap<String, TerminalHandshakeState>>,
     pub(crate) event_streams: RwLock<HashMap<String, EventStreamHandle>>,
-    pub(crate) port_forwards: Mutex<HashMap<String, PortForwardRuntimeState>>,
+    pub(crate) port_forwards: RwLock<HashMap<String, PortForwardRuntimeState>>,
     pub(crate) port_forward_rules: super::PortForwardRuleStore,
 }
 
 pub(crate) struct PortForwardRuntimeHandle {
     pub(crate) stop_tx: watch::Sender<bool>,
+    pub(crate) join: Option<tokio::task::JoinHandle<()>>,
     pub(crate) server_id: String,
     pub(crate) local_port: u16,
     pub(crate) tx_bytes: Arc<AtomicU64>,
@@ -64,6 +65,7 @@ pub(crate) struct PortForwardRuntimeState {
     pub(crate) last_rx_bytes: u64,
     pub(crate) tx_speed_bps: f64,
     pub(crate) rx_speed_bps: f64,
+    pub(crate) warmup_retrying: bool,
 }
 
 impl Default for PortForwardRuntimeState {
@@ -76,6 +78,7 @@ impl Default for PortForwardRuntimeState {
             last_rx_bytes: 0,
             tx_speed_bps: 0.0,
             rx_speed_bps: 0.0,
+            warmup_retrying: false,
         }
     }
 }

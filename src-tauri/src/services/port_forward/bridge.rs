@@ -4,36 +4,80 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use log::error;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio::net::TcpStream as TokioTcpStream;
+use tokio::sync::Semaphore;
 use tokio::sync::watch;
+use tokio::task::JoinSet;
 
 use crate::config::timeouts::PORT_FORWARD_ACCEPT_RETRY_DELAY;
 use crate::dto::port_forward::PortForwardError;
 use crate::dto::server::ServerConfig;
-use crate::error::{AppError, AppResult};
+use crate::error::AppError;
 use crate::ssh::pool;
 
 pub(super) struct PortForwardBridgeArgs {
     pub(super) local_stream: TcpStream,
-    pub(super) server_cfg: ServerConfig,
-    pub(super) remote_host: String,
+    pub(super) server_cfg: Arc<ServerConfig>,
+    pub(super) remote_host: Arc<str>,
     pub(super) remote_port: u16,
     pub(super) last_error: Arc<Mutex<Option<PortForwardError>>>,
     pub(super) tx_bytes: Arc<AtomicU64>,
     pub(super) rx_bytes: Arc<AtomicU64>,
+    pub(super) stop_rx: watch::Receiver<bool>,
 }
 
 pub(super) struct PortForwardAcceptArgs {
     pub(super) listener: TcpListener,
-    pub(super) server_cfg: ServerConfig,
-    pub(super) remote_host: String,
+    pub(super) server_cfg: Arc<ServerConfig>,
+    pub(super) remote_host: Arc<str>,
     pub(super) remote_port: u16,
     pub(super) stop_rx: watch::Receiver<bool>,
     pub(super) last_error: Arc<Mutex<Option<PortForwardError>>>,
     pub(super) tx_bytes: Arc<AtomicU64>,
     pub(super) rx_bytes: Arc<AtomicU64>,
+}
+
+struct CountingStream<T> {
+    inner: T,
+    read_counter: Arc<AtomicU64>,
+    write_counter: Arc<AtomicU64>,
+}
+
+impl<T: AsyncRead + Unpin> AsyncRead for CountingStream<T> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let before = buf.filled().len();
+        match Pin::new(&mut self.inner).poll_read(cx, buf) {
+            Poll::Ready(Ok(())) => {
+                self.read_counter
+                    .fetch_add((buf.filled().len() - before) as u64, Ordering::Relaxed);
+                Poll::Ready(Ok(()))
+            }
+            result => result,
+        }
+    }
+}
+
+impl<T: AsyncWrite + Unpin> AsyncWrite for CountingStream<T> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        match Pin::new(&mut self.inner).poll_write(cx, buf) {
+            Poll::Ready(Ok(written)) => {
+                self.write_counter.fetch_add(written as u64, Ordering::Relaxed);
+                Poll::Ready(Ok(written))
+            }
+            result => result,
+        }
+    }
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
 }
 
 pub(super) fn error_message(error: &AppError) -> String {
@@ -61,14 +105,15 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
         last_error,
         tx_bytes,
         rx_bytes,
+        mut stop_rx,
     } = args;
 
     let _ = local_stream.set_nodelay(true);
     let log_server_id = server_cfg.id.clone();
-    let log_remote_host = remote_host.clone();
+    let log_remote_host = remote_host.to_string();
 
-    let result = async move {
-        let channel = pool::open_direct_tcpip(&server_cfg, remote_host.clone(), remote_port)
+    let transfer = async move {
+        let channel = pool::open_direct_tcpip(&server_cfg, remote_host.as_ref(), remote_port)
             .await?
             .map_err(|e| AppError::unavailable("port_forward.remote_unreachable").with_source(e))?;
 
@@ -79,20 +124,24 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
             .map_err(|e| AppError::internal("port_forward.local_socket_takeover_failed").with_source(e))?;
         let remote_stream = channel.into_stream();
 
-        let (local_read, local_write) = tokio::io::split(local_stream);
-        let (remote_read, remote_write) = tokio::io::split(remote_stream);
-
-        tokio::select! {
-            res = async {
-                tokio::try_join!(
-                    transfer_stream(local_read, remote_write, tx_bytes.clone()),
-                    transfer_stream(remote_read, local_write, rx_bytes.clone())
-                )?;
-                Ok::<(), AppError>(())
-            } => res
+        let mut local_stream = CountingStream {
+            inner: local_stream,
+            read_counter: tx_bytes,
+            write_counter: rx_bytes,
+        };
+        let mut remote_stream = remote_stream;
+        tokio::io::copy_bidirectional(&mut local_stream, &mut remote_stream)
+            .await
+            .map(|_| ())
+            .map_err(|e| AppError::internal("port_forward.transfer_failed").with_source(e))
+    };
+    let result = tokio::select! {
+        result = transfer => result,
+        changed = stop_rx.changed() => {
+            let _ = changed;
+            Ok(())
         }
-    }
-    .await;
+    };
 
     let failure = match result {
         Ok(()) => None,
@@ -114,32 +163,6 @@ pub(super) async fn bridge_once(args: PortForwardBridgeArgs) {
     }
 }
 
-async fn transfer_stream<R, W>(mut reader: R, mut writer: W, counter: Arc<AtomicU64>) -> AppResult<()>
-where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
-{
-    let mut buf = [0u8; 16 * 1024];
-    loop {
-        let n = reader
-            .read(&mut buf)
-            .await
-            .map_err(|e| AppError::internal("port_forward.read_failed").with_source(e))?;
-        if n == 0 {
-            writer
-                .shutdown()
-                .await
-                .map_err(|e| AppError::internal("port_forward.shutdown_failed").with_source(e))?;
-            return Ok(());
-        }
-        writer
-            .write_all(&buf[..n])
-            .await
-            .map_err(|e| AppError::internal("port_forward.write_failed").with_source(e))?;
-        counter.fetch_add(n as u64, Ordering::Relaxed);
-    }
-}
-
 pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
     let PortForwardAcceptArgs {
         listener,
@@ -158,8 +181,12 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
         Err(_) => return,
     };
 
+    const MAX_ACTIVE_BRIDGES: usize = 64;
+    let permits = Arc::new(Semaphore::new(MAX_ACTIVE_BRIDGES));
+    let mut bridges = JoinSet::new();
     loop {
         tokio::select! {
+            Some(_) = bridges.join_next(), if !bridges.is_empty() => {}
             changed = stop_rx.changed() => {
                 if changed.is_ok() && *stop_rx.borrow() {
                     break;
@@ -177,7 +204,12 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
                     let tx = tx_bytes.clone();
                     let rx = rx_bytes.clone();
                     let rp = remote_port;
-                    tokio::spawn(async move {
+                    let stop_rx = stop_rx.clone();
+                    let permits = Arc::clone(&permits);
+                    bridges.spawn(async move {
+                        let Ok(_permit) = permits.acquire_owned().await else {
+                            return;
+                        };
                         bridge_once(PortForwardBridgeArgs {
                             local_stream: stream,
                             server_cfg: cfg,
@@ -186,6 +218,7 @@ pub(super) async fn accept_loop(args: PortForwardAcceptArgs) {
                             last_error: le,
                             tx_bytes: tx,
                             rx_bytes: rx,
+                            stop_rx,
                         })
                         .await;
                     });

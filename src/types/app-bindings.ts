@@ -103,6 +103,7 @@ export const events = {
 	imagePullDone: makeEvent<ImagePullDone>("image-pull-done"),
 	imagePullProgress: makeEvent<ImagePullProgress>("image-pull-progress"),
 	installStepEvent: makeEvent<InstallStepEvent>("install-step-event"),
+	portForwardSnapshot: makeEvent<PortForwardSnapshot>("port-forward-snapshot"),
 };
 
 /* Types */
@@ -556,7 +557,6 @@ export type PortForward = {
 	local_port: number,
 	bind_address: string,
 	running: boolean,
-	/**  EMA 平滑后的速率，单位为字节/秒；格式化和 i18n 归前端 */
 	tx_speed_bps: number | null,
 	rx_speed_bps: number | null,
 	last_error: PortForwardError | null,
@@ -574,14 +574,13 @@ export type PortForwardCreate = {
 	enabled: boolean,
 };
 
-/**
- *  端口转发的最近一次错误。保留完整 AppError 而不是拍平成字符串，
- *  前端才能走 resolveAppError 拿到 i18n 文案、action 提示和 params 插值。
- */
 export type PortForwardError = {
 	error: AppError,
-	/**  发生时间（Unix 毫秒），用于判断这条错误是否还新鲜 */
 	at_ms: number,
+};
+
+export type PortForwardSnapshot = {
+	forwards: PortForward[],
 };
 
 export type RunContainer = {
@@ -668,3 +667,4 @@ function makeEvent<T>(name: string, serialize?: (payload: T) => unknown, deseria
 
     return Object.assign(fn, base);
 }
+

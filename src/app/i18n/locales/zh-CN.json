@@ -431,15 +431,12 @@
         "runtime_lock_failed": {
           "message": "更新端口转发运行时状态失败"
         },
-        "shutdown_failed": {
-          "message": "关闭端口转发写入端失败"
+        "transfer_failed": {
+          "message": "转发数据失败"
         },
         "warmup_timeout": {
           "message": "连接 {{host}} 超时",
           "action": "请检查目标主机是否可达，以及安全组或防火墙设置"
-        },
-        "write_failed": {
-          "message": "写入端口转发数据失败"
         }
       },
       "serde": {
@@ -1231,7 +1228,6 @@
       "errorRetry": "重试",
       "errorRetrying": "正在重试…",
       "errorTitle": "最近一次错误",
-      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "填 0 时由系统随机分配本地端口",
       "noMatch": "没有匹配「{{query}}」的规则",
       "noTcpPorts": "该容器没有可用 TCP 端口",

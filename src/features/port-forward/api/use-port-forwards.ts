@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { commands } from '@/types/app-bindings'
+import { commands, events } from '@/types/app-bindings'
 import i18n from '@/app/i18n'
 import { qk } from '@/shared/api/query-keys'
 import { toast } from '@/shared/components/toast'
@@ -33,6 +33,7 @@ export function useLocalAddresses(enabled = true) {
       { ip: '0.0.0.0', name: i18n.t('backend.port_forward.all_interfaces') },
       { ip: '127.0.0.1', name: '127.0.0.1 (localhost)' },
     ],
+    staleTime: 30_000,
   })
 }
 
@@ -46,24 +47,23 @@ export function useCreatePortForwardRule() {
   })
 }
 
-const POLL_INTERVAL_MS = 3000
-
 export function usePortForwardPolling(enabled: boolean) {
   const qc = useQueryClient()
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
 
   useEffect(() => {
-    const refresh = () => {
+    const unlistenPromise = events.portForwardSnapshot.listen(({ payload }) => {
       if (!enabledRef.current || document.hidden) return
-      void qc.invalidateQueries({ queryKey: qk.portForwards() })
+      qc.setQueryData(qk.portForwards(), payload.forwards)
+    })
+    const refresh = () => {
+      if (enabledRef.current && !document.hidden) void qc.invalidateQueries({ queryKey: qk.portForwards() })
     }
-
-    const timer = window.setInterval(refresh, POLL_INTERVAL_MS)
     document.addEventListener('visibilitychange', refresh)
     return () => {
-      window.clearInterval(timer)
       document.removeEventListener('visibilitychange', refresh)
+      void unlistenPromise.then((unlisten) => unlisten())
     }
   }, [qc])
 }

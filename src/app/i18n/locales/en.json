@@ -431,15 +431,12 @@
         "runtime_lock_failed": {
           "message": "Couldn't update the port forwarding runtime state"
         },
-        "shutdown_failed": {
-          "message": "Couldn't close the port forwarding writer"
+        "transfer_failed": {
+          "message": "Couldn't transfer port forwarding data"
         },
         "warmup_timeout": {
           "message": "Timed out connecting to {{host}}",
           "action": "Check that the host is reachable and review firewall or security group rules"
-        },
-        "write_failed": {
-          "message": "Couldn't write port forwarding data"
         }
       },
       "serde": {
@@ -1231,7 +1228,6 @@
       "errorRetry": "Retry",
       "errorRetrying": "Retrying…",
       "errorTitle": "Last error",
-      "groupRunning": "{{running}}/{{total}}",
       "localPortHint": "Enter 0 to let the system pick a local port",
       "noMatch": "No rules match “{{query}}”",
       "noTcpPorts": "This container has no TCP ports",

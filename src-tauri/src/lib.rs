@@ -19,7 +19,7 @@ use config::store::{get_data_file, load_servers};
 use dto::events::{
     AppstoreSyncProgress, DockerStreamError, DockerStreamPayload, DockerStreamRefresh, DockerStreamStatus,
     EventStreamStatus, HostKeyPromptRequired, ImageExportProgress, ImageImportProgress, ImagePullDone,
-    ImagePullLayerProgress, ImagePullProgress, InstallStepEvent,
+    ImagePullLayerProgress, ImagePullProgress, InstallStepEvent, PortForwardSnapshot,
 };
 use log::{error, info, warn};
 #[cfg(debug_assertions)]
@@ -123,6 +123,7 @@ pub fn run() {
             InstallStepEvent,
             AppstoreSyncProgress,
             HostKeyPromptRequired,
+            PortForwardSnapshot,
         ])
         .typ::<EventStreamStatus>()
         .typ::<ImagePullLayerProgress>()
@@ -199,7 +200,7 @@ pub fn run() {
                 terminal_ws_clients: RwLock::new(HashMap::new()),
                 terminal_handshakes: RwLock::new(HashMap::new()),
                 event_streams: RwLock::new(HashMap::new()),
-                port_forwards: Mutex::new(HashMap::new()),
+                port_forwards: RwLock::new(HashMap::new()),
                 port_forward_rules,
             });
             services::port_forward::spawn_speed_sampler(app.handle().clone());

@@ -7,19 +7,31 @@ use log::{error, info, warn};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::watch;
 
-use crate::config::timeouts::PORT_FORWARD_WARMUP_TIMEOUT;
+use crate::config::timeouts::{DOCKER_EVENT_RECONNECT_DELAYS_SECS, PORT_FORWARD_WARMUP_TIMEOUT};
 use crate::dto::port_forward::{PortForwardError, PortForwardRule};
 use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::ssh::client::spawn_on_runtime;
 use crate::ssh::pool;
-use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_mutex};
+use crate::state::{AppState, PortForwardRuntimeHandle, PortForwardRuntimeState, get_server_config, lock_write};
 
 use super::bridge::{PortForwardAcceptArgs, accept_loop, error_message};
 
 const LOG_TARGET: &str = "shipyardx_lib::services::port_forward";
 
 type RuntimeMap = HashMap<String, PortForwardRuntimeState>;
+
+async fn stop_runtime_handle(mut handle: PortForwardRuntimeHandle) {
+    let _ = handle.stop_tx.send(true);
+    if let Some(mut join) = handle.join.take()
+        && tokio::time::timeout(std::time::Duration::from_secs(2), &mut join)
+            .await
+            .is_err()
+    {
+        join.abort();
+        let _ = join.await;
+    }
+}
 
 #[derive(Clone, Copy)]
 enum StaleScope<'a> {
@@ -28,11 +40,15 @@ enum StaleScope<'a> {
     All,
 }
 
-pub(super) fn update_rule_enabled_and_runtime(id: String, enabled: bool, state: &State<'_, AppState>) -> AppResult<()> {
-    update_rules_enabled_and_runtime(std::slice::from_ref(&id), enabled, state)
+pub(super) async fn update_rule_enabled_and_runtime(
+    id: String,
+    enabled: bool,
+    state: &State<'_, AppState>,
+) -> AppResult<()> {
+    update_rules_enabled_and_runtime(std::slice::from_ref(&id), enabled, state).await
 }
 
-pub(super) fn update_rules_enabled_and_runtime(
+pub(super) async fn update_rules_enabled_and_runtime(
     ids: &[String],
     enabled: bool,
     state: &State<'_, AppState>,
@@ -56,11 +72,14 @@ pub(super) fn update_rules_enabled_and_runtime(
     }
 
     if !enabled {
-        let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
-        for id in ids {
-            if let Some(handle) = runtime.remove(id).and_then(|entry| entry.handle) {
-                let _ = handle.stop_tx.send(true);
-            }
+        let handles: Vec<_> = {
+            let mut runtime = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+            ids.iter()
+                .filter_map(|id| runtime.remove(id).and_then(|entry| entry.handle))
+                .collect()
+        };
+        for handle in handles {
+            stop_runtime_handle(handle).await;
         }
     }
 
@@ -93,10 +112,10 @@ fn start_port_forward_runtime(
     let tx_bytes = Arc::new(AtomicU64::new(0));
     let rx_bytes = Arc::new(AtomicU64::new(0));
 
-    spawn_on_runtime(accept_loop(PortForwardAcceptArgs {
+    let join = spawn_on_runtime(accept_loop(PortForwardAcceptArgs {
         listener,
-        server_cfg: server_cfg.clone(),
-        remote_host: rule.remote_host.clone(),
+        server_cfg: Arc::new(server_cfg.clone()),
+        remote_host: Arc::from(rule.remote_host.as_str()),
         remote_port: rule.remote_port,
         stop_rx,
         last_error: Arc::clone(&last_error),
@@ -109,6 +128,7 @@ fn start_port_forward_runtime(
         PortForwardRuntimeState {
             handle: Some(PortForwardRuntimeHandle {
                 stop_tx,
+                join: Some(join),
                 server_id: rule.server_id.clone(),
                 local_port: actual_local_port,
                 tx_bytes,
@@ -145,7 +165,7 @@ fn collect_server_configs(
     configs
 }
 
-fn start_rules(
+async fn start_rules(
     state: &State<'_, AppState>,
     enabled_rules: &[PortForwardRule],
     scope: StaleScope<'_>,
@@ -153,25 +173,31 @@ fn start_rules(
 ) -> AppResult<HashMap<String, Vec<String>>> {
     let keep: HashSet<&str> = enabled_rules.iter().map(|rule| rule.id.as_str()).collect();
     let mut started_by_server: HashMap<String, Vec<String>> = HashMap::new();
-    let mut runtime = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?;
-
-    let stale: Vec<String> = runtime
-        .iter()
-        .filter(|(id, entry)| {
-            !keep.contains(id.as_str())
-                && match scope {
-                    StaleScope::Keep => false,
-                    StaleScope::Server(scope) => entry.handle.as_ref().is_some_and(|handle| handle.server_id == scope),
-                    StaleScope::All => true,
-                }
-        })
-        .map(|(id, _)| id.clone())
-        .collect();
-    for id in stale {
-        if let Some(handle) = runtime.remove(&id).and_then(|entry| entry.handle) {
-            let _ = handle.stop_tx.send(true);
-        }
+    let stale_handles = {
+        let mut runtime = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?;
+        let stale: Vec<String> = runtime
+            .iter()
+            .filter(|(id, entry)| {
+                !keep.contains(id.as_str())
+                    && match scope {
+                        StaleScope::Keep => false,
+                        StaleScope::Server(scope) => {
+                            entry.handle.as_ref().is_some_and(|handle| handle.server_id == scope)
+                        }
+                        StaleScope::All => true,
+                    }
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        stale
+            .into_iter()
+            .filter_map(|id| runtime.remove(&id).and_then(|entry| entry.handle))
+            .collect::<Vec<_>>()
+    };
+    for handle in stale_handles {
+        stop_runtime_handle(handle).await;
     }
+    let mut runtime = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?;
 
     for rule in enabled_rules {
         let outcome = match configs.get(&rule.server_id) {
@@ -208,38 +234,70 @@ fn start_rules(
 }
 
 fn spawn_server_warmup(app_handle: AppHandle, server_cfg: ServerConfig, rule_ids: Vec<String>) {
-    let spawned = spawn_on_runtime(async move {
-        let server_id = server_cfg.id.clone();
-        let failure = match tokio::time::timeout(PORT_FORWARD_WARMUP_TIMEOUT, pool::warm_up(&server_cfg)).await {
-            Ok(Ok(())) => None,
-            Ok(Err(error)) => Some(error),
-            Err(_) => Some(
-                AppError::timeout("port_forward.warmup_timeout")
-                    .param("host", &server_cfg.host)
-                    .retryable(true),
-            ),
-        };
-
-        if let Some(error) = failure.as_ref() {
-            warn!(
-                target: LOG_TARGET,
-                "port forward warmup failed; server_id={} rule_count={} code={} detail={}",
-                server_id,
-                rule_ids.len(),
-                error.code,
-                error_message(error)
-            );
-        }
-        let failure = failure.map(PortForwardError::now);
-
+    {
         let app_state = app_handle.state::<AppState>();
-        let Ok(mut runtime) = lock_mutex(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
+        let Ok(mut runtime) = lock_write(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
             return;
         };
+        let mut started = false;
         for id in &rule_ids {
-            if let Some(entry) = runtime.get_mut(id) {
-                entry.last_error = failure.clone();
+            if let Some(entry) = runtime.get_mut(id)
+                && entry.handle.is_some()
+                && !entry.warmup_retrying
+            {
+                entry.warmup_retrying = true;
+                started = true;
             }
+        }
+        if !started {
+            return;
+        }
+    }
+
+    let spawned = spawn_on_runtime(async move {
+        let server_id = server_cfg.id.clone();
+        let mut attempt = 0usize;
+        loop {
+            let failure = match tokio::time::timeout(PORT_FORWARD_WARMUP_TIMEOUT, pool::warm_up(&server_cfg)).await {
+                Ok(Ok(())) => None,
+                Ok(Err(error)) => Some(error),
+                Err(_) => Some(
+                    AppError::timeout("port_forward.warmup_timeout")
+                        .param("host", &server_cfg.host)
+                        .retryable(true),
+                ),
+            };
+
+            let active = {
+                let app_state = app_handle.state::<AppState>();
+                let Ok(mut runtime) = lock_write(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
+                    return;
+                };
+                let active = rule_ids
+                    .iter()
+                    .any(|id| runtime.get(id).is_some_and(|entry| entry.handle.is_some()));
+                for id in &rule_ids {
+                    if let Some(entry) = runtime.get_mut(id) {
+                        entry.last_error = failure.clone().map(PortForwardError::now);
+                        entry.warmup_retrying = failure.is_some() && active;
+                    }
+                }
+                active
+            };
+
+            if failure.is_none() || !active {
+                return;
+            }
+
+            let delay = DOCKER_EVENT_RECONNECT_DELAYS_SECS[attempt.min(DOCKER_EVENT_RECONNECT_DELAYS_SECS.len() - 1)];
+            warn!(
+                target: LOG_TARGET,
+                "port forward warmup failed; retrying; server_id={} rule_count={} attempt={} delay_secs={} code={} detail={}",
+                server_id, rule_ids.len(), attempt + 1, delay, failure.as_ref().map(|error| error.code.as_str()).unwrap_or_default(),
+                failure.as_ref().map(error_message).unwrap_or_default()
+            );
+            attempt = attempt.saturating_add(1);
+            tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
         }
     });
 
@@ -275,7 +333,7 @@ pub async fn start_all_enabled(server_id: String, app_handle: AppHandle, state: 
         .collect();
 
     let configs = collect_server_configs(&state, &enabled_rules);
-    let started = start_rules(&state, &enabled_rules, StaleScope::Server(&server_id), &configs)?;
+    let started = start_rules(&state, &enabled_rules, StaleScope::Server(&server_id), &configs).await?;
     spawn_warmups(&app_handle, started, &configs);
     Ok(())
 }
@@ -289,16 +347,16 @@ pub async fn start_port_forward(id: String, app_handle: AppHandle, state: State<
         .cloned()
         .ok_or_else(|| AppError::not_found("port_forward.not_found"))?;
 
-    if let Some(handle) = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+    let handle = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?
         .remove(&id)
-        .and_then(|entry| entry.handle)
-    {
-        let _ = handle.stop_tx.send(true);
+        .and_then(|entry| entry.handle);
+    if let Some(handle) = handle {
+        stop_runtime_handle(handle).await;
     }
 
     let rules = [rule];
     let configs = collect_server_configs(&state, &rules);
-    let started = start_rules(&state, &rules, StaleScope::Keep, &configs)?;
+    let started = start_rules(&state, &rules, StaleScope::Keep, &configs).await?;
     spawn_warmups(&app_handle, started, &configs);
     Ok(())
 }
@@ -313,7 +371,7 @@ pub async fn start_all_enabled_global(app_handle: AppHandle, state: State<'_, Ap
         .collect();
 
     let configs = collect_server_configs(&state, &enabled_rules);
-    let started = start_rules(&state, &enabled_rules, StaleScope::All, &configs)?;
+    let started = start_rules(&state, &enabled_rules, StaleScope::All, &configs).await?;
     info!(
         target: LOG_TARGET,
         "started all enabled port forwards; rule_count={} server_count={}",
@@ -325,31 +383,33 @@ pub async fn start_all_enabled_global(app_handle: AppHandle, state: State<'_, Ap
 }
 
 pub async fn stop_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    let handle = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+    let handle = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?
         .remove(&id)
         .ok_or_else(|| AppError::not_found("port_forward.not_found"))?;
 
     if let Some(runtime) = handle.handle {
-        let _ = runtime.stop_tx.send(true);
+        let server_id = runtime.server_id.clone();
+        let local_port = runtime.local_port;
+        stop_runtime_handle(runtime).await;
         info!(
             target: LOG_TARGET,
             "port forward runtime stopped; rule_id={} server_id={} local_port={}",
             id,
-            runtime.server_id,
-            runtime.local_port
+            server_id,
+            local_port
         );
     }
     Ok(())
 }
 
 pub async fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
-    let handles: Vec<_> = lock_mutex(&state.port_forwards, "port_forward.runtime_lock_failed")?
+    let handles: Vec<_> = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?
         .drain()
         .collect();
     let total = handles.len();
     for (_id, handle) in handles {
         if let Some(runtime) = handle.handle {
-            let _ = runtime.stop_tx.send(true);
+            stop_runtime_handle(runtime).await;
         }
     }
     info!(
