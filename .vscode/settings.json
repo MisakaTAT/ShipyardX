@@ -4,5 +4,6 @@
         "src/app/i18n/locales"
     ],
     "i18n-ally.sourceLanguage": "zh-CN",
-    "tailwindCSS.lint.suggestCanonicalClasses": "ignore"
+    "tailwindCSS.lint.suggestCanonicalClasses": "ignore",
+    "i18n-ally.keystyle": "nested"
 }
