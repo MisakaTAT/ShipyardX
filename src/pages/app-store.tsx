@@ -110,12 +110,9 @@ export default function AppStorePage() {
     <div className={`flex h-full flex-col ${!isEmpty ? 'gap-3' : ''}`}>
       {!isEmpty && (
         <div className="shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex h-8 items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold text-foreground">{t('ui.appStore.title')}</h1>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {t('ui.appStore.subtitle', { count: apps.length })}
-              </p>
             </div>
             <div className="flex items-center gap-2">
               <CommandPaletteButton />

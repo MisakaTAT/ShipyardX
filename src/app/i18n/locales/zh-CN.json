@@ -834,7 +834,6 @@
       "objectCount": "{{received}} / {{total}} 个对象",
       "openSettings": "打开应用商店设置",
       "selectSource": "选择应用源",
-      "subtitle": "浏览和安装商店中的应用，一键部署到远程服务器，共 {{count}} 个应用。",
       "sync": "同步",
       "syncing": "同步中",
       "syncingTitle": "正在同步应用商店",
@@ -896,7 +895,6 @@
       "emptyBody": "立即配置连接，便捷管理 Docker 容器与镜像，并使用集成终端。连接凭据仅保存在本机，不会上传至其他服务。",
       "emptyTitle": "尚未配置远程服务器",
       "noMatch": "没有找到匹配的服务器",
-      "subtitle": "管理远程服务器连接，选择一个服务器进入工作区。",
       "title": "服务器"
     },
     "containers": {
@@ -1029,7 +1027,6 @@
       "portLabel": "端口",
       "probeAll": "检测全部",
       "recheck": "重新检测",
-      "subtitle": "管理已信任的 SSH 主机密钥，指纹变化时会中断连接并要求重新确认。",
       "title": "主机指纹",
       "trusted": "已信任 {{host}}:{{port}} 的指纹",
       "trustInstead": "改为信任"
@@ -1243,7 +1240,6 @@
       "statusPending": "待启动",
       "stop": "停止",
       "stoppedAll": "已停止所有转发",
-      "summary": "{{hosts}} 台主机 · {{running}}/{{total}} 条监听中",
       "title": "端口转发"
     },
     "run": {

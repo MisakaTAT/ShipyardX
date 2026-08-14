@@ -137,16 +137,9 @@ export default function PortForwardPage() {
       <div className="flex-1 overflow-auto p-3">
         <div className="flex flex-col gap-3">
           <div className="shrink-0">
-            <div className="flex items-center justify-between">
+            <div className="flex h-8 items-center justify-between">
               <div>
                 <h1 className="text-lg font-semibold text-foreground">{t('ui.portForward.title')}</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t('ui.portForward.summary', {
-                    hosts: groups.length,
-                    running: runningCount,
-                    total: rules.length,
-                  })}
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 <CommandPaletteButton />

@@ -834,7 +834,6 @@
       "objectCount": "{{received}} / {{total}} オブジェクト",
       "openSettings": "アプリストアの設定を開く",
       "selectSource": "ソースを選択",
-      "subtitle": "アプリを閲覧・インストールし、リモートサーバーへワンステップで配置できます。全 {{count}} 件。",
       "sync": "同期",
       "syncing": "同期中",
       "syncingTitle": "アプリストアを同期しています",
@@ -896,7 +895,6 @@
       "emptyBody": "接続を追加すると、Docker のコンテナやイメージを管理し、内蔵ターミナルを利用できます。認証情報はこの端末にのみ保存され、外部には送信されません。",
       "emptyTitle": "サーバーが未設定です",
       "noMatch": "一致するサーバーがありません",
-      "subtitle": "リモートサーバーの接続を管理します。選択するとワークスペースが開きます。",
       "title": "サーバー"
     },
     "containers": {
@@ -1029,7 +1027,6 @@
       "portLabel": "ポート",
       "probeAll": "すべて確認",
       "recheck": "再確認",
-      "subtitle": "信頼済みの SSH ホスト鍵を管理します。フィンガープリントが変わると接続を中断し、再確認を求めます。",
       "title": "ホストフィンガープリント",
       "trusted": "{{host}}:{{port}} のフィンガープリントを信頼しました",
       "trustInstead": "こちらを信頼"
@@ -1243,7 +1240,6 @@
       "statusPending": "未起動",
       "stop": "停止",
       "stoppedAll": "すべての転送を停止しました",
-      "summary": "ホスト {{hosts}} 台 · {{running}}/{{total}} 待ち受け中",
       "title": "ポート転送"
     },
     "run": {

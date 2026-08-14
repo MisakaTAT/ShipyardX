@@ -51,10 +51,9 @@ export default function Connections({ onConnect }: ConnectionsProps) {
         <div className={`flex h-full flex-col ${servers.length > 0 ? 'gap-3' : ''}`}>
           {servers.length > 0 ? (
             <div className="shrink-0">
-              <div className="flex items-center justify-between">
+              <div className="flex h-8 items-center justify-between">
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">{t('ui.connections.title')}</h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{t('ui.connections.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <CommandPaletteButton />
