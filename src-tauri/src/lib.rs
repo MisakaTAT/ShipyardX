@@ -204,6 +204,7 @@ pub fn run() {
                 port_forward_rules,
             });
             services::port_forward::spawn_speed_sampler(app.handle().clone());
+            ssh::pool::spawn_idle_reaper();
             Ok(())
         })
         .run(tauri::generate_context!())

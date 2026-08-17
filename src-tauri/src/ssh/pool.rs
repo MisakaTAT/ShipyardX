@@ -10,12 +10,14 @@ use crate::dto::server::ServerConfig;
 use crate::error::{AppError, AppResult};
 use crate::utils::output::floor_char_boundary;
 
-use super::client::{SshClientHandler, connect};
+use tokio::time::MissedTickBehavior;
+
+use super::client::{SshClientHandler, connect, spawn_on_runtime};
 
 const MAX_CAPTURE_BYTES: usize = 128 * 1024;
-/// 每台服务器的连接数，单连接会让通道创建互相排队
 const SSH_POOL_SIZE: usize = 3;
 const SSH_POOL_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+const SSH_POOL_REAP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 struct PooledConnection {
     handle: Option<Arc<client::Handle<SshClientHandler>>>,
@@ -103,7 +105,7 @@ pub async fn invalidate_server_id(server_id: &str) {
 }
 
 /// 丢弃池对长期闲置连接的引用；活跃桥仍持有 `Arc`，不会被中途断开。
-pub async fn reap_idle() {
+fn reap_idle() {
     let states: Vec<Arc<SshPoolState>> = {
         let guard = pool().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         guard.values().cloned().collect()
@@ -111,12 +113,29 @@ pub async fn reap_idle() {
     let now = Instant::now();
     for state in states {
         for entry in &state.slots {
-            let mut pooled = entry.lock().await;
+            let Ok(mut pooled) = entry.try_lock() else {
+                continue;
+            };
             if pooled.handle.is_some() && now.duration_since(pooled.last_used) >= SSH_POOL_IDLE_TIMEOUT {
                 debug!(target: "shipyardx_lib::ssh::pool", "reaping idle pooled ssh connection");
                 pooled.handle.take();
             }
         }
+    }
+}
+
+pub fn spawn_idle_reaper() {
+    let spawned = spawn_on_runtime(async {
+        let mut ticker = tokio::time::interval(SSH_POOL_REAP_INTERVAL);
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        loop {
+            ticker.tick().await;
+            reap_idle();
+        }
+    });
+
+    if let Err(error) = spawned {
+        warn!(target: "shipyardx_lib::ssh::pool", "unable to spawn ssh pool idle reaper; code={}", error.code);
     }
 }
 
@@ -144,22 +163,17 @@ async fn pooled_handle(
         }
     }
 
-    // 同一服务/用途只允许一个首连；等待者会复用第一个建好的 handle。
     let _connect_guard = state.connect_guard.lock().await;
-    for candidate in &state.slots {
-        let mut pooled = candidate.lock().await;
-        if let Some(handle) = pooled.handle.as_ref().filter(|handle| !handle.is_closed()) {
-            let handle = Arc::clone(handle);
-            pooled.last_used = Instant::now();
-            return Ok(handle);
-        }
-    }
 
     let mut pooled = entry.lock().await;
-    if pooled.handle.as_ref().map(|handle| handle.is_closed()).unwrap_or(true) {
-        debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection; server_id={}", config.id);
-        pooled.handle = Some(Arc::new(connect(config).await?));
+    if let Some(handle) = pooled.handle.as_ref().filter(|handle| !handle.is_closed()) {
+        let handle = Arc::clone(handle);
+        pooled.last_used = Instant::now();
+        return Ok(handle);
     }
+
+    debug!(target: "shipyardx_lib::ssh::pool", "opening pooled ssh connection; server_id={}", config.id);
+    pooled.handle = Some(Arc::new(connect(config).await?));
     pooled.last_used = Instant::now();
     pooled.handle.clone().ok_or_else(missing_pooled_handle_error)
 }

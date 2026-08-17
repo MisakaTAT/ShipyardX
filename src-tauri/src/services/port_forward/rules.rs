@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::dto::port_forward::{PortForward, PortForwardCreate, PortForwardRule};
 use crate::error::{AppError, AppResult};
@@ -49,6 +49,7 @@ pub(super) fn resolve_bind_address(raw: Option<&str>) -> AppResult<String> {
 pub async fn create_port_forward_rule(
     server_id: String,
     params: PortForwardCreate,
+    app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<PortForward> {
     let protocol = params.protocol.trim().to_lowercase();
@@ -83,6 +84,11 @@ pub async fn create_port_forward_rule(
         Ok(rule)
     })?;
 
+    let running = rule.enabled
+        && super::runtime::ensure_running(std::slice::from_ref(&rule), &app_handle, &state)
+            .await?
+            .contains(&rule.id);
+
     Ok(PortForward {
         id: rule.id,
         server_id,
@@ -95,26 +101,37 @@ pub async fn create_port_forward_rule(
         remote_port: rule.remote_port,
         local_port: rule.local_port,
         bind_address: rule.bind_address,
-        running: false,
+        running,
         tx_speed_bps: 0.0,
         rx_speed_bps: 0.0,
         last_error: None,
     })
 }
 
-pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    super::runtime::update_rule_enabled_and_runtime(id, enabled, &state).await
+pub async fn set_port_forward_enabled(
+    id: String,
+    enabled: bool,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    super::runtime::update_rule_enabled_and_runtime(id, enabled, &app_handle, &state).await
 }
 
-pub async fn set_port_forwards_enabled(ids: Vec<String>, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    super::runtime::update_rules_enabled_and_runtime(&ids, enabled, &state).await
+pub async fn set_port_forwards_enabled(
+    ids: Vec<String>,
+    enabled: bool,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    super::runtime::update_rules_enabled_and_runtime(&ids, enabled, &app_handle, &state).await
 }
 
 pub async fn delete_port_forward(id: String, state: State<'_, AppState>) -> AppResult<()> {
-    if let Some(handle) = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?.remove(&id)
-        && let Some(runtime) = handle.handle
-    {
-        let _ = runtime.stop_tx.send(true);
+    let handle = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?
+        .remove(&id)
+        .and_then(|entry| entry.handle);
+    if let Some(handle) = handle {
+        super::runtime::stop_runtime_handle(handle).await;
     }
 
     state.port_forward_rules.mutate_durable(|rules| {

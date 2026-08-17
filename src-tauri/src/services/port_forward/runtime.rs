@@ -21,7 +21,7 @@ const LOG_TARGET: &str = "shipyardx_lib::services::port_forward";
 
 type RuntimeMap = HashMap<String, PortForwardRuntimeState>;
 
-async fn stop_runtime_handle(mut handle: PortForwardRuntimeHandle) {
+pub(super) async fn stop_runtime_handle(mut handle: PortForwardRuntimeHandle) {
     let _ = handle.stop_tx.send(true);
     if let Some(mut join) = handle.join.take()
         && tokio::time::timeout(std::time::Duration::from_secs(2), &mut join)
@@ -40,17 +40,34 @@ enum StaleScope<'a> {
     All,
 }
 
+pub(super) async fn ensure_running(
+    rules: &[PortForwardRule],
+    app_handle: &AppHandle,
+    state: &State<'_, AppState>,
+) -> AppResult<HashSet<String>> {
+    if rules.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let configs = collect_server_configs(state, rules);
+    let started = start_rules(state, rules, StaleScope::Keep, &configs).await?;
+    let started_ids: HashSet<String> = started.values().flatten().cloned().collect();
+    spawn_warmups(app_handle, started, &configs);
+    Ok(started_ids)
+}
+
 pub(super) async fn update_rule_enabled_and_runtime(
     id: String,
     enabled: bool,
+    app_handle: &AppHandle,
     state: &State<'_, AppState>,
 ) -> AppResult<()> {
-    update_rules_enabled_and_runtime(std::slice::from_ref(&id), enabled, state).await
+    update_rules_enabled_and_runtime(std::slice::from_ref(&id), enabled, app_handle, state).await
 }
 
 pub(super) async fn update_rules_enabled_and_runtime(
     ids: &[String],
     enabled: bool,
+    app_handle: &AppHandle,
     state: &State<'_, AppState>,
 ) -> AppResult<()> {
     if ids.is_empty() {
@@ -78,10 +95,18 @@ pub(super) async fn update_rules_enabled_and_runtime(
                 .filter_map(|id| runtime.remove(id).and_then(|entry| entry.handle))
                 .collect()
         };
-        for handle in handles {
-            stop_runtime_handle(handle).await;
-        }
+        futures_util::future::join_all(handles.into_iter().map(stop_runtime_handle)).await;
+        return Ok(());
     }
+
+    let to_start: Vec<PortForwardRule> = state
+        .port_forward_rules
+        .snapshot()?
+        .iter()
+        .filter(|rule| wanted.contains(rule.id.as_str()) && rule.enabled)
+        .cloned()
+        .collect();
+    ensure_running(&to_start, app_handle, state).await?;
 
     Ok(())
 }
@@ -194,9 +219,7 @@ async fn start_rules(
             .filter_map(|id| runtime.remove(&id).and_then(|entry| entry.handle))
             .collect::<Vec<_>>()
     };
-    for handle in stale_handles {
-        stop_runtime_handle(handle).await;
-    }
+    futures_util::future::join_all(stale_handles.into_iter().map(stop_runtime_handle)).await;
     let mut runtime = lock_write(&state.port_forwards, "port_forward.runtime_lock_failed")?;
 
     for rule in enabled_rules {
@@ -407,11 +430,13 @@ pub async fn stop_all_global(state: State<'_, AppState>) -> AppResult<()> {
         .drain()
         .collect();
     let total = handles.len();
-    for (_id, handle) in handles {
-        if let Some(runtime) = handle.handle {
-            stop_runtime_handle(runtime).await;
-        }
-    }
+    futures_util::future::join_all(
+        handles
+            .into_iter()
+            .filter_map(|(_id, entry)| entry.handle)
+            .map(stop_runtime_handle),
+    )
+    .await;
     info!(
         target: LOG_TARGET,
         "stopped all port forward runtimes; count={}",

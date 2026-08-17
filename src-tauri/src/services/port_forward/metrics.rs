@@ -89,12 +89,13 @@ pub fn spawn_speed_sampler(app_handle: AppHandle) {
     let spawned = spawn_on_runtime(async move {
         let mut ticker = tokio::time::interval(PORT_FORWARD_SPEED_TICK);
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        let mut was_active = false;
 
         loop {
             ticker.tick().await;
             let now = Instant::now();
             let app_state = app_handle.state::<AppState>();
-            let forwards = {
+            let forwards: Vec<PortForward> = {
                 let Ok(mut runtime) = lock_write(&app_state.port_forwards, "port_forward.runtime_lock_failed") else {
                     continue;
                 };
@@ -111,10 +112,15 @@ pub fn spawn_speed_sampler(app_handle: AppHandle) {
                     .map(|rule| runtime_state_to_port_forward(rule, runtime.get(&rule.id).unwrap_or(&idle)))
                     .collect()
             };
-            if let Err(error) = (PortForwardSnapshot { forwards }).emit(&app_handle) {
-                warn!(target: "shipyardx_lib::services::port_forward", "unable to emit port forward snapshot: {error}");
+            // 没有任何转发在跑时速率恒为 0，快照不会有变化，推了也是白推。
+            // 空闲时这条路径原来是每秒序列化 + IPC 全量规则，且与页面开没开无关。
+            let active = forwards.iter().any(|forward| forward.running);
+            if active || was_active {
+                if let Err(error) = (PortForwardSnapshot { forwards }).emit(&app_handle) {
+                    warn!(target: "shipyardx_lib::services::port_forward", "unable to emit port forward snapshot: {error}");
+                }
             }
-            crate::ssh::pool::reap_idle().await;
+            was_active = active;
         }
     });
 

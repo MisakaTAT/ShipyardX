@@ -22,21 +22,32 @@ pub async fn list_port_forwards(server_id: String, state: State<'_, AppState>) -
 pub async fn create_port_forward_rule(
     server_id: String,
     params: PortForwardCreate,
+    app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> AppResult<PortForward> {
-    port_forward::create_port_forward_rule(server_id, params, state).await
+    port_forward::create_port_forward_rule(server_id, params, app_handle, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn set_port_forward_enabled(id: String, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    port_forward::set_port_forward_enabled(id, enabled, state).await
+pub async fn set_port_forward_enabled(
+    id: String,
+    enabled: bool,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    port_forward::set_port_forward_enabled(id, enabled, app_handle, state).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn set_port_forwards_enabled(ids: Vec<String>, enabled: bool, state: State<'_, AppState>) -> AppResult<()> {
-    port_forward::set_port_forwards_enabled(ids, enabled, state).await
+pub async fn set_port_forwards_enabled(
+    ids: Vec<String>,
+    enabled: bool,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> AppResult<()> {
+    port_forward::set_port_forwards_enabled(ids, enabled, app_handle, state).await
 }
 
 #[tauri::command]

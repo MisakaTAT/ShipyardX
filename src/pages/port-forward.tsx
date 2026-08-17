@@ -23,8 +23,6 @@ import { CommandPaletteButton } from '@/features/command-palette/ui/command-pale
 import { groupForwards } from '@/features/port-forward/model/group-forwards'
 import { PortForwardHostGroup } from '@/features/port-forward/ui/port-forward-host-group'
 
-const AUTO_COLLAPSE_THRESHOLD = 60
-
 export default function PortForwardPage() {
   const { t } = useTranslation()
   const { data: rules = [], isLoading } = usePortForwards()
@@ -37,7 +35,6 @@ export default function PortForwardPage() {
   const retry = useRetryPortForward()
 
   const [showCreate, setShowCreate] = useState(false)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const openCreate = useCallback(() => setShowCreate(true), [])
@@ -70,25 +67,16 @@ export default function PortForwardPage() {
 
   const groups = useMemo(() => groupForwards(filteredRules, serverById), [filteredRules, serverById])
 
-  const autoCollapse = !search.trim() && filteredRules.length > AUTO_COLLAPSE_THRESHOLD
-  const isCollapsed = useCallback(
-    (key: string) => (autoCollapse ? !expanded.has(key) : collapsed.has(key)),
-    [autoCollapse, expanded, collapsed]
-  )
+  const isCollapsed = useCallback((key: string) => collapsed.has(key), [collapsed])
 
-  const toggleCollapsed = useCallback(
-    (key: string) => {
-      const flip = (prev: Set<string>) => {
-        const next = new Set(prev)
-        if (next.has(key)) next.delete(key)
-        else next.add(key)
-        return next
-      }
-      if (autoCollapse) setExpanded(flip)
-      else setCollapsed(flip)
-    },
-    [autoCollapse]
-  )
+  const toggleCollapsed = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const handlers = useMemo(
     () => ({
