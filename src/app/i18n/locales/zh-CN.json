@@ -9,6 +9,20 @@
           "message": "未找到主窗口"
         }
       },
+      "settings": {
+        "parse_failed": {
+          "message": "解析应用设置失败"
+        },
+        "read_failed": {
+          "message": "读取应用设置失败"
+        },
+        "serialize_failed": {
+          "message": "序列化应用设置失败"
+        },
+        "write_failed": {
+          "message": "写入应用设置失败"
+        }
+      },
       "appstore": {
         "app_key_invalid": {
           "message": "应用标识包含非法字符：{{value}}"
@@ -1440,6 +1454,13 @@
           "title": "开发者工具",
           "toastFailed": "打开 DevTools 失败",
           "toastOpened": "已打开 DevTools"
+        },
+        "logLevel": {
+          "description": "选择全应用统一日志等级，重启应用后生效",
+          "title": "日志等级",
+          "toastLoadFailed": "读取日志等级失败",
+          "toastSaved": "日志等级已保存，重启应用后生效",
+          "toastSaveFailed": "保存日志等级失败"
         },
         "logs": {
           "action": "打开日志目录",

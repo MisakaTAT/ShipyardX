@@ -82,6 +82,8 @@ pub fn run() {
             commands::system::update_docker_daemon_settings,
             commands::system::restart_docker_daemon,
             commands::system::open_devtools,
+            commands::system::get_log_level,
+            commands::system::update_log_level,
             commands::log_stream::start_log_stream,
             commands::log_stream::stop_log_stream,
             commands::docker_events::start_event_stream,
@@ -146,20 +148,7 @@ pub fn run() {
                         file_name: Some("shipyardx".into()),
                     }),
                 ])
-                .level(log::LevelFilter::Info)
-                .level_for("shipyardx_lib::services::terminal", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::services::port_forward", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::services::docker_events", log::LevelFilter::Info)
-                .level_for("shipyardx_lib::services::log_stream", log::LevelFilter::Info)
-                .level_for("shipyardx_lib::services::images", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::services::system", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::services::appstore", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::services::appstore_repo", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::docker::client", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::docker::transport", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::ssh::client", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::ssh::exec", log::LevelFilter::Debug)
-                .level_for("shipyardx_lib::ssh::pool", log::LevelFilter::Debug)
+                .level(config::app_settings::startup_log_level())
                 .rotation_strategy(RotationStrategy::KeepAll)
                 .max_file_size(10_000_000)
                 .build(),

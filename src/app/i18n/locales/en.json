@@ -9,6 +9,20 @@
           "message": "Main window not found"
         }
       },
+      "settings": {
+        "parse_failed": {
+          "message": "Couldn't parse app settings"
+        },
+        "read_failed": {
+          "message": "Couldn't read app settings"
+        },
+        "serialize_failed": {
+          "message": "Couldn't serialize app settings"
+        },
+        "write_failed": {
+          "message": "Couldn't write app settings"
+        }
+      },
       "appstore": {
         "app_key_invalid": {
           "message": "The app identifier contains invalid characters: {{value}}"
@@ -1440,6 +1454,13 @@
           "title": "Developer tools",
           "toastFailed": "Couldn't open DevTools",
           "toastOpened": "DevTools opened"
+        },
+        "logLevel": {
+          "description": "Choose the single app-wide log level. Changes apply after restarting the app",
+          "title": "Log level",
+          "toastLoadFailed": "Couldn't load the log level",
+          "toastSaved": "Log level saved. Restart the app to apply it",
+          "toastSaveFailed": "Couldn't save the log level"
         },
         "logs": {
           "action": "Open log directory",

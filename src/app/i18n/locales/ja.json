@@ -9,6 +9,20 @@
           "message": "メインウィンドウが見つかりません"
         }
       },
+      "settings": {
+        "parse_failed": {
+          "message": "アプリ設定を解析できませんでした"
+        },
+        "read_failed": {
+          "message": "アプリ設定を読み取れませんでした"
+        },
+        "serialize_failed": {
+          "message": "アプリ設定をシリアライズできませんでした"
+        },
+        "write_failed": {
+          "message": "アプリ設定を書き込めませんでした"
+        }
+      },
       "appstore": {
         "app_key_invalid": {
           "message": "アプリ識別子に使用できない文字が含まれています: {{value}}"
@@ -1440,6 +1454,13 @@
           "title": "開発者ツール",
           "toastFailed": "DevTools を開けませんでした",
           "toastOpened": "DevTools を開きました"
+        },
+        "logLevel": {
+          "description": "アプリ全体で使うログレベルを選びます。変更は再起動後に反映されます",
+          "title": "ログレベル",
+          "toastLoadFailed": "ログレベルを読み込めませんでした",
+          "toastSaved": "ログレベルを保存しました。反映には再起動が必要です",
+          "toastSaveFailed": "ログレベルを保存できませんでした"
         },
         "logs": {
           "action": "ログディレクトリを開く",

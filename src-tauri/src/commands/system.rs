@@ -1,5 +1,6 @@
 use tauri::{AppHandle, Manager, State};
 
+use crate::config::app_settings;
 use crate::dto::container::ContainerStats;
 use crate::dto::daemon::{DaemonSettings, DaemonUpdate};
 use crate::dto::info::DockerEngineInfo;
@@ -70,4 +71,16 @@ pub async fn open_devtools(app: AppHandle) -> AppResult<()> {
 
     webview.open_devtools();
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_log_level(app: AppHandle) -> AppResult<String> {
+    app_settings::get_log_level(&app)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_log_level(app: AppHandle, level: String) -> AppResult<String> {
+    app_settings::update_log_level(&app, level)
 }
