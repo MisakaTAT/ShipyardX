@@ -20,8 +20,10 @@ export interface HostGroup {
   enabledCount: number
 }
 
-export function formatSpeed(bytesPerSecond: number | null): string {
-  if (bytesPerSecond == null || !Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return '0 B/s'
+export function splitSpeed(bytesPerSecond: number | null): { value: string; unit: string } {
+  if (bytesPerSecond == null || !Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) {
+    return { value: '0', unit: 'B/s' }
+  }
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let value = bytesPerSecond
   let unit = 0
@@ -29,7 +31,15 @@ export function formatSpeed(bytesPerSecond: number | null): string {
     value /= 1000
     unit += 1
   }
-  return `${value >= 100 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}/s`
+  return {
+    value: `${value >= 100 || unit === 0 ? Math.round(value) : value.toFixed(1)}`,
+    unit: `${units[unit]}/s`,
+  }
+}
+
+export function formatSpeed(bytesPerSecond: number | null): string {
+  const { value, unit } = splitSpeed(bytesPerSecond)
+  return `${value} ${unit}`
 }
 
 export function collectRuleIds(group: HostGroup | ContainerGroup): string[] {
