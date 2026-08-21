@@ -52,11 +52,12 @@ export function formatHotkeyLabel(value: string | null | undefined, unsetLabel =
   const symbols: Record<string, string> = isMacPlatform()
     ? { Mod: '\u2318', Meta: '\u2318', Ctrl: '\u2303', Alt: '\u2325', Shift: '\u21e7' }
     : { Mod: 'Ctrl', Meta: 'Win', Ctrl: 'Ctrl', Alt: 'Alt', Shift: 'Shift' }
+  const separator = isMacPlatform() ? '' : '+'
 
   return normalized
     .split('+')
     .map((token) => symbols[token] ?? token)
-    .join('+')
+    .join(separator)
 }
 
 /**

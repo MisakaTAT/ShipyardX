@@ -5,6 +5,7 @@ import { useAppSettings } from '@/app/settings-store'
 import { formatHotkeyLabel } from '@/shared/lib/hotkeys'
 import { ChevronRight, CornerDownLeft, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
+import { Kbd, KbdGroup } from '@/shared/ui/kbd'
 import { cn } from '@/shared/lib/utils'
 import {
   filterItems,
@@ -180,19 +181,11 @@ export function CommandPalette({ open, initialQuery = '', onOpenChange }: Comman
   )
 }
 
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="flex h-5 min-w-5 items-center justify-center rounded border border-border bg-background px-1 font-hotkey text-[11px] text-muted-foreground">
-      {children}
-    </kbd>
-  )
-}
-
 function Hint({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
     <span className={cn('flex items-center gap-1', className)}>
       {label}
-      {children}
+      <KbdGroup>{children}</KbdGroup>
     </span>
   )
 }
