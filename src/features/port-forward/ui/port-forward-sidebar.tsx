@@ -42,7 +42,7 @@ function ScopeItem({ active, icon, label, title, count, indent, leading, onSelec
         className={cn('flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 text-left', indent)}
       >
         <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:size-3.5">{icon}</span>
-        <span className={cn('min-w-0 flex-1 truncate text-[13px]', active && 'font-medium')}>{label}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px]">{label}</span>
       </button>
       <span className="shrink-0 pl-1 text-[11px] tabular-nums opacity-60">{count}</span>
     </div>
@@ -93,7 +93,7 @@ export function PortForwardSidebar({ groups, totalCount, scope, onScopeChange }:
               active={isSameScope(scope, { kind: 'host', key: host.key })}
               icon={<Server />}
               label={host.serverName}
-              title={host.serverHost ?? host.serverName}
+              title={host.serverHost ? `${host.serverName} (${host.serverHost})` : host.serverName}
               count={host.ruleCount}
               indent="pl-0"
               leading={
@@ -121,7 +121,7 @@ export function PortForwardSidebar({ groups, totalCount, scope, onScopeChange }:
                     active={isSameScope(scope, { kind: 'container', key: container.key })}
                     icon={<StatusDot state={aggregateState(container.rules)} />}
                     label={containerLabel(container)}
-                    title={container.containerId}
+                    title={container.containerName ?? container.containerId}
                     count={container.rules.length}
                     indent="pl-8"
                     onSelect={() => onScopeChange({ kind: 'container', key: container.key })}

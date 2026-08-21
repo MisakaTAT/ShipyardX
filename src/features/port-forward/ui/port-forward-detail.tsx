@@ -90,7 +90,9 @@ function SectionHeader({
       <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-3.5">
         {icon}
       </span>
-      <span className="truncate text-xs font-medium text-foreground">{label}</span>
+      <span className="truncate text-xs font-medium text-foreground" title={label}>
+        {label}
+      </span>
       {sublabel ? <span className="shrink-0 font-mono text-xs text-muted-foreground/70">{sublabel}</span> : null}
       <BulkButton rules={rules} onBulkEnabled={onBulkEnabled} className="ml-auto" />
     </div>
@@ -155,6 +157,7 @@ export function PortForwardDetail({
                       onDelete={onDelete}
                       onRetry={onRetry}
                       retrying={retryingId === rule.id}
+                      showContainer={isAll}
                     />
                   </div>
                 ))}

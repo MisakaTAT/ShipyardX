@@ -7,6 +7,7 @@ import {
   containerLabel,
   isSameScope,
   resolveScope,
+  ruleContainerLabel,
   scopeKey,
   summarizeRules,
 } from '@/features/port-forward/model/port-forward-scope'
@@ -149,5 +150,18 @@ describe('buildSections', () => {
   it('returns nothing when the scope is gone', () => {
     expect(buildSections(groups, { kind: 'host', key: 'gone' })).toEqual([])
     expect(buildSections(groups, { kind: 'container', key: 'gone' })).toEqual([])
+  })
+})
+
+describe('ruleContainerLabel', () => {
+  it('prefers the container name', () => {
+    expect(ruleContainerLabel(rule({ id: 'x', server_id: 's1', container_id: 'abc', container_name: 'web' }))).toBe(
+      'web'
+    )
+  })
+
+  it('falls back to a 12-char id, matching the sidebar and section headers', () => {
+    const long = 'a3f91c02be44ffffffff'
+    expect(ruleContainerLabel(rule({ id: 'x', server_id: 's1', container_id: long }))).toBe('a3f91c02be44')
   })
 })

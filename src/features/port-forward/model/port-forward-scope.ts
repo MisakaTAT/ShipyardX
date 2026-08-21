@@ -13,8 +13,14 @@ export function isSameScope(a: ForwardScope, b: ForwardScope): boolean {
   return scopeKey(a) === scopeKey(b)
 }
 
+const SHORT_ID_LENGTH = 12
+
 export function containerLabel(container: ContainerGroup): string {
-  return container.containerName ?? container.containerId.slice(0, 12)
+  return container.containerName ?? container.containerId.slice(0, SHORT_ID_LENGTH)
+}
+
+export function ruleContainerLabel(rule: PortForward): string {
+  return rule.container_name ?? rule.container_id.slice(0, SHORT_ID_LENGTH)
 }
 
 function hostRules(host: HostGroup): PortForward[] {

@@ -7,6 +7,7 @@ import { ToneBadge } from '@/shared/components/tone-badge'
 import type { BadgeTone } from '@/shared/styles/variants'
 import { cn } from '@/shared/lib/utils'
 import { formatSpeed } from '@/features/port-forward/model/group-forwards'
+import { ruleContainerLabel } from '@/features/port-forward/model/port-forward-scope'
 import { PortForwardErrorPopover } from '@/features/port-forward/ui/port-forward-error-popover'
 import { ruleState } from '@/features/port-forward/model/forward-state'
 import { StatusBadge } from '@/features/port-forward/ui/port-forward-status'
@@ -17,11 +18,19 @@ interface PortForwardRuleRowProps {
   onDelete: (id: string) => void
   onRetry: (id: string) => void
   retrying?: boolean
+  showContainer?: boolean
 }
 
 const PROTOCOL_TONE: Record<string, BadgeTone> = { tcp: 'info', udp: 'pending' }
 
-export function PortForwardRuleRow({ rule, onToggleEnabled, onDelete, onRetry, retrying }: PortForwardRuleRowProps) {
+export function PortForwardRuleRow({
+  rule,
+  onToggleEnabled,
+  onDelete,
+  onRetry,
+  retrying,
+  showContainer,
+}: PortForwardRuleRowProps) {
   const { t } = useTranslation()
   const local = rule.local_port > 0 ? `${rule.bind_address}:${rule.local_port}` : null
   const state = ruleState(rule)
@@ -31,6 +40,15 @@ export function PortForwardRuleRow({ rule, onToggleEnabled, onDelete, onRetry, r
       <div className="w-[86px] shrink-0">
         <StatusBadge state={state} />
       </div>
+
+      {showContainer ? (
+        <div
+          className="w-28 shrink-0 truncate text-xs text-muted-foreground"
+          title={rule.container_name ?? rule.container_id}
+        >
+          {ruleContainerLabel(rule)}
+        </div>
+      ) : null}
 
       <div className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="w-[20ch] truncate font-mono text-[13px]" title={local ?? undefined}>
