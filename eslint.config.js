@@ -63,4 +63,15 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // Build/release scripts live outside `src`, so the "@/..." alias does not
+    // resolve for them; relative imports are the only option here.
+    files: ['scripts/**/*.{ts,tsx,mjs,js}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
 ])
