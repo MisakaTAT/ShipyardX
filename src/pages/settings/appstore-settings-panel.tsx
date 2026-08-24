@@ -21,9 +21,6 @@ import {
 } from '@/features/appstore/api/use-appstore'
 import { useSavedDraft } from '@/shared/hooks/use-saved-draft'
 
-const SETTINGS_CONTROL_CLASSNAME = 'h-8 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
-const SETTINGS_TOGGLE_CLASSNAME = 'flex h-8 w-fit items-center gap-3'
-
 export type AppStorePanelSettings = LocalAppstoreSettings
 type AppStoreSource = AppStorePanelSettings['sources'][number]
 
@@ -208,7 +205,6 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                   }
                   placeholder={t('ui.settings.appstore.sources.namePlaceholder')}
                   disabled={saving}
-                  className={SETTINGS_CONTROL_CLASSNAME}
                 />
                 <Input
                   value={source.repoUrl}
@@ -216,7 +212,6 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                   onBlur={() => void handleSourceBlur(source.id)}
                   placeholder={DEFAULT_APPSTORE_SOURCES[0].repoUrl}
                   disabled={saving}
-                  className={SETTINGS_CONTROL_CLASSNAME}
                 />
                 <div className="flex h-8 items-center justify-center">
                   <Switch
@@ -255,7 +250,7 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
           title={t('ui.settings.appstore.proxy.enableTitle')}
           description={t('ui.settings.appstore.proxy.enableDesc')}
           action={
-            <label className={SETTINGS_TOGGLE_CLASSNAME}>
+            <label className="flex">
               <Switch
                 checked={draft.proxyEnabled}
                 onCheckedChange={(checked) => {
@@ -279,7 +274,6 @@ export function AppStoreSettingsPanel({ settings, onSavedChange }: AppStoreSetti
                 onBlur={(event) => void persistSettings({ ...draft, proxyUrl: event.target.value })}
                 placeholder="http://127.0.0.1:7890"
                 disabled={saving}
-                className={SETTINGS_CONTROL_CLASSNAME}
               />
             </div>
           }

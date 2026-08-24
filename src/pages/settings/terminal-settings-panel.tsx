@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown } from 'lucide-react'
 import { type TerminalCursorStyle, type TerminalFrontend, type TerminalThemeName } from '@/app/settings-store'
 import { SettingsActionRow, SettingsPanelShell, SettingsResetRow } from '@/pages/settings/settings-panel-shell'
 import { XTERM_THEME_MAP } from '@/themes/xtermjs'
 import { XTERM_THEME_NAMES } from '@/themes/xtermjs/names'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/shared/ui/combobox'
 import { Switch } from '@/shared/ui/switch'
 
 const TERMINAL_FRONTEND_OPTIONS: Array<{ value: TerminalFrontend; label: string }> = [
@@ -19,10 +26,6 @@ const CURSOR_STYLE_OPTIONS = [
   { value: 'underline', labelKey: 'ui.settings.terminal.cursorStyle.underline' },
   { value: 'bar', labelKey: 'ui.settings.terminal.cursorStyle.bar' },
 ] as const satisfies ReadonlyArray<{ value: TerminalCursorStyle; labelKey: string }>
-
-const SETTINGS_CONTROL_CLASSNAME = 'h-8 rounded-lg border-border bg-card px-3 py-0 text-sm leading-none shadow-none'
-
-const SETTINGS_TOGGLE_CLASSNAME = 'flex h-8 w-fit items-center gap-3'
 
 interface TerminalSettingsPanelProps {
   frontend: TerminalFrontend
@@ -123,7 +126,7 @@ export function TerminalSettingsPanel({
           action={
             <div className="w-full max-w-xs">
               <Select value={frontend} onValueChange={(value) => onFrontendChange(value as TerminalFrontend)}>
-                <SelectTrigger className={`w-full ${SETTINGS_CONTROL_CLASSNAME}`}>
+                <SelectTrigger className="w-full">
                   <SelectValue>
                     {TERMINAL_FRONTEND_OPTIONS.find((option) => option.value === frontend)?.label}
                   </SelectValue>
@@ -144,7 +147,7 @@ export function TerminalSettingsPanel({
           title={t('ui.settings.terminal.ligatures.title')}
           description={t('ui.settings.terminal.ligatures.description')}
           action={
-            <label className={SETTINGS_TOGGLE_CLASSNAME}>
+            <label className="flex">
               <Switch checked={ligatures} onCheckedChange={onLigaturesChange} />
             </label>
           }
@@ -154,32 +157,44 @@ export function TerminalSettingsPanel({
           title={t('ui.settings.terminal.theme.title')}
           description={t('ui.settings.terminal.theme.description')}
           action={
-            <SearchablePicker<TerminalThemeName>
-              value={theme}
-              options={XTERM_THEME_NAMES}
-              onChange={onThemeChange}
-              renderValue={(option) => formatThemeName(option)}
-              renderOption={(option) => {
-                const themeColors = XTERM_THEME_MAP[option]
-                return (
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      {[themeColors.background, themeColors.foreground, themeColors.red, themeColors.blue].map(
-                        (color, index) => (
-                          <span
-                            key={`${option}-${index}`}
-                            className="size-3 rounded-full border border-black/10"
-                            style={{ backgroundColor: color }}
-                          />
-                        )
-                      )}
-                    </div>
-                    <span className="truncate">{formatThemeName(option)}</span>
-                  </div>
-                )
-              }}
-              placeholder={t('ui.settings.terminal.theme.searchPlaceholder')}
-            />
+            <div className="w-full max-w-xs">
+              <Combobox
+                items={XTERM_THEME_NAMES}
+                value={theme}
+                onValueChange={(value) => {
+                  if (value) onThemeChange(value as TerminalThemeName)
+                }}
+                itemToStringLabel={(value: TerminalThemeName) => formatThemeName(value)}
+              >
+                <ComboboxInput className="w-full" placeholder={t('ui.settings.terminal.theme.searchPlaceholder')} />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t('ui.common.noMatch')}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(option: TerminalThemeName) => {
+                      const themeColors = XTERM_THEME_MAP[option]
+                      return (
+                        <ComboboxItem key={option} value={option}>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              {[themeColors.background, themeColors.foreground, themeColors.red, themeColors.blue].map(
+                                (color, index) => (
+                                  <span
+                                    key={`${option}-${index}`}
+                                    className="size-3 rounded-full border border-black/10"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                )
+                              )}
+                            </div>
+                            <span className="truncate">{formatThemeName(option)}</span>
+                          </div>
+                        </ComboboxItem>
+                      )
+                    }}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
           }
         />
 
@@ -200,7 +215,6 @@ export function TerminalSettingsPanel({
                     event.currentTarget.blur()
                   }
                 }}
-                className={SETTINGS_CONTROL_CLASSNAME}
               />
             </div>
           }
@@ -210,12 +224,30 @@ export function TerminalSettingsPanel({
           title={t('ui.settings.terminal.fontFamily.title')}
           description={t('ui.settings.terminal.fontFamily.description')}
           action={
-            <SearchablePicker
-              value={fontFamily}
-              options={fontChoices}
-              onChange={onFontFamilyChange}
-              placeholder={t('ui.settings.terminal.fontFamily.searchPlaceholder')}
-            />
+            <div className="w-full max-w-xs">
+              <Combobox
+                items={fontChoices}
+                value={fontFamily}
+                onValueChange={(value) => {
+                  if (value) onFontFamilyChange(value)
+                }}
+              >
+                <ComboboxInput
+                  className="w-full"
+                  placeholder={t('ui.settings.terminal.fontFamily.searchPlaceholder')}
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t('ui.common.noMatch')}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(option: string) => (
+                      <ComboboxItem key={option} value={option}>
+                        <span className="truncate">{option}</span>
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
           }
         />
 
@@ -236,7 +268,6 @@ export function TerminalSettingsPanel({
                     event.currentTarget.blur()
                   }
                 }}
-                className={SETTINGS_CONTROL_CLASSNAME}
               />
             </div>
           }
@@ -248,7 +279,7 @@ export function TerminalSettingsPanel({
           action={
             <div className="w-full max-w-xs">
               <Select value={cursorStyle} onValueChange={(value) => onCursorStyleChange(value as TerminalCursorStyle)}>
-                <SelectTrigger className={`w-full ${SETTINGS_CONTROL_CLASSNAME}`}>
+                <SelectTrigger className="w-full">
                   <SelectValue>
                     {(() => {
                       const option = CURSOR_STYLE_OPTIONS.find((item) => item.value === cursorStyle)
@@ -272,7 +303,7 @@ export function TerminalSettingsPanel({
           title={t('ui.settings.terminal.cursorBlink.title')}
           description={t('ui.settings.terminal.cursorBlink.description')}
           action={
-            <label className={SETTINGS_TOGGLE_CLASSNAME}>
+            <label className="flex">
               <Switch checked={cursorBlink} onCheckedChange={onCursorBlinkChange} />
             </label>
           }
@@ -295,7 +326,6 @@ export function TerminalSettingsPanel({
                     event.currentTarget.blur()
                   }
                 }}
-                className={SETTINGS_CONTROL_CLASSNAME}
               />
             </div>
           }
@@ -309,97 +339,4 @@ export function TerminalSettingsPanel({
 
 function formatThemeName(name: string) {
   return name.split('_').join(' ')
-}
-
-function SearchablePicker<T extends string>({
-  value,
-  options,
-  onChange,
-  placeholder,
-  renderValue,
-  renderOption,
-}: {
-  value: T
-  options: readonly T[]
-  onChange: (value: T) => void
-  placeholder: string
-  renderValue?: (value: T) => ReactNode
-  renderOption?: (value: T) => ReactNode
-}) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const rootRef = useRef<HTMLDivElement | null>(null)
-  const filteredOptions = options.filter((option) => option.toLowerCase().includes(query.trim().toLowerCase()))
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open])
-
-  return (
-    <div ref={rootRef} className="relative w-full max-w-xs">
-      <button
-        type="button"
-        className={`relative flex w-full items-center border border-input ${SETTINGS_CONTROL_CLASSNAME}`}
-        onClick={() => {
-          setOpen((current) => !current)
-          setQuery('')
-        }}
-      >
-        <span className="truncate pr-7 text-left">{renderValue ? renderValue(value) : value}</span>
-        <ChevronDown className="absolute right-3 size-4 text-muted-foreground" />
-      </button>
-      {open ? (
-        <div className="absolute top-full z-50 mt-1 w-full overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
-          <div className="border-b border-border p-1">
-            <Input
-              type="text"
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => event.stopPropagation()}
-              placeholder={placeholder}
-              className="h-8 rounded-md border-border bg-card px-2.5 py-0 text-sm"
-            />
-          </div>
-          <div className="max-h-64 overflow-y-auto p-1">
-            {filteredOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => {
-                  onChange(option)
-                  setOpen(false)
-                  setQuery('')
-                }}
-              >
-                {renderOption ? renderOption(option) : <span className="truncate">{option}</span>}
-              </button>
-            ))}
-            {filteredOptions.length === 0 ? (
-              <div className="px-2 py-2 text-sm text-muted-foreground">{t('ui.common.noMatch')}</div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
 }

@@ -25,8 +25,6 @@ const THEME_OPTIONS = [
   { value: 'system', labelKey: 'ui.settings.general.theme.system', descKey: 'ui.settings.general.theme.systemDesc' },
 ] as const satisfies ReadonlyArray<{ value: AppearanceTheme; labelKey: string; descKey: string }>
 
-const SETTINGS_CONTROL_CLASSNAME = 'h-8 w-full rounded-lg border-border bg-card px-3 py-0 text-sm shadow-none'
-
 export function GeneralSettingsPanel() {
   const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
@@ -218,7 +216,7 @@ export function GeneralSettingsPanel() {
           action={
             <div className="w-full max-w-xs">
               <Select value={settings.language} onValueChange={(value) => updateLanguage(value as LanguageSetting)}>
-                <SelectTrigger className={SETTINGS_CONTROL_CLASSNAME}>
+                <SelectTrigger className="w-full">
                   <SelectValue>
                     {settings.language === 'system'
                       ? t('ui.settings.general.language.system')

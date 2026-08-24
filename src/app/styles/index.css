@@ -156,7 +156,8 @@
 [data-slot='select-trigger']:focus-visible,
 [data-slot='input'][aria-invalid='true'],
 [data-slot='textarea'][aria-invalid='true'],
-[data-slot='select-trigger'][aria-invalid='true'] {
+[data-slot='select-trigger'][aria-invalid='true'],
+[data-slot='input-group'] {
   box-shadow: none !important;
 }
 
