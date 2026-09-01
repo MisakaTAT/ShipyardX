@@ -84,3 +84,15 @@ pub async fn get_log_level(app: AppHandle) -> AppResult<String> {
 pub async fn update_log_level(app: AppHandle, level: String) -> AppResult<String> {
     app_settings::update_log_level(&app, level)
 }
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_dependency_log_level(app: AppHandle) -> AppResult<String> {
+    app_settings::get_dependency_log_level(&app)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_dependency_log_level(app: AppHandle, level: String) -> AppResult<String> {
+    app_settings::update_dependency_log_level(&app, level)
+}

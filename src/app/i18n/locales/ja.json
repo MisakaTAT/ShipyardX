@@ -1448,6 +1448,13 @@
         }
       },
       "debug": {
+        "dependencyLogLevel": {
+          "description": "サードパーティ依存ライブラリのログレベルを選びます。warn のままにするとデバッグノイズを抑えられます",
+          "title": "依存ライブラリのログレベル",
+          "toastLoadFailed": "依存ライブラリのログレベルを読み込めませんでした",
+          "toastSaved": "依存ライブラリのログレベルを保存しました",
+          "toastSaveFailed": "依存ライブラリのログレベルを保存できませんでした"
+        },
         "devtools": {
           "action": "開発者ツールを開く",
           "description": "現在のメインウィンドウの DevTools を開きます",
@@ -1456,10 +1463,10 @@
           "toastOpened": "DevTools を開きました"
         },
         "logLevel": {
-          "description": "アプリ全体で使うログレベルを選びます。変更は再起動後に反映されます",
+          "description": "ShipyardX 自身のログレベルを選びます",
           "title": "ログレベル",
           "toastLoadFailed": "ログレベルを読み込めませんでした",
-          "toastSaved": "ログレベルを保存しました。反映には再起動が必要です",
+          "toastSaved": "ログレベルを保存しました",
           "toastSaveFailed": "ログレベルを保存できませんでした"
         },
         "logs": {

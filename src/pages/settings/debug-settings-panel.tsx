@@ -22,23 +22,31 @@ const LOG_LEVEL_LABELS: Record<LogLevel, string> = {
   trace: 'Trace',
 }
 
+type PendingAction = 'devtools' | 'logs' | 'log-level' | 'dependency-log-level'
+
 export function DebugSettingsPanel() {
   const { t } = useTranslation()
-  const [pendingAction, setPendingAction] = useState<'devtools' | 'logs' | 'log-level' | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [logLevel, setLogLevel] = useState<LogLevel>('info')
+  const [dependencyLogLevel, setDependencyLogLevel] = useState<LogLevel>('warn')
 
   useEffect(() => {
     let cancelled = false
 
-    invoke<string>('get_log_level')
-      .then((level) => {
-        if (!cancelled && level && isLogLevel(level)) setLogLevel(level)
-      })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, t('ui.settings.debug.logLevel.toastLoadFailed')), {
-          description: getErrorDescription(error, t('ui.settings.debug.logLevel.toastLoadFailed')),
+    const load = (command: string, apply: (level: LogLevel) => void, failedMessage: string) => {
+      invoke<string>(command)
+        .then((level) => {
+          if (!cancelled && level && isLogLevel(level)) apply(level)
         })
-      })
+        .catch((error) => {
+          toast.error(getErrorMessage(error, failedMessage), {
+            description: getErrorDescription(error, failedMessage),
+          })
+        })
+    }
+
+    load('get_log_level', setLogLevel, t('ui.settings.debug.logLevel.toastLoadFailed'))
+    load('get_dependency_log_level', setDependencyLogLevel, t('ui.settings.debug.dependencyLogLevel.toastLoadFailed'))
 
     return () => {
       cancelled = true
@@ -76,25 +84,55 @@ export function DebugSettingsPanel() {
     }
   }
 
-  const handleLogLevelChange = async (level: string) => {
+  const changeLogLevel = async (options: {
+    level: string
+    command: string
+    action: PendingAction
+    current: LogLevel
+    apply: (level: LogLevel) => void
+    savedMessage: string
+    failedMessage: string
+  }) => {
+    const { level, command, action, current, apply, savedMessage, failedMessage } = options
     if (!isLogLevel(level)) return
 
-    const previous = logLevel
-    setLogLevel(level)
-    setPendingAction('log-level')
+    apply(level)
+    setPendingAction(action)
     try {
-      const saved = await invoke<string>('update_log_level', { level })
-      if (isLogLevel(saved)) setLogLevel(saved)
-      toast.success(t('ui.settings.debug.logLevel.toastSaved'))
+      const saved = await invoke<string>(command, { level })
+      if (isLogLevel(saved)) apply(saved)
+      toast.success(savedMessage)
     } catch (error) {
-      setLogLevel(previous)
-      toast.error(getErrorMessage(error, t('ui.settings.debug.logLevel.toastSaveFailed')), {
-        description: getErrorDescription(error, t('ui.settings.debug.logLevel.toastSaveFailed')),
+      apply(current)
+      toast.error(getErrorMessage(error, failedMessage), {
+        description: getErrorDescription(error, failedMessage),
       })
     } finally {
       setPendingAction(null)
     }
   }
+
+  const handleLogLevelChange = (level: string) =>
+    changeLogLevel({
+      level,
+      command: 'update_log_level',
+      action: 'log-level',
+      current: logLevel,
+      apply: setLogLevel,
+      savedMessage: t('ui.settings.debug.logLevel.toastSaved'),
+      failedMessage: t('ui.settings.debug.logLevel.toastSaveFailed'),
+    })
+
+  const handleDependencyLogLevelChange = (level: string) =>
+    changeLogLevel({
+      level,
+      command: 'update_dependency_log_level',
+      action: 'dependency-log-level',
+      current: dependencyLogLevel,
+      apply: setDependencyLogLevel,
+      savedMessage: t('ui.settings.debug.dependencyLogLevel.toastSaved'),
+      failedMessage: t('ui.settings.debug.dependencyLogLevel.toastSaveFailed'),
+    })
 
   return (
     <SettingsPanelShell>
@@ -102,27 +140,18 @@ export function DebugSettingsPanel() {
         <SettingsActionRow
           title={t('ui.settings.debug.logLevel.title')}
           description={t('ui.settings.debug.logLevel.description')}
+          action={<LogLevelSelect value={logLevel} onChange={handleLogLevelChange} disabled={pendingAction !== null} />}
+        />
+
+        <SettingsActionRow
+          title={t('ui.settings.debug.dependencyLogLevel.title')}
+          description={t('ui.settings.debug.dependencyLogLevel.description')}
           action={
-            <div className="w-full max-w-xs">
-              <Select
-                value={logLevel}
-                onValueChange={(value) => {
-                  if (typeof value === 'string') void handleLogLevelChange(value)
-                }}
-                disabled={pendingAction !== null}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue>{LOG_LEVEL_LABELS[logLevel]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {LOG_LEVELS.map((level) => (
-                    <SelectItem key={level} value={level}>
-                      {LOG_LEVEL_LABELS[level]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <LogLevelSelect
+              value={dependencyLogLevel}
+              onChange={handleDependencyLogLevelChange}
+              disabled={pendingAction !== null}
+            />
           }
         />
 
@@ -161,6 +190,39 @@ export function DebugSettingsPanel() {
         />
       </div>
     </SettingsPanelShell>
+  )
+}
+
+function LogLevelSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: LogLevel
+  onChange: (level: string) => void
+  disabled: boolean
+}) {
+  return (
+    <div className="w-full max-w-xs">
+      <Select
+        value={value}
+        onValueChange={(next) => {
+          if (typeof next === 'string') onChange(next)
+        }}
+        disabled={disabled}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue>{LOG_LEVEL_LABELS[value]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {LOG_LEVELS.map((level) => (
+            <SelectItem key={level} value={level}>
+              {LOG_LEVEL_LABELS[level]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   )
 }
 

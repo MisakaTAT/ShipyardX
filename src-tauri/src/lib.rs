@@ -21,7 +21,7 @@ use dto::events::{
     EventStreamStatus, HostKeyPromptRequired, ImageExportProgress, ImageImportProgress, ImagePullDone,
     ImagePullLayerProgress, ImagePullProgress, InstallStepEvent, PortForwardSnapshot,
 };
-use log::{error, info, warn};
+use log::{LevelFilter, error, info, warn};
 #[cfg(debug_assertions)]
 use specta_typescript::Typescript;
 use tauri::Manager;
@@ -84,6 +84,8 @@ pub fn run() {
             commands::system::open_devtools,
             commands::system::get_log_level,
             commands::system::update_log_level,
+            commands::system::get_dependency_log_level,
+            commands::system::update_dependency_log_level,
             commands::log_stream::start_log_stream,
             commands::log_stream::stop_log_stream,
             commands::docker_events::start_event_stream,
@@ -139,6 +141,8 @@ pub fn run() {
 
     let invoke_handler = specta_builder.invoke_handler();
 
+    config::app_settings::init_log_levels();
+
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -148,7 +152,8 @@ pub fn run() {
                         file_name: Some("shipyardx".into()),
                     }),
                 ])
-                .level(config::app_settings::startup_log_level())
+                .level(LevelFilter::Trace)
+                .filter(config::app_settings::log_record_enabled)
                 .rotation_strategy(RotationStrategy::KeepAll)
                 .max_file_size(10_000_000)
                 .build(),

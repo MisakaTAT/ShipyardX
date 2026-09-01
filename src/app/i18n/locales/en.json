@@ -1448,6 +1448,13 @@
         }
       },
       "debug": {
+        "dependencyLogLevel": {
+          "description": "Level for logs coming from third-party dependencies. Keep it at warn to hide their debug noise",
+          "title": "Dependency log level",
+          "toastLoadFailed": "Couldn't load the dependency log level",
+          "toastSaved": "Dependency log level saved",
+          "toastSaveFailed": "Couldn't save the dependency log level"
+        },
         "devtools": {
           "action": "Open DevTools",
           "description": "Open DevTools for the current main window",
@@ -1456,10 +1463,10 @@
           "toastOpened": "DevTools opened"
         },
         "logLevel": {
-          "description": "Choose the single app-wide log level. Changes apply after restarting the app",
+          "description": "Level for ShipyardX's own logs",
           "title": "Log level",
           "toastLoadFailed": "Couldn't load the log level",
-          "toastSaved": "Log level saved. Restart the app to apply it",
+          "toastSaved": "Log level saved",
           "toastSaveFailed": "Couldn't save the log level"
         },
         "logs": {

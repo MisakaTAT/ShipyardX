@@ -115,10 +115,10 @@ pub fn spawn_speed_sampler(app_handle: AppHandle) {
             // 没有任何转发在跑时速率恒为 0，快照不会有变化，推了也是白推。
             // 空闲时这条路径原来是每秒序列化 + IPC 全量规则，且与页面开没开无关。
             let active = forwards.iter().any(|forward| forward.running);
-            if active || was_active {
-                if let Err(error) = (PortForwardSnapshot { forwards }).emit(&app_handle) {
-                    warn!(target: "shipyardx_lib::services::port_forward", "unable to emit port forward snapshot: {error}");
-                }
+            if (active || was_active)
+                && let Err(error) = (PortForwardSnapshot { forwards }).emit(&app_handle)
+            {
+                warn!(target: "shipyardx_lib::services::port_forward", "unable to emit port forward snapshot: {error}");
             }
             was_active = active;
         }

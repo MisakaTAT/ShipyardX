@@ -1448,6 +1448,13 @@
         }
       },
       "debug": {
+        "dependencyLogLevel": {
+          "description": "选择第三方依赖日志的等级，保持 warn 可屏蔽其调试噪声",
+          "title": "依赖库日志等级",
+          "toastLoadFailed": "读取依赖库日志等级失败",
+          "toastSaved": "依赖库日志等级已保存",
+          "toastSaveFailed": "保存依赖库日志等级失败"
+        },
         "devtools": {
           "action": "打开开发者工具",
           "description": "打开当前主窗口的开发者工具",
@@ -1456,10 +1463,10 @@
           "toastOpened": "已打开 DevTools"
         },
         "logLevel": {
-          "description": "选择全应用统一日志等级，重启应用后生效",
+          "description": "选择 ShipyardX 自身日志的等级",
           "title": "日志等级",
           "toastLoadFailed": "读取日志等级失败",
-          "toastSaved": "日志等级已保存，重启应用后生效",
+          "toastSaved": "日志等级已保存",
           "toastSaveFailed": "保存日志等级失败"
         },
         "logs": {
